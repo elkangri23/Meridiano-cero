@@ -1,0 +1,203 @@
+A.C.M.E. | Juego de investigación internacional
+
+DOCUMENTO MAESTRO DE DISEÑO (GDD) · Versión 0.1 para revisión · 27 de octubre de 2026
+
+Estado: borrador de diseño. Recoge decisiones consensuadas y separa las propuestas técnicas todavía pendientes. Nombre comercial definitivo por decidir.
+
+1. Visión y pilares
+
+Videojuego de detectives internacional, educativo y rejugable, inspirado en la experiencia de los clásicos de Carmen Sandiego y en la estética MS-DOS. El jugador investiga mediante lenguaje natural, viaja por ciudades reales y resuelve casos generados por IA antes de comenzar la partida.
+
+Libertad real para investigar, equivocarse, viajar y perder por agotar el plazo.
+
+Misterio justo: verdad y pistas fijadas antes de jugar; ninguna IA cambia la solución durante la partida.
+
+Narrativa breve, personajes naturales y escenarios pixel art principalmente ambientales.
+
+Sin indicadores de si el jugador va bien o mal ni pistas automáticas.
+
+Accesibilidad y controles comprensibles desde el inicio.
+
+2. Plataforma, identidad y experiencia
+
+Primera plataforma: aplicación web progresiva (PWA), utilizable en navegador e instalable en escritorio; diseño adaptable a móviles. Interfaz de pantalla única: escenario ilustrado central, información y herramientas laterales, consola narrativa y campo de órdenes inferior. Ventanas retro movibles/minimizables para mapa, expediente, laboratorio, comunicaciones y otros paneles; en pantallas pequeñas se adaptan a la superficie disponible.
+
+Pixel art estilo MS-DOS, retratos de personajes, animaciones breves, tipografía retro legible y opción de tipografía accesible. No se requiere buscar píxeles diminutos para hallar pruebas.
+
+3. Configuración y comienzo de un caso
+
+Delito
+
+Robo internacional, desaparición, fraude, espionaje, sabotaje, misterio histórico investigado en la actualidad y selección aleatoria; otros delitos compatibles con nivel de contenido.
+
+Dificultad
+
+Fácil / Normal / Difícil.
+
+Exploración
+
+Guiada / Libre, independiente de dificultad.
+
+Duración objetivo
+
+Corta (~10–15 min), media (~20–30 min), larga (~40–60 min) de juego real; el reloj interno usa otra escala.
+
+Región
+
+Selección geográfica o aleatoria.
+
+Contenido
+
+Familiar (por defecto) / General.
+
+SORPRÉNDEME
+
+Aleatoriza los parámetros del caso.
+
+Todos los casos suceden en el presente; pueden tratar objetos, obras o hechos históricos. Antes de jugar se genera y valida el expediente completo. Margaret Sullivan ofrece una introducción breve y omisible, siempre recuperable en el dossier. La partida comienza directamente en el escenario inicial del delito, sin viaje ni trámite previo.
+
+4. Generación, coherencia y validación
+
+La IA prepara, antes del inicio, delito, solución, motivaciones, cronología, personajes, conocimientos individuales, relaciones, lugares investigables, pruebas, resultados de análisis, registros consultables, acontecimientos condicionados, plazos y condiciones de victoria/fracaso. No se generan nuevos escenarios investigables ni nuevas pruebas durante la partida.
+
+Proceso lógico de planificación criminal, geografía, personajes, pistas, revisión de coherencia y dirección narrativa; pueden ser etapas, no necesariamente modelos distintos.
+
+Validador comprueba consistencia, geografía, solvencia, varias rutas independientes, tiempos suficientes, restricciones de contenido y ausencia de bloqueos.
+
+Simulaciones de rutas y pruebas automáticas; si falla una comprobación, regenerar o corregir antes de ofrecer el caso.
+
+El motor determinista gobierna estado, reloj, legalidad, disponibilidad y resultados; el LLM expresa conversaciones y descripciones sin alterar hechos.
+
+Si un modelo no alcanza la calidad exigida para generar casos, puede jugar expedientes ya validados.
+
+5. Exploración mundial y localizaciones
+
+Mapa mundial interactivo y buscador libre de ciudades reales. Se puede viajar a destinos equivocados y perder tiempo sin recibir avisos sobre su pertinencia. En modo guiado se muestran desde el principio las ciudades investigables, sin señalar la importancia de sus pistas. En modo libre se descubren mediante investigación, pero el buscador permite viajar a cualquier ciudad admitida.
+
+Dos categorías: escenarios investigables, finitos y definidos previamente; y destinos turísticos/culturales, con información histórica y geográfica sin nuevas pruebas. El atlas se consulta sin coste de tiempo; visitar lugares físicamente puede consumirlo. Debe existir un catálogo verificable de destinos y una respuesta clara si una ciudad no está disponible, sin fingir cobertura universal.
+
+6. Acciones, inspecciones y evidencias
+
+Entrada libre de órdenes generales («examino la sala») o específicas («reviso la cerradura»). La inspección general describe lo claramente visible; las evidencias ocultas requieren una acción concreta. El juego interpreta acciones plausibles no incluidas en menús, pero solo sobre elementos y resultados permitidos por el expediente.
+
+Se pueden encadenar órdenes en un mensaje: se ejecutan por orden y se suma su coste sin detenerse por pistas encontradas. Si una acción es imposible o faltan decisiones necesarias, se pausa la secuencia y se pregunta si cancelar o continuar con acciones independientes viables. No se cobra tiempo por acciones omitidas.
+
+Maletín de evidencias integrado en el dossier, sin límites artificiales ni combinaciones absurdas. Recoger un objeto requiere orden explícita o una acción que lo implique. Se distinguen objetos físicos, observaciones, testimonios, resultados y registros. Las relaciones se guardan con su procedencia y grado de corroboración, sin desvelar la solución.
+
+7. Personajes y conversaciones
+
+NPC con personalidad, conocimiento limitado, memoria de la conversación y trato recibido. Comprenden referencias contextuales, permiten retomar conversaciones y reaccionan a historias de cobertura improvisadas. No inventan hechos, mentiras deliberadas ni acusaciones falsas; sí pueden callar, negarse, equivocarse honestamente o mostrarse ambiguos. Nerviosismo no equivale a culpabilidad.
+
+Presionar puede reducir la colaboración, pero siempre habrá rutas alternativas para no bloquear el caso. Nadie actúa por su cuenta mientras el jugador piensa: no hay movimiento autónomo en tiempo real. La narración usa frases breves y gestos evocadores, evitando diálogos interminables.
+
+8. Equipo recurrente A.C.M.E.
+
+Margaret Sullivan
+
+Directora; presenta casos, evalúa carrera y puede responder preguntas sobre el encargo.
+
+Dr. Samuel Richter
+
+Laboratorio forense y explicación factual de análisis.
+
+Elena Vázquez
+
+Inteligencia, bases de datos y verificaciones.
+
+David Nakamura
+
+Viajes, coordinación internacional y apoyo a detenciones.
+
+Clara Beaumont
+
+Expedientes, documentación y organización.
+
+Nombres provisionales. Los miembros recuerdan la trayectoria del detective y mantienen personalidades diferenciadas. Pueden ejecutar consultas y gestiones concretas, pero nunca indicar si se va bien, señalar al culpable ni sugerir la siguiente pista.
+
+9. Tiempo, desplazamientos y eventos
+
+Reloj y plazo siempre visibles. El tiempo avanza únicamente por acciones que lo consumen (viajes, búsquedas físicas, análisis, verificaciones, esperas); no por pensar, escribir, conversar, leer, consultar atlas o expediente. Mostrar duración estimada y hora prevista antes de confirmar acciones relevantes. Varias tareas pueden progresar en paralelo cuando el tiempo avanza.
+
+Plazo estricto e inamovible: una acción que cruza la fecha límite termina el caso en el instante exacto del vencimiento, incluso a mitad de una secuencia. Viajes directos con origen, destino, duración y confirmación. Retrasos aéreos ocasionales (~5 %, de 15–45 min de tiempo interno), previstos y contemplados en la validación del presupuesto temporal.
+
+10. Comunicaciones y solicitudes
+
+Central con llamadas, WhatsApp, SMS, correo y fax, según contactos disponibles. Se pueden enviar mensajes, documentos y solicitudes; las respuestas de gestiones pendientes llegan al alcanzar la hora prevista del juego, incluso mientras se viaja. Conversar o leer no cuesta tiempo; una búsqueda o trámite sí puede requerirlo. Canales, contactos, datos disponibles y condiciones de respuesta están fijados en el expediente.
+
+11. Laboratorio, inteligencia y órdenes
+
+Laboratorio para huellas, documentos, fotografías, audio, muestras y materiales cuando proceda. Resultados predeterminados, tiempos estimados, solicitudes simultáneas y hechos presentados sin interpretaciones que revelen culpabilidad. Terminal de inteligencia consultable en lenguaje natural para identidades, viajes, empresas, vehículos, propiedades y otros registros previamente definidos; ausencia de registro no demuestra inocencia.
+
+La detención exige orden emitida por la autoridad ficticia común A.C.M.E. El jugador aporta sospechoso y pruebas. La orden acredita suficiencia para detener, no culpabilidad; puede concederse contra inocentes. Pruebas obtenidas irregularmente pueden ser inadmisibles. Denegación de orden no cierra automáticamente el caso.
+
+12. Detenciones y resolución
+
+En casos con arresto: aproximadamente 30 % detenciones automáticas coordinadas con autoridades y 70 % intervenciones interactivas de identificación, conversación y coordinación; nunca combates ni persecuciones violentas. El tipo se fija al generar el caso. Una vez que existe orden válida y se conoce la ubicación del sospechoso, este permanece allí hasta la intervención: no hay fugas sorpresivas para alargar el caso.
+
+La detención no cierra por sí sola la investigación. El jugador pulsa «Finalizar investigación», confirma y A.C.M.E. evalúa automáticamente las actuaciones; no debe rellenar un informe adicional. El agotamiento del plazo también cierra el caso. El informe revela verdad completa, cronología, pruebas halladas y omitidas, detenciones correctas o erróneas, objetivos, puntuación y carrera. Resultados posibles: completo, parcial, no resuelto o incorrecto, según tipo de delito.
+
+13. Carrera, reputación y guardado
+
+Perfil con nombre, alias y avatar pixel art. Rangos, puntos, medallas, casos, países y monumentos; ascensos principalmente honoríficos: TODAS las herramientas están disponibles desde el inicio, con independencia del rango. Prestigio, integridad y confianza institucional son dimensiones internas mostradas mediante etiquetas cualitativas, no barras numéricas. Los errores pueden producir advertencias o suspensiones, pero la reputación puede recuperarse.
+
+Guardado automático completo y varios casos simultáneos independientes, sin avance del reloj al estar inactivos. Resumen breve al retomar. Archivo de casos cerrados; posibilidad de repetir exactamente un expediente en nueva partida o generar variante completamente validada. Evitar acumular puntos de carrera explotando repeticiones idénticas.
+
+14. Acciones irregulares y tono seguro
+
+Se pueden intentar acciones no convencionales (forzar accesos, suplantar, sobornar, entrar sin permiso), con consecuencias proporcionales y basadas en conocimiento plausible de testigos o autoridades; pueden afectar admisibilidad, cooperación, reputación o provocar retirada del caso. Sin salud, puntos de vida, combates, lesiones gestionables ni muerte permanente del detective.
+
+Modo Familiar predeterminado: sin asesinatos ni temas perturbadores o sexuales. Modo General: permite temáticas más serias, incluidos homicidios tratados sin violencia gráfica; se excluyen delitos sexuales, gore y combates en ambos. Restricciones verificadas al crear el expediente y controladas también durante la narración en vivo.
+
+15. Audio, idioma y accesibilidad
+
+Banda sonora MIDI/sintetizadores retro y efectos ambientales; interruptores y volúmenes independientes de música, efectos, narración y volumen general. Lectura en voz alta opcional con síntesis de voz del sistema/navegador: narración, diálogos, documentos, velocidad, voz, reproducción manual/automática y repetir texto. Todo sonido relevante tendrá equivalente textual.
+
+Interfaz traducible mediante traductor universal A.C.M.E.; idioma de juego independiente de nacionalidad de personajes. Accesibilidad prevista desde el diseño: paletas para protanopia, deuteranopia y tritanopia; alto contraste, ajustes de color, tamaño de letra y escala, fuente legible, navegación por teclado, foco visible, lectores de pantalla, texto alternativo de escenas, reducción de movimiento y no depender solo del color. Objetivo de conformidad WCAG 2.2 AA para la interfaz.
+
+16. IA configurable y arquitectura propuesta
+
+Configuración de proveedores para generación, validación y dirección narrativa: FreeLLMAPI como predeterminado de desarrollo; Ollama, LM Studio, OpenAI, Anthropic, Gemini y endpoints compatibles, según capacidades reales. Abstracción de proveedores, comprobación de capacidades, tratamiento de errores, límites y costes. En PWA deben diseñarse con cuidado la protección de claves, CORS, conexiones a localhost y necesidad eventual de intermediario seguro.
+
+Propuesta de módulos: (1) creador/validador de expedientes, (2) motor determinista de reglas y reloj, (3) capa de diálogo/narración IA, (4) catálogo geográfico, (5) interfaz y accesibilidad, (6) persistencia/importación/exportación, (7) proveedores IA. El estado debe versionarse y poder reanudarse de forma fiable.
+
+17. Importación, exportación y evolución
+
+Desde la primera versión: importar/exportar expedientes autocontenidos y validados para compartir entre jugadores, incluso con diferentes proveedores IA. Formato versionado y verificable. Los ficheros pueden contener la solución; ofuscarla no equivale a protegerla criptográficamente sin un servidor confiable.
+
+Fuera del alcance inicial: archivo comunitario central A.C.M.E. con publicación, búsqueda, valoraciones, moderación y descargas; épocas históricas jugables; otras ampliaciones que no comprometan el núcleo.
+
+18. Criterios de aceptación de la primera versión
+
+Un caso no puede iniciarse hasta que generación, validación y guardado finalicen satisfactoriamente.
+
+La verdad del caso no cambia durante la partida; conversaciones y resultados nunca contradicen el expediente.
+
+Se puede completar o perder una investigación con reglas de tiempo estrictas y sin avisos de rumbo correcto/incorrecto.
+
+Funcionan exploración guiada y libre, mapa y buscador, acciones generales/específicas, dossier y varias vías de resolución.
+
+Comunicación, laboratorio, inteligencia, orden y detención respetan tiempos, permisos y hechos del caso.
+
+Se puede cerrar manualmente, obtener informe final y reanudar partidas guardadas.
+
+Opciones de accesibilidad y audio se aplican sin impedir el juego; ninguna pista requiere distinguir colores o detalles gráficos inaccesibles.
+
+19. Cuestiones abiertas para revisión
+
+Nombre definitivo del juego y dirección artística detallada (resolución base, paletas, retratos).
+
+Esquema técnico del expediente, formato de importación/exportación y política de versiones.
+
+Catálogo geográfico inicial, cobertura de ciudades y criterio de tiempos de viaje realistas.
+
+Reglas numéricas internas de puntuación, reputación, tiempos y equilibrio de dificultad.
+
+Definición precisa de pruebas admisibles, estados de intervención y consecuencias de conductas irregulares.
+
+Diseño de seguridad y moderación del contenido generado por modelos externos, especialmente en modo Familiar.
+
+Política de almacenamiento local/nube y claves de proveedores; pruebas con modelos de capacidad desigual.
+
+Plan de hitos: prototipo jugable, vertical slice de caso validado, accesibilidad, pruebas y lanzamiento.
+
+FIN DEL BORRADOR · Documento para revisión, no especificación técnica cerrada.

@@ -1,0 +1,385 @@
+A.C.M.E.
+
+Documento de Arquitectura Técnica (TAD) · Versión 1.0 — propuesta para aprobación
+
+27 de octubre de 2026  |  Estado: diseño técnico; no constituye implementación
+
+Documento complementario al GDD v0.1 aprobado. El GDD gobierna las mecánicas; este TAD define cómo construirlas y operarlas.
+
+1. Resumen ejecutivo
+
+A.C.M.E. será un videojuego detectivesco internacional, web y de código abierto (AGPL-3.0-only), instalable por terceros y con una instancia pública gratuita. La lógica de investigación será autoritativa y determinista en el backend; los modelos de IA generarán expedientes validados e interpretarán/narrarán acciones sin poder alterar la verdad del caso.
+
+Desarrollo inicial en ordenador personal con modelos locales mediante Ollama o LM Studio; uso de pnpm para desarrollo y Docker Compose para servicios y distribución.
+
+Producción futura en VPS: registro obligatorio, partidas persistentes y FreeLLMAPI como IA proporcionada por el administrador, sin configuración para el jugador.
+
+Instalaciones independientes: cualquier persona podrá desplegar A.C.M.E. y configurar su propio proveedor o endpoint compatible; no dependerán de la instancia pública.
+
+Diseño modular, una sola base de código, despliegues configurables y seguridad por defecto.
+
+2. Decisiones y límites
+
+Decisión
+
+Criterio
+
+Producto
+
+Web responsiva; no se exige PWA ni instalación cliente.
+
+Código
+
+Repositorio público GitHub; AGPL-3.0-only y avisos de autoría preservados.
+
+Modos
+
+Instancia pública administrada y despliegue autoalojado.
+
+Autenticación
+
+Obligatoria en público; en instalación privada se puede ofrecer usuario administrador local o registro configurable.
+
+IA
+
+Servidor aporta IA por defecto en público; autoalojado configura modelos propios.
+
+Estado
+
+Servidor autoritativo; no exponer solución íntegra al navegador.
+
+Persistencia
+
+PostgreSQL en desarrollo y producción; migraciones versionadas.
+
+Infraestructura
+
+Docker Compose; sin Kubernetes ni microservicios en primera versión.
+
+Fuera del primer lanzamiento: comunidad pública de intercambio/moderación de casos, multijugador cooperativo, pagos, apps nativas, ejecución offline integral y despliegues federados.
+
+3. Vista lógica y límites de confianza
+
+Navegador React → API HTTPS Fastify → servicios de dominio (motor, expedientes, usuarios, límites) → PostgreSQL. El servicio de IA invoca adaptadores hacia APIs externas o endpoints locales. Trabajos largos de generación/validación se ejecutan en un worker separado con cola persistente.
+
+El navegador es no confiable: solo recibe datos revelados al detective. El backend valida autenticación, permisos, acciones, tiempos, estado y cuotas. Las respuestas de la IA son también no confiables: se validan por esquema, contra el expediente y por reglas del motor.
+
+4. Stack y estructura del monorepositorio
+
+Capa
+
+Tecnología inicial
+
+Motivo
+
+Frontend
+
+React + TypeScript + Vite
+
+Interfaz web y ventanas retro.
+
+API
+
+Node.js LTS + Fastify
+
+API modular y tipada.
+
+Motor
+
+TypeScript puro
+
+Probable sin navegador ni IA.
+
+Esquemas
+
+Zod + JSON Schema
+
+Validación de entrada y expedientes.
+
+Datos
+
+PostgreSQL + Drizzle
+
+Transacciones, migraciones, consultas tipadas.
+
+Colas
+
+Tabla de jobs en PostgreSQL al inicio
+
+Evitar Redis hasta necesitarlo.
+
+Pruebas
+
+Vitest + Playwright
+
+Reglas, integración y flujos reales.
+
+Dev/Deploy
+
+pnpm workspaces + Docker Compose
+
+Iteración local y distribución reproducible.
+
+Estructura propuesta: apps/web, apps/api, apps/worker; packages/engine, case-schema, case-generator, ai-adapters, shared, ui; docs/, tests/, infra/docker/, .github/.
+
+5. Modelo de dominio
+
+User, Credential/Session, DetectiveProfile, CareerRecord, Settings y AIConfiguration (ámbito usuario o instalación).
+
+CaseDefinition: identificador, versión, semilla, hechos inmutables, culpable(s), NPCs, ciudades, lugares, pistas, pruebas, reglas de resolución, duración, modo y dificultad.
+
+CaseRun: instancia jugable, usuario, reloj, acciones, inventario, pruebas reveladas, estados de NPC, solicitudes, órdenes, detenciones y resultado.
+
+ActionLog: evento secuencial, entrada normalizada, coste temporal, cambios de estado, versión del motor y resultado; permite auditoría y depuración.
+
+ProviderUsage: proveedor, función, modelo, tokens/estimación, latencia, coste estimado, errores y usuario, minimizando contenido personal.
+
+La definición completa del caso se conserva en el servidor. El cliente recibe proyecciones filtradas según lo descubierto. La integridad del caso se protege con versión de esquema y hash; una partida queda asociada a una versión inmutable.
+
+6. Contrato de acciones y motor
+
+Flujo: texto libre → intérprete IA produce intención estructurada → validador de esquema → resolución determinista del motor → persistencia transaccional → narrador IA limitado a hechos autorizados → respuesta visual. Si el intérprete falla, se solicita aclaración sin alterar el estado.
+
+Entrada normalizada
+
+Ejemplo
+
+type
+
+inspect | collect | talk | travel | analyze | communicate | request_warrant | detain | finish
+
+targetId
+
+ID existente y visible/accesible, cuando proceda
+
+parameters
+
+Criterios concretos de inspección, mensaje o destino
+
+expectedVersion
+
+Versión de CaseRun para control de concurrencia
+
+idempotencyKey
+
+Evita doble ejecución por reintentos
+
+Reglas: solo el motor puede cambiar tiempo, inventario, hechos descubiertos, órdenes y desenlace. La IA no puede crear lugares investigables, evidencias, resultados de laboratorio ni información secreta. Las acciones por lotes se ejecutan secuencialmente; hallazgos no interrumpen el lote, pero imposibilidad sí exige confirmación para continuar.
+
+7. Reloj y tareas asíncronas
+
+El tiempo del juego avanza únicamente por acciones con coste; lectura, escritura, conversaciones y espera fuera del juego no lo hacen. Antes de ejecutar, la API ofrece estimación de duración y tiempo restante. Si una acción supera el plazo, se trunca al instante exacto del vencimiento y se cierra el caso automáticamente.
+
+Análisis, mensajes pendientes y otros jobs internos se programan con timestamps del reloj del caso, no con el reloj real. Al avanzar el tiempo se procesan eventos vencidos en orden estable. Retrasos raros de viaje se calculan desde una semilla persistida y se consideran durante la validación de solvencia.
+
+8. Generación, validación y simulación
+
+Pipeline: plan del delito → geografía real verificable → personajes y conocimientos → red de pistas/rutas → normalización JSON → validación determinista → revisión semántica IA → simulación de rutas y límites temporales → persistencia inmutable. No se habilita jugar hasta superar todas las puertas de calidad.
+
+Validaciones duras: referencias válidas, coherencia temporal, culpable y objetivos fijados, pistas accesibles, múltiples rutas, límites de tiempo, órdenes y detenciones alcanzables, ausencia de softlocks.
+
+Validación semántica: plausibilidad, tono Familiar/General, geografía, diálogos y consistencia de motivaciones. La IA revisora no sustituye las pruebas deterministas.
+
+Simulaciones: al menos rutas de éxito alternativas y rutas de error; se incluyen retrasos y acciones no productivas dentro de márgenes definidos.
+
+Casos rechazados se regeneran con presupuesto máximo de intentos y error claro si no se obtiene uno válido; nunca se sirve un expediente incompleto.
+
+9. Adaptadores y configuración de IA
+
+Interfaz común por función: generateCase, validateCase, interpretAction, narrateResult y converse; cada una recibe esquemas y límites específicos. Configuración independiente para generador, validador y director de partida. Proveedores iniciales: Ollama, LM Studio, OpenAI-compatible, OpenAI, Anthropic, Gemini; FreeLLMAPI según protocolo verificado.
+
+Cada adaptador declara capacidades (JSON estructurado, contexto, herramientas, streaming), timeout, reintentos acotados y estimación de coste. Un test de conexión no garantiza calidad de generación: se ofrecen pruebas funcionales y avisos para modelos insuficientes. El cambio de modelo no altera casos ya fijados.
+
+En desarrollo local, Ollama corre preferentemente fuera de Docker; la API usa una URL configurada (host.docker.internal en Docker Desktop, sujeto a plataforma). En la instancia pública, las conexiones hacia endpoints de usuarios estarán deshabilitadas por defecto; el administrador podrá habilitarlas solo con controles reforzados.
+
+10. Seguridad de IA y endpoints
+
+Nunca publicar claves de FreeLLMAPI ni otros proveedores en frontend, repositorio o logs; secretos mediante variables de entorno/gestor de secretos.
+
+Cifrado de credenciales de usuarios en reposo con clave de cifrado separada; no prometer cifrado extremo a extremo si el servidor debe usarlas.
+
+SSRF: bloquear rangos internos, loopback, metadatos cloud, redirecciones no verificadas, esquemas no HTTPS en público; validar DNS y destino efectivo en conexión.
+
+En instalaciones privadas permitir acceso a Ollama local mediante política explícita del administrador; no reutilizar las restricciones de la instancia pública sin considerar su entorno.
+
+Prompt injection: documentos y mensajes NPC tratados como datos; salida IA validada por esquema y lista de hechos permitidos.
+
+Límites por usuario, IP, modelo, función y gasto global; cola con concurrencia máxima, cancelación, backoff y corte de emergencia.
+
+Sesiones con cookies HttpOnly, Secure y SameSite; CSRF según diseño, protección de login, recuperación de contraseña y políticas de retención de datos.
+
+11. API y operaciones principales
+
+Ruta conceptual
+
+Responsabilidad
+
+POST /auth/register, /auth/login
+
+Identidad y sesión; configurable por instalación.
+
+GET /me, PATCH /settings
+
+Perfil, accesibilidad y preferencias.
+
+GET/POST /cases
+
+Listar y solicitar generación.
+
+GET /cases/:id
+
+Proyección permitida del expediente.
+
+POST /runs, GET /runs/:id
+
+Crear/reanudar partida.
+
+POST /runs/:id/actions
+
+Validar y ejecutar acciones con idempotencia.
+
+POST /runs/:id/finish
+
+Cierre explícito y evaluación.
+
+GET /jobs/:id
+
+Estado de generación y análisis.
+
+GET/POST /ai/config, POST /ai/test
+
+Proveedores, capacidades y pruebas.
+
+Para eventos de generación y mensajes se puede comenzar con polling y evolucionar a SSE; no se requieren WebSockets desde el primer prototipo. Todas las rutas se versionarán (/api/v1).
+
+12. Experiencia visual y accesibilidad
+
+Interfaz de una pantalla con ventanas retro móviles, minimizables y comparables; reloj y plazo siempre visibles. Texto libre para acciones, mapa interactivo, expediente, comunicaciones, laboratorio y terminal de inteligencia. El servidor solo entrega escenas y objetos autorizados; no se ocultan secretos únicamente con CSS.
+
+Objetivo WCAG 2.2 AA: navegación por teclado, foco visible, lectores de pantalla, tamaño de fuente y escala, alto contraste, modos de daltonismo, reducción de movimiento, etiquetas descriptivas sin revelar pruebas ocultas. TTS con Web Speech API como primera opción y subtítulos/texto siempre disponibles. Audio y música nunca son fuente exclusiva de pistas.
+
+13. Despliegue y configuración
+
+Entorno
+
+Componentes
+
+Autenticación / IA
+
+Desarrollo
+
+web + api + worker + PostgreSQL (Compose); Ollama en host
+
+Cuenta local de prueba; Ollama.
+
+Autoalojado
+
+Compose con web, api, worker y PostgreSQL; proxy HTTPS recomendado
+
+Registro configurable; proveedor propio.
+
+Público
+
+VPS + proxy TLS + servicios + DB + backups + monitorización
+
+Registro obligatorio; IA del servidor por defecto (FreeLLMAPI).
+
+Distribución: README con requisitos, ejemplo .env sin secretos, compose.yaml, migraciones automáticas controladas, health checks, volumen persistente, backups y guía de actualización. El comando docker compose up -d será objetivo de experiencia, no promesa de cero configuración: habrá que definir secretos, dominio/HTTPS y proveedor.
+
+El servidor público no depende de que el jugador configure API. En autoalojamiento no habrá llamadas al VPS del creador, telemetría obligatoria ni dependencia de una cuenta central.
+
+14. Datos, privacidad y recuperación
+
+Guardar partidas con transacciones y checkpoints; pruebas de restauración de PostgreSQL; políticas de borrado de cuenta y exportación de datos. Para la instancia pública: informar de qué contenido se transmite a proveedores de IA, minimizar datos personales y revisar obligaciones RGPD y condiciones del proveedor antes del lanzamiento. Separar logs técnicos de conversaciones y definir retención.
+
+15. Código abierto, créditos y propiedad intelectual
+
+Licencia objetivo: AGPL-3.0-only para código propio, con texto íntegro LICENSE, cabeceras/avisos cuando corresponda, NOTICE.md, AUTHORS.md, CONTRIBUTING.md y créditos visibles. Se preservarán avisos de copyright y atribuciones razonables conforme a la licencia; no se garantiza legalmente que cualquier fork mantenga una pantalla de créditos idéntica. Confirmar nombre legal de autor y texto final de avisos antes de publicar.
+
+Los colaboradores conservan los derechos que correspondan sobre sus aportaciones bajo las condiciones aceptadas. Dependencias, fuentes, música y arte tendrán inventario de licencias compatible. Crear marca, personajes y gráficos originales: inspiración retro sí; reutilización de elementos protegidos de Carmen Sandiego, no.
+
+16. Trabajo con agentes de programación
+
+Un arquitecto conversacional inspecciona el repositorio, propone alcance y plan y solicita aprobación antes de tareas grandes. Agentes especializados pueden trabajar en ramas/worktrees separados para motor, IA, frontend, persistencia y QA. Integración mediante contratos, revisión de código y CI; ningún agente debe modificar silenciosamente el GDD o las reglas cerradas.
+
+Cada tarea debe indicar: objetivo, archivos afectados, criterios de aceptación, pruebas, riesgos, dependencias y entregables. Las decisiones de arquitectura se registran como ADR en docs/adr/.
+
+17. Plan de ejecución y puertas de calidad
+
+Fase
+
+Entregable comprobable
+
+0. Base
+
+Monorepo, CI, Docker Compose, PostgreSQL, autenticación mínima y convenciones.
+
+1. Motor
+
+Estado, reloj, acciones, evidencias, órdenes, cierre; pruebas sin IA.
+
+2. Vertical slice
+
+Caso fijo de prueba, diálogo libre, varias ciudades, laboratorio, guardado y final.
+
+3. Generador
+
+Pipeline IA, validación dura, revisión, simulación y cola de trabajos.
+
+4. Experiencia
+
+Interfaz retro, mapas, ventanas, música, TTS y accesibilidad.
+
+5. Lanzamiento
+
+Límites de consumo, observabilidad, backups, hardening, documentación y despliegue VPS.
+
+Criterios de aceptación transversales: ningún hecho inventado en ejecución; plazo exacto; casos no válidos nunca jugables; guardado/reanudación fiable; API sin filtración de secretos; proveedor intercambiable; autoalojamiento reproducible; accesibilidad verificable.
+
+18. Riesgos y mitigaciones
+
+Riesgo
+
+Mitigación
+
+Modelos locales poco fiables
+
+Roles separados, salidas estructuradas, validación estricta y tests de compatibilidad.
+
+Costes FreeLLMAPI imprevisibles
+
+Cuotas, métricas, presupuestos, colas y apagado de emergencia.
+
+Casos insolubles
+
+Validación determinista + simulaciones + rechazo previo.
+
+Fuga de solución
+
+Proyecciones por usuario y motor en servidor.
+
+SSRF / claves expuestas
+
+Allowlist/política de destinos, aislamiento de red, cifrado y secretos.
+
+Complejidad excesiva
+
+Monolito modular, fases con vertical slice, sin microservicios iniciales.
+
+19. Decisiones pendientes antes de implementar
+
+Nombre definitivo del producto, marca y atribución exacta del creador en NOTICE/AUTHORS/créditos.
+
+Política de registro en instalaciones privadas y flujo de primer administrador.
+
+Modelo(s) Ollama de referencia para desarrollo, límites de contexto y pruebas de calidad.
+
+Protocolo real de FreeLLMAPI, cuotas disponibles y condiciones de uso.
+
+Parámetros iniciales de generación y presupuestos de acciones, basados en pruebas de juego.
+
+Licencias de assets (arte, música, tipografías) y política de contribuciones.
+
+Política de privacidad, borrado y conservación para la futura instancia pública.
+
+Conclusión: la arquitectura permite desarrollar localmente sin depender de APIs comerciales, distribuir el juego de forma independiente y ofrecer más adelante una web pública gratuita financiada inicialmente por el administrador, sin comprometer las reglas del juego ni el carácter abierto del proyecto.
