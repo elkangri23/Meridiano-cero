@@ -1,14 +1,22 @@
 # Puesta en funcionamiento prevista
 
-Estado: guía de diseño. El proyecto todavía NO se puede arrancar como juego. Se convertirá en runbook probado en fases 1 y 6. No se proporciona URL ficticia de repositorio ni se afirma que un compose inexistente funciona.
+Actualizado: 2026-10-28. Hay base ejecutable y Compose de desarrollo; todavía no hay distribución del juego completa ni instalación independiente aceptada. [Estado y bloqueos](../plan/ESTADO.md). Esta guía separa lo disponible de los procedimientos futuros.
 
-## Desarrollo local
+## Desarrollo local disponible
 
-Requisitos futuros: runtime Node/pnpm con versiones fijadas, Docker Compose, espacio para PostgreSQL y un proveedor local compatible. Primero comprobar entorno y puertos; después configurar variables privadas, levantar DB, aplicar migraciones y arrancar API/web. Probar fixture antes de integrar modelo.
+El [manual de desarrollo](DESARROLLO.md) recoge versiones, copia segura de .env y arranque web/API. El prototipo /prototype y la evaluación mock funcionan sin modelo real; no son el juego completo.
 
-Ollama se ejecutará preferentemente fuera de Docker. Desde contenedores habrá que comprobar la dirección del host: host.docker.internal puede servir en Docker Desktop y requerir configuración distinta en Linux. No abrir el proveedor local a Internet para resolver conectividad.
+Existe docker-compose.yml con servicios db/api/web y volumen pgdata. Para iniciar solo PostgreSQL durante desarrollo, el comando definido es:
 
-Validación de arranque: health/readiness correctos, DB migrada, usuario local de prueba seguro, fixture accesible y preferencias persistidas tras reinicio. Prueba de modelo separada de calidad de generación.
+~~~text
+docker compose up -d db
+~~~
+
+Esta actualización documental no ejecuta Docker, migra ni altera volúmenes. Antes de usarlo, revisar almacenamiento y puertos del entorno propio. Los usuarios/passwords del ejemplo son sintéticos de desarrollo.
+
+No anunciar aún un arranque completo reproducible: el servicio api usa API_HOST=0.0.0.0 y el código actual exige 127.0.0.1. Hay esquema Drizzle y SQL inicial, pero no script db:migrate ni ensayo de migración/reinicio acreditado en este avance. Readiness comprueba conectividad con SELECT 1, sin verificar migraciones.
+
+Sesiones, usuario local de juego, fixture accesible por HTTP y preferencias persistidas no están conectados. [Evaluación IA](IA-LOCAL.md) distingue sondeo y calidad real. El adaptador actual solo admite origen literal 127.0.0.1; la futura conectividad desde contenedores se diseñará sin abrir el proveedor a Internet.
 
 ## Autoalojamiento con Docker
 
@@ -26,7 +34,7 @@ Secuencia prevista:
 9. Ejecutar test de proveedor y caso fijo.
 10. Crear backup y probar restauración antes de uso importante.
 
-El futuro comando `docker compose up -d` no sustituye la configuración de secretos, HTTPS, proveedor y datos persistentes. No ejecutar aún: no existe archivo de distribución.
+El Compose de desarrollo presente no sustituye al futuro paquete de distribución. El arranque autoalojado completo exige resolver configuración, secretos, HTTPS, migraciones y persistencia; no se presenta como un procedimiento probado.
 
 ## Variables previstas
 
@@ -42,7 +50,7 @@ El futuro comando `docker compose up -d` no sustituye la configuración de secre
 | AI_API_KEY | Credencial si se necesita | Solo servidor |
 | Clave de cifrado separada | Cifrado de credenciales guardadas | Requerida solo al habilitar esa capacidad |
 
-Son nombres contractuales propuestos; la fase 1 los materializa en esquema de configuración y ejemplo. No pegar claves en archivos públicos.
+La tabla describe configuración objetivo. APP_MODE, API_HOST/API_PORT, PUBLIC_ORIGIN, DATABASE_URL y las banderas de sesión/registro tienen validación inicial; las demás capacidades siguen propuestas. La CLI IA actual usa OLLAMA_ORIGIN y --model, no AI_PROVIDER/AI_MODEL. No pegar claves en archivos públicos.
 
 ## VPS público
 

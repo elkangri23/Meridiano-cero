@@ -50,3 +50,38 @@ Preferencias persisten por usuario; aplicar al inicio sin parpadeos que impidan 
 Carga inicial, solicitud en curso, proveedor caído, conexión perdida, conflicto de versión, partida cerrada y reanudación tienen pantallas/mensajes recuperables. No bloquear el acceso al dossier porque la IA esté caída. Acciones no enviadas se conservan localmente como borrador de texto sin guardar secretos.
 
 La UI no calcula resultados de investigación: recibe PlayerView y eventos. Reproducir una animación o cambiar panel no ejecuta acción de motor.
+
+## Alcance obligatorio del primer caso jugable
+
+DEC-015 confirma ventanas movibles y minimizables desde el primer caso jugable, con estética MS-DOS/pixel art. Su funcionalidad no se pospone a T5-05. En móvil se mantiene la adaptación prevista, sin exigir arrastre como único control; teclado, foco y recuperación de ventanas deben formar parte de T3-03.
+
+DEC-014 incluye autoguardado y guardados manuales en esa entrega. La UI deberá distinguir guardado en curso, confirmado y fallido; no anunciar éxito antes de confirmación del servidor. DEC-017 permite cargar puntos anteriores del mismo caso para cambiar decisiones; DEC-021 fija diez manuales por partida además del autoguardado, sin borrado automático de manuales.
+
+DEC-016: una ambigüedad se presenta como pregunta antes de actuar; no avanza reloj ni realiza acciones parciales. DEC-013: cada partida se juega por un único detective de su usuario propietario, sin controles de multijugador.
+
+
+## Contrato de estados de UI para T3
+
+Estados de entrada: idle, interpreting, clarification, preview, committing, recovering y error. Solo una intención mutante en vuelo por partida desde la misma vista; las demás pestañas se controlan por versión de servidor. El borrador sigue editable mientras no confirme otro texto; una respuesta vieja nunca sustituye una vista de branchId/version más reciente.
+
+clarification conserva la orden original y presenta la pregunta; no ejecuta nada. preview muestra pasos, coste/rango y hora prevista, consecuencias conocidas y confirmar/cancelar. committing deshabilita doble envío y conserva idempotencyKey. Si la respuesta se pierde, recovering consulta la operación/reintenta la misma clave; no inventa una nueva acción. Un 409 refresca estado y exige nuevo preview para confirmar cambios.
+
+Guardado: idle, saving, saved o failed. saved solo tras confirmación del servidor. El listado muestra nombre, ciudad/minuto y fecha; diez manuales además del autoguardado. Al alcanzar el límite se elige cuál borrar/reemplazar, sin borrado automático. Cargar muestra confirmación de que se volverá a ese punto y perderá el progreso posterior de la rama actual, manteniendo el primer resultado oficial. No se implica que desaparezca la auditoría del servidor.
+
+### Ventanas y foco
+
+Cada herramienta tiene windowId estable y estado closed, open o minimized. Abrir desde la barra crea/restaura la misma ventana, no duplicados. Minimizar mantiene contenido/borrador y añade un control de restauración visible. Cerrar devuelve foco al botón que abrió la herramienta; restaurar vuelve al último control útil o al título.
+
+En escritorio se puede mover por arrastre y por un control Mover del título: flechas cambian posición, Enter termina y Escape cancela el movimiento. El modo de movimiento no atrapa el foco ni aplica atajos globales que interfieran con escritura o lector. No arrastrar es un camino completo y equivalente.
+
+Mantener título y controles dentro de la superficie visible. Al cambiar zoom, escala, viewport o fuente, normalizar posiciones; Restablecer distribución recupera todas las ventanas. En móvil se presenta un panel de ancho disponible por herramienta con navegación explícita, sin coordenadas de escritorio que escondan controles.
+
+Un cambio de posición/minimización no invoca motor, IA ni guardado de partida. La selección de herramienta no expone catálogos privados. El reloj/plazo y acceso a consola permanecen alcanzables en todos los modos. No mover foco al llegar resultados de polling; anunciar novedades de forma moderada.
+
+### Preferencias separadas de snapshots
+
+GET /me entrega settingsVersion y preferencias; PATCH /settings acepta expectedSettingsVersion y changes validado. Campos de presentación: fontMode retro/accessible, textScale (100 a 200), palette de catálogo, reducedMotion y windowLayout. No aceptar CSS/HTML arbitrarios.
+
+windowLayout solo contiene windowIds permitidos, estado y posiciones relativas finitas normalizadas al área. Una revisión de settings no modifica version del juego. Las preferencias se aplican por usuario y no retroceden al cargar un save. Contraste/paletas, TTS/audio e idiomas se amplían en sus fases sin perder compatibilidad del objeto de preferencias.
+
+Accesibilidad y aspecto MS-DOS/pixel art se verifican con los subcasos UI del [catálogo detallado](../quality/T3-aceptacion-detallada.md). El prototipo actual aún no implementa este contrato completo.

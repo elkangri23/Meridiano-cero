@@ -1,93 +1,82 @@
 # Desarrollo y contribución
 
-Estado: base de workspace implementada en T1-02; DB, sesión y juego siguen pendientes. Consultar su evidencia para resultados reales de cada comando.
+Actualizado: 2026-10-28. Consultar [estado actual](../plan/ESTADO.md), [backlog](../plan/BACKLOG.md) y evidencia de la tarea antes de trabajar. El proyecto tiene código ejecutable, pero no una investigación completa jugable.
 
-## Qué existe ahora
+## Estructura existente
 
-Fuentes GDD/TAD, requisitos, roadmap, specs, ADR y aceptación, más un workspace
-pnpm de tres paquetes: apps/web (React/Vite), apps/api (Fastify) y
-packages/contracts (contrato público de health consumido por ambos). Hay
-manifiestos, lockfile y configuración estricta/lint/imports. No hay Compose,
-base de datos, identidad, motor ni caso jugable. Git ya existía y no se reinicializa.
+- apps/web: React/Vite, comprobación básica de API y prototipo de desarrollo.
+- apps/api: Fastify, configuración/pool PostgreSQL y servicios IA en src/ai.
+- packages/contracts: contratos consumidos por web/API.
+- packages/case-schema: definición y validación del expediente.
+- packages/engine: motor, fixture y pruebas sin IA.
 
-Se puede comprobar la documentación con Python 3: `python scripts/verify_docs.py`. No requiere paquetes externos ni red.
+Son cinco proyectos de producto más la raíz pnpm. Hay Compose, esquema Drizzle y SQL inicial; no hay comando db:migrate ni guardado de partidas conectado. No existen todavía worker, generador, biblioteca UI o paquete ai-adapters independientes.
 
-## Entorno objetivo
+Las direcciones de dependencias son las de SPEC-012. Los siete fallos de imports heredados, incluidos crypto en engine y la reexportación contracts/case-schema, están registrados como pendientes; no se presentan como arquitectura ya conforme.
 
-Windows con PowerShell y Docker Compose; Node LTS y pnpm para desarrollar. Ollama o LM Studio en host para IA local. Versiones exactas de la base en SPEC-009 y package.json; no se inventa que cualquier modelo sirve por disponer de una GPU concreta.
+## Entorno y primer arranque
 
-PostgreSQL en Docker también durante desarrollo. Configuración local privada separada de ejemplos versionados. Las claves no entran en frontend, capturas, tests ni logs.
+Versiones usadas: Node 24.22.1, pnpm 12.15.0 y TypeScript 6.0.3 según manifiestos. Usar dependencias nativas del sistema elegido; no compartir node_modules de Windows y WSL ni modificar WSL como efecto del trabajo de producto.
 
-## Estructura prevista
+En PowerShell, desde el worktree:
 
-apps/web: interfaz React/Vite. apps/api: Fastify y coordinación/persistencia. apps/worker aparece al introducir trabajos de generación. packages/engine: reglas puras. packages/case-schema: validación del expediente. Otros paquetes de IA, generador, contratos y UI se crean cuando hay uso real.
-
-No crear el árbol completo por adelantado con archivos vacíos. Los límites están en SPEC-012; no importar apps desde paquetes ni usar contratos secretos en web.
-
-## Flujo de una tarea
-
-1. Escoger tarea preparada con dependencias satisfechas.
-2. Leer requisitos, spec, ADR y controles asociados.
-3. Cerrar decisiones pendientes de esa tarea antes de implementar.
-4. Cambiar solo lo necesario y añadir comprobaciones de comportamiento.
-5. Ejecutar tipos/lint/pruebas pertinentes y revisar diff.
-6. Registrar resultados reales y actualizar trazabilidad/estado.
-7. Demostrar el hito al usuario.
-
-Si aparece una contradicción, registrar decisión en BASELINE; si es arquitectura, nuevo ADR. No modificar silenciosamente los Word ni las reglas del juego. Una refactorización debe conservar comportamiento y tener evidencia; no reescribir módulos completos por gusto.
-
-## Comandos de la base T1-02
-
-En una terminal WSL con Node 24.22.1 y pnpm 12.15.0, entrar en el worktree.
-`node --version` y `pnpm --version` deben coincidir antes de instalar. No mezclar
-node_modules entre sistemas; no usar Node 20 de Windows para esta base.
-
-```bash
-pnpm install --frozen-lockfile --ignore-scripts
-test -e .env || cp .env.example .env
+~~~powershell
+node --version
+pnpm --version
+pnpm install --frozen-lockfile
+if (-not (Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -Destination .env }
+pnpm --filter @meridiano/web... build
 pnpm dev
-```
+~~~
 
-Copiar el ejemplo solo si no existe .env propio; no sobreescribir secretos.
-En PowerShell el equivalente de copia es Copy-Item con comprobación previa,
-pero requiere Node 24/pnpm fijados y dependencias instaladas para Windows.
-Web: http://127.0.0.1:5173. API: http://127.0.0.1:3000/api/v1/health.
-El proxy lee API_PORT del entorno de la raíz; CORS no se habilita. La pantalla
-no interpreta acciones ni crea sesión, usuario o datos. Ctrl+C detiene los watchers.
+La compilación inicial de web y sus dependencias prepara case-schema/contracts en un checkout limpio. Configurar DATABASE_URL para usar la DB. El ejemplo contiene valores sintéticos de desarrollo y no debe sobrescribir un archivo privado existente.
 
-| Comando | Alcance real |
+Web por defecto: http://127.0.0.1:5173. API: http://127.0.0.1:3000/api/v1/health. La API solo admite modo development, host 127.0.0.1 y sesión/registro desactivados. Readiness ejecuta SELECT 1; no verifica que exista el esquema esperado.
+
+Para revisar solo el prototipo:
+
+~~~text
+pnpm --filter @meridiano/web dev --port 5174
+~~~
+
+Abrir http://127.0.0.1:5174/prototype. Usa muestras públicas y no requiere Ollama ni una partida. Se excluye de producción. Mantener reglas MS-DOS/pixel art, fuente legible alternativa y accesibilidad de SPEC-006; no convertir el prototipo en motor de reglas.
+
+## Comandos y límites
+
+| Comando | Alcance |
 |---|---|
-| pnpm dev | Compila contratos y arranca sus watchers, API y Vite en loopback |
-| pnpm build | Compila contratos/API y produce bundle web |
-| pnpm typecheck | Comprueba todos los proyectos sin emitir, tras compilar el contrato compartido |
-| pnpm lint | ESLint y verificación de imports/ciclos |
-| pnpm check:imports | Dependency-cruiser sobre el código de apps/paquetes |
-| pnpm test | Vitest de HTTP/configuración; no pruebas del juego |
-| pnpm verify:guards | Contrato incompatible, web/API fuente y compilada, Node nativo y ciclos; limpieza final |
-| pnpm smoke | HTTP real de Vite y API con puertos efímeros de loopback y cierre final |
+| pnpm dev | Compila contracts y arranca scripts dev de los proyectos que los tienen |
+| pnpm build | Compilación del workspace; no afirmar que pasó por tener builds parciales |
+| pnpm typecheck | Tipos del workspace; la evidencia T3 acredita el typecheck API |
+| pnpm lint | ESLint e imports; actualmente bloqueado por errores heredados |
+| pnpm check:imports | Dependency-cruiser; siete infracciones conocidas |
+| pnpm test | HTTP base, motor e IA; última suite: 146 pruebas correctas |
+| pnpm eval:ai --mock | Corpus v2, diecisiete escenarios con oráculo determinista |
+| pnpm eval:ai --probe | Inventario Ollama; no evaluación de calidad |
+| pnpm scan:secrets | Detector local de patrones, no auditoría completa |
+| python3 scripts/verify_docs.py | Integridad documental y hashes de originales |
+| pnpm verify:guards | Pruebas negativas de tipos/imports/ciclos; no revalidadas tras T3 |
+| pnpm smoke | Comprobaciones HTTP heredadas; no E2E del juego ni prueba de persistencia |
 
-El control de imports descubre los src de cada paquete real y sigue sus exports
-compilados; no excluye un destino privado por estar en dist. La detección de
-paquetes y el ejecutable real se comparten entre check:imports y las pruebas negativas.
+No ejecutar verify:guards con watchers/build/typecheck concurrentes: crea archivos inválidos temporales. No hay comandos de backup/restore ni test:e2e disponibles. Los comandos futuros se separan en [instalación](INSTALACION.md) y [operación](OPERACION.md).
 
-No ejecutar verify:guards al mismo tiempo que dev, typecheck o build: escribe
-archivos temporales intencionadamente inválidos dentro del worktree y los retira.
-No usa credenciales ni modifica archivos existentes. No hay comandos de migración,
-backup, ready ni test:e2e implementados; llegan con DB/CI/primer caso según backlog.
-Los artefactos dist, node_modules, .env y resultados de herramientas quedan fuera
-de Git. .env.example contiene solo valores sintéticos sin secretos.
+El Compose actual incluye DB/API/web. Puede iniciarse únicamente db para trabajar en la base, pero el stack completo no está cerrado: API_HOST del servicio api contradice la validación del proceso. No interpretar un YAML presente como prueba de arranque limpio.
 
-TypeScript se ajustó de la selección preliminar 7.0.2 a 6.0.3 porque la versión
-mantenida de typescript-eslint declara soporte <6.1.0. No se oculta el aviso de
-incompatibilidad ni se desactivan reglas para conservar una versión más nueva.
-Fuente: [soporte oficial](https://typescript-eslint.io/users/dependency-versions/).
+## Flujo de trabajo
 
-## Código y dependencias
+1. Trabajar en worktree; consultar BASELINE, ROADMAP, BACKLOG, spec y ADR aplicables.
+2. Respetar dependencias o registrar el adelanto parcial expresamente autorizado.
+3. Implementar el cambio mínimo con responsabilidades claras, KISS y DRY.
+4. Ejecutar controles pertinentes y registrar tanto fallos como límites.
+5. Actualizar contratos y evidencia sin dar por aceptada una fase por superar tests parciales.
+6. Mensajes de commit en español. Commits, integración, push y despliegue requieren autorización vigente; integración manual.
 
-KISS, DRY y tipos estrictos según SPEC-012. Favorecer módulos cohesionados y funciones explícitas. No clases base, repositorios universales, service locator ni abstracciones sin necesidad. Contratos públicos únicos; engine no necesita IA para probarse.
+No modificar originales de docs/meridi, credenciales, instalación WSL ni otros proyectos. Usar datos sintéticos. No crear subagentes sin petición expresa.
 
-Cada dependencia nueva debe aportar una capacidad usada, con licencia compatible y mantenimiento comprobado. No usar un paquete grande para reemplazar pocas líneas claras. No inventar mecanismos de auth o criptografía para ahorrar dependencia.
+## IA y calidad
 
-## Revisión y contribuciones
+[IA local](IA-LOCAL.md) explica transporte, memoria y evaluación. Un mock aprobado no acredita comprensión ni ausencia de contradicciones de un modelo real. Sin URL/modelo disponibles no se instala ni descarga nada automáticamente.
 
-Una contribución describe problema, cambio, requisitos, pruebas y limitaciones. No confundir mock con evaluación real de IA. No enviar datos personales o claves en issues. Antes de publicar normas definitivas, cerrar autoría/licencias y el procedimiento de contribuciones. GitHub no se crea ni se publica automáticamente por existir estos documentos.
+[Última evidencia](../quality/T3-04.md): build API, typecheck API, lint IA y 146 pruebas correctos; siete errores globales de lint y siete de imports siguen abiertos. Sin E2E ni aceptación OWASP completa.
+
+Dependencias nuevas requieren necesidad, mantenimiento y licencia justificados. No crear capas vacías ni criptografía propia. Mantener secretos, prompts y conversaciones fuera de logs y de evidencias públicas.

@@ -1,6 +1,6 @@
 # Operación, recuperación y diagnóstico
 
-Estado: runbook previsto, pendiente de ensayo. No hay servicios reales que operar todavía.
+Estado: runbook objetivo de distribución, pendiente de ensayo. Existen servicios de desarrollo y CLI de IA, pero no instalación de producto aceptada ni operación pública. Para sus límites actuales consultar [ESTADO](../plan/ESTADO.md). Los procedimientos siguientes no son evidencia de ejecución.
 Contrato: SPEC-009/010/011. No incluir secretos ni conversaciones en evidencias públicas.
 
 ## Arranque y parada

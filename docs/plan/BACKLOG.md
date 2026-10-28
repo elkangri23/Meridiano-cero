@@ -1,6 +1,6 @@
 # Backlog de implementación
 
-Fecha de actualización: 2026-10-28. Responsable por defecto: agente implementador de la tarea, con revisión del usuario por hito. F0 es la entrega documental, no código de producto. T1-01 fue integrada en main por petición del usuario; T1-02 se entrega para revisión tras su instrucción de continuar la fase 1; las otras tareas están definidas y esperan dependencias. E4–E7 son tareas de preparación de fase; sus tareas de ejecución T4–T7 están desglosadas más abajo y pendientes de cierre técnico. Cada tarea hereda requisitos desde [REQUISITOS](REQUISITOS.md), specs desde el [registro](../specs/README.md) y ADR según su sistema.
+Fecha de actualización: 2026-10-28. Responsable por defecto: agente implementador de la tarea, con revisión del usuario por hito. F0 es la entrega documental, no código de producto. T1-01 corresponde al cierre documental de base; T1-02 está en revisión, T1-03 tiene implementación parcial y T1-04 tiene workflow con cierre de calidad pendiente. T2 figura completada en el registro de origen, con bloqueos globales explícitos. T3-01/T3-03/T3-04 están en curso; T3-02/T3-05 esperan integración. [Estado consolidado de este worktree](ESTADO.md). E4–E7 son tareas de preparación de fase; sus tareas de ejecución T4–T7 están desglosadas más abajo y pendientes de cierre técnico. Cada tarea hereda requisitos desde [REQUISITOS](REQUISITOS.md), specs desde el [registro](../specs/README.md) y ADR según su sistema.
 
 Estados: pendiente → preparada (spec cerrada y dependencias satisfechas) → en curso → en revisión → completada; bloqueada exige causa y desbloqueo. Completar requiere evidencia y criterios, no solo archivos existentes.
 
@@ -8,18 +8,18 @@ Estados: pendiente → preparada (spec cerrada y dependencias satisfechas) → e
 |---|---|---|---|---|---|---|---|
 | T1-01 | 1 | Completada | F0 | Cerrar SPEC-004/009 para base: sesión local loopback, API v1, configuración y migraciones; precisar controles SPEC-011 | docs/specs; contratos de base y lista de versiones soportadas | ACC-020/024/039 | BYPASS local nunca en modo público; sin credenciales universales |
 | T1-02 | 1 | En revisión | T1-01 | Inicializar Git y workspace pnpm mínimo; web/API, contratos públicos y engine solo cuando consumidos; TS strict y límites de imports | manifiestos, configuración TS/lint, README de arranque | ACC-025/040 | No crear worker ni shared sin uso; no commit/push automáticos |
-| T1-03 | 1 | Pendiente | T1-02 | Compose para PostgreSQL y servicios base; Drizzle, primera migración, configuración validada, health/readiness y datos persistentes | infra/configuración y migraciones probadas desde instalación limpia | ACC-024/039 | DB no pública; secretos fuera de Git; no borrar volúmenes existentes |
-| T1-04 | 1 | Completada | T1-03 | CI con tipos/lint/imports/pruebas, lockfile, escaneo secretos/dependencias y evidencia de base | workflow reproducible y registro F1 | ACC-025/040 | No afirmar análisis ejecutado si GitHub aún no existe; ejecutar equivalente local |
+| T1-03 | 1 | En curso | T1-02 | Compose para PostgreSQL y servicios base; Drizzle, primera migración, configuración validada, health/readiness y datos persistentes | infra/configuración y migraciones probadas desde instalación limpia | ACC-024/039 | DB no pública; secretos fuera de Git; no borrar volúmenes existentes |
+| T1-04 | 1 | En revisión | T1-03 | CI con tipos/lint/imports/pruebas, lockfile, escaneo secretos/dependencias y evidencia de base | workflow reproducible y registro F1 | ACC-025/040 | No afirmar análisis ejecutado si GitHub aún no existe; ejecutar equivalente local |
 | T2-01 | 2 | Completada | T1-04 | Implementar contrato de CaseDefinition/CaseRun/PlayerView y validador; cerrar detalles de SPEC-001/002 sin cambiar reglas | case-schema y tipos públicos separados; pruebas negativas | ACC-001/002/015/017 | Nunca exportar definición secreta al bundle web |
 | T2-02 | 2 | Completada | T2-01 | Codificar fixture de SPEC-003, condiciones y acciones; validar referencias y ambas rutas | fixture versionado y reporte determinista | ACC-008/009/017 | Cálculos documentales no sustituyen simulaciones; texto seguro |
 | T2-03 | 2 | Completada | T2-02 | Resolver inspect/collect/talk y lotes con pausa/cancelación/reanudación; proveniencia y admisibilidad | engine puro y escenarios de inventario/secuencias | ACC-002/004/005/011 | Sin invención ni cobro por omitidas; no red en engine |
 | T2-04 | 2 | Completada | T2-03 | Reloj, viajes seeded, solicitudes paralelas y eventos ordenados; preview y vencimiento | reglas de tiempo y tests de borde | ACC-006/007/017 | Plazo gana empate; no usar reloj de pared en partida |
 | T2-05 | 2 | Completada | T2-04 | Órdenes sin oráculo de culpa, detención, recuperación y cierre confirmado/informe | reglas y resultados del caso fijo | ACC-010/012/036 | La detención no cierra; no filtrar verdad antes del informe |
 | T2-06 | 2 | Completada | T2-05 | Simular dos rutas independientes, error, parcial, vencimiento y retrasos; demostrar motor sin IA | guiones y registro F2 | ACC-008/009/012/017 | Revisar costes reales frente a SPEC-003; ningún test marcado pasado sin ejecutar |
-| T3-01 | 3 | En curso | T2-06 | Cerrar SPEC-004/005/006 para primer caso; modelo local real, errores, wireframes, foco, DTO y presupuestos | specs completas para integración y conjunto de evaluación | ACC-016/018/019/038 | No elegir modelo por test de conexión; confirmar disponibilidad sin instalar a ciegas |
+| T3-01 | 3 | En curso | T2-06 | Cerrar SPEC-004/005/006 para primer caso; modelo real del proveedor disponible, errores, wireframes, foco, DTO y presupuestos | specs completas para integración y conjunto de evaluación | ACC-016/018/019/038 | No elegir modelo por test de conexión; confirmar disponibilidad sin instalar a ciegas |
 | T3-02 | 3 | Pendiente | T3-01 | API sesión local, ownership, proyección, preview/commit, transacciones, guardado y ActionLog | servicios API/DB y pruebas con dos usuarios/pestañas | ACC-013/014/015/020/021 | Cliente no manda owner; fallo narración no reejecuta acciones |
 | T3-03 | 3 | En curso | T3-02 | Pantalla retro funcional, comandos, mapa 3 ciudades, dossier, comunicaciones/lab, confirmaciones e informe | UI responsive con teclado/foco y preferencias legibles | ACC-003/004/012/019 | Sin píxeles ocultos ni sugerencias de culpable; no inventar catálogo global |
-| T3-04 | 3 | Pendiente | T3-03 | Adaptador Ollama y mock de CI, interpretación y narración limitadas, memoria NPC y fallback factual | integración IA y registro de evaluación real | ACC-005/016/018/038 | No pasar expediente completo; limitar texto libre que contradiga hechos |
+| T3-04 | 3 | En curso | T3-03 | Contrato independiente del proveedor, adaptadores y mock de CI, interpretación y narración limitadas, memoria NPC y fallback factual | integración IA y registro de evaluación real | ACC-005/016/018/038 | No pasar expediente completo; limitar texto libre que contradiga hechos |
 | T3-05 | 3 | Pendiente | T3-04 | E2E ambas rutas, guardar/reanudar, keyboard y revisión humana del caso | registro F3 con demostración y límites | ACC-008/009/014/019 | Accesibilidad completa queda fase 5; no presentar hito como v1 |
 | E4-01 | 4 | Pendiente | T3-05 | Cerrar SPEC-007 y desglosar generador, jobs, capacidades, import/export y simulación | spec, tareas y reporte de casos aceptados/rechazados | ACC-023/027/029/034 | Worker recuperable; no ejecutar contenido de expedientes |
 | E5-01 | 5 | Pendiente | T4-06 | Cerrar SPEC-008 y ampliar SPEC-006; completar GDD y evaluar calidad | tareas por variedad/catálogo/carrera/irregularidades/audio/idiomas/accesibilidad | ACC-003/005/019/029/030/031/036/037 | Sin recortes silenciosos del GDD; licencias de arte verificadas |
@@ -62,3 +62,32 @@ Las tareas de cierre de spec son trabajo concreto: producen contrato revisable, 
 ## Inicio anticipado de T3 autorizado
 
 Se adelantan preparación de contratos y vista de muestra sin efectos, por instrucción del usuario del 2026-10-28. T3-01/T3-03 están parcialmente en curso; sus dependencias de integración no se eliminan. [Avance y límites](../quality/T3-inicio.md). El lint global heredado de T2 bloquea el cierre de calidad, aunque sus 60 pruebas pasen.
+
+
+## Avance T3-04
+
+Adaptador local, servicios factuales, memoria validada, doble CI y evaluación sintética implementados. [Evidencia](../quality/T3-04.md), [comandos disponibles](../manuales/IA-LOCAL.md). Se adelanta trabajo independiente por petición del usuario; las dependencias siguen vigentes. Sin URL/modelo real y con T3-02/T3-03 pendientes de integración, la tarea no se marca completada.
+
+Continuación T3-04: codec sin coerciones, fallback limitado a actos autorizados, cancelación tardía, corpus v2 con memoria y paso mock de CI. Sigue en curso, sin instalar modelos ni dar por superadas las dependencias.
+
+## Reconciliación documental del estado
+
+T1-03 pasa a en curso: Compose/esquema/SQL existen, pero faltan comando de migración y evidencia de arranque/reinicio reproducible. T1-04 pasa a en revisión: workflow presente no equivale a CI aprobada. Se mantienen las marcas históricas de T2, sin aceptar su puerta de fase mientras persistan siete fallos de lint y siete de imports. Esta revisión documental no modifica dependencias ni cierra criterios de aceptación.
+
+## Alcance del primer caso confirmado por el usuario
+
+DEC-013/014/015/016: casos individuales por usuario registrado, sin multijugador; autoguardado más guardado manual; ventanas movibles/minimizables desde el primer caso; aclaración previa de órdenes ambiguas. T3-01 debe cerrar los contratos afectados, T3-02 implementa guardados/autorización y T3-03 sus controles y ventanas. Confirmar requisitos no completa esas tareas.
+
+DEC-017 confirma cargar guardados manuales anteriores para probar otras decisiones del mismo caso. T3-02/T3-03 deben contemplar restauración coherente, concurrencia y previews caducados; DEC-020 fija el primer resultado definitivo para carrera y reputación, sin sustitución ni duplicación de recompensas.
+
+## Proveedores por entorno confirmados
+
+DEC-018/019: arquitectura de IA genérica; Ollama doméstico, FreeLLMAPI en trabajo/VPS, proveedor/endpoint configurable en instalaciones propias. El VPS incluye predeterminado del administrador y claves personales opcionales. T3-01/T3-04 deben conservar esa independencia y evaluar el proveedor disponible, sin exigir Ollama en el trabajo. T7-02 incorpora configuración y protección de credenciales personales; T7-03 mantiene cuotas separadas y límites del servicio.
+
+T3-02 debe conservar el registro oficial al cargar un guardado; T5-04 aplicará DEC-020 al primer resultado, con unicidad y pruebas de repetición/concurrencia bajo ACC-030. Estas reglas están documentadas, no implementadas por esta actualización.
+
+## Concreción técnica de T3
+
+[API](../specs/API-juego.md), [guardados](../specs/GUARDADOS.md), [conversaciones](../specs/CONVERSACIONES.md) y [aceptación detallada](../quality/T3-aceptacion-detallada.md) concretan las tareas existentes. DEC-021 fija diez manuales por partida. No se alteran estados ni dependencias por tener estos documentos.
+
+T3-02 debe implementar agregado/revisión/rama, ledger de operaciones, snapshots y primer cierre oficial, además de DTO seguro. T3-03 añade estados de UI, guardados y ventanas con alternativa al arrastre. T3-04 integra política y persistencia de conversación con proveedor genérico. T3-05 ejecuta los subcasos aplicables, diferenciando contrato, tests sintéticos, integración PostgreSQL y prueba real.

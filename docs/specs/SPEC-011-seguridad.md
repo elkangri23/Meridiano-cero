@@ -65,3 +65,7 @@ Fase 1: configuración y CI. Fase 3: permisos, sesiones, proyección y pruebas d
 Críticos/altos aplicables bloquean lanzamiento. Otros hallazgos requieren severidad, responsable y fecha/condición de solución. Un falso positivo se excluye solo con evidencia y revisión. No declarar certificación OWASP ni conformidad ASVS completa: esta es selección aplicable y trazada.
 
 La revisión previa a público ampliará la selección ASVS con autenticación, cookies, TLS y criptografía específicos una vez elegidas sus implementaciones. No marcar esos ámbitos como excluidos por faltar todavía el código.
+
+## Proveedores personales en VPS
+
+DEC-019 permite claves personales opcionales, sin eliminar el proveedor común. Es un alcance de implementación pendiente: requiere cifrado y aislamiento por cuenta, autorización de operaciones sobre conexiones y destinos habilitados por administrador. Aportar una clave no permite que el usuario imponga una URL arbitraria al servidor. El [contrato de proveedores](IA-proveedores.md) concreta fronteras y aceptación; no se declara implementado por documentarlo.

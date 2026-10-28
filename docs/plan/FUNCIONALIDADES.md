@@ -1,6 +1,6 @@
 # Funcionalidades objetivo y entregas
 
-Esta es la vista de producto del GDD/TAD. Estado de todas: planificadas, sin implementación. Las fases iniciales incorporan un subconjunto; fase 5 completa GDD funcional y fases 6–7 distribución/servicio. Las cláusulas normativas y pruebas están en REQUISITOS y specs.
+Esta es la vista de producto del GDD/TAD. El catálogo describe el objetivo v1, no una lista de funciones ya jugables. Motor/fixture tienen implementación, la UI es un prototipo y la IA tiene servicios parciales. [Estado por área y límites](ESTADO.md). Las fases iniciales incorporan un subconjunto; fase 5 completa GDD funcional y fases 6–7 distribución/servicio. Las cláusulas normativas y pruebas están en REQUISITOS y specs.
 
 | Sistema | Funcionalidad que recibirá el jugador/administrador | Primera entrega / completa |
 |---|---|---|
@@ -45,3 +45,7 @@ Esta es la vista de producto del GDD/TAD. Estado de todas: planificadas, sin imp
 No ayudas automáticas de rumbo, pruebas nuevas improvisadas, solución cambiada, combate, salud ni muerte permanente. Familiar por defecto; General también excluye gore/delitos sexuales/combate. No píxeles imprescindibles ni pistas solo por color/sonido. No movimiento autónomo en tiempo real. No rangos que bloqueen herramientas.
 
 La v1 no incluye comunidad pública de casos, épocas históricas jugables, multijugador, pagos, apps nativas, funcionamiento offline integral ni federación. La inspiración retro no autoriza reutilizar marcas, personajes o gráficos protegidos.
+
+## Proveedores confirmados
+
+Instalaciones propias: proveedor y endpoint configurables mediante adaptadores. Casa: Ollama; trabajo: FreeLLMAPI. VPS: proveedor predeterminado del administrador y claves personales opcionales para otro proveedor habilitado, sin obligar a aportar claves para jugar. DEC-018/019; [detalle de contratos y aceptación](../specs/IA-proveedores.md). Es alcance confirmado, no funcionalidad completa ya disponible.

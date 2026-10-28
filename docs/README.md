@@ -1,10 +1,10 @@
 # Documentación de implementación
 
-Estado: fase 1 en desarrollo. T1-01, T1-02 y T1-03 completadas. T1-04 (CI) pendiente. Web/API con PostgreSQL, migración y readiness implementados. Sesión, caso jugable y generación pendientes. Evidencia en BACKLOG y docs/quality/.
+Actualizado: 2026-10-28. Base parcial, motor implementado y T3 en curso. [Estado consolidado](plan/ESTADO.md): 146 pruebas correctas, prototipo retro y servicios IA con mock; sesión/partidas, evaluación real y cierre de calidad pendientes.
 
 ## Orden de lectura
 
-1. [Roadmap](plan/ROADMAP.md) y [decisiones de alcance](plan/BASELINE.md).
+1. [Estado actual](plan/ESTADO.md), [Roadmap](plan/ROADMAP.md) y [decisiones de alcance](plan/BASELINE.md).
 2. [Requisitos](plan/REQUISITOS.md), [backlog](plan/BACKLOG.md) y [registro de specs](specs/README.md).
 3. [Arquitectura](architecture/ARQUITECTURA.md), [ADR](adr/README.md), [seguridad](specs/SPEC-011-seguridad.md) y [guía de programación](specs/SPEC-012-programacion.md).
 4. [Pruebas previstas](quality/ACEPTACION.md) y [evidencia de fase 0](quality/FASE-0.md).
@@ -18,9 +18,9 @@ Estado: fase 1 en desarrollo. T1-01, T1-02 y T1-03 completadas. T1-04 (CI) pendi
 - [Manuales de uso, desarrollo, instalación, operación y pruebas](manuales/README.md).
 - [Glosario de dominio](architecture/GLOSARIO.md).
 
-Las doce specs tienen contenido desarrollado. Las cifras propuestas que necesitan medición, equilibrio o datos del proveedor se identifican expresamente y se cierran en la tarea correspondiente. Los comandos de producto de los manuales son objetivos futuros, no procedimientos ejecutados.
+Las doce specs tienen contenido desarrollado. Las cifras propuestas que necesitan medición, equilibrio o datos del proveedor se identifican expresamente y se cierran en la tarea correspondiente. Los manuales distinguen comandos existentes, ejecuciones registradas y procedimientos futuros; consultar el estado antes de usar un runbook.
 
-La autorización actual establece el plan de implementación y la entrega inicial documental. Los ADR de estructura aceptados derivan de ese plan; los parámetros del caso fijo son una propuesta concreta para el primer hito. Las fases 1–7 permanecen pendientes.
+La autorización actual establece el plan de implementación y la entrega inicial documental. Los ADR de estructura aceptados derivan de ese plan; los parámetros del caso fijo son una propuesta concreta para el primer hito. Las fases 1 y 3 están en curso; la fase 2 tiene implementación funcional con calidad pendiente; las fases 4–7 no han comenzado.
 
 Cada requisito tiene un ID estable, fuente, spec, tarea responsable y escenario de aceptación. Un escenario definido no constituye evidencia de que el producto funcione. Al ejecutar una tarea, registrar comando, entorno, revisión y resultado en el registro del hito; nunca sustituir esta evidencia por una casilla marcada.
 
@@ -33,3 +33,13 @@ Plantillas: [spec](templates/spec.md), [ADR](templates/adr.md), [tarea](template
 ## Avance T3
 
 [Interfaz inicial y verificaciones](quality/T3-inicio.md), [frontera de presentación](specs/T3-presentacion-inicial.md). Prototipo solo en desarrollo: http://127.0.0.1:5174/prototype. No es una investigación jugable ni una IA conectada.
+
+[Integración IA T3-04 y evidencia parcial](quality/T3-04.md), con [manual de evaluación](manuales/IA-LOCAL.md). Modelo real y conexión a partidas pendientes.
+
+[Contrato de proveedores y claves por entorno](specs/IA-proveedores.md): Ollama doméstico, FreeLLMAPI en trabajo/VPS, instalaciones propias configurables y proveedor común con claves personales opcionales en VPS.
+
+## Contratos técnicos desarrollados para programar T3
+
+[API](specs/API-juego.md), [guardados](specs/GUARDADOS.md), [conversaciones](specs/CONVERSACIONES.md) y [68 subcasos de aceptación](quality/T3-aceptacion-detallada.md). Incluyen campos, validaciones, errores, transacciones, reintentos y comportamiento entre ramas. El código actual aún debe adaptarse; no son pruebas ejecutadas ni cierre automático de tareas.
+
+[Revisión de contradicciones y mejoras de coste bajo/medio](quality/REVISION-CONTRATOS-T3.md), con alcance de rama y pendientes previos a integración.

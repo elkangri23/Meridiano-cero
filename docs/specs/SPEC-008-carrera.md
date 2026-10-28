@@ -32,3 +32,21 @@ Autoguardado de cada transición confirmada. Múltiples casos abiertos con reloj
 ## Aceptación y cierre pendiente
 
 T5-04 cierra fórmula y umbrales en spec con evidencia de playtest antes de código. Tests de recompensa idempotente, repetición, varias partidas, reputación recuperable, sanción con conocimiento plausible y lectura de informe. Ninguna fórmula abierta debe resolverse como constante improvisada en implementación.
+
+## Guardados manuales y repetición
+
+DEC-017 permite volver a un guardado manual del mismo caso y probar decisiones distintas. La carga no borra el registro de recompensas ya concedidas ni permite acumularlas por repetir la misma resolución. DEC-020 fija el primer resultado para carrera y reputación; no se sustituye por el mejor resultado posterior.
+
+### Primer resultado oficial
+
+El primer cierre definitivo persistido del caso para ese perfil fija su resultado oficial, sea éxito, parcial, error o vencimiento. Cargar guardados antes de ese primer cierre permite cambiar decisiones sin existir aún un resultado oficial. Tras registrarlo, las nuevas resoluciones del mismo expediente son práctica: no mejoran ni empeoran de nuevo la carrera/reputación ni vuelven a otorgar puntos o medallas.
+
+El registro oficial y su clave de unicidad quedan fuera del estado restaurable. Abrir otra partida del mismo expediente no reinicia esta regla; se aplica la identidad de contenido ya prevista, no solo el runId. Una variante realmente distinta y validada conserva el tratamiento de otra definición.
+
+Persistir cierre y registro oficial de forma atómica. Dos cierres concurrentes no producen dos resultados oficiales: el primero confirmado en servidor prevalece. Reintentar la misma operación devuelve lo registrado. La UI distingue el resultado oficial del resultado de práctica.
+
+Aceptación adicional bajo ACC-030: cerrar incorrectamente, cargar un guardado anterior y lograr éxito conserva el primer resultado; cerrar con éxito y repetir con error tampoco cambia carrera/reputación. Reintentos, dos pestañas y otra partida del mismo contenido no crean recompensas ni sustituciones adicionales.
+
+## Persistencia de primer resultado en T3
+
+Aunque las fórmulas numéricas se implementen en T5-04, T3-02 debe conservar identidad de contenido y primer cierre oficial fuera del snapshot restaurable. No esperar a la fase de puntos para permitir que una carga borre qué cierre fue el primero. [GUARDADOS](GUARDADOS.md) concreta concurrencia, práctica y registros.

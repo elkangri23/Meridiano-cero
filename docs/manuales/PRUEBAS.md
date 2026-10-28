@@ -1,6 +1,6 @@
 # Pruebas y evidencia
 
-Estado: estrategia implementable; solo el verificador documental existe actualmente.
+Actualizado: 2026-10-28. Existen Vitest, controles de tipos/lint/imports, evaluación IA con doble y verificador documental. Última suite de producto: 146 pruebas correctas, once archivos; corpus v2: 17 escenarios con mock. Evidencia en [T3-04](../quality/T3-04.md). Persisten siete errores globales de lint y siete de imports. No se han ejecutado E2E del juego, evaluación real ni una auditoría completa OWASP.
 Catálogo: [40 escenarios de aceptación](../quality/ACEPTACION.md).
 
 ## Pirámide de comprobaciones

@@ -8,7 +8,7 @@ Motor puro: resolveAction(definition, run, action) devuelve nuevo estado, evento
 
 Acciones iniciales: inspect, collect, talk, travel, analyze, communicate, query, wait, request_warrant, detain, recover y finish. Cada tipo tiene parámetros propios validados, nunca un diccionario arbitrario ejecutable. Los identificadores deben existir y ser accesibles. No desvelar por qué un ID oculto no es accesible.
 
-Estados: active → closed. Una secuencia puede quedar awaiting_decision dentro de una partida activa; no ejecutar otras acciones que muten hasta cancelar/reanudar esa secuencia. Cierre irreversible; repetir crea otra partida. Resultado de acción: applied, clarification_required, impossible, confirmation_required o case_closed. Errores técnicos se gestionan fuera del motor y no son consecuencias narrativas.
+Estados: active → closed. Una secuencia puede quedar awaiting_decision dentro de una partida activa; no ejecutar otras acciones que muten hasta cancelar/reanudar esa secuencia. El cierre es definitivo dentro de esa rama y el motor no admite acciones posteriores en ella. Cargar un manual anterior puede abrir otra rama mediante el servicio de guardados (DEC-017), sin borrar el primer resultado oficial (DEC-020); repetir desde inicio crea otra partida. Resultado de acción: applied, clarification_required, impossible, confirmation_required o case_closed. Errores técnicos se gestionan fuera del motor y no son consecuencias narrativas.
 
 ## Reloj
 
@@ -43,3 +43,9 @@ Carrera se aplica una sola vez por cierre, fuera de este primer contrato numéri
 ## Aceptación
 
 ACC-002 a ACC-013 y ACC-017. Comprobar entradas sin mutación, efectos al minuto exacto, eventos simultáneos, ausencia de movimiento en tiempo real, lotes, admisibilidad y replay con la misma semilla. Los costes concretos del fixture están en SPEC-003; el equilibrio global se cierra en SPEC-008.
+
+## Frontera de integración detallada
+
+El [API de juego](API-juego.md) valida una unión cerrada de acciones y adapta al motor; no entrega Record<string,unknown> sin comprobar al dominio. La versión del agregado HTTP y la secuencia de auditoría pueden ser distintas de las versiones/ordinales internos restaurados del motor.
+
+Las políticas de conversación se desarrollan en [CONVERSACIONES](CONVERSACIONES.md). No se permite que el modelo amplíe efectos más allá de la transición validada.

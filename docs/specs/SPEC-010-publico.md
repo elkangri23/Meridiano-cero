@@ -36,3 +36,9 @@ Despliegue de staging antes de público. Ensayar registro, juego completo, lími
 ## Aceptación
 
 ACC-020/022/025/027/028/033. T7-01 fija parámetros; T7-02 implementa cuentas/privacidad; T7-03 cuotas/telemetría; T7-04 revisión y staging. Registro de salida incluye valores reales, proveedor probado, backups y responsable de incidentes.
+
+## Claves personales opcionales confirmadas
+
+DEC-019 establece para la primera versión pública proveedor común del administrador y conexión personal opcional por usuario. La experiencia sin claves sigue disponible. El usuario puede elegir otro proveedor habilitado y aportar su propia clave; esto no habilita endpoints arbitrarios ni comparte credenciales con otras cuentas.
+
+Aplicar [contrato de proveedores](IA-proveedores.md): resolución explícita, cifrado y aislamiento de claves, consumo separado, límites de recursos también con claves propias y ausencia de fallback silencioso entre conexiones. T7-02 debe incluir configuración/cambio/borrado de credenciales personales antes de declarar entregado ese alcance.
