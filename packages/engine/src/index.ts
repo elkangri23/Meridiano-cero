@@ -223,6 +223,79 @@ function executeBatchStep(def: CaseDefinition, run: CaseRun, step: BatchStep): {
   }
 }
 
+// ── Procesamiento de solicitudes programadas ──────────────────────────────────
+
+function processMaturedRequests(def: CaseDefinition, run: CaseRun, newMinute: number, expired: boolean): { run: CaseRun; matured: ScheduledResult[] } {
+  void def; void expired;
+  const matured: ScheduledResult[] = [];
+  const remaining: ScheduledResult[] = [];
+  let currentRun = run;
+
+  for (const req of run.pendingRequests) {
+    const shouldMature = expired ? req.dueMinute < newMinute : req.dueMinute <= newMinute;
+    if (shouldMature) {
+      matured.push(req);
+      if (req.type === 'warrant') {
+        const suspectId = typeof req.payload === 'object' && req.payload !== null && 'suspectId' in req.payload
+          ? String((req.payload as { suspectId: unknown }).suspectId)
+          : '';
+        const warrantId = `warrant:${suspectId}`;
+        if (suspectId && !currentRun.warrants.includes(warrantId)) {
+          currentRun = { ...currentRun, warrants: [...currentRun.warrants, warrantId] };
+        }
+      } else if (req.type === 'analyze') {
+        const evidenceId = typeof req.payload === 'object' && req.payload !== null && 'evidenceId' in req.payload
+          ? String((req.payload as { evidenceId: unknown }).evidenceId)
+          : '';
+        if (evidenceId && !currentRun.discoveries.includes(`analysis:${evidenceId}`)) {
+          currentRun = { ...currentRun, discoveries: [...currentRun.discoveries, `analysis:${evidenceId}`] };
+        }
+      }
+    } else {
+      remaining.push(req);
+    }
+  }
+
+  currentRun = { ...currentRun, pendingRequests: remaining };
+  return { run: currentRun, matured };
+}
+
+// ── Resultado de cierre ───────────────────────────────────────────────────────
+
+function computeObjectives(def: CaseDefinition): string[] {
+  return def.objectives.filter((o) => o.achieved).map((o) => o.id);
+}
+
+function computeResult(def: CaseDefinition, run: CaseRun): FinalReport['result'] {
+  const hasWrongDetention = run.detentions.some((d) => !def.solution.includes(d));
+  const allObjectivesAchieved = def.objectives.every((o) => o.achieved);
+  if (hasWrongDetention) return 'incorrect';
+  if (allObjectivesAchieved) return 'complete';
+  if (def.objectives.some((o) => o.achieved)) return 'partial';
+  return 'unresolved';
+}
+
+// ── Warrant ───────────────────────────────────────────────────────────────────
+
+export function canIssueWarrant(def: CaseDefinition, run: CaseRun, suspectId: string): boolean {
+  const has = (ids: string[]) => ids.every((id) => {
+    if (!run.inventory.includes(id)) return false;
+    const adm = run.admissibility[id];
+    if (adm === false) return false;
+    if (adm === true) return true;
+    const ev = def.evidence.find((e) => e.id === id);
+    return ev?.admissible ?? false;
+  });
+
+  if (suspectId === 'ines' || suspectId === 'ines-valera') {
+    return has(['EV-03', 'EV-04']) || has(['EV-06', 'EV-07', 'EV-08']);
+  }
+  if (suspectId === 'tomas' || suspectId === 'tomas-rios') {
+    return has(['EV-09', 'EV-10']);
+  }
+  return false;
+}
+
 // ── resolveAction ─────────────────────────────────────────────────────────────
 
 export function resolveAction(
@@ -459,16 +532,13 @@ export function resolveAction(
       const newMinute = advanceMinute(run.minute, minutes, def.deadlineMinutes);
       const expired = hasExpired(newMinute, def.deadlineMinutes);
 
-      // Madurar solicitudes pendientes cuyo dueMinute <= newMinute
-      const matured = run.pendingRequests.filter((r) => r.dueMinute <= newMinute);
-      const remaining = run.pendingRequests.filter((r) => r.dueMinute > newMinute);
-
-      const newRun: CaseRun = {
+      const baseRun: CaseRun = {
         ...run,
         version: run.version + 1,
         minute: newMinute,
-        pendingRequests: remaining,
       };
+      const { run: processedRun, matured } = processMaturedRequests(def, baseRun, newMinute, expired);
+      const newRun = processedRun;
       const events = [makeEvent(run.minute, 'wait', { minutes, matured: matured.length })];
 
       if (expired) {
@@ -529,6 +599,70 @@ export function resolveAction(
       return { status: 'applied', run: newRun, events };
     }
 
+    case 'request_warrant': {
+      const suspectId = action.params.suspectId;
+      if (typeof suspectId !== 'string' || suspectId.length === 0) {
+        return { status: 'impossible', run, events: [], reason: 'suspectId inválido.' };
+      }
+      const requestId = `req-${nextOrdinal()}`;
+      const newRequest: ScheduledResult = {
+        id: requestId,
+        dueMinute: run.minute + 30,
+        type: 'warrant',
+        payload: { suspectId },
+      };
+      const newRun: CaseRun = {
+        ...run,
+        version: run.version + 1,
+        pendingRequests: [...run.pendingRequests, newRequest],
+      };
+      const events = [makeEvent(run.minute, 'request_warrant', { requestId, suspectId })];
+      return { status: 'applied', run: newRun, events };
+    }
+
+    case 'detain': {
+      const suspectId = action.params.suspectId;
+      if (typeof suspectId !== 'string') {
+        return { status: 'impossible', run, events: [], reason: 'suspectId inválido.' };
+      }
+      const warrantId = `warrant:${suspectId}`;
+      if (!run.warrants.includes(warrantId)) {
+        return { status: 'impossible', run, events: [], reason: 'No hay orden activa para este sospechoso.' };
+      }
+      // Identidad confirmada y localización conocida se asumen si el jugador las ha establecido
+      const locationKnown = run.discoveries.includes(`location:${suspectId}`);
+      if (!locationKnown) {
+        return { status: 'impossible', run, events: [], reason: 'Ubicación del sospechoso no conocida.' };
+      }
+      const newDetentions = [...run.detentions, suspectId];
+      const newRun: CaseRun = {
+        ...run,
+        version: run.version + 1,
+        detentions: newDetentions,
+      };
+      const events = [makeEvent(run.minute, 'detain', { suspectId })];
+      return { status: 'applied', run: newRun, events };
+    }
+
+    case 'recover': {
+      const objectId = action.params.objectId;
+      if (typeof objectId !== 'string') {
+        return { status: 'impossible', run, events: [], reason: 'objectId inválido.' };
+      }
+      const hasAccess = run.warrants.some((w) => w.includes('access')) || run.discoveries.includes('forced-entry');
+      if (!hasAccess) {
+        return { status: 'impossible', run, events: [], reason: 'Sin acceso a L-7.' };
+      }
+      const newRecovered = [...run.recoveredObjects, objectId];
+      const newRun: CaseRun = {
+        ...run,
+        version: run.version + 1,
+        recoveredObjects: newRecovered,
+      };
+      const events = [makeEvent(run.minute, 'recover', { objectId, irregular: run.discoveries.includes('forced-entry') })];
+      return { status: 'applied', run: newRun, events };
+    }
+
     case 'finish': {
       if (action.params.confirmed !== true) {
         return { status: 'confirmation_required', run, events: [], preview: {
@@ -538,23 +672,28 @@ export function resolveAction(
           description: 'Confirmar cierre del caso.',
         }};
       }
-      const allObjectivesAchieved = def.objectives.every((o) => o.achieved);
-      const hasWrongDetention = run.detentions.some((d) => {
-        return !def.solution.includes(d);
+      // Marcar objetivos logrados
+      const updatedObjectives = def.objectives.map((o) => {
+        if (o.id === 'obj-detener' && run.detentions.includes(def.solution)) return { ...o, achieved: true };
+        if (o.id === 'obj-recuperar' && run.recoveredObjects.length > 0) return { ...o, achieved: true };
+        return o;
       });
+      const updatedDef = { ...def, objectives: updatedObjectives };
+      const hasWrongDetention = run.detentions.some((d) => !def.solution.includes(d));
+      const allObjectivesAchieved = updatedDef.objectives.every((o) => o.achieved);
       let result: FinalReport['result'];
       if (hasWrongDetention) {
         result = 'incorrect';
       } else if (allObjectivesAchieved) {
         result = 'complete';
-      } else if (def.objectives.some((o) => o.achieved)) {
+      } else if (updatedDef.objectives.some((o) => o.achieved)) {
         result = 'partial';
       } else {
         result = 'unresolved';
       }
       const report: FinalReport = {
         result,
-        objectivesAchieved: def.objectives.filter((o) => o.achieved).map((o) => o.id),
+        objectivesAchieved: updatedDef.objectives.filter((o) => o.achieved).map((o) => o.id),
         reason: 'finished',
         minute: run.minute,
       };
@@ -608,32 +747,32 @@ export function confirmAction(
         ? run.discoveries
         : [...run.discoveries, `travel:${toCityId}`];
 
-      const newRun: CaseRun = {
+      const baseRun: CaseRun = {
         ...run,
         version: run.version + 1,
         minute: newMinute,
         position: { cityId: toCityId, locationId: run.position.locationId },
         discoveries: newDiscoveries,
       };
-      const events = [makeEvent(run.minute, 'travel', { toCityId, baseCost, delay, totalCost })];
+      const { run: processedRun, matured } = processMaturedRequests(def, baseRun, newMinute, expired);
+      const events = [makeEvent(run.minute, 'travel', { toCityId, baseCost, delay, totalCost }), ...matured.map((r) => makeEvent(newMinute, 'request_matured', { requestId: r.id, type: r.type }))];
 
       if (expired) {
-        // Vencimiento: cerrar por plazo
         const report: FinalReport = {
-          result: def.objectives.some((o) => o.achieved) ? 'partial' : 'unresolved',
-          objectivesAchieved: def.objectives.filter((o) => o.achieved).map((o) => o.id),
+          result: computeResult(def, processedRun),
+          objectivesAchieved: computeObjectives(def),
           reason: 'deadline',
           minute: newMinute,
         };
         const closedRun: CaseRun = {
-          ...newRun,
+          ...processedRun,
           status: 'closed',
           finalReport: report,
         };
         return { status: 'case_closed', run: closedRun, events, report };
       }
 
-      return { status: 'applied', run: newRun, events };
+      return { status: 'applied', run: processedRun, events };
     }
 
     case 'analyze': {
