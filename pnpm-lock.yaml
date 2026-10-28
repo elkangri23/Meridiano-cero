@@ -232,7 +232,23 @@ importers:
         specifier: 8.3.5
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15)
 
-  packages/contracts: {}
+  packages/case-schema: {}
+
+  packages/contracts:
+    dependencies:
+      '@meridiano/case-schema':
+        specifier: workspace:*
+        version: link:../case-schema
+
+  packages/engine:
+    dependencies:
+      '@meridiano/case-schema':
+        specifier: workspace:*
+        version: link:../case-schema
+    devDependencies:
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
 
 packages:
 
