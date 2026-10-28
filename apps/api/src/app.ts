@@ -5,9 +5,6 @@ import { registerLocalAuth } from './auth/routes.ts';
 import Fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { HealthResponse } from '@meridiano/contracts';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from './db/schema.js';
-import { Pool } from 'pg';
 
 export function createApp(options?: { config: AppConfig; database: Database }) {
   const app = Fastify({ logger: false, trustProxy: false, bodyLimit: 65536, requestIdHeader: false, genReqId: () => randomUUID() });

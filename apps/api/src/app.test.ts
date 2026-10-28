@@ -33,10 +33,9 @@ describe('base HTTP sin datos del juego', () => {
     expect(internal.json().error.code).toBe('INTERNAL_ERROR');
     expect(internal.body).not.toContain('SECRETO_SINTETICO');
   });
-  it('anuncia readiness; no anuncia login ni sesión todavía', async () => {
+  it('no anuncia readiness ni login ni sesión sin configuración', async () => {
     const ready = await app.inject({ method: 'GET', url: '/api/v1/ready' });
-    expect(ready.statusCode).toBe(200);
-    expect(ready.json()).toEqual({ status: 'ready' });
+    expect(ready.statusCode).toBe(404);
     for (const url of ['/api/v1/auth/local-session', '/api/v1/auth/login']) {
       const response = await app.inject({ method: 'GET', url });
       expect(response.statusCode).toBe(404);
@@ -47,7 +46,7 @@ describe('base HTTP sin datos del juego', () => {
 
 describe('arranque cerrado', () => {
   it('admite únicamente configuración local explícita', () => {
-    expect(readBootstrapConfig(local)).toEqual({ host: '127.0.0.1', port: 3000, databaseUrl: 'postgres://app:app@localhost:5432/app' });
+    expect(readBootstrapConfig(local)).toEqual({ host: '127.0.0.1', port: 3000 });
   });
   it.each([
     { APP_MODE: 'public' }, { APP_MODE: undefined }, { API_HOST: '0.0.0.0' },

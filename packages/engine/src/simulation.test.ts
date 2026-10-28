@@ -266,7 +266,7 @@ describe('T2-06: simulación de rutas independientes sin IA', () => {
     const r = resolveAction(def, run, { type: 'recover', params: { objectId: 'astrolabio-original' } });
     expect(r.status).toBe('applied');
     if (r.status === 'applied' && r.events.length > 0) {
-      expect(r.events[0].payload.irregular).toBe(true);
+      expect(r.events[0]!.payload.irregular).toBe(true);
     }
   });
 

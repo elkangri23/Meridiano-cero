@@ -7,8 +7,12 @@ async function start(): Promise<void> {
   const database = createDatabase(config.databaseUrl);
   const app = createApp({ config, database });
   app.addHook('onClose', async () => { await database.pool.end(); });
+  const shutdown = async () => {
+    await app.close().catch(() => { process.exitCode = 1; });
+    await database.pool.end().catch(() => {});
+  };
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.once(signal, () => { void app.close().catch(() => { process.exitCode = 1; }); void pool.end().catch(() => {}); });
+    process.once(signal, () => { void shutdown(); });
   }
   try { await app.listen({ host: config.host, port: config.port }); }
   catch (error) { await app.close(); throw error; }
