@@ -35,6 +35,26 @@ Importaciones: tamaño, profundidad y recuentos acotados; JSON validado antes de
 
 Timeouts y reintentos acotados por función. Ningún reintento de IA ejecuta de nuevo la acción del motor. Fallo de autorización/validación nunca se transforma en permiso. Los errores públicos no incluyen stack, consultas, tokens ni hechos ocultos.
 
+## Controles de base concretados en T1-01
+
+Fecha: 2026-10-28. Diseño concretado, no control implementado ni verificado.
+SPEC-004 define el protocolo de sesión y SPEC-009 la validación de arranque.
+
+| Amenaza de base | Defensa exigida | Evidencia al implementar |
+|---|---|---|
+| Bypass local expuesto por error | APP_MODE explícito, bandera separada, binding 127.0.0.1 y origen exacto; rechazo antes de escuchar | Arranques negativos con public, wildcard y origen ajeno, ACC-024 |
+| Sitio externo usa la API local | Origin en bootstrap, CSRF y Origin en mutaciones, JSON obligatorio, sin CORS global | Origen externo/ausente rechazado, ACC-020 |
+| Proxy confunde identidad local | trustProxy=false; no decidir identidad por Host | X-Forwarded-* y Host manipulados no habilitan sesión |
+| Extracción de sesión de DB/logs | Token aleatorio de 256 bits, digest en DB; cookie HttpOnly y redacción | Rotación, caducidad, revocación y ausencia de token en logs, ACC-020/024 |
+| Reinicio crea otro usuario | Perfil persistente por operación explícita y sin credencial universal | Reinicio conserva perfil y dato, ACC-039 |
+| Fallo publica detalles internos | Error estable y health/readiness mínimos | Sin stack, SQL, URL DB o valores privados, ACC-024 |
+
+403 por Origin/CSRF no se confunde con 404 de ownership ni 401 de sesión.
+Revocar sesión no borra perfil ni partidas. La cuenta local no es administrador.
+Antes de login con contraseña se debe medir Argon2id con la librería seleccionada
+y registrar parámetros, latencia, memoria y concurrencia: una recomendación
+mínima no es calibración real. La matriz ASVS sigue siendo selección inicial.
+
 ## Puertas de seguridad
 
 Fase 1: configuración y CI. Fase 3: permisos, sesiones, proyección y pruebas de IA. Fase 4: importaciones/cola. Fase 6: restauración. Fase 7: revisión manual y dinámica sobre entorno de pruebas, con límites que eviten afectar a terceros.

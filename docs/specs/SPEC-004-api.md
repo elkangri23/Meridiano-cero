@@ -13,7 +13,100 @@ Autenticación pública: usuario y contraseña; contraseña mediante implementac
 
 Roles iniciales: player y administrator. Un administrador gestiona instalación/proveedores/usuarios; no se expone lectura indiscriminada de conversaciones desde el juego. Operaciones administrativas auditadas y separadas. No hay roles por rango de detective.
 
-## Superficie API propuesta
+## Contrato de base de T1-01
+
+Fecha de concreción: 2026-10-28. Este apartado fija la base local; las acciones,
+login con contraseña y recuperación siguen sus fases del backlog. No declara
+endpoints implementados. Ante discrepancia, este apartado concreta únicamente
+la fase 1 y no cambia las reglas de juego.
+
+### Identidad local y sesión
+
+- `LOCAL_DEV_AUTH_ENABLED` es obligatorio y booleano; no se deduce de NODE_ENV.
+  Solo puede ser true con APP_MODE=development, API_HOST=127.0.0.1 y
+  PUBLIC_ORIGIN con hostname 127.0.0.1. localhost, ::1 y comodines no son
+  alias admitidos inicialmente: una única dirección evita ambigüedad de cookies.
+- El usuario local tiene rol player y un ID persistente generado por servidor;
+  no existe contraseña por defecto ni selección de usuario por cabecera/query.
+  Una operación de migración/semilla explícita crea ese perfil una sola vez.
+- `POST /api/v1/auth/local-session` crea una sesión exclusivamente bajo esa
+  configuración y devuelve perfil mínimo y token CSRF. Verifica Origin igual a
+  PUBLIC_ORIGIN y exige Content-Type application/json y cuerpo {} sin campos de identidad.
+  Fuera de development el endpoint no se registra. La configuración inválida
+  falla antes de escuchar, no se limita a esconder el endpoint.
+- Sesión opaca: 32 bytes aleatorios con crypto.randomBytes, base64url; guardar
+  solo su digest SHA-256 en PostgreSQL, usuario, creación, expiración y revocación.
+  SHA-256 sirve para tokens aleatorios de alta entropía, nunca para contraseñas.
+  SESSION_SECRET no sustituye la entropía del token ni genera usuarios.
+- Cookie `meridiano_session`, HttpOnly, Path=/api/v1, SameSite=Lax, sin Domain;
+  Secure obligatorio en HTTPS. Solo el HTTP de development en 127.0.0.1 permite
+  Secure=false. Expiración absoluta de 8 horas, sin renovación silenciosa.
+  Crear otra sesión rota la cookie; revocar la anterior en la misma transacción.
+- CSRF: token independiente de 32 bytes, ligado a sesión en servidor, retornado solo
+  en respuesta autenticada y conservado en memoria del cliente. No autentica sin
+  la cookie de sesión; queda excluido de logs. Mutaciones
+  exigen Origin exacto y X-CSRF-Token; lectura GET /me permite recuperarlo sin
+  rotar ni cambiar identidad. Comparación de longitud y tiempo constante;
+  regenerarlo al rotar sesión. Nunca se envía por URL.
+- `GET /api/v1/me` sin sesión válida devuelve 401; no crea identidad por efecto
+  lateral. `POST /api/v1/auth/logout` revoca sesión y expira cookie; repetir la
+  operación con sesión ya revocada devuelve 204 sin crear nueva sesión.
+- No confiar en X-Forwarded-For/Host/Proto: trustProxy=false en base local.
+  El proxy de Vite conecta a API por loopback y conserva el Origin del navegador;
+  no se habilita CORS para compensar una configuración incoherente.
+
+### Base HTTP y errores
+
+Fase 1 implementará únicamente health, ready y la sesión local aplicable;
+el catálogo restante de esta spec espera sus tareas. GET /api/v1/health devuelve
+200 con {status: "ok"} si el proceso atiende. GET /api/v1/ready devuelve 200
+con {status: "ready"} solo con DB accesible y migración esperada aplicada;
+en otro caso 503 con {status: "not_ready"}. No comprueba Ollama ni llama a IA.
+Ambas rutas son sin sesión y no revelan versiones, hostnames ni conexión DB.
+
+Error JSON único: {error: {code, message, requestId, fieldErrors?}}. requestId
+lo genera el servidor y se repite en X-Request-Id; una cabecera entrante no se
+considera autoridad ni se refleja sin validación. fieldErrors solo contiene
+nombres de campos públicos y códigos, nunca valores recibidos.
+
+| HTTP | code de base | Significado |
+|---|---|---|
+| 400 | INVALID_REQUEST | Entrada o JSON no válido |
+| 401 | SESSION_REQUIRED | Sesión ausente, caducada o revocada |
+| 403 | ORIGIN_REJECTED / CSRF_REJECTED | Mutación no autorizada |
+| 404 | NOT_FOUND | Ruta o recurso inaccesible |
+| 413 | PAYLOAD_TOO_LARGE | Cuerpo excede 64 KiB |
+| 415 | UNSUPPORTED_MEDIA_TYPE | Tipo de cuerpo no admitido |
+| 429 | RATE_LIMITED | Límite operativo; Retry-After sin datos privados |
+| 500 | INTERNAL_ERROR | Fallo inesperado redactado |
+| 503 | DEPENDENCY_UNAVAILABLE | Dependencia necesaria no disponible |
+
+Los códigos de acciones y DTO de juego se cierran en T3-01; esta tabla no
+convierte endpoints futuros en alcance de fase 1. La creación de sesión local
+se limita inicialmente a 10 intentos por minuto por dirección de conexión,
+sin confiar en cabeceras reenviadas; contador acotado en proceso suficiente para
+la base de un solo proceso. No se presenta como defensa pública distribuida.
+
+### Contraseñas: frontera aún pendiente
+
+Librería seleccionada para evaluar: argon2 0.45.1 (node-argon2, MIT), mantenida
+y compatible documentalmente con Node 24. Solo se ha instalado en una carpeta
+temporal de evaluación, sin añadirla al producto. El binario precompilado exige
+GLIBC_2.34 y Ubuntu 20.04 aporta 2.31; compilar con el g++ instalado también
+falla al requerir -std=gnu++20. No hay calibración ejecutada ni fallback inseguro.
+Punto de partida de calibración: Argon2id, memoryCost=19456 KiB, timeCost=2,
+parallelism=1, salt aleatoria de al menos 16 bytes y salida de 32 bytes. Es el
+suelo de evaluación, no un resultado medido ni configuración pública aprobada.
+Registrar hash/verify, rechazo de contraseña incorrecta, latencia y memoria en
+el entorno objetivo; aumentar coste si el presupuesto lo permite. Login y
+recuperación permanecen fuera de fase 1. La falta de calibración se conserva
+como pendiente explícito de T1-01, sin afirmar cierre total de esta tarea.
+
+Fuentes consultadas: [node-argon2](https://github.com/ranisalt/node-argon2),
+[versiones de la librería](https://github.com/ranisalt/node-argon2/releases) y
+[guía de almacenamiento de contraseñas](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+
+## Superficie API prevista por fases
 
 | Método y ruta relativa | Entrada principal | Respuesta permitida |
 |---|---|---|

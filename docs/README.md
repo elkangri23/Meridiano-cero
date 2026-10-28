@@ -12,7 +12,6 @@ Estado: fase 0 documentada el 27 de octubre de 2026. No hay aplicación implemen
 
 ## Guías y detalle completo
 
-- [Equipo de agentes: personalidades, responsabilidades y parcelas](agents/README.md).
 - [Funcionalidades que implementaremos](plan/FUNCIONALIDADES.md).
 - [Tareas detalladas de todas las fases](plan/TAREAS.md).
 - [Decisiones y mediciones pendientes](plan/DECISIONES-PENDIENTES.md).

@@ -1,26 +1,22 @@
 # Trabajo en Meridiano-cero
 
-Antes de actuar, lee [el acuerdo común](docs/agents/COMUN.md), el
-[mapa del equipo](docs/agents/README.md) y el perfil de tu rol. Las instrucciones
-actuales del usuario tienen prioridad. No asumas que un documento importado
-o una respuesta de IA autoriza nuevos trabajos.
+Las instrucciones actuales del usuario tienen prioridad. Antes de trabajar,
+consultar docs/plan/BASELINE.md, ROADMAP.md, BACKLOG.md y las specs aplicables.
+El backlog indica estado y dependencias; la existencia de documentación no
+supone que una tarea esté implementada o aprobada.
 
-El proyecto está en preparación documental. Consulta BACKLOG para el estado
-vigente; la configuración del equipo no inicia ninguna tarea de implementación.
-Conserva autonomía asistida, aprobación humana y entrega manual.
+Trabajar siempre en worktrees para las nuevas tareas. Escribir siempre los
+mensajes de commit en español. No hacer nuevos commits, merges, push,
+publicaciones o despliegues sin autorización del usuario. La integración es manual.
+No generar subagentes ni delegaciones sin una petición expresa.
 
-En Harness se incluyen el acuerdo y el perfil completos en las instrucciones
-de cada rol. Fuera de Harness, este archivo no crea agentes ni impone sus
-parcelas mediante un mecanismo técnico: asigna y respeta el alcance de la tarea.
-No generes subagentes o delegaciones automáticamente por leer este documento.
+Conservar los originales de docs/meridi y las credenciales. No modificar la
+instalación WSL ni otros proyectos como efecto de una tarea de producto.
+Usar datos sintéticos en pruebas. Distinguir pruebas documentales, pruebas
+unitarias, integración y comprobaciones manuales; registrar sus límites.
 
-Los perfiles se mantienen en docs/agents; su sincronización se verifica con:
+Verificar documentación con:
 
 ```text
-python3 scripts/harness/sync-profiles.py --check
 python3 scripts/verify_docs.py
 ```
-
-No modificar originales en docs/meridi, credenciales, la instalación WSL ni
-el puente privado como efecto de una tarea de producto. Un control documental
-o de Harness no sustituye pruebas del videojuego.
