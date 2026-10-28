@@ -354,3 +354,5 @@ export function createInitialRun(
     finalReport: null,
   };
 }
+
+export { astrolabioDefinition } from './fixtures/case-astrolabio.js';
