@@ -1,6 +1,6 @@
 # Meridiano-cero
 
-Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Estado: fase 1 en desarrollo. Workspace web/API inicial; todavía no hay partida jugable, base de datos ni sesión implementadas.
+Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Estado: fase 1 en desarrollo. Workspace web/API con PostgreSQL y migración inicial; todavía no hay partida jugable ni sesión implementada.
 
 ## Implementación
 
@@ -15,17 +15,21 @@ Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Est
 
 React/TypeScript, Fastify, PostgreSQL, pnpm y Docker Compose. Motor determinista separado de IA, web y persistencia. KISS, DRY y seguridad verificable son criterios de entrega, no afirmaciones de controles ya implementados.
 
-Los contratos de T1-01 están integrados. T1-02 crea el workspace inicial; el
-estado vigente está en BACKLOG. Git y su remoto se conservan, sin reinicializar.
+## Estado de T1 (fase 1)
+
+| Tarea | Estado | Descripción |
+|---|---|---|
+| T1-01 | ✅ Completada | Contratos de base SPEC-004/009/011 cerrados; sesiones locales, API v1, configuración y migraciones |
+| T1-02 | ✅ Completada | Workspace pnpm mínimo: web React/Vite, API Fastify, contratos compartidos, TS strict, lint, guards |
+| T1-03 | ✅ Completada | Compose PostgreSQL, Drizzle schema, migración SQL, health/readiness, pool pg |
+| T1-04 | ⏳ Pendiente | CI con tipos/lint/imports/pruebas, lockfile congelado, escaneo secretos/dependencias |
 
 ## Desarrollo local de la base
 
-Requisitos: Node 24.22.1 y pnpm 12.15.0. En este equipo están disponibles en
-Ubuntu/WSL; el Node 20 global de Windows no satisface el requisito del proyecto.
-Trabajar desde el worktree y no mezclar node_modules de Windows y Linux.
+Requisitos: Node 24.22.1 y pnpm 12.15.0. Trabajar en Windows 10 con Cezar; no mezclar node_modules de Windows y Linux.
 
 ```bash
-pnpm install --frozen-lockfile --ignore-scripts
+pnpm install --frozen-lockfile
 test -e .env || cp .env.example .env
 pnpm dev
 ```
@@ -47,6 +51,18 @@ pnpm smoke
 tipos/imports/ciclos; ejecutarlo con los watchers detenidos. Los comandos de DB,
 readiness y E2E del juego siguen pendientes de sus tareas. Más detalles en
 [la guía de desarrollo](docs/manuales/DESARROLLO.md).
+
+### Base de datos (T1-03)
+
+```bash
+docker compose up -d db
+cp .env.example .env
+pnpm --filter @meridiano/api db:migrate
+pnpm --filter @meridiano/api dev
+```
+
+Health: http://127.0.0.1:3000/api/v1/health (proceso)
+Readiness: http://127.0.0.1:3000/api/v1/ready (DB + migración)
 
 ## Contexto del proyecto
 

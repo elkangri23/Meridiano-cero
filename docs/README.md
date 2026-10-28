@@ -1,6 +1,6 @@
 # Documentación de implementación
 
-Estado: fase 1 en desarrollo. La base web/API inicial se incorpora en T1-02; DB, sesión y caso jugable están pendientes. Evidencia y dependencias en BACKLOG.
+Estado: fase 1 en desarrollo. T1-01, T1-02 y T1-03 completadas. T1-04 (CI) pendiente. Web/API con PostgreSQL, migración y readiness implementados. Sesión, caso jugable y generación pendientes. Evidencia en BACKLOG y docs/quality/.
 
 ## Orden de lectura
 
