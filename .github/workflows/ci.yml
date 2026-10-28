@@ -36,6 +36,9 @@ jobs:
       - name: Tests
         run: pnpm test
 
+      - name: Evaluate AI contracts (deterministic mock, no model)
+        run: pnpm eval:ai --mock
+
       - name: Verify guards
         run: pnpm verify:guards
 

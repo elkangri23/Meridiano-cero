@@ -17,7 +17,8 @@
     "test": "pnpm --filter @meridiano/contracts build && vitest run",
     "verify:guards": "pnpm --filter @meridiano/contracts build && pnpm --filter @meridiano/api build && node scripts/dev/verify-guards.mjs",
     "smoke": "pnpm --filter @meridiano/contracts build && node --experimental-strip-types scripts/dev/smoke-workspace.mjs",
-    "scan:secrets": "node scripts/dev/scan-secrets.mjs"
+    "scan:secrets": "node scripts/dev/scan-secrets.mjs",
+    "eval:ai": "node --experimental-strip-types apps/api/src/ai/evaluate-cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
