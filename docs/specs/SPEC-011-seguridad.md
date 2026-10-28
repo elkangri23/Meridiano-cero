@@ -1,6 +1,6 @@
 # SPEC-011 Seguridad y modelo de amenazas
 
-Estado: diseño inicial, ningún control de producto verificado. 2026-10-27.
+Estado: contrato de base de T1-01 para revisión; ningún control integrado de producto verificado. 2026-10-28.
 Responsable de implementación: quien entrega la tarea; revisión de seguridad independiente antes de fase 7.
 REQ-Q01 a REQ-Q12; ADR-010. Matriz de controles: [OWASP](../security/OWASP.md).
 
@@ -51,9 +51,12 @@ SPEC-004 define el protocolo de sesión y SPEC-009 la validación de arranque.
 
 403 por Origin/CSRF no se confunde con 404 de ownership ni 401 de sesión.
 Revocar sesión no borra perfil ni partidas. La cuenta local no es administrador.
-Antes de login con contraseña se debe medir Argon2id con la librería seleccionada
-y registrar parámetros, latencia, memoria y concurrencia: una recomendación
-mínima no es calibración real. La matriz ASVS sigue siendo selección inicial.
+Argon2id se midió como referencia en Windows x64/Node 24.22.1: 65536 KiB,
+3 iteraciones y paralelismo 1; datos y límites en SPEC-004 y evidencia de T1-01.
+No equivale a una prueba de login ni a validar Linux/público. Repetir la medición
+en el entorno de destino antes de habilitar contraseñas. La matriz ASVS sigue
+siendo selección inicial. Respuestas autenticadas no se cachean y los secretos
+no tienen defaults universales; no exigir claves sin consumidor en fase 1.
 
 ## Puertas de seguridad
 

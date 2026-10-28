@@ -4,8 +4,8 @@ No son requisitos olvidados ni autorizaciones pendientes para documentar. Son de
 
 | Tema | Base documentada | Cierre requerido | Responsable / gate |
 |---|---|---|---|
-| Versiones de herramientas | Node LTS, pnpm, PostgreSQL y stack elegido | Versiones mantenidas exactas, compatibilidad y lockfile | T1-01 |
-| Auth de base | Sesiones opacas y Argon2id mantenido | Librerías, calibración, cookie/CSRF y límites de login | T1-01; T3-01 |
+| Versiones de herramientas | Versiones exactas y pruebas sintéticas en SPEC-009 | Revisar entrega T1-01; fijar manifiestos/lockfile y comprobar workspace real en T1-02 | T1-01; T1-02 |
+| Auth de base | Contrato de sesión/CSRF y Argon2 0.45.1 calibrado en Windows/Node 24; SPEC-004 | Revisar base T1-01; repetir calibración en destino antes de contraseñas Linux/público; implementar y probar login/límites en su fase | T1-01; T3-01; E7-01 |
 | UX inicial | Pantalla única retro y panel móvil | Wireframes, orden de foco y confirmaciones probados | T3-01 |
 | Modelo local | Ollama primero, roles separables | Modelo/versión/contexto, hardware, latencia y corpus real | T3-01 |
 | Corpus y prosa factual | Motor decide y hechos autorizados | Fronteras de texto libre y criterio de fallback ensayados | T3-01; T3-04 |

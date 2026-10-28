@@ -1,6 +1,6 @@
 # SPEC-004 API, identidad y persistencia de acciones
 
-Estado: especificación detallada propuesta; cerrar en T1-01 y ampliar en T3-01. Fecha: 2026-10-27.
+Estado: contrato de base cerrado para revisión de T1-01; ampliación de juego en T3-01. Fecha: 2026-10-28. No implementado ni aceptado por el usuario.
 Fuentes: TAD §3,5,6,10,11,14; GDD §6,9,13. ADR-003/007/010.
 
 ## Objetivo y fronteras
@@ -37,7 +37,8 @@ la fase 1 y no cambia las reglas de juego.
 - Sesión opaca: 32 bytes aleatorios con crypto.randomBytes, base64url; guardar
   solo su digest SHA-256 en PostgreSQL, usuario, creación, expiración y revocación.
   SHA-256 sirve para tokens aleatorios de alta entropía, nunca para contraseñas.
-  SESSION_SECRET no sustituye la entropía del token ni genera usuarios.
+  No hace falta una clave de firma para este token opaco: la sesión se valida
+  contra el digest persistido. No exigir SESSION_SECRET sin un consumidor real.
 - Cookie `meridiano_session`, HttpOnly, Path=/api/v1, SameSite=Lax, sin Domain;
   Secure obligatorio en HTTPS. Solo el HTTP de development en 127.0.0.1 permite
   Secure=false. Expiración absoluta de 8 horas, sin renovación silenciosa.
@@ -47,10 +48,13 @@ la fase 1 y no cambia las reglas de juego.
   la cookie de sesión; queda excluido de logs. Mutaciones
   exigen Origin exacto y X-CSRF-Token; lectura GET /me permite recuperarlo sin
   rotar ni cambiar identidad. Comparación de longitud y tiempo constante;
-  regenerarlo al rotar sesión. Nunca se envía por URL.
+  regenerarlo al rotar sesión. Nunca se envía por URL. Respuestas de sesión y
+  perfil usan Cache-Control: no-store; no devolver el CSRF en un recurso público.
 - `GET /api/v1/me` sin sesión válida devuelve 401; no crea identidad por efecto
   lateral. `POST /api/v1/auth/logout` revoca sesión y expira cookie; repetir la
-  operación con sesión ya revocada devuelve 204 sin crear nueva sesión.
+  operación con sesión ya revocada devuelve 204 sin crear nueva sesión. En ese
+  caso sigue exigiendo Origin válido, sin intentar validar un CSRF ya eliminado.
+  Con sesión activa exige ambos controles antes de revocar.
 - No confiar en X-Forwarded-For/Host/Proto: trustProxy=false en base local.
   El proxy de Vite conecta a API por loopback y conserva el Origin del navegador;
   no se habilita CORS para compensar una configuración incoherente.
@@ -87,20 +91,48 @@ se limita inicialmente a 10 intentos por minuto por dirección de conexión,
 sin confiar en cabeceras reenviadas; contador acotado en proceso suficiente para
 la base de un solo proceso. No se presenta como defensa pública distribuida.
 
-### Contraseñas: frontera aún pendiente
+### Contraseñas: calibración de referencia
 
-Librería seleccionada para evaluar: argon2 0.45.1 (node-argon2, MIT), mantenida
-y compatible documentalmente con Node 24. Solo se ha instalado en una carpeta
-temporal de evaluación, sin añadirla al producto. El binario precompilado exige
-GLIBC_2.34 y Ubuntu 20.04 aporta 2.31; compilar con el g++ instalado también
-falla al requerir -std=gnu++20. No hay calibración ejecutada ni fallback inseguro.
-Punto de partida de calibración: Argon2id, memoryCost=19456 KiB, timeCost=2,
-parallelism=1, salt aleatoria de al menos 16 bytes y salida de 32 bytes. Es el
-suelo de evaluación, no un resultado medido ni configuración pública aprobada.
-Registrar hash/verify, rechazo de contraseña incorrecta, latencia y memoria en
-el entorno objetivo; aumentar coste si el presupuesto lo permite. Login y
-recuperación permanecen fuera de fase 1. La falta de calibración se conserva
-como pendiente explícito de T1-01, sin afirmar cierre total de esta tarea.
+Librería seleccionada: argon2 0.45.1 (node-argon2, MIT). Evaluada con Node
+24.22.1 portable en Windows x64, sin cambiar Node global ni WSL. La ejecución
+real con datos sintéticos validó hash/verify, contraseña incorrecta, sales
+aleatorias distintas de al menos 16 bytes, PHC Argon2id v19, salida de 32 bytes,
+rechazo de PHC malformado y dos operaciones simultáneas.
+
+| Memoria KiB | Iteraciones | Mediana hash / verify | Máximo hash / verify |
+|---|---|---|---|
+| 19456 | 2 | 68,3 / 66,1 ms | 91,2 / 74,7 ms |
+| 19456 | 3 | 112,9 / 110,0 ms | 175,1 / 144,2 ms |
+| 65536 | 3 | 551,0 / 456,2 ms | 944,0 / 653,5 ms |
+
+Nueve muestras por perfil, tras calentamiento; parallelism=1 en todos. Selección
+de referencia: **Argon2id, memoryCost=65536 KiB, timeCost=3, parallelism=1,
+hashLength=32**, dejando que la librería genere la salt. Ofrece más memoria que
+el mínimo ensayado y todas las muestras individuales quedaron bajo un segundo
+en esta máquina. No usar una salt fija, añadir pepper casero ni implementar PHC
+a mano. Guardar la cadena PHC completa y usar hash/verify/needsRehash de la librería.
+
+Concurrencia de referencia: máximo dos operaciones Argon2 activas por proceso;
+sin cola ilimitada. Presupuestar al menos 256 MiB de memoria del proceso y medir
+bajo carga antes de habilitar login. El máximo RSS observado fue 172536 KiB
+(~168,5 MiB), acumulado para el proceso de prueba, no memoria atribuible solo
+al hash. Dos hashes simultáneos del perfil elegido tardaron 449,0 ms en una
+sola muestra; la carga variable impide inferir escalado o capacidad pública.
+
+El login sigue fuera de fase 1. Para su futura integración se propone limitar
+antes del hash a 5 intentos/15 minutos por identificador normalizado y 20/15
+minutos por dirección fiable; respuesta genérica sin enumeración y sin bloqueo
+permanente de cuenta. Estos límites y la concurrencia se vuelven a evaluar en
+T3-01 o E7-01 según el modo habilitado; no son controles ya implementados.
+
+Ubuntu 20.04 no pudo cargar el precompilado (requiere GLIBC_2.34; hay 2.31) ni
+compilarlo con su g++ actual (-std=gnu++20). Esa limitación no se declara resuelta:
+antes de habilitar contraseñas en Linux debe validarse un entorno compatible y
+repetirse la calibración allí. La base local de fase 1 usa sesión sin contraseña.
+La distribución pública requiere medición propia, no hereda estas latencias.
+
+Medidas completas y método: [evidencia de T1-01](../quality/T1-01-evidencia.md)
+y [resultado JSON](../quality/evidence/T1-01-argon2-windows.json).
 
 Fuentes consultadas: [node-argon2](https://github.com/ranisalt/node-argon2),
 [versiones de la librería](https://github.com/ranisalt/node-argon2/releases) y

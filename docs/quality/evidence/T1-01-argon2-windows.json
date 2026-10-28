@@ -1,0 +1,143 @@
+{
+  "node": "v24.22.1",
+  "argon2": "0.45.1",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "11th Gen Intel(R) Core(TM) i7-1195G7 @ 2.90GHz",
+  "availableParallelism": 8,
+  "profiles": [
+    {
+      "memoryCostKiB": 19456,
+      "timeCost": 2,
+      "parallelism": 1,
+      "hashLengthBytes": 32,
+      "samples": 9,
+      "hashMs": [
+        66.96169999999995,
+        65.40329999999994,
+        68.31320000000005,
+        61.64119999999991,
+        61.58659999999986,
+        68.64380000000006,
+        77.73270000000002,
+        72.18280000000004,
+        91.2219
+      ],
+      "verifyMs": [
+        74.6608,
+        61.45180000000005,
+        59.92050000000006,
+        65.04070000000002,
+        64.66819999999984,
+        66.14679999999998,
+        70.64280000000008,
+        67.8284000000001,
+        73.62819999999988
+      ],
+      "hashMedianMs": 68.31320000000005,
+      "hashMaxMs": 91.2219,
+      "verifyMedianMs": 66.14679999999998,
+      "verifyMaxMs": 74.6608,
+      "twoConcurrentMs": 89.69480000000021,
+      "processMaxRssKiB": 80904,
+      "checks": {
+        "correctPassword": true,
+        "wrongPasswordRejected": true,
+        "distinctSalts": true,
+        "saltAtLeast16Bytes": true,
+        "phcParameters": true
+      }
+    },
+    {
+      "memoryCostKiB": 19456,
+      "timeCost": 3,
+      "parallelism": 1,
+      "hashLengthBytes": 32,
+      "samples": 9,
+      "hashMs": [
+        98.16200000000026,
+        105.48930000000018,
+        104.60800000000017,
+        109.67140000000018,
+        121.10059999999976,
+        164.02550000000065,
+        175.0738999999994,
+        112.86339999999927,
+        145.73559999999998
+      ],
+      "verifyMs": [
+        98.54649999999992,
+        144.2163999999998,
+        104.5281,
+        133.6655999999998,
+        138.32930000000033,
+        110.03169999999955,
+        104.82690000000002,
+        144.1875,
+        104.4977000000008
+      ],
+      "hashMedianMs": 112.86339999999927,
+      "hashMaxMs": 175.0738999999994,
+      "verifyMedianMs": 110.03169999999955,
+      "verifyMaxMs": 144.2163999999998,
+      "twoConcurrentMs": 132.08100000000013,
+      "processMaxRssKiB": 81512,
+      "checks": {
+        "correctPassword": true,
+        "wrongPasswordRejected": true,
+        "distinctSalts": true,
+        "saltAtLeast16Bytes": true,
+        "phcParameters": true
+      }
+    },
+    {
+      "memoryCostKiB": 65536,
+      "timeCost": 3,
+      "parallelism": 1,
+      "hashLengthBytes": 32,
+      "samples": 9,
+      "hashMs": [
+        479.85159999999996,
+        600.7438999999995,
+        600.5110999999997,
+        512.3806999999997,
+        351.5118000000002,
+        357.67819999999847,
+        944.0071000000007,
+        680.102899999998,
+        550.958300000002
+      ],
+      "verifyMs": [
+        513.1176999999998,
+        549.0102000000006,
+        437.0704999999998,
+        387.14739999999983,
+        437.40769999999975,
+        315.3144000000011,
+        515.1106000000018,
+        653.5455999999976,
+        456.17239999999947
+      ],
+      "hashMedianMs": 550.958300000002,
+      "hashMaxMs": 944.0071000000007,
+      "verifyMedianMs": 456.17239999999947,
+      "verifyMaxMs": 653.5455999999976,
+      "twoConcurrentMs": 448.96299999999974,
+      "processMaxRssKiB": 172536,
+      "checks": {
+        "correctPassword": true,
+        "wrongPasswordRejected": true,
+        "distinctSalts": true,
+        "saltAtLeast16Bytes": true,
+        "phcParameters": true
+      }
+    }
+  ],
+  "malformedHashRejected": true,
+  "runtimeArtifact": {
+    "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-win-x64.zip",
+    "sha256": "d2046d28c2c3dcd211ac5145c0bf30e2047ef9dfb306693c8c6e2eccd8b95fa5",
+    "checksumSource": "https://nodejs.org/dist/v24.22.1/SHASUMS256.txt"
+  },
+  "date": "2026-10-28"
+}

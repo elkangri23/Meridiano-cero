@@ -12,6 +12,8 @@ Inventariar runtimes/Docker/Ollama disponibles sin instalar ni abrir puertos. Fi
 
 Salida comprobable: Entregar specs cerradas para base y prueba prevista de arranque que rechace APP_MODE public con bypass de desarrollo.
 
+Entrega documental y calibración de referencia: [evidencia de T1-01](../quality/T1-01-evidencia.md). Las pruebas reales de arranque/DB corresponden a T1-03, no se sustituyen por esta entrega.
+
 ## T1-02
 
 Contratos: SPEC-012; ADR-001/002.

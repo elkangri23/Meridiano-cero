@@ -1,6 +1,6 @@
 # T1-01: inicio y evidencia de contratos de base
 
-Fecha: 2026-10-28. Estado: EN CURSO; no completada ni aceptada.
+Fecha: 2026-10-28. Estado actual: EN REVISIÓN; entrega documental realizada, pendiente de aceptación del usuario.
 Responsable: Codex, encargo documental explícito del usuario.
 Base: commit 5241a22. Rama: codex/t1-01-contratos-base, worktree independiente.
 
@@ -27,7 +27,7 @@ por Ollama ausente; no se oculta como inventario totalmente satisfactorio.
 wsl --list --verbose mostró Ubuntu-20.04 Running y docker-desktop Stopped.
 No se interrogó el daemon ni inventariaron contenedores o datos ajenos.
 
-## Pendientes antes del cierre
+## Pendientes registrados al iniciar (véase resolución posterior)
 
 - Calibrar argon2 0.45.1 en entorno de evaluación aislado: hash/verify,
   contraseña incorrecta, tiempos y memoria; los mínimos de SPEC-004 no son
@@ -92,3 +92,74 @@ conservar Ubuntu 20.04 y repetir Argon2 antes de cerrar T1-01.
 La consulta de preparación de entorno queda sin efecto tras el cambio de
 prioridad del usuario. No se realizará esa instalación durante la limpieza del
 proyecto. T1-01 queda pendiente de retomar; T1-02 no se ha iniciado.
+
+## Resolución de la calibración y entrega para revisión
+
+Continuación del 2026-10-28 sobre commit f151f7e. Se utilizó Windows x64 y
+Node 24.22.1 portable oficial, sin alterar Node 20 global ni la instalación WSL.
+El zip se verificó contra SHASUMS256.txt descargado por HTTPS del mismo sitio:
+[archivo Node](https://nodejs.org/dist/v24.22.1/node-v24.22.1-win-x64.zip) y
+[checksums oficiales](https://nodejs.org/dist/v24.22.1/SHASUMS256.txt).
+SHA-256: d2046d28c2c3dcd211ac5145c0bf30e2047ef9dfb306693c8c6e2eccd8b95fa5.
+Es una comprobación de integridad contra origen HTTPS, no verificación de firma.
+
+Argon2 0.45.1 se instaló mediante el npm del runtime portable en una carpeta
+bajo TEMP con --prefix, --save-exact, --ignore-scripts, --no-audit y --no-fund.
+Se pasaron dos npmrc temporales vacíos distintos para usuario/global; no se
+consultaron credenciales ni se modificaron sus archivos. El primer intento con
+el mismo npmrc para ambos ámbitos falló; se corrigió antes de instalar.
+
+Medidor reproducible: [scripts/dev/measure-argon2.cjs](../../scripts/dev/measure-argon2.cjs).
+Acepta una carpeta temporal como argumento, comprueba Node 24 y argon2 0.45.1,
+utiliza contraseñas aleatorias sintéticas y solo imprime medidas y comprobaciones.
+El primer ensayo asumía un orden concreto de parámetros PHC; la librería
+serializó otro orden. Se corrigió para comparar nombres/valores sin depender
+del orden, conservando comprobación de Argon2id, v19, memoria, iteraciones y
+paralelismo. No se cambió el algoritmo ni se omitió una comprobación de seguridad.
+
+Reproducción desde PowerShell, con un Node 24 ya disponible y dependencias en
+carpeta temporal independiente (marcadores de ruta, no comandos ya instalados):
+
+```powershell
+& '<ruta-node24>\node.exe' '<ruta-node24>\node_modules\npm\bin\npm-cli.js' install --prefix '<carpeta-temporal>' --userconfig '<npmrc-usuario-vacio>' --globalconfig '<npmrc-global-vacio>' --ignore-scripts --no-audit --no-fund --save-exact argon2@0.45.1
+& '<ruta-node24>\node.exe' scripts/dev/measure-argon2.cjs '<carpeta-temporal>'
+```
+
+El comando de medición final terminó con código 0. Datos completos:
+[resultado JSON](evidence/T1-01-argon2-windows.json).
+
+| Memoria KiB / iteraciones / paralelismo | Mediana hash / verify ms | Máximo hash / verify ms | Dos hashes simultáneos ms | Máximo RSS de proceso KiB |
+|---|---|---|---|---|
+| 19456 / 2 / 1 | 68,3 / 66,1 | 91,2 / 74,7 | 89,7 | 80904 |
+| 19456 / 3 / 1 | 112,9 / 110,0 | 175,1 / 144,2 | 132,1 | 81512 |
+| 65536 / 3 / 1 | 551,0 / 456,2 | 944,0 / 653,5 | 449,0 | 172536 |
+
+Nueve muestras por perfil después de calentamiento. RSS es máximo acumulado de
+proceso, no memoria exclusiva de Argon2. La concurrencia tiene una sola muestra
+por perfil y carga variable: no permite calcular capacidad de servicio ni afirmar
+que dos operaciones escalen mejor que una. No son percentiles de producción.
+
+Pasaron contraseña correcta, rechazo de incorrecta, sales distintas >=16 bytes,
+PHC con parámetros esperados, hash de 32 bytes y rechazo de PHC malformado.
+Perfil de referencia elegido: 65536 KiB / 3 / 1, límite propuesto de dos hashes
+activos por proceso, con revalidación de memoria y latencia antes de login real.
+No hay contraseña reutilizada, servidor, cuenta, llamadas IA ni puertos abiertos.
+
+### Coherencia final de contratos
+
+- Sesión opaca y CSRF persistidos, caducidad, revocación, cookies y no-store.
+- Sin SESSION_SECRET obligatorio sin consumidor: la sesión valida digest en DB,
+  no una firma. Secretos reales necesarios: credencial DB; claves de capacidades
+  futuras se definirán cuando exista consumidor, por separado.
+- Origen/bypass/mode validados antes de efectos; prueba negativa prevista para
+  public con bypass, sin afirmar que ya corrió contra una aplicación.
+- Versiones exactas, pool/timeouts, migrador explícito y readiness acotado.
+- Calibración Windows real; Ubuntu 20.04 sigue limitado para Argon2. La base F1
+  usa sesión local sin contraseña; validar contraseñas Linux antes de habilitarlas
+  es gate posterior, y público debe medirse en su propio entorno.
+
+Los pendientes iniciales de seleccionar versiones, concretar arranque y obtener
+una calibración de referencia están resueltos para esta entrega documental.
+Permanecen pendientes de implementación ACC-020/024/039 y resto de fase 1.
+T1-01 se entrega EN REVISIÓN, no se marca completada ni aceptada automáticamente.
+T1-02 continúa pendiente; no se ha iniciado por producir este registro.

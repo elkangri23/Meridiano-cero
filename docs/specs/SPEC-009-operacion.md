@@ -1,6 +1,6 @@
 # SPEC-009 Desarrollo, instalación y recuperación
 
-Estado: contrato operativo detallado propuesto; comandos en manuales aún no implementados.
+Estado: contrato de base cerrado para revisión de T1-01; distribución final pendiente de fase 6. Comandos de producto aún no implementados.
 Fuentes: TAD §4/9/13–15; GDD §16/17/19. ADR-004/008.
 
 ## Perfiles
@@ -15,7 +15,7 @@ No hay worker vacío en fase 1. No hay Kubernetes, Redis ni telemetría obligato
 
 ## Configuración y secretos
 
-Contrato de variables a implementar, no archivo existente: APP_MODE, PUBLIC_ORIGIN, DATABASE_URL, SESSION_SECRET, REGISTRATION_ENABLED, AI_PROVIDER, AI_BASE_URL, AI_MODEL y AI_API_KEY opcional según proveedor. Añadir clave separada de cifrado al guardar credenciales de usuario. Validación al arrancar y valores de ejemplo sin secretos.
+Contrato de variables a implementar, no archivo existente: APP_MODE, PUBLIC_ORIGIN, DATABASE_URL, REGISTRATION_ENABLED, AI_PROVIDER, AI_BASE_URL, AI_MODEL y AI_API_KEY opcional según proveedor. Añadir clave separada de cifrado al guardar credenciales de usuario. Validación al arrancar y valores de ejemplo sin secretos.
 
 AI_BASE_URL local puede apuntar a Ollama en host por política de administrador. En Docker Desktop host.docker.internal es candidato sujeto a comprobación; no imponerlo a Linux. No desactivar controles públicos para soportar localhost privado.
 
@@ -72,9 +72,13 @@ de Git; T1-02 debe añadir reglas de exclusión antes de generar cualquier archi
 | API_PORT | Entero 1..65535; 3000 propuesto para ejemplo local, fallo si ocupado |
 | PUBLIC_ORIGIN | Origen único sin credenciales, ruta, query ni fragmento; HTTP solo development loopback; HTTPS obligatorio en public |
 | LOCAL_DEV_AUTH_ENABLED | Obligatoria, booleano explícito, sin default; true solo bajo las tres condiciones de SPEC-004 |
-| DATABASE_URL | Obligatoria, PostgreSQL; nunca incluirla en respuestas ni errores |
-| SESSION_SECRET | Obligatorio, al menos 32 bytes aleatorios codificados en base64; independiente de credenciales de desarrollo |
+| DATABASE_URL | Obligatoria, esquema postgresql o postgres, usuario/contraseña no vacíos en la base; nunca incluirla en respuestas ni errores |
 | REGISTRATION_ENABLED | Booleano, false por defecto; no habilitar registro en fase 1 aunque se configure true: rechazar capacidad no implementada |
+
+SESSION_SECRET no se exige en fase 1: sesión y CSRF son tokens aleatorios
+persistidos, sin firma ni consumidor de esa clave. Si una capacidad futura
+necesita firma o cifrado, definirá su clave separada y su validación antes de
+habilitarla; no reutilizar la contraseña DB ni claves de otros programas.
 
 AI_PROVIDER/AI_BASE_URL/AI_MODEL/AI_API_KEY no son requisitos de arranque de la
 base sin consumidor IA. Se validarán al habilitar esa capacidad, sin reutilizar
@@ -108,7 +112,7 @@ automáticamente. Health de proceso no equivale a esquema listo.
 | public con LOCAL_DEV_AUTH_ENABLED=true | Fallo antes de DB/listener; sin crear perfil | Prueba negativa T1-03, ACC-024 |
 | development con bypass y host 0.0.0.0, localhost o ::1 | Fallo cerrado | Pruebas parametrizadas T1-03 |
 | Origin externo o ausente al crear sesión local | 403 sin sesión/cookie | Integración ACC-020 |
-| SESSION_SECRET ausente/mal codificado o DB URL inválida | Salida no cero sin revelar valor | ACC-024/039 |
+| DATABASE_URL ausente, inválida o sin credencial de base | Salida no cero sin revelar valor | ACC-024/039 |
 | DB caída o migración pendiente | health=200, ready=503 si el proceso ya arrancó | ACC-039 |
 | Migrar, crear perfil/sesión, reiniciar conservando volumen | Mismo perfil; sesión válida hasta expiración/revocación | ACC-039 |
 | Perfil local y registro público solicitado | Rechazo de configuración | ACC-024 |
@@ -195,7 +199,8 @@ de SQL con Drizzle/pg sin abrir conexión. Todos pasaron. tsc --version confirm�
 tipado de la aplicación, migraciones reales, persistencia ni funcionamiento UI.
 
 Argon2 no pudo cargarse ni compilarse en ese entorno. El proyecto no declara
-Ubuntu 20.04 como entorno completo validado. La calibración queda pendiente de un
-entorno compatible. No se realizará ninguna instalación o actualización de WSL
-como parte de la limpieza del proyecto. No se bajan versiones ni parámetros
+Ubuntu 20.04 como entorno completo validado. La calibración de referencia sí se ejecutó
+en Windows x64 con Node 24.22.1 portable y Argon2 0.45.1; véase SPEC-004 y el
+registro de T1-01. No acredita contraseñas en Linux: esa comprobación sigue
+siendo condición previa a habilitarlas allí. No se modificó WSL. No se bajan versiones ni parámetros
 para esconder el fallo.
