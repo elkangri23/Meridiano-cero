@@ -1,6 +1,6 @@
 # Roadmap por hitos verificables
 
-Sin fechas comprometidas. Estimar una fase cuando su spec esté cerrada y se conozca el entorno. Revisión humana al finalizar cada hito. Estados actuales: fase 0 entregada documentalmente; fase 1 en curso; fases 2–7 pendientes.
+Sin fechas comprometidas. Estimar una fase cuando su spec esté cerrada y se conozca el entorno. Revisión humana al finalizar cada hito. Estados actuales: fase 0 entregada documentalmente; fase 1 entregada técnicamente en local, revisión de hito y CI remota pendientes; fases 2–7 pendientes.
 
 | Fase | Resultado demostrable | Dependencias | Puerta de salida |
 |---|---|---|---|
@@ -26,3 +26,5 @@ Entregar alcance realizado, requisitos/pruebas, comandos y resultados, limitacio
 ## Bloqueos de lanzamiento
 
 Ningún hallazgo crítico/alto aplicable abierto; restauración probada; autoría/licencias y privacidad resueltas; endpoint público de IA verificado; costes y corte global ensayados. No publicar repositorio ni desplegar VPS como efecto lateral de cerrar documentación.
+
+Entrega de base: [evidencia F1](../quality/FASE-1.md). Hay un aviso moderado de tooling registrado; ninguna afirmación de seguridad global ni lanzamiento público.

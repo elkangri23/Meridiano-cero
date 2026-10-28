@@ -50,3 +50,7 @@ Las referencias ASVS identifican ámbitos relacionados, no equivalencia completa
 | v5.0.0-1.2.8 | No se procesa LaTeX | Reabrir si se permite renderizado LaTeX |
 
 No excluir autenticación, TLS, cifrado, SSRF o importaciones por no estar implementados aún. Antes de fase 7 revisar catálogo completo y justificar cualquier otra exclusión. Cada fila deberá pasar a IMPLEMENTADA y después VERIFICADA con revisión, entorno, prueba y evidencia; actualmente ninguna tiene ese estado.
+
+## Evidencia parcial de base: T1
+
+Sesión local, Origin/CSRF, expiración/rotación, DB mínima, errores/readiness y herramientas de cadena de suministro tienen pruebas locales de base en [T1-03](../quality/T1-03-evidencia.md) y [T1-04](../quality/T1-04-evidencia.md). Esto cubre subconjuntos de SEC-08/09/12/14: las filas siguen sin verificación integral de sus funciones futuras, y no se afirma conformidad ASVS global.

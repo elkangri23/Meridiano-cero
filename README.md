@@ -1,6 +1,6 @@
 # Meridiano-cero
 
-Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Estado: fase 1 en desarrollo. Workspace web/API con PostgreSQL y migración inicial; todavía no hay partida jugable ni sesión implementada.
+Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Estado: base de fase 1 implementada con PostgreSQL y sesión local. Todavía no hay partida jugable, motor ni IA.
 
 ## Implementación
 
@@ -26,31 +26,53 @@ React/TypeScript, Fastify, PostgreSQL, pnpm y Docker Compose. Motor determinista
 
 ## Desarrollo local de la base
 
-Requisitos: Node 24.22.1 y pnpm 12.15.0. Trabajar en Windows 10 con Cezar; no mezclar node_modules de Windows y Linux.
+Requisitos: Node 24.22.1, pnpm 12.15.0 y Docker Desktop con motor Linux activo.
+Usar un worktree. No compartir node_modules entre Windows y Linux.
 
-```bash
-pnpm install --frozen-lockfile
-test -e .env || cp .env.example .env
+```text
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm setup:local
+docker compose up -d --wait
+pnpm db:migrate
 pnpm dev
 ```
 
-Abrir http://127.0.0.1:5173. La pantalla permite comprobar la API de desarrollo
-por el proxy del mismo origen. Health solo acredita proceso HTTP, no DB ni juego.
-El ejemplo no contiene credenciales y mantiene sesión/registro desactivados.
+setup:local genera .env y secretos únicos sin imprimirlos ni sobrescribir archivos.
+No copiar la plantilla encima de una configuración existente. PostgreSQL usa
+127.0.0.1:15432 y volumen persistente; la API 127.0.0.1:3000; web en
+http://127.0.0.1:5173. No hay registro público. Health acredita proceso; ready,
+DB y esquema. La sesión local solo está habilitada en development con origen exacto.
 
-```bash
-pnpm build
+```text
 pnpm typecheck
 pnpm lint
+pnpm check:format
 pnpm test
+pnpm build
 pnpm verify:guards
 pnpm smoke
+pnpm security:dependencies
+pnpm security:secrets --verify-detector
 ```
 
-`verify:guards` introduce y retira archivos sintéticos para comprobar fallos de
-tipos/imports/ciclos; ejecutarlo con los watchers detenidos. Los comandos de DB,
-readiness y E2E del juego siguen pendientes de sus tareas. Más detalles en
-[la guía de desarrollo](docs/manuales/DESARROLLO.md).
+Pruebas de integración aisladas (no usar una DB real):
+
+```text
+pnpm setup:local --test
+docker compose --env-file .env.integration -p meridiano-cero-t1-test up -d --wait
+pnpm test:integration
+pnpm verify:persistence
+docker compose --env-file .env.integration -p meridiano-cero-t1-test down
+```
+
+El test usa puerto 15433 y otro volumen. verify:persistence detiene y recrea
+únicamente ese contenedor, conservando datos. down no elimina el volumen.
+verify:guards genera/retira archivos sintéticos; ejecutarlo sin watchers.
+La CI GitHub está definida y fijada por SHA; no se ha ejecutado remotamente ni
+se ha hecho push. Hay un aviso moderado de tooling registrado en la evidencia.
+
+Entrega: [T1-03](docs/quality/T1-03-evidencia.md),
+[T1-04](docs/quality/T1-04-evidencia.md) y [guía de base](docs/manuales/BASE-LOCAL.md).
 
 ### Base de datos (T1-03)
 

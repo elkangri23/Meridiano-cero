@@ -17,7 +17,14 @@
     "test": "pnpm --filter @meridiano/contracts build && vitest run",
     "verify:guards": "pnpm --filter @meridiano/contracts build && pnpm --filter @meridiano/api build && node scripts/dev/verify-guards.mjs",
     "smoke": "pnpm --filter @meridiano/contracts build && node --experimental-strip-types scripts/dev/smoke-workspace.mjs",
-    "scan:secrets": "node scripts/dev/scan-secrets.mjs"
+    "setup:local": "node scripts/dev/configure-local.mjs",
+    "db:generate": "pnpm --filter @meridiano/api exec drizzle-kit generate --name=base",
+    "db:migrate": "pnpm --filter @meridiano/api db:migrate",
+    "test:integration": "pnpm --filter @meridiano/contracts build && node --env-file-if-exists=.env.integration node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
+    "verify:persistence": "node --env-file=.env.integration scripts/dev/verify-persistence.mjs",
+    "security:secrets": "node scripts/dev/check-secrets.mjs",
+    "security:dependencies": "pnpm audit --audit-level high",
+    "check:format": "node scripts/dev/check-whitespace.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

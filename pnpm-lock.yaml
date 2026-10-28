@@ -193,12 +193,9 @@ importers:
       '@meridiano/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@meridiano/engine':
-        specifier: workspace:*
-        version: link:../../packages/engine
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(@types/pg@8.18.0)(pg@8.23.1)
+        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
       fastify:
         specifier: 5.12.7
         version: 5.12.7
@@ -207,8 +204,8 @@ importers:
         version: 8.23.1
     devDependencies:
       '@types/pg':
-        specifier: 8.18.0
-        version: 8.18.0
+        specifier: 8.23.1
+        version: 8.23.1
       drizzle-kit:
         specifier: 0.31.11
         version: 0.31.11
@@ -938,8 +935,8 @@ packages:
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
-  '@types/pg@8.18.0':
-    resolution: {integrity: sha512-gT+oueVQkqnj6ajGJXblFR4iavIXWsGAFCk3dP4Kki5+a9R4NMt0JARdk6s8cUKcfUoqP5dAtDSLU8xYUTFV+Q==}
+  '@types/pg@8.23.1':
+    resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
 
   '@types/react-dom@19.3.0':
     resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
@@ -2424,7 +2421,7 @@ snapshots:
     dependencies:
       undici-types: 7.24.6
 
-  '@types/pg@8.18.0':
+  '@types/pg@8.23.1':
     dependencies:
       '@types/node': 24.19.2
       pg-protocol: 1.16.1
@@ -2670,9 +2667,9 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.23.15
 
-  drizzle-orm@0.45.4(@types/pg@8.18.0)(pg@8.23.1):
+  drizzle-orm@0.45.4(@types/pg@8.23.1)(pg@8.23.1):
     optionalDependencies:
-      '@types/pg': 8.18.0
+      '@types/pg': 8.23.1
       pg: 8.23.1
 
   enhanced-resolve@5.26.0:
@@ -3363,6 +3360,19 @@ snapshots:
   uri-js@4.4.1:
     dependencies:
       punycode: 2.3.1
+
+  vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15):
+    dependencies:
+      lightningcss: 1.33.0
+      picomatch: 4.0.7
+      postcss: 8.5.32
+      rolldown: 1.2.15
+      tinyglobby: 0.2.17
+    optionalDependencies:
+      '@types/node': 24.19.2
+      esbuild: 0.28.2
+      fsevents: 2.3.3
+      tsx: 4.23.15
 
   vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15):
     dependencies:

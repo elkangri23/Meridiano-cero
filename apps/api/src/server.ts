@@ -1,32 +1,21 @@
 import { createApp } from './app.ts';
-import { readBootstrapConfig } from './config.ts';
-import { Pool } from 'pg';
+import { readAppConfig } from './config.ts';
+import { createDatabase } from './database/connection.ts';
 
 async function start(): Promise<void> {
-  const config = readBootstrapConfig(process.env);
-  const pool = new Pool({ connectionString: config.databaseUrl, max: 5, connectionTimeoutMillis: 2000, idleTimeoutMillis: 30000 });
-  const readyCheck = async () => {
-    try {
-      const client = await pool.connect();
-      try {
-        await client.query('SELECT 1');
-        return { ok: true };
-      } finally {
-        client.release();
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Error desconocido';
-      return { ok: false, detail: message };
-    }
-  };
-  const app = createApp({ readyCheck, pool });
+  const config = readAppConfig(process.env);
+  const database = createDatabase(config.databaseUrl);
+  const app = createApp({ config, database });
+  app.addHook('onClose', async () => { await database.pool.end(); });
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => { void app.close().catch(() => { process.exitCode = 1; }); void pool.end().catch(() => {}); });
   }
-  await app.listen(config);
-  console.log(`API de desarrollo en http://${config.host}:${config.port}; DB configurada.`);
+  try { await app.listen({ host: config.host, port: config.port }); }
+  catch (error) { await app.close(); throw error; }
+  console.log('API local iniciada; consultar /api/v1/ready para DB y esquema.');
 }
 start().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : 'No se pudo iniciar la API.');
+  const code = error instanceof Error && /^CONFIG_[A-Z_]+$/.test(error.message) ? error.message : 'API_START_FAILED';
+  console.error(code);
   process.exitCode = 1;
 });

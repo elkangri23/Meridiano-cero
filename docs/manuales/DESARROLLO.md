@@ -1,5 +1,7 @@
 # Desarrollo y contribución
 
+Actualización 2026-10-28: la base local de fase 1 ya está implementada. Procedimiento actual y límites: [BASE-LOCAL](BASE-LOCAL.md). Los apartados de distribución/juego completo de este documento siguen siendo objetivos de sus fases.
+
 Estado: base de workspace implementada en T1-02; DB, sesión y juego siguen pendientes. Consultar su evidencia para resultados reales de cada comando.
 
 ## Qué existe ahora

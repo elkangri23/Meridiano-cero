@@ -1,6 +1,6 @@
 # SPEC-009 Desarrollo, instalación y recuperación
 
-Estado: contrato de base cerrado para revisión de T1-01; distribución final pendiente de fase 6. Comandos de producto aún no implementados.
+Estado: base local implementada en T1-03; distribución final pendiente de fase 6. Comandos disponibles y evidencia en BASE-LOCAL y T1-03.
 Fuentes: TAD §4/9/13–15; GDD §16/17/19. ADR-004/008.
 
 ## Perfiles
@@ -204,3 +204,7 @@ en Windows x64 con Node 24.22.1 portable y Argon2 0.45.1; véase SPEC-004 y el
 registro de T1-01. No acredita contraseñas en Linux: esa comprobación sigue
 siendo condición previa a habilitarlas allí. No se modificó WSL. No se bajan versiones ni parámetros
 para esconder el fallo.
+
+## Estado de implementación de base
+
+T1-03 implementa Compose, roles mínimos, migración explícita con hashes/bloqueo, perfil y sesiones persistentes. T1-04 añade controles locales y workflow; no CI remota ejecutada. [Procedimiento vigente](../manuales/BASE-LOCAL.md), [evidencia T1-03](../quality/T1-03-evidencia.md) y [T1-04](../quality/T1-04-evidencia.md). Los apartados de selección de entorno describen observaciones históricas; no implican cambios en WSL.
