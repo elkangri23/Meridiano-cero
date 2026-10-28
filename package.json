@@ -24,7 +24,9 @@
     "verify:persistence": "node --env-file=.env.integration scripts/dev/verify-persistence.mjs",
     "security:secrets": "node scripts/dev/check-secrets.mjs",
     "security:dependencies": "pnpm audit --audit-level high",
-    "check:format": "node scripts/dev/check-whitespace.mjs"
+    "check:format": "node scripts/dev/check-whitespace.mjs",
+    "scan:secrets": "node scripts/dev/scan-secrets.mjs",
+    "eval:ai": "node --experimental-strip-types apps/api/src/ai/evaluate-cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

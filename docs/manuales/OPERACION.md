@@ -1,8 +1,6 @@
 # Operación, recuperación y diagnóstico
 
-Actualización 2026-10-28: la base local de fase 1 ya está implementada. Procedimiento actual y límites: [BASE-LOCAL](BASE-LOCAL.md). Los apartados de distribución/juego completo de este documento siguen siendo objetivos de sus fases.
-
-Estado: runbook previsto, pendiente de ensayo. No hay servicios reales que operar todavía.
+Estado: runbook objetivo de distribución, pendiente de ensayo. Existen servicios de desarrollo y CLI de IA, pero no instalación de producto aceptada ni operación pública. Para sus límites actuales consultar [ESTADO](../plan/ESTADO.md). Los procedimientos siguientes no son evidencia de ejecución.
 Contrato: SPEC-009/010/011. No incluir secretos ni conversaciones en evidencias públicas.
 
 ## Arranque y parada
@@ -51,3 +49,5 @@ Definir retención por dato antes de público. Exportar solo datos propios; borr
 ## Checklist previo a abrir público
 
 Pruebas funcionales completas; críticos/altos aplicables resueltos; permisos y CSRF revisados; endpoints/SSRF comprobados; secretos fuera de build/logs; cuota y corte global ensayados; restore probado; políticas/licencias y autoría cerradas; soporte/incidentes definidos. Registrar evidencia, no casillas sin resultado.
+
+Base local heredada de main: [BASE-LOCAL](BASE-LOCAL.md), con migraciones, readiness y sesión PostgreSQL. La evidencia de esa fase es histórica; consultar el estado integrado para las verificaciones nuevas.

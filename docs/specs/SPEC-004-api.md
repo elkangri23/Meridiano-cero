@@ -1,6 +1,6 @@
 # SPEC-004 API, identidad y persistencia de acciones
 
-Estado: cerrada para primer caso en T3-01 (2026-10-28). Contratos de juego listos para implementación en T3-02.
+Estado: contrato de base para revisión de T1-01; contrato detallado de juego y guardados desarrollado en T3-01, pendiente de implementación y verificación. Fecha: 2026-10-28. Este contrato no acredita implementación de las rutas de juego ni aceptación del hito.
 Fuentes: TAD §3,5,6,10,11,14; GDD §6,9,13. ADR-003/007/010.
 
 ## Objetivo y fronteras
@@ -152,7 +152,7 @@ Fuentes consultadas: [node-argon2](https://github.com/ranisalt/node-argon2),
 | GET /cases | filtros y paginación | Catálogo accesible sin solución |
 | POST /cases | parámetros del caso | Job de generación, fase 4 |
 | GET /cases/:id | ID autorizado | Metadatos jugables, nunca definición completa |
-| POST /runs | definitionId validado | PlayerView inicial |
+| POST /runs | caseId validado y accesible | PlayerView inicial |
 | GET /runs/:id | ID propio | PlayerView y versión |
 | POST /runs/:id/actions/preview | texto interpretado o acciones estructuradas | Plan visible, costes y confirmationToken |
 | POST /runs/:id/actions | token de preview, expectedVersion, idempotencyKey | Resultado y PlayerView |
@@ -172,9 +172,9 @@ Son contratos previstos, no endpoints existentes. Auth administrativa y exportac
 
 Request IDs generados por servidor y reflejados al cliente. Respuesta de acción: runId, version, outcome, events públicos, playerView y narrativeStatus. Nunca devolver logs internos o prompts.
 
-Error público: code estable, message segura, requestId y fieldErrors opcionales sin eco de secretos. 400 estructura inválida; 401 sin sesión; 404 recurso ausente/no autorizado para no enumerar IDs; 409 versión/clave conflictiva; 422 acción imposible o aclaración; 429 cuota; 503 dependencia no disponible. Las imposibilidades del mundo del juego también pueden expresarse como outcome en una respuesta válida; distinguirlas de error HTTP de validación.
+Error público: code estable, message segura, requestId y fieldErrors opcionales sin eco de secretos. 400 estructura inválida; 401 sin sesión; 404 recurso ausente/no autorizado; 409 versión/clave/estado conflictivo; 422 snapshot incompatible; 429 cuota; 503 dependencia necesaria no disponible. Un preview válido ambiguo o imposible responde 200 con kind clarification/impossible y sin efectos. El [contrato de juego](API-juego.md) fija códigos y recuperación sin alternativas de interpretación.
 
-Límites iniciales propuestos: texto de orden 4.000 caracteres; lote máximo 10 pasos; cuerpo normal 64 KiB; paginación 25 por defecto y 100 máximo. Importación tiene límites separados en SPEC-007. Ajustar solo mediante cambio documentado y pruebas.
+Límites iniciales propuestos: texto de orden 4.000 caracteres; lote máximo ocho pasos; cuerpo normal 64 KiB; paginación 25 por defecto y 100 máximo. Importación tiene límites separados en SPEC-007. Ajustar solo mediante cambio documentado y pruebas.
 
 ## Preview y confirmación
 
@@ -191,3 +191,19 @@ Narración se solicita tras commit. Si falla, resultado factual; no rollback de 
 ## Aceptación
 
 ACC-013/014/015/018/020/021/024. T1-01 debe comprobar disponibilidad de librerías y fijar parámetros de autenticación antes de código. Pruebas de dos usuarios, sesión revocada, token de preview viejo, CSRF, doble pestaña, fallo antes/después de commit y mismo ID con otra carga. No se utilizarán credenciales reales en fixtures.
+
+## Registro, modalidad y guardados: decisiones de producto
+
+DEC-013 confirma cuentas registradas y elección de caso para el producto local y VPS. Cada partida pertenece a un único usuario y tiene un detective jugador. Sin endpoints de participación multijugador. El perfil técnico de desarrollo descrito arriba es exclusivamente una herramienta de pruebas/desarrollo, no el sistema de cuentas del producto terminado.
+
+DEC-014 requiere autoguardado y guardado manual desde el primer caso jugable. T3-02 debe concretar sus DTO, operaciones de creación/listado/carga y errores con autorización por recurso, versión e idempotencia. Un cliente no fija ownerId ni sustituye el estado autoritativo por un JSON arbitrario. DEC-017 permite volver a un punto anterior del mismo caso. La carga requiere autorización, control de concurrencia y protección frente a reintentos; no reinicia el registro de recompensas concedidas. DEC-020 fija el primer resultado definitivo para carrera y reputación; persistirlo con unicidad y conservarlo ante cargas, nuevas partidas idénticas y reintentos.
+
+DEC-016 obliga a aclarar la orden ambigua antes de generar un plan ejecutable. No hay avance de reloj, cambios de estado ni ejecución parcial mientras falte esa decisión.
+
+## Contrato de integración T3 desarrollado
+
+[API de juego](API-juego.md) concreta DTO por campo, parámetros de acciones, rutas, tokens, errores y precedencia de idempotencia; [guardados](GUARDADOS.md) concreta snapshots y carga. Estos anexos son la referencia detallada para T3 y resuelven el catálogo preliminar de esta spec. No implican endpoints implementados.
+
+La versión HTTP de concurrencia pertenece al agregado persistido y no se copia del snapshot interno del motor al restaurar. Narración, memoria y eventos se vinculan a rama/operación. Los esquemas ejecutables se implementarán una sola vez en contratos/validación; no mantener dos validadores divergentes por frontend y backend.
+
+Las pruebas previstas se desglosan en [aceptación T3](../quality/T3-aceptacion-detallada.md), con distinción explícita entre contrato y ejecución.

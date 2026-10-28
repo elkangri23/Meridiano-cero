@@ -47,3 +47,7 @@ pnpm check:imports falla con siete infracciones heredadas: contracts reexporta t
 La consulta a 127.0.0.1:11434/api/tags no obtuvo respuesta desde este entorno. No demuestra que Ollama no esté instalado; no se ha seleccionado/evaluado modelo ni cambiado configuración.
 
 Validación documental: 52 Markdown, 107 requisitos, 39 tareas, 12 specs, 10 ADR, 40 escenarios y 15 controles; enlaces/IDs/grafo y originales Word correctos. La salida HTTP y la compilación no sustituyen revisión visual ni pruebas interactivas.
+
+## Lectura histórica y estado posterior
+
+Este registro conserva las verificaciones del primer prototipo y sus 60 pruebas de base. Después se corrigió el diseño a MS-DOS/pixel art y se observó la vista de escritorio; teclado completo, móvil y accesibilidad siguen pendientes. El avance IA y la suite posterior de 146 pruebas se registran en [T3-04](T3-04.md). Consultar [estado consolidado](../plan/ESTADO.md) para no interpretar las limitaciones históricas como ausencia actual de esos servicios.

@@ -5,7 +5,7 @@ Fuentes: TAD §4/9/13–15; GDD §16/17/19. ADR-004/008.
 
 ## Perfiles
 
-Development: Vite y API en host o Compose, PostgreSQL en Compose y Ollama en host. Solo loopback para servicios de prueba. Perfil de prueba explícito sin credencial universal. Semillas/fixtures ficticios.
+Development: Vite y API en host o Compose y PostgreSQL en Compose; IA configurable: Ollama en casa y FreeLLMAPI en trabajo según DEC-018. Solo loopback para servicios de prueba. Perfil de prueba explícito sin credencial universal. Semillas/fixtures ficticios.
 
 Self-hosted: web, API, DB y worker desde fase 4; proxy HTTPS recomendado. Primer administrador por bootstrap de un uso; registro deshabilitado por defecto y activable por administrador. El juego funciona con proveedor propio sin llamar a infraestructura del creador.
 
@@ -42,7 +42,7 @@ ni anuncia comandos disponibles. La configuración del producto será independie
 | pg | 8.23.1, MIT | Cliente PostgreSQL sin pg-native; peer de Drizzle >=8 |
 | Docker | CLI 26.1.3 observado | No demuestra daemon accesible ni versión admitida definitiva |
 | Compose | Subcomando docker compose ausente en Ubuntu | Bloqueo de entorno para T1-03; no instalar como efecto de esta tarea |
-| Ollama | Ejecutable no localizado en PATH de Ubuntu | No demuestra ausencia en Windows; necesario evaluar en T3-01 |
+| Ollama | Ejecutable no localizado en PATH de Ubuntu | Inventario histórico; no exige Ollama en trabajo/VPS. Evaluar el proveedor disponible según DEC-018 |
 
 La selección no actualiza Ubuntu ni Docker. Docker Desktop figuraba detenido
 en el inventario WSL; no se ha arrancado para esta tarea. La ausencia de Compose

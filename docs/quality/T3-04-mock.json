@@ -1,0 +1,234 @@
+{
+  "recordedAt": "2026-10-28T14:11:27.097Z",
+  "hardware": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpu": "11th Gen Intel(R) Core(TM) i7-1195G7 @ 2.90GHz",
+    "memoryBytes": 16804995072
+  },
+  "nodeVersion": "v24.22.1",
+  "status": "evaluated",
+  "metadata": {
+    "mode": "mock",
+    "model": "deterministic-ci"
+  },
+  "evaluation": {
+    "corpusVersion": 2,
+    "passed": true,
+    "results": [
+      {
+        "id": "clear",
+        "passed": true,
+        "source": "actions",
+        "latencyMs": 3
+      },
+      {
+        "id": "paraphrase",
+        "passed": true,
+        "source": "actions",
+        "latencyMs": 0
+      },
+      {
+        "id": "travel",
+        "passed": true,
+        "source": "actions",
+        "latencyMs": 0
+      },
+      {
+        "id": "conversation",
+        "passed": true,
+        "source": "actions",
+        "latencyMs": 0
+      },
+      {
+        "id": "batch",
+        "passed": true,
+        "source": "actions",
+        "latencyMs": 0
+      },
+      {
+        "id": "ambiguous",
+        "passed": true,
+        "source": "clarification",
+        "latencyMs": 0
+      },
+      {
+        "id": "impossible",
+        "passed": true,
+        "source": "clarification",
+        "latencyMs": 0
+      },
+      {
+        "id": "missing-evidence",
+        "passed": true,
+        "source": "clarification",
+        "latencyMs": 0
+      },
+      {
+        "id": "injection",
+        "passed": true,
+        "source": "clarification",
+        "latencyMs": 0
+      },
+      {
+        "id": "english",
+        "passed": true,
+        "source": "actions",
+        "latencyMs": 0
+      },
+      {
+        "id": "repeat-clear",
+        "passed": true,
+        "source": "actions",
+        "latencyMs": 4
+      },
+      {
+        "id": "confirmed-result",
+        "passed": true,
+        "source": "model",
+        "latencyMs": 1
+      },
+      {
+        "id": "npc-12",
+        "passed": true,
+        "source": "model",
+        "latencyMs": 1
+      },
+      {
+        "id": "npc-13",
+        "passed": true,
+        "source": "model",
+        "latencyMs": 0
+      },
+      {
+        "id": "npc-14",
+        "passed": true,
+        "source": "model",
+        "latencyMs": 0
+      },
+      {
+        "id": "memory-resume",
+        "passed": true,
+        "source": "model",
+        "latencyMs": 2
+      },
+      {
+        "id": "memory-revoked",
+        "passed": true,
+        "source": "model",
+        "latencyMs": 0
+      }
+    ]
+  },
+  "metrics": [
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "interpretAction",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "narrateResult",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "converse",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "converse",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "converse",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "converse",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "converse",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    },
+    {
+      "operation": "converse",
+      "latencyMs": 0,
+      "usage": null,
+      "error": null
+    }
+  ],
+  "scope": "Corpus sintético; no sustituye evaluación del caso fijo, memoria persistente ni E2E."
+}

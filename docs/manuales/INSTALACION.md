@@ -1,16 +1,22 @@
 # Puesta en funcionamiento prevista
 
-Actualización 2026-10-28: la base local de fase 1 ya está implementada. Procedimiento actual y límites: [BASE-LOCAL](BASE-LOCAL.md). Los apartados de distribución/juego completo de este documento siguen siendo objetivos de sus fases.
+Actualizado: 2026-10-28. Hay base ejecutable y Compose de desarrollo; todavía no hay distribución del juego completa ni instalación independiente aceptada. [Estado y bloqueos](../plan/ESTADO.md). Esta guía separa lo disponible de los procedimientos futuros.
 
-Estado: guía de diseño. El proyecto todavía NO se puede arrancar como juego. Se convertirá en runbook probado en fases 1 y 6. No se proporciona URL ficticia de repositorio ni se afirma que un compose inexistente funciona.
+## Desarrollo local disponible
 
-## Desarrollo local
+El [manual de desarrollo](DESARROLLO.md) recoge versiones, copia segura de .env y arranque web/API. El prototipo /prototype y la evaluación mock funcionan sin modelo real; no son el juego completo.
 
-Requisitos futuros: runtime Node/pnpm con versiones fijadas, Docker Compose, espacio para PostgreSQL y un proveedor local compatible. Primero comprobar entorno y puertos; después configurar variables privadas, levantar DB, aplicar migraciones y arrancar API/web. Probar fixture antes de integrar modelo.
+La base vigente se describe en [BASE-LOCAL](BASE-LOCAL.md): setup:local genera configuración, compose.yaml arranca PostgreSQL y db:migrate aplica SQL con ledger. Readiness comprueba DB y migraciones; la sesión técnica de desarrollo existe.
 
-Ollama se ejecutará preferentemente fuera de Docker. Desde contenedores habrá que comprobar la dirección del host: host.docker.internal puede servir en Docker Desktop y requerir configuración distinta en Linux. No abrir el proveedor local a Internet para resolver conectividad.
+~~~text
+pnpm setup:local
+docker compose -f compose.yaml up -d --wait
+pnpm db:migrate
+~~~
 
-Validación de arranque: health/readiness correctos, DB migrada, usuario local de prueba seguro, fixture accesible y preferencias persistidas tras reinicio. Prueba de modelo separada de calidad de generación.
+No sobrescribir secretos ni mezclar los volúmenes con docker-compose.yml, que es un stack heredado distinto. Los ensayos de DB de fase 1 tienen su evidencia histórica; la integración T3 no los convierte en pruebas de guardado del juego.
+
+Sesión base no significa API de partidas: faltan ownership/preview/commit, guardados manuales y preferencias persistidas del juego. [Evaluación IA](IA-LOCAL.md) separa mock y proveedor real; el adaptador Ollama actual sigue restringido a loopback.
 
 ## Autoalojamiento con Docker
 
@@ -28,7 +34,7 @@ Secuencia prevista:
 9. Ejecutar test de proveedor y caso fijo.
 10. Crear backup y probar restauración antes de uso importante.
 
-El futuro comando `docker compose up -d` no sustituye la configuración de secretos, HTTPS, proveedor y datos persistentes. No ejecutar aún: no existe archivo de distribución.
+El Compose de desarrollo presente no sustituye al futuro paquete de distribución. El arranque autoalojado completo exige resolver configuración, secretos, HTTPS, migraciones y persistencia; no se presenta como un procedimiento probado.
 
 ## Variables previstas
 
@@ -44,7 +50,7 @@ El futuro comando `docker compose up -d` no sustituye la configuración de secre
 | AI_API_KEY | Credencial si se necesita | Solo servidor |
 | Clave de cifrado separada | Cifrado de credenciales guardadas | Requerida solo al habilitar esa capacidad |
 
-Son nombres contractuales propuestos; la fase 1 los materializa en esquema de configuración y ejemplo. No pegar claves en archivos públicos.
+La tabla describe configuración objetivo. APP_MODE, API_HOST/API_PORT, PUBLIC_ORIGIN, DATABASE_URL y las banderas de sesión/registro tienen validación inicial; las demás capacidades siguen propuestas. La CLI IA actual usa OLLAMA_ORIGIN y --model, no AI_PROVIDER/AI_MODEL. No pegar claves en archivos públicos.
 
 ## VPS público
 

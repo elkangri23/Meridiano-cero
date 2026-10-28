@@ -33,7 +33,7 @@ Todos los escenarios de producto están NO EJECUTADOS. Se implementarán en las 
 | ACC-027 | Cuota rechaza antes de invocar, corte global, concurrencia/cancelación y métricas comprobados | Integración |
 | ACC-028 | Fallos de acceso/proveedor generan logs redactados y alerta verificable; incidente recuperable | Operación |
 | ACC-029 | Variedad delitos/dificultad/región/duración; Familiar/General filtrados antes y durante juego | Generador/manual |
-| ACC-030 | Carrera recuperable, etiquetas cualitativas y sin recompensas por repetir expediente idéntico | Motor/E2E |
+| ACC-030 | Carrera recuperable, etiquetas cualitativas; primer resultado oficial para carrera/reputación, invariable ante cargas/repeticiones y sin recompensas duplicadas | Motor/E2E |
 | ACC-031 | Audio/TTS configurables independientes, traducción, texto equivalente y preferencias persistidas | E2E/manual |
 | ACC-032 | Instalación independiente arranca con proveedor propio sin cuenta ni llamadas al creador | Instalación |
 | ACC-033 | Registro público permite jugar sin API personal; política de retención/exportación/borrado probada | E2E/operación |
@@ -56,3 +56,7 @@ F6: 026/032/035.
 F7: completar 020–028/033 y revisión de todos los requisitos v1.
 
 No todos los tipos de prueba son automáticos. La conformidad de accesibilidad requiere evaluación manual además de herramientas.
+
+## Desglose verificable del primer caso
+
+Los ACC compuestos se desarrollan en [68 subcasos de aceptación T3](T3-aceptacion-detallada.md): API/autorización, guardados, memoria NPC, proveedores y UI. El documento define precondición, resultado y tipo de prueba. Son escenarios a implementar; no se suman a las 146 pruebas ya ejecutadas ni acreditan por sí solos los ACC completos.

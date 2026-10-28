@@ -43,3 +43,23 @@ SPEC-007 definirá formato completo. Límite inicial propuesto para diseño: JSO
 ## Aceptación
 
 ACC-001/002/014/015/017/021/023/024. Comprobar proyección con un objeto centinela secreto, referencias rotas, versión futura, hash alterado, dos usuarios, dos partidas y reinicio. El validador documental actual no implementa estos controles.
+
+## Aclaraciones de propiedad y guardado confirmadas
+
+El usuario se registra, selecciona un caso y juega en solitario. Cada CaseRun tiene un único propietario y un solo detective jugador; no hay cooperación o competición multijugador, ni local ni en VPS. Esta regla no limita el número de cuentas de una instalación ni obliga a una sola partida por cuenta.
+
+El primer caso jugable tendrá autoguardado y guardado manual. Ambos deben conservar el estado completo necesario para reanudar: reloj, descubrimientos, solicitudes, conversación/memoria NPC, órdenes, lotes y versión del motor/expediente. Crear un guardado no consume tiempo del juego ni cambia la verdad del caso. No se aceptan estados arbitrarios enviados por el cliente como guardados válidos.
+
+DEC-017 confirma cargar puntos manuales anteriores para probar otras decisiones. DEC-021 fija diez manuales por partida además del estado actual autoguardado; no se borran manuales automáticamente. DEC-020 fija el primer resultado para carrera/reputación. Estas decisiones no se dan por resueltas por confirmar que existen ambos modos. Referencia: DEC-013/014 en BASELINE; tareas T3-02/T3-03 y aceptación ACC-014/021.
+
+### Carga de un punto anterior confirmada
+
+Un guardado manual permite restaurar el estado del mismo caso a ese instante y continuar tomando otras decisiones. Se restauran también reloj, pendientes y memoria NPC; no se conserva conocimiento de la rama abandonada dentro de esos estados. La definición y su hash permanecen iguales.
+
+El retroceso narrativo no rebobina la versión de concurrencia del servidor ni elimina la auditoría operativa. La carga debe invalidar previews antiguos y protegerse frente a acciones en vuelo. El registro de recompensas ya otorgadas no se elimina al cargar un punto anterior. DEC-020 confirma que carrera y reputación conservan el primer resultado definitivo; el registro oficial no se restaura desde un guardado ni cambia por una resolución posterior.
+
+## Persistencia detallada para T3
+
+[GUARDADOS](GUARDADOS.md) define la unidad de autoguardado, límites, registros, endpoints y carga atómica. No hace falta crear copias periódicas para el autoguardado: cada transición confirmada ya deja durable el último estado. Los snapshots manuales son independientes e inmutables salvo sus metadatos.
+
+[API-juego](API-juego.md) define PlayerViewDto público con rama/revisión del agregado, nombres autorizados y solicitudes sin payload interno. No equivale a serializar el tipo PlayerView heredado. El esquema actual requiere adaptación antes de conectar la UI; los anexos no certifican esa integración.

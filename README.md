@@ -1,90 +1,46 @@
 # Meridiano-cero
 
-Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Estado: base de fase 1 implementada con PostgreSQL y sesión local. Todavía no hay partida jugable, motor ni IA.
+Videojuego de investigación internacional; A.C.M.E. es el nombre provisional. Estado integrado al 2026-10-28: base PostgreSQL con migrador y sesión local, motor implementado, prototipo MS-DOS/pixel art y servicios IA independientes del proveedor. No hay todavía investigación completa conectada, guardados manuales ni evaluación real del modelo.
 
-## Implementación
+## Estado y contratos
 
-- [Índice del paquete de implementación](docs/README.md)
-- [Roadmap por hitos](docs/plan/ROADMAP.md)
-- [Backlog preparado y dependencias](docs/plan/BACKLOG.md)
-- [Requisitos trazables](docs/plan/REQUISITOS.md)
-- [Funcionalidades](docs/plan/FUNCIONALIDADES.md) y [tareas detalladas](docs/plan/TAREAS.md)
-- [Uso, desarrollo, instalación y operación](docs/manuales/README.md)
-- [Arquitectura](docs/architecture/ARQUITECTURA.md) y [glosario](docs/architecture/GLOSARIO.md)
-- [Specs](docs/specs/README.md), [ADR](docs/adr/README.md) y [matriz OWASP](docs/security/OWASP.md)
+- [Estado integrado y límites](docs/plan/ESTADO.md).
+- [Roadmap](docs/plan/ROADMAP.md), [backlog](docs/plan/BACKLOG.md) y [tareas](docs/plan/TAREAS.md).
+- [Índice documental](docs/README.md), [requisitos](docs/plan/REQUISITOS.md) y [funcionalidades](docs/plan/FUNCIONALIDADES.md).
+- [Base local](docs/manuales/BASE-LOCAL.md), [desarrollo](docs/manuales/DESARROLLO.md) y [evaluación IA](docs/manuales/IA-LOCAL.md).
+- [API](docs/specs/API-juego.md), [guardados](docs/specs/GUARDADOS.md), [conversaciones](docs/specs/CONVERSACIONES.md) y [proveedores](docs/specs/IA-proveedores.md).
 
-React/TypeScript, Fastify, PostgreSQL, pnpm y Docker Compose. Motor determinista separado de IA, web y persistencia. KISS, DRY y seguridad verificable son criterios de entrega, no afirmaciones de controles ya implementados.
+## Desarrollo local
 
-## Estado de T1 (fase 1)
+Requisitos: Node 24.22.1, pnpm 12.15.0 y Docker Desktop con motor Linux. Desde el worktree:
 
-| Tarea | Estado | Descripción |
-|---|---|---|
-| T1-01 | ✅ Completada | Contratos de base SPEC-004/009/011 cerrados; sesiones locales, API v1, configuración y migraciones |
-| T1-02 | ✅ Completada | Workspace pnpm mínimo: web React/Vite, API Fastify, contratos compartidos, TS strict, lint, guards |
-| T1-03 | ✅ Completada | Compose PostgreSQL, Drizzle schema, migración SQL, health/readiness, pool pg |
-| T1-04 | ⏳ Pendiente | CI con tipos/lint/imports/pruebas, lockfile congelado, escaneo secretos/dependencias |
-
-## Desarrollo local de la base
-
-Requisitos: Node 24.22.1, pnpm 12.15.0 y Docker Desktop con motor Linux activo.
-Usar un worktree. No compartir node_modules entre Windows y Linux.
-
-```text
-pnpm install --frozen-lockfile --ignore-scripts
+~~~text
+pnpm install --frozen-lockfile
 pnpm setup:local
-docker compose up -d --wait
+docker compose -f compose.yaml up -d --wait
 pnpm db:migrate
 pnpm dev
-```
+~~~
 
-setup:local genera .env y secretos únicos sin imprimirlos ni sobrescribir archivos.
-No copiar la plantilla encima de una configuración existente. PostgreSQL usa
-127.0.0.1:15432 y volumen persistente; la API 127.0.0.1:3000; web en
-http://127.0.0.1:5173. No hay registro público. Health acredita proceso; ready,
-DB y esquema. La sesión local solo está habilitada en development con origen exacto.
+setup:local genera configuración privada sin sobrescribirla ni imprimir claves. Si ya existe, conservarla y revisar el manual. No copiar la plantilla sobre secretos propios.
 
-```text
-pnpm typecheck
-pnpm lint
-pnpm check:format
-pnpm test
+La base vigente usa compose.yaml (solo PostgreSQL en 127.0.0.1:15432); API y Vite se ejecutan en host. docker-compose.yml es un archivo heredado distinto, sin validación del stack completo; no usarlo como sustituto de este procedimiento ni mezclar volúmenes.
+
+Web: http://127.0.0.1:5173. API: http://127.0.0.1:3000/api/v1/health. Readiness comprueba DB y migraciones esperadas. Sesión de desarrollo solo en loopback, sin registro público ni contraseñas por defecto.
+
+El prototipo de desarrollo está en /prototype del puerto Vite; para 5174: pnpm --filter @meridiano/web dev --port 5174. Usa datos sintéticos, sin IA ni partidas conectadas, y se excluye de producción.
+
+## Verificación e integración
+
+~~~text
 pnpm build
-pnpm verify:guards
-pnpm smoke
-pnpm security:dependencies
-pnpm security:secrets --verify-detector
-```
+pnpm typecheck
+pnpm test
+pnpm eval:ai --mock
+python3 scripts/verify_docs.py
+~~~
 
-Pruebas de integración aisladas (no usar una DB real):
-
-```text
-pnpm setup:local --test
-docker compose --env-file .env.integration -p meridiano-cero-t1-test up -d --wait
-pnpm test:integration
-pnpm verify:persistence
-docker compose --env-file .env.integration -p meridiano-cero-t1-test down
-```
-
-El test usa puerto 15433 y otro volumen. verify:persistence detiene y recrea
-únicamente ese contenedor, conservando datos. down no elimina el volumen.
-verify:guards genera/retira archivos sintéticos; ejecutarlo sin watchers.
-La CI GitHub está definida y fijada por SHA; no se ha ejecutado remotamente ni
-se ha hecho push. Hay un aviso moderado de tooling registrado en la evidencia.
-
-Entrega: [T1-03](docs/quality/T1-03-evidencia.md),
-[T1-04](docs/quality/T1-04-evidencia.md) y [guía de base](docs/manuales/BASE-LOCAL.md).
-
-### Base de datos (T1-03)
-
-```bash
-docker compose up -d db
-cp .env.example .env
-pnpm --filter @meridiano/api db:migrate
-pnpm --filter @meridiano/api dev
-```
-
-Health: http://127.0.0.1:3000/api/v1/health (proceso)
-Readiness: http://127.0.0.1:3000/api/v1/ready (DB + migración)
+[Registro de integración](docs/quality/INTEGRACION-T3-04.md): resultados del merge, controles pendientes y alcance exacto. El corpus mock no acredita calidad de un proveedor real ni E2E del juego.
 
 ## Contexto del proyecto
 

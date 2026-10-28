@@ -1,6 +1,12 @@
 # Manual de juego previsto
 
-Este manual describe funciones planificadas según el GDD. No hay todavía una versión ejecutable. No incluye la solución del caso fijo; su spec es material de desarrollo con spoilers.
+Este manual describe la experiencia objetivo del GDD. Existe un prototipo ejecutable de desarrollo, sin investigación jugable ni guardado. No incluye la solución del caso fijo; su spec es material de desarrollo con spoilers.
+
+## Uso disponible del prototipo
+
+Abrir /prototype en el puerto de Vite; el avance se mostró en http://127.0.0.1:5174/prototype. Solo existe en desarrollo y usa datos sintéticos. Permite abrir dossier, atlas, laboratorio, comunicaciones y ajustes de lectura; preparar texto y abrir/cancelar una confirmación de muestra. Fuente alternativa, escala y contraste son ajustes locales del prototipo, no preferencias persistidas por usuario.
+
+Navegar y confirmar la muestra no ejecuta acciones, consume tiempo, consulta un LLM ni guarda partidas. El resto de este manual describe el juego que se conectará en las tareas pendientes. [Estado actual](../plan/ESTADO.md).
 
 ## Entrar y crear detective
 
@@ -63,3 +69,9 @@ La lengua del juego será independiente de la nacionalidad del personaje. Ningun
 ## Exportar e importar
 
 Se podrán compartir expedientes completos validados entre instalaciones/proveedores. Exportar contiene la solución y debe confirmarse conscientemente; no es exportar solo las notas del detective. Importar revalida el contenido y no ejecuta código del archivo.
+
+## Decisiones confirmadas para el primer caso
+
+El usuario se registra, elige un caso y lo juega en solitario, con un detective jugador por partida. No hay multijugador en local ni VPS. El primer caso jugable incluirá autoguardado y guardados manuales, además de ventanas retro movibles y minimizables. Si una orden es ambigua, el juego preguntará antes de actuar.
+
+Son requisitos confirmados, no prestaciones nuevas del prototipo actual. Puedes cargar un guardado manual para volver atrás y probar otras decisiones del mismo caso. No se duplican recompensas al repetir. Para carrera y reputación contará el primer resultado definitivo del caso. Puedes repetirlo para practicar, pero las resoluciones posteriores no sustituyen ese resultado ni conceden nuevas recompensas. Dispondrás de diez guardados manuales por partida de caso, además del autoguardado. Al alcanzar el límite elegirás cuál borrar o reemplazar; no se eliminarán manuales automáticamente.

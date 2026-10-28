@@ -1,6 +1,8 @@
 # Arquitectura de implementación
 
-Estado: arquitectura objetivo; base web/API inicial implementada en T1-02. Motor, DB e IA siguen pendientes. Derivada del TAD y del plan aceptado; detalles normativos en specs y decisiones en ADR.
+Actualizado: 2026-10-28. Este documento describe la arquitectura objetivo. Existen web/API, contratos, case-schema, engine y artefactos PostgreSQL; la IA parcial reside en apps/api/src/ai. La coordinación HTTP/transaccional de partidas sigue pendiente. [Estado verificable](../plan/ESTADO.md). Derivada del TAD y del plan aceptado; detalles normativos en specs y decisiones en ADR.
+
+Los diagramas siguientes son flujos de destino: no representan una integración completa ya disponible. No hay worker, generador ni paquete ai-adapters independiente.
 
 ## Flujo de una acción
 

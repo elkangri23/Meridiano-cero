@@ -1,6 +1,6 @@
 # Tareas detalladas de implementación
 
-El [backlog](BACKLOG.md) es la fuente de estado, dependencias y entregable. Este documento concreta pasos y criterio de salida por tarea, sin duplicar estados. Requisitos se heredan de la [matriz](REQUISITOS.md). Todas las tareas esperan sus dependencias; ninguna está implementada por existir esta descripción.
+El [backlog](BACKLOG.md) es la fuente de estado, dependencias y entregable. Este documento concreta pasos y criterio de salida por tarea, sin duplicar estados. Requisitos se heredan de la [matriz](REQUISITOS.md). La implementación y las dependencias vigentes se consultan en el backlog y el [estado consolidado](ESTADO.md); ninguna tarea se considera terminada por existir esta descripción.
 
 T1-01 cierra la base; E4-01/E5-01/E6-01/E7-01 revisan y cierran la spec de su fase antes de sus tareas T. Son gates de preparación, no sustitutos del hito completo. Usar [plantilla de evidencia](../templates/evidencia.md) al ejecutar.
 
@@ -92,7 +92,7 @@ Salida comprobable: Demostrar que ambas rutas acaban bajo plazo con retraso máx
 
 Contratos: SPEC-004/005/006; ADR-006/007.
 
-Definir DTO de preview/commit y errores; probar un modelo local realmente disponible; diseñar pantalla y foco en móvil/escritorio.
+Implementar la revisión de contratos [API](../specs/API-juego.md), [guardados](../specs/GUARDADOS.md) y [conversaciones](../specs/CONVERSACIONES.md); evaluar el proveedor real disponible según DEC-018, sin exigir Ollama en el trabajo; cerrar wireframes/foco y datos de política del fixture.
 
 Salida comprobable: Cerrar límites de contexto/timeout tras medición y conjunto adversarial antes de acoplar UI e IA.
 
@@ -100,7 +100,7 @@ Salida comprobable: Cerrar límites de contexto/timeout tras medición y conjunt
 
 Contratos: SPEC-004/011; ADR-007.
 
-Persistir transiciones en transacción con clave/versión y ownership. Endpoint devuelve PlayerView; la narración sucede después.
+Persistir transiciones con ownership, revisión del agregado y branchId, ledger de idempotencia, autoguardado, diez manuales, restauración y registro oficial externo a snapshots. Implementar PlayerViewDto explícito y recuperación de operaciones según los anexos. La narración de eventos confirmados sucede después del commit; selección de diálogo previa revalidada, sin HTTP externo bajo bloqueos SQL.
 
 Salida comprobable: Dos pestañas disputan versión, dos usuarios disputan runId, reintento tras timeout devuelve resultado único; pruebas CSRF.
 
@@ -108,7 +108,7 @@ Salida comprobable: Dos pestañas disputan versión, dos usuarios disputan runId
 
 Contratos: SPEC-006; ADR-003.
 
-Construir interfaz del fixture, herramientas y confirmaciones; un panel no ejecuta reglas por su cuenta.
+Construir interfaz del fixture, ventanas movibles/minimizables desde el primer caso, herramientas, guardados y estados de interpretación/confirmación/recuperación. Aplicar foco, modo móvil y preferencias separadas de snapshots según SPEC-006. Un panel no ejecuta reglas por su cuenta.
 
 Salida comprobable: Completar flujo con teclado; visualizar pendientes, cierre y errores sin pistas automáticas ni secretos en DOM.
 
@@ -116,7 +116,7 @@ Salida comprobable: Completar flujo con teclado; visualizar pendientes, cierre y
 
 Contratos: SPEC-005; ADR-006.
 
-Integrar Ollama y doble de CI; contexto autorizado por NPC y plantillas factuales para resultados no justificables.
+Integrar proveedor mediante contrato común y doble de CI; Ollama en casa y FreeLLMAPI en trabajo/VPS según DEC-018. Contexto autorizado por NPC y plantillas factuales para resultados no justificables. Avance parcial y pendientes registrados en [evidencia T3-04](../quality/T3-04.md); estado vigente en BACKLOG.
 
 Salida comprobable: Instrucciones hostiles, negación de NPC, referencia contextual, modelo caído e intento de inventar evidencia producen salida segura.
 

@@ -22,7 +22,7 @@ Mantener corpus de órdenes claras, ambiguas, lotes, referencias, imposibles e i
 
 ## Revisión del prototipo
 
-Comprobar visualmente escritorio/móvil, navegación por teclado, entrada/confirmación/cancelación, retorno de foco, escala y contraste. Es una revisión pendiente por fallo de adjunto del navegador integrado, no sustituida por HTTP 200 ni build. No declarar AA ni E2E aprobado.
+Comprobar visualmente escritorio/móvil, navegación por teclado, entrada/confirmación/cancelación, retorno de foco, escala y contraste. Se realizó una revisión visual parcial de escritorio durante la corrección MS-DOS/pixel art. La revisión interactiva completa y móvil sigue pendiente; HTTP 200 y build no la sustituyen. No declarar AA ni E2E aprobado.
 
 ## Reglas visuales consultadas antes de modificar el prototipo
 
