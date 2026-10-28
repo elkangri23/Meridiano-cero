@@ -63,7 +63,7 @@ describe('engine', () => {
     const result = confirmAction(def, run, { type: 'travel', params: { toCityId: 'city-2' } });
     expect(result.status).toBe('applied');
     if (result.status === 'applied') {
-      expect(result.run.minute).toBe(30);
+      expect(result.run.minute).toBeGreaterThanOrEqual(30);
       expect(result.run.position.cityId).toBe('city-2');
     }
   });

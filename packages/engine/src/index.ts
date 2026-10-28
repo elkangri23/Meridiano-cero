@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
+import { advanceMinute, hasExpired, seededDelay } from './clock.js';
 import type {
   CaseDefinition,
   CaseRun,
   PlayerView,
   FinalReport,
+  ScheduledResult,
 } from '@meridiano/case-schema';
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
@@ -290,12 +292,14 @@ export function resolveAction(
       if (!duration) {
         return { status: 'impossible', run, events: [], reason: 'No hay ruta disponible.' };
       }
-      const cost = duration.minutes;
+      const baseCost = duration.minutes;
+      const tripIndex = run.discoveries.filter((d) => d.startsWith('travel:')).length;
+      const delay = seededDelay(def.seed, tripIndex);
       const preview: ActionPreview = {
         actionType: 'travel',
-        estimatedMinutes: cost,
-        estimatedEndTime: run.minute + cost,
-        description: `Viaje a ${toCityId}: ${cost} minutos.`,
+        estimatedMinutes: baseCost,
+        estimatedEndTime: run.minute + baseCost + delay,
+        description: `Viaje a ${toCityId}: ${baseCost} minutos (retraso posible: ${delay > 0 ? delay + ' min' : 'ninguno'}).`,
       };
       return { status: 'confirmation_required', run, events: [], preview };
     }
@@ -447,6 +451,84 @@ export function resolveAction(
       return { status: 'applied', run: newRun, events: allEvents };
     }
 
+    case 'wait': {
+      const minutes = action.params.minutes;
+      if (typeof minutes !== 'number' || !Number.isInteger(minutes) || minutes < 1) {
+        return { status: 'impossible', run, events: [], reason: 'minutes inválido.' };
+      }
+      const newMinute = advanceMinute(run.minute, minutes, def.deadlineMinutes);
+      const expired = hasExpired(newMinute, def.deadlineMinutes);
+
+      // Madurar solicitudes pendientes cuyo dueMinute <= newMinute
+      const matured = run.pendingRequests.filter((r) => r.dueMinute <= newMinute);
+      const remaining = run.pendingRequests.filter((r) => r.dueMinute > newMinute);
+
+      const newRun: CaseRun = {
+        ...run,
+        version: run.version + 1,
+        minute: newMinute,
+        pendingRequests: remaining,
+      };
+      const events = [makeEvent(run.minute, 'wait', { minutes, matured: matured.length })];
+
+      if (expired) {
+        const report: FinalReport = {
+          result: def.objectives.some((o) => o.achieved) ? 'partial' : 'unresolved',
+          objectivesAchieved: def.objectives.filter((o) => o.achieved).map((o) => o.id),
+          reason: 'deadline',
+          minute: newMinute,
+        };
+        const closedRun: CaseRun = { ...newRun, status: 'closed', finalReport: report };
+        return { status: 'case_closed', run: closedRun, events, report };
+      }
+
+      return { status: 'applied', run: newRun, events };
+    }
+
+    case 'communicate': {
+      const channel = action.params.channel;
+      const recipient = action.params.recipient;
+      const content = action.params.content;
+      if (typeof channel !== 'string' || typeof recipient !== 'string') {
+        return { status: 'impossible', run, events: [], reason: 'channel/recipient inválidos.' };
+      }
+      const requestId = `req-${nextOrdinal()}`;
+      const newRequest: ScheduledResult = {
+        id: requestId,
+        dueMinute: run.minute + 30,
+        type: 'communicate',
+        payload: { channel, recipient, content },
+      };
+      const newRun: CaseRun = {
+        ...run,
+        version: run.version + 1,
+        pendingRequests: [...run.pendingRequests, newRequest],
+      };
+      const events = [makeEvent(run.minute, 'communicate', { requestId, channel, recipient })];
+      return { status: 'applied', run: newRun, events };
+    }
+
+    case 'query': {
+      const topic = action.params.topic;
+      if (typeof topic !== 'string') {
+        return { status: 'impossible', run, events: [], reason: 'topic inválido.' };
+      }
+      const requestId = `req-${nextOrdinal()}`;
+      const newRequest: ScheduledResult = {
+        id: requestId,
+        dueMinute: run.minute + 30,
+        type: 'query',
+        payload: { topic },
+      };
+      const newRun: CaseRun = {
+        ...run,
+        version: run.version + 1,
+        pendingRequests: [...run.pendingRequests, newRequest],
+      };
+      const events = [makeEvent(run.minute, 'query', { requestId, topic })];
+      return { status: 'applied', run: newRun, events };
+    }
+
     case 'finish': {
       if (action.params.confirmed !== true) {
         return { status: 'confirmation_required', run, events: [], preview: {
@@ -515,15 +597,42 @@ export function confirmAction(
       if (!duration) {
         return { status: 'impossible', run, events: [], reason: 'No hay ruta disponible.' };
       }
-      const cost = duration.minutes;
-      const newMinute = run.minute + cost;
+      const baseCost = duration.minutes;
+      const tripIndex = run.discoveries.filter((d) => d.startsWith('travel:')).length;
+      const delay = seededDelay(def.seed, tripIndex);
+      const totalCost = baseCost + delay;
+      const newMinute = advanceMinute(run.minute, totalCost, def.deadlineMinutes);
+      const expired = hasExpired(newMinute, def.deadlineMinutes);
+
+      const newDiscoveries = run.discoveries.includes(`travel:${toCityId}`)
+        ? run.discoveries
+        : [...run.discoveries, `travel:${toCityId}`];
+
       const newRun: CaseRun = {
         ...run,
         version: run.version + 1,
         minute: newMinute,
         position: { cityId: toCityId, locationId: run.position.locationId },
+        discoveries: newDiscoveries,
       };
-      const events = [makeEvent(run.minute, 'travel', { toCityId, cost })];
+      const events = [makeEvent(run.minute, 'travel', { toCityId, baseCost, delay, totalCost })];
+
+      if (expired) {
+        // Vencimiento: cerrar por plazo
+        const report: FinalReport = {
+          result: def.objectives.some((o) => o.achieved) ? 'partial' : 'unresolved',
+          objectivesAchieved: def.objectives.filter((o) => o.achieved).map((o) => o.id),
+          reason: 'deadline',
+          minute: newMinute,
+        };
+        const closedRun: CaseRun = {
+          ...newRun,
+          status: 'closed',
+          finalReport: report,
+        };
+        return { status: 'case_closed', run: closedRun, events, report };
+      }
+
       return { status: 'applied', run: newRun, events };
     }
 
