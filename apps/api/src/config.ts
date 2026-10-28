@@ -1,4 +1,4 @@
-export interface BootstrapConfig { host: '127.0.0.1'; port: number }
+export interface BootstrapConfig { host: '127.0.0.1'; port: number; databaseUrl: string }
 
 function validateOrigin(value: string | undefined): void {
   if (!value) throw new Error('Falta PUBLIC_ORIGIN.');
@@ -11,6 +11,13 @@ function validateOrigin(value: string | undefined): void {
 }
 
 /** Arranque mínimo sin DB ni identidad; su configuración completa llega en T1-03. */
+function validateDatabaseUrl(env: NodeJS.ProcessEnv): string {
+  const url = env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL es obligatoria.');
+  if (!/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(url)) throw new Error('DATABASE_URL debe ser PostgreSQL válido.');
+  return url;
+}
+
 export function readBootstrapConfig(env: NodeJS.ProcessEnv): BootstrapConfig {
   if (env.APP_MODE !== 'development') throw new Error('La base actual solo admite APP_MODE=development explícito.');
   if (env.API_HOST !== '127.0.0.1') throw new Error('API_HOST debe ser 127.0.0.1.');
@@ -21,5 +28,6 @@ export function readBootstrapConfig(env: NodeJS.ProcessEnv): BootstrapConfig {
   validateOrigin(env.PUBLIC_ORIGIN);
   if (env.LOCAL_DEV_AUTH_ENABLED !== 'false') throw new Error('LOCAL_DEV_AUTH_ENABLED debe ser false: todavía no hay sesión.');
   if (env.REGISTRATION_ENABLED !== 'false') throw new Error('REGISTRATION_ENABLED debe ser false: todavía no hay registro.');
-  return { host: '127.0.0.1', port };
+  const databaseUrl = validateDatabaseUrl(env);
+  return { host: '127.0.0.1', port, databaseUrl };
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
 import { readBootstrapConfig } from './config.ts';
-const local = { APP_MODE: 'development', API_HOST: '127.0.0.1', API_PORT: '3000', PUBLIC_ORIGIN: 'http://127.0.0.1:5173', LOCAL_DEV_AUTH_ENABLED: 'false', REGISTRATION_ENABLED: 'false' };
+const local = { APP_MODE: 'development', API_HOST: '127.0.0.1', API_PORT: '3000', PUBLIC_ORIGIN: 'http://127.0.0.1:5173', LOCAL_DEV_AUTH_ENABLED: 'false', REGISTRATION_ENABLED: 'false', DATABASE_URL: 'postgres://app:app@localhost:5432/app' };
 
 describe('base HTTP sin datos del juego', () => {
   const app = createApp();
@@ -33,8 +33,11 @@ describe('base HTTP sin datos del juego', () => {
     expect(internal.json().error.code).toBe('INTERNAL_ERROR');
     expect(internal.body).not.toContain('SECRETO_SINTETICO');
   });
-  it('no anuncia readiness, login ni sesión todavía', async () => {
-    for (const url of ['/api/v1/ready', '/api/v1/auth/local-session', '/api/v1/auth/login']) {
+  it('anuncia readiness; no anuncia login ni sesión todavía', async () => {
+    const ready = await app.inject({ method: 'GET', url: '/api/v1/ready' });
+    expect(ready.statusCode).toBe(200);
+    expect(ready.json()).toEqual({ status: 'ready' });
+    for (const url of ['/api/v1/auth/local-session', '/api/v1/auth/login']) {
       const response = await app.inject({ method: 'GET', url });
       expect(response.statusCode).toBe(404);
       expect(JSON.stringify(response.json())).not.toContain(url);
@@ -44,7 +47,7 @@ describe('base HTTP sin datos del juego', () => {
 
 describe('arranque cerrado', () => {
   it('admite únicamente configuración local explícita', () => {
-    expect(readBootstrapConfig(local)).toEqual({ host: '127.0.0.1', port: 3000 });
+    expect(readBootstrapConfig(local)).toEqual({ host: '127.0.0.1', port: 3000, databaseUrl: 'postgres://app:app@localhost:5432/app' });
   });
   it.each([
     { APP_MODE: 'public' }, { APP_MODE: undefined }, { API_HOST: '0.0.0.0' },

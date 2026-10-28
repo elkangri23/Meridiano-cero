@@ -2,13 +2,24 @@ import Fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { HealthResponse } from '@meridiano/contracts';
 
-export function createApp() {
+export interface ReadyCheck { ok: boolean; detail?: string }
+
+export function createApp(options?: { readyCheck?: () => Promise<ReadyCheck> }) {
   const app = Fastify({ logger: false, trustProxy: false, bodyLimit: 65536, requestIdHeader: false, genReqId: () => randomUUID() });
   app.addHook('onRequest', async (request, reply) => {
     reply.header('X-Request-Id', request.id);
     reply.header('Cache-Control', 'no-store');
   });
   app.get<{ Reply: HealthResponse }>('/api/v1/health', async () => ({ status: 'ok' }));
+  app.get('/api/v1/ready', async (_request, reply) => {
+    if (options?.readyCheck) {
+      const result = await options.readyCheck();
+      if (!result.ok) {
+        return reply.code(503).send({ status: 'not_ready', detail: result.detail });
+      }
+    }
+    return reply.send({ status: 'ready' });
+  });
   app.setNotFoundHandler((request, reply) => {
     return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Recurso no disponible.', requestId: request.id } });
   });
