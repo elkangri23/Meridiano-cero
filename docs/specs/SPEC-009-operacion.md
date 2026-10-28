@@ -1,7 +1,77 @@
 # SPEC-009 Desarrollo, instalación y recuperación
 
-Estado: contrato operativo detallado propuesto; comandos en manuales aún no implementados.
+Estado: cerrada para base en T1-01; comandos en manuales aún no implementados.
 Fuentes: TAD §4/9/13–15; GDD §16/17/19. ADR-004/008.
+
+## Decisiones de cierre T1-01 (2026-10-28)
+
+Estas decisiones cerraron los puntos propuestos de esta spec para la base de fase 1.
+No son aprobación histórica; se registran como decisiones de implementación.
+
+| Tema | Decisión tomada | Fundamento |
+|---|---|---|
+| Versiones de herramientas | Usar las versiones instaladas en el entorno de desarrollo. No se fijan valores concretos hasta que se verifique contra documentación vigente en T1-01. Se conservan en lockfile/manifiestos. | SPEC-009 §L22 |
+| Entorno development | Vite + API + PostgreSQL en Compose + Ollama en host (casa, RTX 5080). En trabajo: FreeLLMAPI como proveedor alternativo. | SPEC-009 §L8; DEC-002 |
+| PostgreSQL | Crear en Docker Compose como parte de T1-03. No se asume versión previa instalada. | SPEC-009 §L14; BACKLOG T1-03 |
+| Modo development | Variable `APP_MODE=development`, binding loopback. Rechazado en configuración pública. | SPEC-009 §L8; SPEC-004 §L10 |
+| Proveedor IA | `AI_PROVIDER=ollama` por defecto; `AI_PROVIDER=freellmapi` alternativo. No hardcodear endpoint. | SPEC-009 §L18; DEC-002 |
+
+## Contratos de base T1-01 (cerrados 2026-10-28)
+
+### Compose de desarrollo (fase 1)
+
+`docker-compose.yml` en la raíz, services:
+
+| Service | Image | Puertos | Notas |
+|---|---|---|---|
+| `db` | `postgres:16` | Solo red interna `app` | Volumen `pgdata` persistente. Credenciales privadas. |
+| `api` | Build de `apps/api` | 3000 → loopback | Lee `DATABASE_URL` del entorno. |
+| `web` | Build de `apps/web` | No expuesto | Solo red `app` + loopback para desarrollo. |
+
+Variables de entorno del compose:
+```
+POSTGRES_USER=app
+POSTGRES_PASSWORD=app
+POSTGRES_DB=app
+```
+
+No se exponen puertos de DB al host. No se usa `host.docker.internal` como
+candidato universal; se comprueba en Docker Desktop, no se impone a Linux.
+
+### Scripts de superficie (fase 1)
+
+| Script | Comando | Estado |
+|---|---|---|
+| `pnpm dev` | Inicia API + web en desarrollo | Cerrado |
+| `pnpm build` | Build de web y API | Cerrado |
+| `pnpm typecheck` | `tsc --noEmit` sin emitir | Cerrado |
+| `pnpm lint` | ESLint | Cerrado |
+| `pnpm test` | Vitest | Cerrado |
+| `pnpm test:e2e` | Playwright | Cerrado |
+| `pnpm db:migrate` | Drizzle migrate | Cerrado |
+| `pnpm db:seed` | Semillas ficticias development | Cerrado |
+| `pnpm db:backup` | Backup cifrado de DB | Cerrado |
+| `pnpm db:restore` | Restaurar backup | Cerrado |
+| `pnpm health` | `GET /health` | Cerrado |
+| `pnpm ready` | `GET /ready` | Cerrado |
+
+### Validación al arrancar
+
+Al iniciar, la API verifica en orden:
+1. Variables requeridas presentes (`PUBLIC_ORIGIN`, `DATABASE_URL`, `SESSION_SECRET`).
+2. Conexión a DB y migraciones aplicadas.
+3. `APP_MODE=development` → binding loopback, `REGISTRATION_ENABLED` configurable.
+4. `APP_MODE=production` → rechaza `development`, exige `PUBLIC_ORIGIN` HTTPS,
+   `REGISTRATION_ENABLED=false` por defecto.
+5. Proveedor IA configurado; no falla el arranque si el proveedor no está
+   disponible (solo `/ready` lo refleja).
+
+### Lockfile y versiones
+
+- `pnpm-lock.yaml` congelado en T1-02.
+- `package.json` sin dependencias innecesarias. Cada dependencia debe tener
+  consumidor demostrado.
+- No se usa `latest` en comandos de instalación sin revisión.
 
 ## Perfiles
 

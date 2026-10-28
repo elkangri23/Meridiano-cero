@@ -35,6 +35,32 @@ Importaciones: tamaño, profundidad y recuentos acotados; JSON validado antes de
 
 Timeouts y reintentos acotados por función. Ningún reintento de IA ejecuta de nuevo la acción del motor. Fallo de autorización/validación nunca se transforma en permiso. Los errores públicos no incluyen stack, consultas, tokens ni hechos ocultos.
 
+## Controles cerrados para T1-01 (2026-10-28)
+
+Estos controles están precisados para la base de fase 1. No significa que estén
+implementados; significa que el contrato está cerrado y T1-02/T1-03 deben
+cumplirlos. Los controles no listados aquí son propuestos para fases posteriores.
+
+| Amenaza | Control cerrado T1-01 | Estado |
+|---|---|---|
+| TH-01 | ACL por recurso: cada endpoint de lectura/escritura comprueba que el recurso pertenece a la sessión autenticada. PlayerView se construye por lista explícita de campos autorizados; nunca serialización genérica. | Contrato cerrado |
+| TH-06 | Sesiones opacas con hash del token en DB. Rotación al login. Revocación al logout. Login/recuperación devuelven mensaje genérico sin enumerar cuentas. Límite de intentos: 5 en 15 min por IP+username, bloqueo 15 min. Cookie HttpOnly, SameSite=Lax, Secure solo en production. | Contrato cerrado |
+| TH-07 | Secretos fuera de Git: `DATABASE_URL`, `SESSION_SECRET`, `AI_API_KEY` solo en variables de entorno o gestor de secretos. Frontend nunca recibe secretos. Logs sin tokens, contraseñas ni URLs de DB. | Contrato cerrado |
+| TH-09 | Lockfile congelado (`pnpm-lock.yaml`). CI ejecuta desde checkout limpio y verifica lockfile intacto. Análisis de dependencias y secretos en CI. Permisos mínimos en contenedores: usuario no root, DB sin puerto público. | Contrato cerrado |
+| TH-12 | Logs protegidos: solo en registro del servidor, sin datos personales ni hechos del caso. Alertas configurables para fallos de DB/proveedor. Health/readiness exponen solo estado técnico. | Contrato cerrado |
+| TH-02 | Policy de egreso para `AI_BASE_URL`: solo loopback u host configurado explícitamente por administrador. No redirecciones, no resolución DNS dinámica, sin fetching de URLs del jugador. Aplicable parcialmente en fase 1 (configuración); verificación completa en fase 7. | Contrato cerrado, sin verificar |
+
+### Controles no aplicables en fase 1
+
+| Amenaza | Motivo |
+|---|---|
+| TH-03 | Requiere IA y contexto de narración (fase 3). |
+| TH-04 | Requiere texto de órdenes/expedientes (fase 3+). |
+| TH-05 | Requiere motor y transacciones de acciones (fase 3). |
+| TH-08 | Requiere cuotas de IA y generación (fase 4). |
+| TH-10 | Requiere importación y validación de casos (fase 4). |
+| TH-11 | Requiere proveedor IA y narración (fase 3). |
+
 ## Puertas de seguridad
 
 Fase 1: configuración y CI. Fase 3: permisos, sesiones, proyección y pruebas de IA. Fase 4: importaciones/cola. Fase 6: restauración. Fase 7: revisión manual y dinámica sobre entorno de pruebas, con límites que eviten afectar a terceros.

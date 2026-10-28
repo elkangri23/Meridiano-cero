@@ -1,7 +1,20 @@
 # SPEC-004 API, identidad y persistencia de acciones
 
-Estado: especificación detallada propuesta; cerrar en T1-01 y ampliar en T3-01. Fecha: 2026-10-27.
+Estado: cerrada para base en T1-01; se amplía en T3-01. Fecha: 2026-10-27.
 Fuentes: TAD §3,5,6,10,11,14; GDD §6,9,13. ADR-003/007/010.
+
+## Decisiones de cierre T1-01 (2026-10-28)
+
+Estas decisiones cerraron los puntos propuestos de esta spec para la base de fase 1.
+No son aprobación histórica; se registran como decisiones de implementación.
+
+| Tema | Decisión tomada | Fundamento |
+|---|---|---|
+| Modo development | Variable `APP_MODE=development`, binding loopback. No habilitable en configuración pública. | SPEC-004 §L10; SPEC-009 §L8 |
+| Autenticación | Argon2id con valores por defecto de la librería mantenida. No hashes caseros. | SPEC-004 §L12; SPEC-011 §L30 |
+| Límites iniciales | Texto 4.000 caracteres; lote máximo 10 pasos; cuerpo normal 64 KiB; paginación 25 por defecto, 100 máximo. | SPEC-004 §L52 (propuestos → aprobados tal cual) |
+| Proveedor IA | `AI_PROVIDER=ollama` por defecto; `AI_PROVIDER=freellmapi` como alternativa configurada. Intercambiable según capacidades (REQ-G16-01). | DEC-002; SPEC-005; entorno de desarrollo híbrido |
+| Preview/confirmación | Token opaco en servidor, caduca a 5 minutos de reloj real. | SPEC-004 §L56 |
 
 ## Objetivo y fronteras
 
@@ -12,6 +25,81 @@ Identidad local inicial: crear perfil de desarrollo por configuración explícit
 Autenticación pública: usuario y contraseña; contraseña mediante implementación mantenida de Argon2id y parámetros calibrados/documentados al cerrar la base. Sesión opaca generada criptográficamente, guardada en servidor; almacenar hash del token de sesión. Cookie HttpOnly, Secure en HTTPS y SameSite=Lax; proteger mutaciones con comprobación de origen y token CSRF. No usar localStorage para sesiones. No inventar protocolo criptográfico.
 
 Roles iniciales: player y administrator. Un administrador gestiona instalación/proveedores/usuarios; no se expone lectura indiscriminada de conversaciones desde el juego. Operaciones administrativas auditadas y separadas. No hay roles por rango de detective.
+
+## Contratos de base T1-01 (cerrados 2026-10-28)
+
+Los siguientes endpoints y DTOs están cerrados para la base de fase 1. No son
+implementación; son el contrato que T1-02/T1-03 deben cumplir. Los endpoints
+no incluidos aquí son propuestos para fases posteriores y no se implementan en
+fase 1.
+
+### Endpoints de base (fase 1)
+
+| Ruta | Estado | Contrato |
+|---|---|---|
+| `GET /health` | Cerrado | `{"status":"ok","version":string}`. Sin auth, sin secretos. |
+| `GET /ready` | Cerrado | `{"status":"ready"}` o 503 si DB/proveedor no disponibles. Sin secretos. |
+| `POST /auth/register` | Cerrado para development | Solo cuando `APP_MODE=development` y `REGISTRATION_ENABLED=true`. Body: `{username:string, password:string}`. Respuesta: `{profile:{id,username,createdAt}, session:{token, expiresAt}}`. 400 si username duplicado o inválido. |
+| `POST /auth/login` | Cerrado | Body: `{username:string, password:string}`. Sesión rotada al autenticar. 401 con mensaje genérico (sin enumerar cuenta). |
+| `POST /auth/logout` | Cerrado | Requiere cookie de sessión + token CSRF. Revoca la sessión. 204. |
+| `GET /me` | Cerrado | Requiere autenticación. Respuesta: perfil propio y preferencias. 401 sin sessión. |
+| `PATCH /settings` | Cerrado | Body parcial de preferencias validadas. 401 sin sessión. |
+
+### DTOs de base
+
+**Sesión:**
+```json
+{
+  "token": "string",
+  "expiresAt": "ISO8601",
+  "cookie": {
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "Lax",
+    "path": "/",
+    "maxAge": 86400000
+  }
+}
+```
+
+**Error público (todos los endpoints):**
+```json
+{
+  "error": {
+    "code": "string",
+    "message": "string",
+    "requestId": "string",
+    "fieldErrors": { "string": ["string"] }
+  }
+}
+```
+Códigos estables: `INVALID_INPUT`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`,
+`RATE_LIMITED`, `SERVICE_UNAVAILABLE`. Nunca stack, SQL, claves ni hechos ocultos.
+
+### Límites de base (fase 1)
+
+| Límite | Valor | Ajuste |
+|---|---|---|
+| Texto de orden | 4.000 caracteres | Solo con cambio documentado y pruebas |
+| Lote máximo | 10 pasos | Solo con cambio documentado y pruebas |
+| Cuerpo petición | 64 KiB | Solo con cambio documentado y pruebas |
+| Paginación | 25 por defecto, 100 máximo | Solo con cambio documentado y pruebas |
+| Token preview | Caduca 5 min reloj real | No negociable |
+| Sesión | 24 h, rotación al login | No negociable |
+
+### Configuración de base
+
+| Variable | Requerido | Valor development | Valor public | Notas |
+|---|---|---|---|---|
+| `APP_MODE` | No | `development` | `production` | Public rechaza `development` |
+| `PUBLIC_ORIGIN` | Sí | `http://localhost:3000` | HTTPS real | Origen del navegador |
+| `DATABASE_URL` | Sí | `postgres://app:app@localhost:5432/app` | Postgres real | Privada, fuera de Git |
+| `SESSION_SECRET` | Sí | Valor development | Valor seguro | Argon2id para hash de token |
+| `REGISTRATION_ENABLED` | No | `true` | `false` | Public: activable por admin |
+| `AI_PROVIDER` | No | `ollama` | `ollama` o `freellmapi` | Interchangeable |
+| `AI_BASE_URL` | No | `http://localhost:11434` | Configurado por admin | Policy de egreso |
+| `AI_MODEL` | No | Instalado en host | Configurado por admin | |
+| `AI_API_KEY` | No | No se usa | Opcional | Solo para proveedores externos |
 
 ## Superficie API propuesta
 
@@ -41,7 +129,9 @@ Roles iniciales: player y administrator. Un administrador gestiona instalación/
 | GET /runs/:id/report | partida propia cerrada | Informe definitivo |
 | GET /health; GET /ready | ninguna | Estado técnico mínimo |
 
-Son contratos previstos, no endpoints existentes. Auth administrativa y exportación de datos personales se concretan antes de fase 7.
+Los endpoints de **base** (fase 1) están cerrados en la sección anterior.
+Los endpoints de **propuesta** (fases 2+) no se implementan en fase 1.
+Auth administrativa y exportación de datos personales se concretan antes de fase 7.
 
 ## DTO y errores
 
