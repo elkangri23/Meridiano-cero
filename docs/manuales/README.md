@@ -1,6 +1,8 @@
 # Manuales del proyecto
 
-Estado: diseño documentado; todavía no existe aplicación instalable. Los comandos de producto aquí descritos son objetivos de la implementación, no procedimientos probados. El único comando ejecutable incluido actualmente es la verificación documental.
+Estado: todavía no existe aplicación instalable del videojuego. Los comandos de producto aquí descritos son objetivos de la implementación, no procedimientos probados. Las herramientas de desarrollo Harness y la verificación documental sí están disponibles; tienen guías separadas del uso previsto del juego.
+
+- [Cómo usar Harness en Meridiano-cero](HARNESS.md): abrir el equipo, preparar planes, aprobar tareas, revisar cambios e integrar manualmente.
 
 - [Uso del juego](USO.md): experiencia y herramientas que implementaremos.
 - [Desarrollo](DESARROLLO.md): entorno, arquitectura y flujo de contribución.
