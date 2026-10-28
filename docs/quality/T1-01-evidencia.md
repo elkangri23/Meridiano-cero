@@ -1,6 +1,6 @@
 # T1-01: inicio y evidencia de contratos de base
 
-Fecha: 2026-10-28. Estado actual: EN REVISIÓN; entrega documental realizada, pendiente de aceptación del usuario.
+Fecha: 2026-10-28. Estado actual: COMPLETADA para base; integrada en main (37d48dd) por petición del usuario, que autorizó continuar la fase 1. No equivale a aceptar el hito completo F1.
 Responsable: Codex, encargo documental explícito del usuario.
 Base: commit 5241a22. Rama: codex/t1-01-contratos-base, worktree independiente.
 
@@ -187,3 +187,9 @@ privada persistente, lockfile, ACL/proyección por fase, errores redactados,
 rotación/revocación, pruebas y mínimos privilegios. El inventario físico de
 hardware de otros equipos no se convierte en un hecho verificado aquí.
 La carpeta .ai/ sin seguimiento en el checkout principal no se añade ni modifica.
+
+## Ajuste de herramientas al implementar T1-02
+
+La selección preliminar TypeScript 7.0.2 se sustituye por 6.0.3 al comprobar que
+typescript-eslint 8.72.1 soporta >=4.8.4 <6.1.0. Versión exacta y motivo en
+SPEC-009 y evidencia de T1-02. No cambia reglas del juego ni la calibración de Argon2.

@@ -22,6 +22,8 @@ Crear workspace con web/API y contratos consumidos, tsconfig strict, lint/import
 
 Salida comprobable: Revisión de imports sin ciclos y ausencia de paquetes vacíos; comando de tipos debe detectar un contrato incompatible.
 
+Entrega y comandos ejecutados: [evidencia de T1-02](../quality/T1-02-evidencia.md).
+
 ## T1-03
 
 Contratos: SPEC-009/011; ADR-004/008.

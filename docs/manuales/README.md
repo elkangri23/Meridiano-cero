@@ -1,6 +1,6 @@
 # Manuales del proyecto
 
-Estado: todavía no existe aplicación instalable del videojuego. Los comandos de producto aquí descritos son objetivos de la implementación, no procedimientos probados. La verificación documental está disponible mediante scripts/verify_docs.py.
+Estado: todavía no existe aplicación instalable del videojuego. La guía de desarrollo distingue los comandos implementados en T1-02 de los objetivos futuros; instalación del juego, DB y operación siguen pendientes. La verificación documental está disponible mediante scripts/verify_docs.py.
 
 
 - [Uso del juego](USO.md): experiencia y herramientas que implementaremos.

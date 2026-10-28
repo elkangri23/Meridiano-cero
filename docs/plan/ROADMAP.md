@@ -1,6 +1,6 @@
 # Roadmap por hitos verificables
 
-Sin fechas comprometidas. Estimar una fase cuando su spec esté cerrada y se conozca el entorno. Revisión humana al finalizar cada hito. Estados actuales: fase 0 entregada documentalmente; fases 1–7 pendientes.
+Sin fechas comprometidas. Estimar una fase cuando su spec esté cerrada y se conozca el entorno. Revisión humana al finalizar cada hito. Estados actuales: fase 0 entregada documentalmente; fase 1 en curso; fases 2–7 pendientes.
 
 | Fase | Resultado demostrable | Dependencias | Puerta de salida |
 |---|---|---|---|

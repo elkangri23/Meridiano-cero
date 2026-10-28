@@ -37,7 +37,7 @@ ni anuncia comandos disponibles. La configuración del producto será independie
 | Fastify | 5.12.7, MIT | API; prueba sintética separada del producto |
 | React / react-dom | 19.3.1 / 19.3.1, MIT | Interfaz; mantener ambas versiones iguales |
 | Vite | 8.3.5, MIT | Dev/build web; Node 24 satisface engines |
-| TypeScript | 7.0.2, Apache-2.0 | Compilación estricta; verificar binario nativo en Ubuntu |
+| TypeScript | 6.0.3, Apache-2.0 | Ajuste de T1-02: compatible con typescript-eslint 8.72.1 (<6.1); selección anterior 7.0.2 no compatible con lint |
 | drizzle-orm / drizzle-kit | 0.45.4 Apache-2.0 / 0.31.11 MIT | Consultas tipadas / migraciones explícitas |
 | pg | 8.23.1, MIT | Cliente PostgreSQL sin pg-native; peer de Drizzle >=8 |
 | Docker | CLI 26.1.3 observado | No demuestra daemon accesible ni versión admitida definitiva |

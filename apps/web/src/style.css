@@ -1,0 +1,8 @@
+html { color-scheme: dark; background: #10191c; color: #e3eee8; font-family: ui-monospace, monospace; }
+body { margin: 0; }
+main { max-width: 48rem; margin: 8vh auto; padding: 2rem; line-height: 1.7; }
+h1 { line-height: 1.2; font-size: clamp(2rem, 6vw, 3rem); }
+.eyebrow { color: #9ed7b3; font-size: .85rem; }
+button { font: inherit; padding: .7rem 1rem; background: #b3e5bf; color: #102219; border: 0; cursor: pointer; }
+button:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+button:disabled { opacity: .65; cursor: wait; }

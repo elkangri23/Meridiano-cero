@@ -1,6 +1,6 @@
 # Arquitectura de implementación
 
-Estado: diseño, sin servicios implementados. Derivada del TAD y del plan aceptado; detalles normativos en specs y decisiones en ADR.
+Estado: arquitectura objetivo; base web/API inicial implementada en T1-02. Motor, DB e IA siguen pendientes. Derivada del TAD y del plan aceptado; detalles normativos en specs y decisiones en ADR.
 
 ## Flujo de una acción
 

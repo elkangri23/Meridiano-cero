@@ -1,16 +1,20 @@
 # Desarrollo y contribución
 
-Estado: instrucciones de producto previstas, pendientes de verificar desde fase 1. No ejecutar comandos de arranque esperando una aplicación existente.
+Estado: base de workspace implementada en T1-02; DB, sesión y juego siguen pendientes. Consultar su evidencia para resultados reales de cada comando.
 
 ## Qué existe ahora
 
-Fuentes GDD/TAD, requisitos, roadmap, specs, ADR, tareas y escenarios de aceptación. No hay package.json, lockfile, Compose, base de datos ni frontend implementados. No se han instalado dependencias ni inicializado Git como parte de documentación.
+Fuentes GDD/TAD, requisitos, roadmap, specs, ADR y aceptación, más un workspace
+pnpm de tres paquetes: apps/web (React/Vite), apps/api (Fastify) y
+packages/contracts (contrato público de health consumido por ambos). Hay
+manifiestos, lockfile y configuración estricta/lint/imports. No hay Compose,
+base de datos, identidad, motor ni caso jugable. Git ya existía y no se reinicializa.
 
 Se puede comprobar la documentación con Python 3: `python scripts/verify_docs.py`. No requiere paquetes externos ni red.
 
 ## Entorno objetivo
 
-Windows con PowerShell y Docker Compose; Node LTS y pnpm para desarrollar. Ollama o LM Studio en host para IA local. Versiones exactas y requisitos de memoria se fijarán con pruebas de entorno; no se inventa que cualquier modelo sirve por disponer de una GPU concreta.
+Windows con PowerShell y Docker Compose; Node LTS y pnpm para desarrollar. Ollama o LM Studio en host para IA local. Versiones exactas de la base en SPEC-009 y package.json; no se inventa que cualquier modelo sirve por disponer de una GPU concreta.
 
 PostgreSQL en Docker también durante desarrollo. Configuración local privada separada de ejemplos versionados. Las claves no entran en frontend, capturas, tests ni logs.
 
@@ -32,19 +36,51 @@ No crear el árbol completo por adelantado con archivos vacíos. Los límites es
 
 Si aparece una contradicción, registrar decisión en BASELINE; si es arquitectura, nuevo ADR. No modificar silenciosamente los Word ni las reglas del juego. Una refactorización debe conservar comportamiento y tener evidencia; no reescribir módulos completos por gusto.
 
-## Comandos objetivo aún no existentes
+## Comandos de la base T1-02
 
-| Comando | Función que deberá implementarse |
+En una terminal WSL con Node 24.22.1 y pnpm 12.15.0, entrar en el worktree.
+`node --version` y `pnpm --version` deben coincidir antes de instalar. No mezclar
+node_modules entre sistemas; no usar Node 20 de Windows para esta base.
+
+```bash
+pnpm install --frozen-lockfile --ignore-scripts
+test -e .env || cp .env.example .env
+pnpm dev
+```
+
+Copiar el ejemplo solo si no existe .env propio; no sobreescribir secretos.
+En PowerShell el equivalente de copia es Copy-Item con comprobación previa,
+pero requiere Node 24/pnpm fijados y dependencias instaladas para Windows.
+Web: http://127.0.0.1:5173. API: http://127.0.0.1:3000/api/v1/health.
+El proxy lee API_PORT del entorno de la raíz; CORS no se habilita. La pantalla
+no interpreta acciones ni crea sesión, usuario o datos. Ctrl+C detiene los watchers.
+
+| Comando | Alcance real |
 |---|---|
-| pnpm install --frozen-lockfile | Instalar versiones fijadas una vez exista lockfile |
-| pnpm dev | Desarrollo web/API contra configuración local |
-| pnpm build | Construcción reproducible |
-| pnpm typecheck | Tipos sin emitir |
-| pnpm lint | Reglas y límites sin modificar archivos |
-| pnpm test | Motor y comprobaciones automatizadas |
-| pnpm test:e2e | Flujos de navegador |
+| pnpm dev | Compila contratos y arranca sus watchers, API y Vite en loopback |
+| pnpm build | Compila contratos/API y produce bundle web |
+| pnpm typecheck | Comprueba todos los proyectos sin emitir, tras compilar el contrato compartido |
+| pnpm lint | ESLint y verificación de imports/ciclos |
+| pnpm check:imports | Dependency-cruiser sobre el código de apps/paquetes |
+| pnpm test | Vitest de HTTP/configuración; no pruebas del juego |
+| pnpm verify:guards | Contrato incompatible, web/API fuente y compilada, Node nativo y ciclos; limpieza final |
+| pnpm smoke | HTTP real de Vite y API con puertos efímeros de loopback y cierre final |
 
-El procedimiento definitivo incluirá variables necesarias, URL local y salidas esperadas después de probarlo. Los scripts de migración no se ejecutarán implícitamente contra una DB elegida por accidente.
+El control de imports descubre los src de cada paquete real y sigue sus exports
+compilados; no excluye un destino privado por estar en dist. La detección de
+paquetes y el ejecutable real se comparten entre check:imports y las pruebas negativas.
+
+No ejecutar verify:guards al mismo tiempo que dev, typecheck o build: escribe
+archivos temporales intencionadamente inválidos dentro del worktree y los retira.
+No usa credenciales ni modifica archivos existentes. No hay comandos de migración,
+backup, ready ni test:e2e implementados; llegan con DB/CI/primer caso según backlog.
+Los artefactos dist, node_modules, .env y resultados de herramientas quedan fuera
+de Git. .env.example contiene solo valores sintéticos sin secretos.
+
+TypeScript se ajustó de la selección preliminar 7.0.2 a 6.0.3 porque la versión
+mantenida de typescript-eslint declara soporte <6.1.0. No se oculta el aviso de
+incompatibilidad ni se desactivan reglas para conservar una versión más nueva.
+Fuente: [soporte oficial](https://typescript-eslint.io/users/dependency-versions/).
 
 ## Código y dependencias
 

@@ -1,6 +1,6 @@
 # Documentación de implementación
 
-Estado: fase 0 documentada el 27 de octubre de 2026. No hay aplicación implementada ni pruebas de producto ejecutadas.
+Estado: fase 1 en desarrollo. La base web/API inicial se incorpora en T1-02; DB, sesión y caso jugable están pendientes. Evidencia y dependencias en BACKLOG.
 
 ## Orden de lectura
 

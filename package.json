@@ -1,0 +1,30 @@
+{
+  "name": "meridiano-cero",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=24.22.1 <25",
+    "pnpm": "12.15.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @meridiano/contracts build && pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm --filter @meridiano/contracts build && pnpm -r typecheck",
+    "lint": "eslint apps packages && pnpm check:imports",
+    "check:imports": "pnpm --filter @meridiano/contracts build && node scripts/dev/check-imports.mjs",
+    "test": "pnpm --filter @meridiano/contracts build && vitest run",
+    "verify:guards": "pnpm --filter @meridiano/contracts build && pnpm --filter @meridiano/api build && node scripts/dev/verify-guards.mjs",
+    "smoke": "pnpm --filter @meridiano/contracts build && node --experimental-strip-types scripts/dev/smoke-workspace.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "dependency-cruiser": "18.7.0",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.0.5"
+  }
+}

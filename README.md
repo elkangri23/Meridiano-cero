@@ -1,6 +1,6 @@
 # Meridiano-cero
 
-Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Estado: fase 0 documental; todavía no hay aplicación implementada.
+Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Estado: fase 1 en desarrollo. Workspace web/API inicial; todavía no hay partida jugable, base de datos ni sesión implementadas.
 
 ## Implementación
 
@@ -15,7 +15,38 @@ Videojuego de investigación internacional, con nombre A.C.M.E. provisional. Est
 
 React/TypeScript, Fastify, PostgreSQL, pnpm y Docker Compose. Motor determinista separado de IA, web y persistencia. KISS, DRY y seguridad verificable son criterios de entrega, no afirmaciones de controles ya implementados.
 
-La entrega inicial documenta el plan; la siguiente tarea es T1-01, cerrar los contratos de base antes de crear código. No se han inicializado Git, servicios ni dependencias como parte de esta fase.
+Los contratos de T1-01 están integrados. T1-02 crea el workspace inicial; el
+estado vigente está en BACKLOG. Git y su remoto se conservan, sin reinicializar.
+
+## Desarrollo local de la base
+
+Requisitos: Node 24.22.1 y pnpm 12.15.0. En este equipo están disponibles en
+Ubuntu/WSL; el Node 20 global de Windows no satisface el requisito del proyecto.
+Trabajar desde el worktree y no mezclar node_modules de Windows y Linux.
+
+```bash
+pnpm install --frozen-lockfile --ignore-scripts
+test -e .env || cp .env.example .env
+pnpm dev
+```
+
+Abrir http://127.0.0.1:5173. La pantalla permite comprobar la API de desarrollo
+por el proxy del mismo origen. Health solo acredita proceso HTTP, no DB ni juego.
+El ejemplo no contiene credenciales y mantiene sesión/registro desactivados.
+
+```bash
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm verify:guards
+pnpm smoke
+```
+
+`verify:guards` introduce y retira archivos sintéticos para comprobar fallos de
+tipos/imports/ciclos; ejecutarlo con los watchers detenidos. Los comandos de DB,
+readiness y E2E del juego siguen pendientes de sus tareas. Más detalles en
+[la guía de desarrollo](docs/manuales/DESARROLLO.md).
 
 ## Contexto del proyecto
 
