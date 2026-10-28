@@ -163,3 +163,27 @@ una calibración de referencia están resueltos para esta entrega documental.
 Permanecen pendientes de implementación ACC-020/024/039 y resto de fase 1.
 T1-01 se entrega EN REVISIÓN, no se marca completada ni aceptada automáticamente.
 T1-02 continúa pendiente; no se ha iniciado por producir este registro.
+
+## Resolución de integración con main
+
+Por encargo del usuario se integra la rama de trabajo con main. main contenía
+24fe382, otra concreción documental de T1-01 sobre la misma base. Se conservan
+ambos historiales; las specs quedan unificadas en un solo contrato, sin duplicar
+apartados contradictorios ni presentar dos alternativas simultáneas como vigentes.
+
+| Diferencia en 24fe382 | Resolución integrada y motivo |
+|---|---|
+| Registro/login y PATCH settings en fase 1 | Base local: sesión de desarrollo, me y logout; registro/login y preferencias esperan su fase. Evita anticipar identidad pública/UI sin consumidores. |
+| Token de sesión en JSON y cookie 24 h / Path=/ | Token solo en cookie HttpOnly; respuesta con perfil y CSRF. Caducidad 8 h y Path=/api/v1 según contrato posterior revisado. Evita exponer el token de autenticación a JavaScript. |
+| APP_MODE por defecto y production como modo público | APP_MODE obligatorio y valores development/self-hosted/public. Fase 1 rechaza modos aún no implementados y bypass fuera de loopback. |
+| SESSION_SECRET sin consumidor y Argon2 para hash de sesión | Sesión opaca aleatoria: digest SHA-256 persistido; no exigir clave sin uso. Argon2id para contraseñas, con parámetros medidos y limitaciones de plataforma explícitas. |
+| PostgreSQL 16 y valores app/app de ejemplo | Selección 18.6, imagen/digest por verificar en T1-03; credenciales privadas generadas, sin valores universales. |
+| Ready dependiente del proveedor IA | Ready comprueba DB/esquema; fase 1 no incorpora proveedor sin consumidor. Health devuelve estado mínimo, sin versión. |
+| Versiones sin fijar y Argon2 con defaults | Lista exacta en SPEC-009 y calibración Windows registrada; no sustituir medición por defaults de una dependencia. |
+| Comandos de backup/restore y proveedor alternativo tratados como base | Se conservan como objetivos de sus fases en manuales/specs; no se anuncian disponibles ni se altera DEC-002. |
+
+Se mantienen los objetivos comunes: origen explícito, monolito web/API, DB
+privada persistente, lockfile, ACL/proyección por fase, errores redactados,
+rotación/revocación, pruebas y mínimos privilegios. El inventario físico de
+hardware de otros equipos no se convierte en un hecho verificado aquí.
+La carpeta .ai/ sin seguimiento en el checkout principal no se añade ni modifica.
