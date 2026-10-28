@@ -1,25 +1,40 @@
 export interface BootstrapConfig { host: '127.0.0.1'; port: number }
-
-function validateOrigin(value: string | undefined): void {
-  if (!value) throw new Error('Falta PUBLIC_ORIGIN.');
+export interface AppConfig extends BootstrapConfig {
+  origin: string; localAuth: boolean; databaseUrl: string;
+}
+function validateOrigin(value: string | undefined): string {
+  if (!value) throw new Error('CONFIG_PUBLIC_ORIGIN');
   try {
     const url = new URL(value);
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== value) throw new Error();
-  } catch {
-    throw new Error('PUBLIC_ORIGIN debe ser un origen HTTP de 127.0.0.1 sin ruta ni credenciales.');
-  }
+    return value;
+  } catch { throw new Error('CONFIG_PUBLIC_ORIGIN'); }
 }
-
-/** Arranque mínimo sin DB ni identidad; su configuración completa llega en T1-03. */
-export function readBootstrapConfig(env: NodeJS.ProcessEnv): BootstrapConfig {
-  if (env.APP_MODE !== 'development') throw new Error('La base actual solo admite APP_MODE=development explícito.');
-  if (env.API_HOST !== '127.0.0.1') throw new Error('API_HOST debe ser 127.0.0.1.');
-  const rawPort = env.API_PORT;
-  if (!rawPort || !/^[1-9]\d*$/.test(rawPort)) throw new Error('API_PORT debe ser un entero entre 1 y 65535.');
-  const port = Number(rawPort);
-  if (!Number.isSafeInteger(port) || port > 65535) throw new Error('API_PORT fuera de rango.');
+function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig {
+  if (env.APP_MODE !== 'development') throw new Error('CONFIG_APP_MODE');
+  if (env.API_HOST !== '127.0.0.1') throw new Error('CONFIG_API_HOST');
+  const port = Number(env.API_PORT);
+  if (!env.API_PORT || !/^[1-9]\d*$/.test(env.API_PORT) || !Number.isSafeInteger(port) || port > 65535) throw new Error('CONFIG_API_PORT');
   validateOrigin(env.PUBLIC_ORIGIN);
-  if (env.LOCAL_DEV_AUTH_ENABLED !== 'false') throw new Error('LOCAL_DEV_AUTH_ENABLED debe ser false: todavía no hay sesión.');
-  if (env.REGISTRATION_ENABLED !== 'false') throw new Error('REGISTRATION_ENABLED debe ser false: todavía no hay registro.');
+  if (env.REGISTRATION_ENABLED !== 'false') throw new Error('CONFIG_REGISTRATION_ENABLED');
   return { host: '127.0.0.1', port };
+}
+export function readDatabaseUrl(value: string | undefined): string {
+  try {
+    if (!value) throw new Error();
+    const url = new URL(value);
+    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.username || !url.password || !url.pathname.slice(1) || url.hash) throw new Error();
+    return value;
+  } catch { throw new Error('CONFIG_DATABASE_URL'); }
+}
+/** Bootstrap without identity, retained for isolated HTTP tests. */
+export function readBootstrapConfig(env: NodeJS.ProcessEnv): BootstrapConfig {
+  const http = readHttp(env);
+  if (env.LOCAL_DEV_AUTH_ENABLED !== 'false') throw new Error('CONFIG_LOCAL_DEV_AUTH_ENABLED');
+  return http;
+}
+export function readAppConfig(env: NodeJS.ProcessEnv): AppConfig {
+  const http = readHttp(env);
+  if (!['true', 'false'].includes(env.LOCAL_DEV_AUTH_ENABLED ?? '')) throw new Error('CONFIG_LOCAL_DEV_AUTH_ENABLED');
+  return { ...http, origin: validateOrigin(env.PUBLIC_ORIGIN), localAuth: env.LOCAL_DEV_AUTH_ENABLED === 'true', databaseUrl: readDatabaseUrl(env.DATABASE_URL) };
 }

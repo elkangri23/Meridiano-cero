@@ -1,0 +1,57 @@
+name: Base y seguridad
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: base-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  base:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24.22.1
+          package-manager-cache: false
+      - name: pnpm aislado
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/meridiano-tools" --ignore-scripts --no-audit --no-fund --save-exact pnpm@12.15.0
+          node "$RUNNER_TEMP/meridiano-tools/node_modules/pnpm/install.js"
+          echo "$RUNNER_TEMP/meridiano-tools/node_modules/.bin" >> "$GITHUB_PATH"
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm check:format
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm verify:guards
+      - run: pnpm smoke
+      - run: python3 scripts/verify_docs.py
+      - name: Dependencias
+        run: pnpm audit --audit-level high
+      - name: Secretos y prueba negativa
+        run: pnpm security:secrets --verify-detector
+      - name: Configuración sintética
+        run: pnpm setup:local --test
+      - name: PostgreSQL aislado
+        run: docker compose --env-file .env.integration -p meridiano-cero-t1-test up -d --wait
+      - name: Integración
+        run: pnpm test:integration
+      - name: Recreación y persistencia
+        run: pnpm verify:persistence
+      - name: Detener recursos de prueba sin eliminar volumen
+        if: always()
+        shell: bash
+        run: |
+          if [ -f .env.integration ]; then
+            docker compose --env-file .env.integration -p meridiano-cero-t1-test down
+          fi

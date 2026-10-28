@@ -1,12 +1,12 @@
 // Comprueba HTTP y proxy locales reales, sin DB, IA, sesión ni navegador.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createApp } from '../../apps/api/src/app.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const fromWeb = createRequire(new URL('../../apps/web/package.json', import.meta.url));
-const { createServer } = await import(fromWeb.resolve('vite'));
+const { createServer } = await import(pathToFileURL(fromWeb.resolve('vite')).href);
 const api = createApp();
 let web;
 try {

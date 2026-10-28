@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { isHealthResponse } from '@meridiano/contracts';
 import './style.css';
 
-const messages = { idle: 'Sin comprobar.', loading: 'Comprobando…', online: 'La API responde. Base de datos y sesión aún no implementadas.', unavailable: 'No se pudo comprobar la API. Revisa el proceso de desarrollo.' } as const;
+const messages = { idle: 'Sin comprobar.', loading: 'Comprobando…', online: 'El servidor responde.', unavailable: 'No se pudo comprobar la API. Revisa el proceso de desarrollo.' } as const;
 function App() {
   const [status, setStatus] = useState<keyof typeof messages>('idle');
   async function checkApi(): Promise<void> {

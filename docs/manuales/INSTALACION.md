@@ -1,5 +1,7 @@
 # Puesta en funcionamiento prevista
 
+Actualización 2026-10-28: la base local de fase 1 ya está implementada. Procedimiento actual y límites: [BASE-LOCAL](BASE-LOCAL.md). Los apartados de distribución/juego completo de este documento siguen siendo objetivos de sus fases.
+
 Estado: guía de diseño. El proyecto todavía NO se puede arrancar como juego. Se convertirá en runbook probado en fases 1 y 6. No se proporciona URL ficticia de repositorio ni se afirma que un compose inexistente funciona.
 
 ## Desarrollo local

@@ -1,5 +1,7 @@
 # Operación, recuperación y diagnóstico
 
+Actualización 2026-10-28: la base local de fase 1 ya está implementada. Procedimiento actual y límites: [BASE-LOCAL](BASE-LOCAL.md). Los apartados de distribución/juego completo de este documento siguen siendo objetivos de sus fases.
+
 Estado: runbook previsto, pendiente de ensayo. No hay servicios reales que operar todavía.
 Contrato: SPEC-009/010/011. No incluir secretos ni conversaciones en evidencias públicas.
 

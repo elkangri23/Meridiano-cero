@@ -1,5 +1,7 @@
 # Manuales del proyecto
 
+Actualización 2026-10-28: la base local de fase 1 ya está implementada. Procedimiento actual y límites: [BASE-LOCAL](BASE-LOCAL.md). Los apartados de distribución/juego completo de este documento siguen siendo objetivos de sus fases.
+
 Estado: todavía no existe aplicación instalable del videojuego. La guía de desarrollo distingue los comandos implementados en T1-02 de los objetivos futuros; instalación del juego, DB y operación siguen pendientes. La verificación documental está disponible mediante scripts/verify_docs.py.
 
 
