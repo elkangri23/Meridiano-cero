@@ -193,6 +193,9 @@ importers:
       '@meridiano/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@meridiano/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@types/pg@8.18.0)(pg@8.23.1)

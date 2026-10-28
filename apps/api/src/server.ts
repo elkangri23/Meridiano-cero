@@ -19,7 +19,7 @@ async function start(): Promise<void> {
       return { ok: false, detail: message };
     }
   };
-  const app = createApp({ readyCheck });
+  const app = createApp({ readyCheck, pool });
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => { void app.close().catch(() => { process.exitCode = 1; }); void pool.end().catch(() => {}); });
   }

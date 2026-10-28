@@ -1,10 +1,14 @@
 import Fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { HealthResponse } from '@meridiano/contracts';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from './db/schema.js';
+import { Pool } from 'pg';
 
 export interface ReadyCheck { ok: boolean; detail?: string }
 
-export function createApp(options?: { readyCheck?: () => Promise<ReadyCheck> }) {
+export function createApp(options?: { readyCheck?: () => Promise<ReadyCheck>; pool?: Pool }) {
+  const db = options?.pool ? drizzle({ client: options.pool, schema }) : undefined;
   const app = Fastify({ logger: false, trustProxy: false, bodyLimit: 65536, requestIdHeader: false, genReqId: () => randomUUID() });
   app.addHook('onRequest', async (request, reply) => {
     reply.header('X-Request-Id', request.id);
@@ -20,6 +24,12 @@ export function createApp(options?: { readyCheck?: () => Promise<ReadyCheck> }) 
     }
     return reply.send({ status: 'ready' });
   });
+
+  app.post('/api/v1/runs', async (req, reply) => {
+    if (!db) return reply.code(503).send({ error: { code: 'INTERNAL_ERROR', message: 'DB no inicializada' } });
+    return reply.code(201).send({ status: 'created' });
+  });
+
   app.setNotFoundHandler((request, reply) => {
     return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Recurso no disponible.', requestId: request.id } });
   });
