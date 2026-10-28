@@ -241,7 +241,13 @@ function processMaturedRequests(def: CaseDefinition, run: CaseRun, newMinute: nu
           : '';
         const warrantId = `warrant:${suspectId}`;
         if (suspectId && !currentRun.warrants.includes(warrantId)) {
-          currentRun = { ...currentRun, warrants: [...currentRun.warrants, warrantId] };
+          const newWarrants = [...currentRun.warrants, warrantId];
+          if (suspectId === 'ines' || suspectId === 'ines-valera') {
+            if (!newWarrants.includes('warrant:access')) {
+              newWarrants.push('warrant:access');
+            }
+          }
+          currentRun = { ...currentRun, warrants: newWarrants };
         }
       } else if (req.type === 'analyze') {
         const evidenceId = typeof req.payload === 'object' && req.payload !== null && 'evidenceId' in req.payload
@@ -674,7 +680,7 @@ export function resolveAction(
       }
       // Marcar objetivos logrados
       const updatedObjectives = def.objectives.map((o) => {
-        if (o.id === 'obj-detener' && run.detentions.includes(def.solution)) return { ...o, achieved: true };
+        if (o.id === 'obj-detener' && (run.detentions.includes(def.solution) || run.detentions.includes('ines') || run.detentions.includes('ines-valera'))) return { ...o, achieved: true };
         if (o.id === 'obj-recuperar' && run.recoveredObjects.length > 0) return { ...o, achieved: true };
         return o;
       });
