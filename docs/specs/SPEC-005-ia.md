@@ -1,6 +1,6 @@
 # SPEC-005 Integración de IA y fidelidad narrativa
 
-Estado: detallada propuesta para T3-01; generación se amplía en SPEC-007.
+Estado: cerrada para primer caso en T3-01 (2026-10-28). Ollama local como proveedor de referencia (REQ-G16-02); DTOs y presupuestos listos para T3-04.
 Fuentes: GDD §4,7,8,16; TAD §6,8–10. ADR-006. ACC-002/005/016/018/038.
 
 ## Funciones y adaptadores

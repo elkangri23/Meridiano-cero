@@ -1,6 +1,6 @@
 # SPEC-006 Interfaz, mapa y accesibilidad
 
-Estado: detallada propuesta; T3-01 fija wireframes para primer caso, T5-05 amplía acabado.
+Estado: cerrada para primer caso en T3-01 (2026-10-28). Wireframes y orden de foco acordados para T3-03.
 Fuentes: GDD §1–3,5,6,8–15; TAD §12. ACC-003/019/031.
 
 ## Pantalla y navegación

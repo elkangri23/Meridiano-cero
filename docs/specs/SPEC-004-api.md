@@ -1,6 +1,6 @@
 # SPEC-004 API, identidad y persistencia de acciones
 
-Estado: contrato de base cerrado para revisión de T1-01; ampliación de juego en T3-01. Fecha: 2026-10-28. No implementado ni aceptado por el usuario.
+Estado: cerrada para primer caso en T3-01 (2026-10-28). Contratos de juego listos para implementación en T3-02.
 Fuentes: TAD §3,5,6,10,11,14; GDD §6,9,13. ADR-003/007/010.
 
 ## Objetivo y fronteras
