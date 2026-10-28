@@ -1,6 +1,6 @@
 # Estado integrado del proyecto
 
-Actualizado: 2026-10-28. Combinación de main 6f43ba2 y codex/t3-04-integracion-ia 3a28abd, preparada en worktree separado para integrar en main. [Evidencia de integración](../quality/INTEGRACION-T3-04.md). Las instantáneas previas de T1/T3 conservan su alcance histórico.
+Actualizado: 2026-10-28. Combinación de main 6298be7 (incluye la base 6f43ba2) y codex/t3-04-integracion-ia 3a28abd, preparada en worktree separado para integrar en main. [Evidencia de integración](../quality/INTEGRACION-T3-04.md). Las instantáneas previas de T1/T3 conservan su alcance histórico.
 
 El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y verificaciones de la combinación, sin declarar el juego terminado.
 
@@ -8,7 +8,7 @@ El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y
 
 | Área | Disponible | Pendiente |
 |---|---|---|
-| Base | Cinco proyectos de producto más la raíz pnpm | No distribución del juego completa |
+| Base | Seis proyectos de producto más la raíz pnpm | No distribución del juego completa |
 | API | Health, readiness DB/ledger, configuración y sesión local PostgreSQL | Sin rutas de partidas registradas en createApp |
 | DB | compose.yaml, migrador/ledger, roles y semilla locales; evidencia histórica F1 | Guardados y transacciones del juego; resolver esquema paralelo db antes de conectar |
 | Motor | Fixture, acciones, reloj, solicitudes y desenlaces | Calidad global y adaptación a los DTO detallados |
@@ -16,7 +16,7 @@ El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y
 | IA | Frontera AiProvider, adaptador Ollama y doble, memoria factual y evaluación CLI | Adaptadores externos, configuración y conexión al juego |
 | CI | Workflow único con controles de base/seguridad y corpus IA | La ejecución local global no está verde |
 
-packages/web/RetroScreen es un artefacto heredado sin manifest/consumidor en la aplicación. Tiene errores de sintaxis y solicita datos privados de CaseDefinition/cooperación; no debe conectarse a web como sustituto del DTO autorizado. La integración lo conserva sin ampliar exposición. No existe un paquete ai-adapters versionado en esta combinación; trabajo no versionado en otro checkout queda fuera del merge.
+packages/web/RetroScreen es un artefacto heredado sin manifest/consumidor en la aplicación. Tiene errores de sintaxis y solicita datos privados de CaseDefinition/cooperación; no debe conectarse a web como sustituto del DTO autorizado. La integración lo conserva sin ampliar exposición. El commit de main 6298be7 añadió packages/ai-adapters durante la verificación y se incorporó sin perderlo. Coexiste con apps/api/src/ai; no está consumido por la API y requiere consolidación de transporte/configuración y revisión de seguridad antes de conectarse.
 
 ## Verificación de la combinación
 
@@ -25,7 +25,7 @@ packages/web/RetroScreen es un artefacto heredado sin manifest/consumidor en la 
 - 157 pruebas correctas, doce archivos, sin integración PostgreSQL real en esta ejecución.
 - Lint del módulo IA correcto; corpus determinista de 17 escenarios correcto.
 - Smoke HTTP web/proxy/API y escaneo local por patrones correctos.
-- Lint global: nueve errores heredados de main, incluidos complejidad y componente no consumido.
+- Lint global: doce errores heredados de main, incluidos complejidad y componente no consumido.
 - Imports: siete infracciones heredadas (contratos/case-schema y engine con crypto/tests).
 - Formato: 22 archivos heredados señalados; no se debilitan sus controles.
 - Verificación documental y revisión de diff en el [registro](../quality/INTEGRACION-T3-04.md).
@@ -63,3 +63,5 @@ DEC-018/019: Ollama doméstico; FreeLLMAPI en trabajo/VPS; instalaciones propias
 La ampliación documental concreta [API](../specs/API-juego.md), [guardados](../specs/GUARDADOS.md), [conversaciones](../specs/CONVERSACIONES.md) y [68 subcasos de aceptación](../quality/T3-aceptacion-detallada.md). DEC-021 confirma diez manuales por partida, además del autoguardado.
 
 Se fijan DTO públicos sin payload interno, revisión HTTP separada del estado restaurable, ramas, orden de idempotencia, protección del primer resultado y contratos de memoria/ventanas. La suite de producto sigue siendo la última de 146 pruebas; no se ha ejecutado código nuevo ni se declaran aprobados estos 68 escenarios.
+
+El paquete ai-adapters añade fábrica y transporte alternativos, pero no nuevas llamadas activas: el servidor sigue sin importarlo. Resolver duplicidad e invariantes antes de conectar; el build no acredita seguridad ni cobertura de ese paquete.

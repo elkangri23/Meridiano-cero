@@ -20,7 +20,7 @@ Objetivos de adaptación: Ollama, LM Studio, FreeLLMAPI, OpenAI, Anthropic/Claud
 
 El motor recibe acciones estructuradas y nunca credenciales ni nombres comerciales. Web presenta configuración pública y resultados autorizados; no implementa SDKs de proveedores ni ejecuta solicitudes directas al modelo. El servidor selecciona la conexión, construye contexto mínimo y llama a un adaptador.
 
-AiProvider ya proporciona una frontera común de solicitud/respuesta en apps/api/src/ai/provider.ts. El código actual contiene adaptador Ollama y doble; todavía faltan catálogo, resolución de configuraciones, almacenamiento de credenciales y adaptadores externos. No se crea una librería genérica vacía para fingir ese soporte.
+AiProvider ya proporciona una frontera común de solicitud/respuesta en apps/api/src/ai/provider.ts. El código contiene adaptador Ollama y doble en API; el main concurrente añadió también packages/ai-adapters con otra interfaz/fábrica. Esta última no es consumida por la API. Falta consolidar ambas fronteras y aplicar catálogo, configuración, seguridad de destinos, credenciales y adaptadores externos antes de conectarla. El nuevo paquete no acredita soporte de los proveedores enumerados por sus nombres.
 
 Las funciones de dominio siguen siendo interpretación, conversación, narración y, en fase 4, generación/revisión. Los adaptadores transportan y normalizan; los servicios aplican permisos, presupuesto y validación factual.
 

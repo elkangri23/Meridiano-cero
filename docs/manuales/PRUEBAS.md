@@ -1,6 +1,6 @@
 # Pruebas y evidencia
 
-Actualizado: 2026-10-28. Existen Vitest, controles de tipos/lint/imports, evaluación IA con doble y verificador documental. Última suite de producto: 157 pruebas correctas, doce archivos; corpus v2: 17 escenarios con mock. Evidencia en [T3-04](../quality/T3-04.md). La integración registra nueve errores de lint, siete de imports y 22 avisos de formato heredados; [detalle](../quality/INTEGRACION-T3-04.md). No se han ejecutado E2E del juego, evaluación real ni una auditoría completa OWASP.
+Actualizado: 2026-10-28. Existen Vitest, controles de tipos/lint/imports, evaluación IA con doble y verificador documental. Última suite de producto: 157 pruebas correctas, doce archivos; corpus v2: 17 escenarios con mock. Evidencia en [T3-04](../quality/T3-04.md). La integración registra doce errores de lint, siete de imports y 22 avisos de formato heredados; [detalle](../quality/INTEGRACION-T3-04.md). No se han ejecutado E2E del juego, evaluación real ni una auditoría completa OWASP.
 Catálogo: [40 escenarios de aceptación](../quality/ACEPTACION.md).
 
 ## Pirámide de comprobaciones

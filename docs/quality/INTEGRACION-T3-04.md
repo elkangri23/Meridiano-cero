@@ -1,6 +1,6 @@
 # Integración T3-04 en main
 
-Fecha: 2026-10-28. Entradas: main 6f43ba2 y rama T3-04 3a28abd. Worktree: integracion-t3-04-main, rama de preparación codex/integracion-t3-04-main. Autorización explícita del usuario: unir T3-04 con main.
+Fecha: 2026-10-28. Entradas: main 6298be7 (sobre 6f43ba2) y rama T3-04 3a28abd. Worktree: integracion-t3-04-main, rama de preparación codex/integracion-t3-04-main. Autorización explícita del usuario: unir T3-04 con main.
 
 ## Resolución
 
@@ -24,7 +24,7 @@ Se conserva el workflow de base/seguridad con acciones fijadas por SHA y control
 | pnpm eval:ai --mock | 17 escenarios correctos | Oráculo determinista, no modelo real |
 | pnpm smoke | HTTP web/proxy/API correcto | Sin DB, sesión o navegador real |
 | pnpm scan:secrets | Sin hallazgos | Patrones; Gitleaks/Docker no ejecutado en este merge |
-| ESLint global | Nueve errores | Heredados de main, sin ocultar |
+| ESLint global | Doce errores | Heredados de main, sin ocultar |
 | pnpm check:imports | Siete infracciones | Heredadas, no debilitadas |
 | pnpm check:format | 22 archivos señalados | Heredados; no se reformatea código ajeno al merge |
 | Verificación documental y diff | Ejecutados antes del commit | Integridad, no conformidad OWASP |
@@ -33,7 +33,7 @@ No se ejecutaron ni modificaron Docker, WSL, bases personales, secretos ni otros
 
 ## Calidad heredada y alcance
 
-Lint: validateCaseDefinition y dos funciones de engine complejas; variable _vr no usada; dos callbacks de simulación complejos; non-null assertion y prefer-const en simulación; error de sintaxis del componente RetroScreen no consumido. Estos archivos son idénticos a main respecto a su lógica; no proceden de los servicios IA incorporados.
+Lint: any y complejidad en el paquete ai-adapters heredado; validateCaseDefinition y dos funciones de engine complejas; variable _vr no usada; dos callbacks de simulación complejos; non-null assertion y prefer-const en simulación; error de sintaxis del componente RetroScreen no consumido. Estos archivos son idénticos a main respecto a su lógica; no proceden de los servicios IA incorporados.
 
 Imports: contracts reexporta tipos case-schema y la regla engine-pure alcanza crypto y cinco archivos de pruebas. Formato señala archivos T2/legados. Deben corregirse con una tarea de calidad, no interpretarse como CI aprobada.
 
@@ -43,4 +43,4 @@ Se conserva la implementación de main y se corrigen las marcas de T3: sesión l
 
 ## Publicación
 
-Se crea commit de merge con ambos padres; después se avanza main y se publica sin force-push. Los cambios no versionados encontrados en el checkout principal, especialmente packages/ai-adapters, no forman parte de la integración y se conservan.
+Se crea commit de merge con ambos padres; después se avanza main y se publica sin force-push. El checkout principal recibió 6298be7 durante la verificación. Se añadió ese commit mediante otro merge, sin force ni pérdida de trabajo. packages/ai-adapters queda incorporado; se añade su importer al lockfile y se normaliza solo whitespace/final de línea en sus seis archivos. No se modifican sus reglas ni se conecta aún a API. Build/tipos y las 157 pruebas se repitieron después de incorporarlo; faltan sus propias pruebas y revisión de seguridad antes de usarlo como transporte.

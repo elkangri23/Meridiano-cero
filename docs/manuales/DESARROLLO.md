@@ -10,7 +10,7 @@ Actualizado: 2026-10-28. Consultar [estado actual](../plan/ESTADO.md), [backlog]
 - packages/case-schema: definición y validación del expediente.
 - packages/engine: motor, fixture y pruebas sin IA.
 
-Son cinco proyectos de producto más la raíz pnpm. Hay compose.yaml, migrador con ledger y sesiones PostgreSQL. El comando db:migrate existe; faltan API/guardado de partidas conectados. No existen todavía worker, generador, biblioteca UI o paquete ai-adapters independientes.
+Son seis proyectos de producto más la raíz pnpm; packages/ai-adapters se incorporó desde el último main y aún no está consumido por la API. Hay compose.yaml, migrador con ledger y sesiones PostgreSQL. El comando db:migrate existe; faltan API/guardado de partidas conectados. No existen todavía worker, generador o biblioteca UI independientes.
 
 Las direcciones de dependencias son las de SPEC-012. Los siete fallos de imports heredados, incluidos crypto en engine y la reexportación contracts/case-schema, están registrados como pendientes; no se presentan como arquitectura ya conforme.
 
@@ -79,6 +79,6 @@ No modificar originales de docs/meridi, credenciales, instalación WSL ni otros 
 
 [IA local](IA-LOCAL.md) explica transporte, memoria y evaluación. Un mock aprobado no acredita comprensión ni ausencia de contradicciones de un modelo real. Sin URL/modelo disponibles no se instala ni descarga nada automáticamente.
 
-[Última evidencia](../quality/T3-04.md): build API, typecheck API, lint IA y 157 pruebas correctos; nueve errores globales de lint, siete de imports y avisos de formato siguen abiertos en la combinación. Sin E2E ni aceptación OWASP completa.
+[Última evidencia](../quality/T3-04.md): build API, typecheck API, lint IA y 157 pruebas correctos; doce errores globales de lint, siete de imports y avisos de formato siguen abiertos en la combinación. Sin E2E ni aceptación OWASP completa.
 
 Dependencias nuevas requieren necesidad, mantenimiento y licencia justificados. No crear capas vacías ni criptografía propia. Mantener secretos, prompts y conversaciones fuera de logs y de evidencias públicas.
