@@ -17,6 +17,10 @@ Fecha: 2026-10-27. Fuente de autoridad: instrucciones actuales del usuario; desp
 | DEC-011 | Import/export contiene solución | Descarga explícita del expediente completo por dueño autorizado; nunca en proyección normal de juego | GDD §17 y ADR-009 |
 | DEC-012 | Ayuda frente a fallo técnico | Mostrar errores operativos sin sugerir pistas ni valorar rumbo de investigación | GDD §1 y SPEC-005 |
 
+## Inicio de T3 en paralelo
+
+El 2026-10-28 el usuario autoriza adelantar T3 antes del cierre de T2. Se permiten contratos y UI con muestras públicas; no se trasladan reglas al cliente ni se declara integración completa sin motor, seguridad y pruebas.
+
 ## Decisiones de producto aún abiertas
 
 Estas decisiones bloquean su tarea, no la base ni el motor: marca y atribución final (fase 6); parámetros numéricos de carrera y variedad (fase 5); arte/sonido y licencias definitivas (fase 5); catálogo ampliado y tiempos realistas (fase 5); modelos de referencia (antes de evaluar fase 3); protocolo, condiciones y cuotas FreeLLMAPI y políticas de retención (fase 7).

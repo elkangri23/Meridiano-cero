@@ -26,4 +26,7 @@ function App() {
 }
 const root = document.getElementById('root');
 if (!root) throw new Error('No existe el contenedor de la aplicación.');
-createRoot(root).render(<App />);
+const application = createRoot(root);
+if (import.meta.env.DEV && globalThis.location.pathname === '/prototype') {
+  void import('./prototype/Prototype').then(({ Prototype }) => { application.render(<Prototype />); });
+} else { application.render(<App />); }

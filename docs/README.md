@@ -29,3 +29,7 @@ Cada requisito tiene un ID estable, fuente, spec, tarea responsable y escenario 
 Tomar una tarea preparada del backlog, cerrar la spec aplicable, implementar el cambio mínimo, ejecutar sus comprobaciones y revisar el hito con el usuario. Actualizar la trazabilidad en el mismo cambio. Los cambios de reglas necesitan decisión explícita registrada en BASELINE y, si alteran arquitectura, un ADR que sustituya al anterior.
 
 Plantillas: [spec](templates/spec.md), [ADR](templates/adr.md), [tarea](templates/tarea.md), [evidencia](templates/evidencia.md).
+
+## Avance T3
+
+[Interfaz inicial y verificaciones](quality/T3-inicio.md), [frontera de presentación](specs/T3-presentacion-inicial.md). Prototipo solo en desarrollo: http://127.0.0.1:5174/prototype. No es una investigación jugable ni una IA conectada.
