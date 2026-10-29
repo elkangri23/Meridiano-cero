@@ -1,3 +1,4 @@
+import { submitCommunication, matureCommunication } from './communications.js';
 import { startBatch, decideBatch } from './batch.js';
 import { materialMinutes, confirmation } from './timed-action.js';
 import { appendRequest, pendingEvidence } from './requests.js';
@@ -18,7 +19,7 @@ import type {
 } from '@meridiano/case-schema';
 
 /** Versión de ejecución; admite el formato de definición engineCompatibility=1. */
-export const ENGINE_VERSION = 8;
+export const ENGINE_VERSION = 14;
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
 
@@ -110,7 +111,7 @@ export function confirmAction(def: CaseDefinition, run: CaseRun, action: Action)
 }
 
 function previewAction(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  const result = resolveActionInternal(def, run, action);
+  const result = resolvePreview(def, run, action);
   requireTransitionVersion(run, result.run);
   if (result.status === 'impossible') return result;
   const minutes = materialMinutes(def, run, action);
@@ -119,11 +120,26 @@ function previewAction(def: CaseDefinition, run: CaseRun, action: Action): Actio
   return previewBatchResult(run, action, result);
 }
 
+function resolvePreview(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  if (action.type === 'batch') return resolveBatch(def, run, action, true);
+  if (action.type === 'batch_decision') return resolveBatchDecision(def, run, action, true);
+  return resolveActionInternal(def, run, action);
+}
+
 function previewBatchResult(run: CaseRun, action: Action, result: ActionResult): ActionResult {
   const elapsed = result.run.minute - run.minute;
-  if (action.type === 'batch_decision' && action.params.decision === 'continue_independent') return confirmation(run, action, elapsed);
-  if (action.type === 'batch' && elapsed > 0) return confirmation(run, action, elapsed);
+  const closesCase = result.events.some(event => event.type === 'finish');
+  if (action.type === 'batch_decision' && action.params.decision === 'continue_independent') return batchConfirmation(run, action, elapsed, closesCase);
+  if (action.type === 'batch' && (elapsed > 0 || closesCase || result.events.some(event => event.type === 'travel'))) return batchConfirmation(run, action, elapsed, closesCase);
   return result;
+}
+
+function batchConfirmation(run: CaseRun, action: Action, elapsed: number, closesCase: boolean): ActionResult {
+  const result = confirmation(run, action, elapsed);
+  if (result.status !== 'confirmation_required') return result;
+  return { ...result, preview: { ...result.preview,
+    description: 'Confirmar secuencia: ' + elapsed + ' minutos estimados; los viajes pueden retrasarse y cambiar la viabilidad de pasos posteriores.' +
+      (closesCase ? ' Incluye cierre del caso; no se ejecutarán pasos posteriores.' : '') } };
 }
 
 function applyMaterial(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
@@ -289,6 +305,7 @@ function processMaturedRequests(def: CaseDefinition, run: CaseRun, newMinute: nu
     if (request.type === 'warrant') currentRun = matureSelectedWarrant(def, currentRun, request);
     if (request.type === 'analyze') currentRun = matureAnalysis(currentRun, request);
     if (request.type === 'fixed_evidence') currentRun = matureEvidence(def, currentRun, request);
+    if (request.type === 'communicate') currentRun = matureCommunication(currentRun, request);
   }
   return { run: { ...currentRun, pendingRequests: remaining }, matured };
 }
@@ -360,12 +377,18 @@ function previewTravel(def: CaseDefinition, run: CaseRun, action: Action): Actio
   return { status: 'confirmation_required', run, events: [], preview };
 }
 
-function resolveBatch(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  return startBatch(run, action.params, (current, step) => applyMaterial(def, current, step));
+function executeBatchStep(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly: boolean): ActionResult {
+  if (action.type === 'travel') return confirmTravel(def, run, action, estimateOnly);
+  if (action.type === 'finish') return finishCase(def, run);
+  return applyMaterial(def, run, action);
 }
 
-function resolveBatchDecision(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  return decideBatch(run, action.params, (current, step) => applyMaterial(def, current, step));
+function resolveBatch(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false): ActionResult {
+  return startBatch(run, action.params, (current, step) => executeBatchStep(def, current, step, estimateOnly));
+}
+
+function resolveBatchDecision(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false): ActionResult {
+  return decideBatch(run, action.params, (current, step) => executeBatchStep(def, current, step, estimateOnly));
 }
 
 function resolveWait(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
@@ -394,23 +417,8 @@ function resolveWait(def: CaseDefinition, run: CaseRun, action: Action): ActionR
   return { status: 'applied', run: newRun, events };
 }
 
-function resolveCommunication(_def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  const channel = action.params.channel;
-  const recipient = action.params.recipient;
-  const content = action.params.content;
-  if (typeof channel !== 'string' || typeof recipient !== 'string') {
-    return { status: 'impossible', run, events: [], reason: 'channel/recipient inválidos.' };
-  }
-  const requestId = `req-${run.version + 1}`;
-  const newRequest: ScheduledResult = {
-    id: requestId,
-    dueMinute: run.minute + 30,
-    type: 'communicate',
-    payload: { channel, recipient, content },
-  };
-  const newRun = appendRequest(run, newRequest);
-  const events = [makeEvent(run.minute, 'communicate', { requestId, channel, recipient })];
-  return { status: 'applied', run: newRun, events };
+function resolveCommunication(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  return submitCommunication(def, run, action.params);
 }
 
 function detentionAuthorized(run: CaseRun, suspect: NonNullable<ReturnType<typeof fixedSuspect>>, params: Record<string, unknown>): boolean {
@@ -447,15 +455,16 @@ function resolveRecovery(def: CaseDefinition, run: CaseRun, action: Action): Act
     events: [makeEvent(run.minute, 'recover', { objectId: ORIGINAL_OBJECT, irregular })] };
 }
 
-function resolveFinish(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  if (action.params.confirmed !== true) {
-    return { status: 'confirmation_required', run, events: [], preview: {
-      actionType: 'finish',
-      estimatedMinutes: 0,
-      estimatedEndTime: run.minute,
-      description: 'Confirmar cierre del caso.',
-    }};
-  }
+function finishParams(action: Action): boolean {
+  return typeof action.params === 'object' && action.params !== null && !Array.isArray(action.params) && Object.keys(action.params).length === 0;
+}
+function resolveFinish(_def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  if (!finishParams(action)) return { status: 'impossible', run, events: [], reason: 'Parámetros de cierre inválidos.' };
+  return { status: 'confirmation_required', run, events: [], preview: {
+    actionType: 'finish', estimatedMinutes: 0, estimatedEndTime: run.minute, description: 'Confirmar cierre del caso.',
+  }};
+}
+function finishCase(def: CaseDefinition, run: CaseRun): ActionResult {
   const report = buildFinalReport(def, run, 'finished');
   const newRun: CaseRun = {
     ...run,
@@ -480,6 +489,7 @@ const handlers: Readonly<Record<Action['type'], Handler>> = Object.freeze({
 
 function confirmActionInternal(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
   switch (action.type) {
+    case 'finish': return finishParams(action) ? finishCase(def, run) : resolveFinish(def, run, action);
     case 'travel': return confirmTravel(def, run, action);
     case 'analyze': return requestAnalysis(def, run, action);
     case 'inspect':
@@ -489,7 +499,13 @@ function confirmActionInternal(def: CaseDefinition, run: CaseRun, action: Action
   }
 }
 
-function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function travelPosition(def: CaseDefinition, run: CaseRun, toCityId: string, expired: boolean): CaseRun['position'] {
+  if (expired) return { ...run.position };
+  const destination = def.locations.find(location => location.cityId === toCityId && location.accessible);
+  return { cityId: toCityId, locationId: destination?.id ?? '' };
+}
+
+function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false): ActionResult {
   const toCityId = action.params.toCityId;
   if (typeof toCityId !== 'string') {
     return { status: 'impossible', run, events: [], reason: 'toCityId inválido.' };
@@ -502,7 +518,7 @@ function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action): Actio
   }
   const confirmedTrips = nextTripCount(run);
   const baseCost = duration.minutes;
-  const delay = seededDelay(def.seed, run.tripCount);
+  const delay = estimateOnly ? 0 : seededDelay(def.seed, run.tripCount);
   const totalCost = baseCost + delay;
   const newMinute = advanceMinute(run.minute, totalCost, def.deadlineMinutes);
   const expired = hasExpired(newMinute, def.deadlineMinutes);
@@ -516,7 +532,7 @@ function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action): Actio
     version: run.version + 1,
     minute: newMinute,
     tripCount: confirmedTrips,
-    position: expired ? { ...run.position } : { cityId: toCityId, locationId: def.locations.find(location => location.cityId === toCityId && location.accessible)?.id ?? '' },
+    position: travelPosition(def, run, toCityId, expired),
     discoveries: expired ? [...run.discoveries] : newDiscoveries,
   };
   const { run: processedRun, matured } = processMaturedRequests(def, baseRun, newMinute, expired);

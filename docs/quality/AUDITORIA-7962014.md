@@ -231,3 +231,56 @@ Motor v8 mantiene hash/seed originales, pero cambia resultados temporales por ve
 ## Avance parcial T3-06: consulta de creación
 
 El localizador por clave revalida sesión/esquema y propiedad en transacción, usa SQL parametrizado y DTO explícito sin estado privado. Se comparte el validador de claves con creación y rutas, sin dependencias nuevas ni capas vacías. Las barreras PostgreSQL verifican revocación concurrente y 404 provisional antes del commit. [Evidencia y límites](T3-06-localizador-creacion.md). Esta entrega no cierra las obligaciones de operaciones/guardados, UI, retención ni certifica cumplimiento completo de OWASP/ASVS o del commit normativo.
+
+## Avance parcial: intervenciones en lote v9
+
+Detención y recuperación reutilizan resolutores/costes individuales con validación cerrada del paso. Pruebas cubren preview sin efectos, permisos independientes, pausa/serialización y vencimiento; las rutas A/B agrupan la intervención sin inyectar descubrimientos. Nuevo snapshot v9, lectura inicial antigua sin reescritura. [Evidencia y límites](T2-intervenciones-lotes-v9.md). No cierra la auditoría, T2/T3 ni las puertas de aceptación restantes.
+
+## Avance parcial: viajes en lotes v10
+
+Viajes reutilizan resolutor individual, contador persistido y reloj; preview/continuación no consultan seed. Parámetros cerrados, pausas/dependencias/plazo y equivalencia factual A/B se verifican sin habilitar API/UI prematuramente. [Evidencia y límites](T2-viajes-lotes-v10.md). No se cierra auditoría ni T2/T3 por esta entrega.
+
+## Avance parcial: cierre en lotes v11
+
+Cierre a coste cero requiere confirmación, con parámetros cerrados y sin informe prospectivo. Reutiliza resolutor individual y terminación del coordinador; pausa/serialización, dependencias, cancelación y plazo conservan sus límites. Rutas A/B verifican cierre en lote sin inyección de pistas. [Evidencia](T2-cierre-lotes-v11.md). No cierra auditoría ni T2/T3; carrera/resultado oficial permanecen fuera del motor.
+
+## Avance parcial: comunicaciones v12
+
+Se elimina payload abierto recipient/content, se comparte validación cerrada en acción/lote/maduración y se acota texto, solicitudes y snapshots serializados. Texto no se interpreta como autoridad, eventos no contienen texto privado y acuse no inventa hechos. [Evidencia y límites](T2-comunicaciones-v12.md). No cierra auditoría/T2/T3; configuración y respuestas factuales del equipo, API/UI/guardados siguen pendientes.
+
+## Avance parcial: navegabilidad del mapa
+
+La puerta estructural verifica alcance dirigido y entrada accesible por ciudad, sin recursión, cambios al fixture o confiar en el reporte externo. Rechazo de nuevas intenciones sin filas y preservación de replay previo cubiertos por integración. [Evidencia y límites](T2-navegabilidad-mapa.md). No se acredita solvencia, auditoría completa o cierre de T2/T3.
+
+## Avance parcial: referencias de conocimiento/solución
+
+Validador 1.3 exige referencias existentes y unicidad; compatibilidad histórica explícita con perfil de sospechosos compartido con el motor. No nombres inferidos, errores con datos privados o reescritura del fixture. [Evidencia y límites](T2-referencias-conocimiento.md). Condiciones de revelación, vocabulario de reglas y solvencia pendientes; no cierra auditoría/T2/T3.
+
+## Avance parcial: permiso factual de testimonio v13
+
+Se reproduce y corrige revelación de EV-09 tras retirar conocimiento de Lucía. Mismo punto de autorización para acción/lote, sin prueba/procedencia ficticia; rutas materiales A/B sin cooperación/conocimiento conservan solvencia bajo retrasos máximos. [Evidencia](T2-permisos-testimonio-v13.md). Política completa, vocabulario declarativo y aceptación pendientes; no se cierra auditoría/T2/T3.
+
+## Avance parcial: rechazo de contenido ignorado
+
+Validador 1.4 no aprueba reglas arbitrarias ni programación inicial que createInitialRun no consume. Manifiesto histórico explícito, sin evaluar texto; solicitudes de acciones y replay previo conservados. [Evidencia](T2-contenido-ejecutable.md). DSL/políticas generales, solvencia y aceptación pendientes; no cierra auditoría/T2/T3.
+
+## Avance parcial: listado propio paginado
+
+DTO explícito, consultas parametrizadas con cuenta de sesión revalidada, cursor sin autoridad propia y paginación por ancla/fecha precisa en un snapshot. No se serializa motor ni se afirma reanudación compatible por listar metadata. [Evidencia y límites](T3-02-lista-partidas.md). No cierra auditoría/T2/T3; UI, acciones, guardados y aceptación siguen pendientes.
+
+## Avance parcial: archivo web conectado
+
+Vista de consulta MS-DOS con contratos runtime cerrados, transporte acotado, sesión/cuenta coherentes y respuestas tardías descartadas. Logout oculta datos sin afirmar éxito antes de 204; sin credenciales en DOM/storage. Pruebas de frontera/modelo y revisión manual sintética separadas. [Evidencia y límites](T3-03-archivo-conectado.md). No cierra auditoría/T3, accesibilidad completa o recuperación de operaciones del caso.
+
+## Avance parcial: intención de creación web
+
+Persistencia mínima antes del POST, cuenta esperada comparada en transacción y éxito solo tras ledger propio. Recarga/404 no generan clave nueva; abort/logout no se afirman como rollback. Ensayo real sintético: un POST y una partida tras acuse perdido y recarga. [Evidencia y límites](T3-creacion-web-recuperable.md). No cierra auditoría/T3 ni recuperación de otras operaciones, política de retención o aceptación del caso completo.
+
+
+La [consulta inicial conectada](T3-ficha-inicial-conectada.md) añade decoder público cerrado, lectura acotada sin mutaciones y descarte de respuestas tardías, sin dependencias ni reglas del motor en UI. Es evidencia parcial de programación y aislamiento; no cierra la auditoría integral ni las ocho incidencias históricas de formato.
+
+
+El [formato cerrado 1.5](T2-formato-cerrado.md) añade rechazo explícito de campos ignorados, errores sin datos suministrados y pruebas de rechazo sin escrituras/replay propio. Sin dependencias, evaluación de código o cambios en transiciones. Acredita ese control parcial, no solvencia general, cierre de fases o cumplimiento OWASP.
+
+
+El [cierre individual v14](T2-cierre-individual-v14.md) retira la aprobación por campo confirmed, conserva preview sin efectos y unifica el cierre de dominio de individuo/lote. Pruebas de inyección, repetición y compatibilidad documentadas; sin exposición HTTP anticipada o declaración de seguridad integral.

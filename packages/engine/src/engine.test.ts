@@ -71,7 +71,7 @@ describe('engine', () => {
 
   it('finish closes case', () => {
     const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
-    const result = resolveAction(def, run, { type: 'finish', params: { confirmed: true } });
+    const result = confirmAction(def, run, { type: 'finish', params: {} });
     expect(result.status).toBe('case_closed');
     if (result.status === 'case_closed') {
       expect(result.run.status).toBe('closed');

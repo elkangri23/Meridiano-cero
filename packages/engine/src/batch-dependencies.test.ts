@@ -83,7 +83,7 @@ describe('T2-03: dependencias conservadoras de lotes', () => {
     { type: 'talk', params: { npcId: 'lucia', approved: true } },
     { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: [] } },
     { type: 'batch', params: { steps: [] } },
-    { type: 'travel', params: { toCityId: 'paris' } },
+    { type: 'travel', params: { toCityId: 'paris', delay: 0 } },
     { type: 'talk', params: { npcId: 'lucia' }, dependsOn: [] },
   ])('valida params y tipos de todo el lote antes del prefijo: %j', value => {
     const run = initial();

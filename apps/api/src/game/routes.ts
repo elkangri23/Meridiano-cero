@@ -1,3 +1,4 @@
+import { listStoredRuns } from './run-list.ts';
 import { isIdempotencyKey } from '@meridiano/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config.ts';
@@ -27,6 +28,13 @@ function lookupBody(value: unknown): string {
     throw new RunStoreError('INVALID_REQUEST');
   }
   return value.idempotencyKey;
+}
+
+function expectedProfile(request: FastifyRequest): string | undefined {
+  const value = request.headers['x-expected-profile-id'];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value)) throw new RunStoreError('INVALID_REQUEST');
+  return value.toLowerCase();
 }
 
 async function available<T>(work: () => Promise<T>): Promise<T> {
@@ -63,16 +71,18 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     return { items: listCases(), nextCursor: null };
   });
   app.get<{ Params: { caseId: string } }>('/api/v1/cases/:caseId', { onRequest: authorize }, async request => caseSummary(request.params.caseId));
+  app.get<{ Querystring: Record<string, unknown> }>('/api/v1/runs', { onRequest: authorize }, request =>
+    available(() => listStoredRuns(database, digest(request), request.query)));
   app.post('/api/v1/runs', { onRequest: authorize }, async (request, reply) => {
     const body = createBody(request.body);
     const definition = findCase(body.caseId);
-    const result = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey));
+    const result = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey, expectedProfile(request)));
     return reply.code(result.replayed ? 200 : 201).send({ ...initialPlayerView(result.run), replayed: result.replayed });
   });
   app.post<{ Querystring: Record<string, unknown> }>('/api/v1/run-creations/lookup', { onRequest: authorize }, async request => {
     if (Object.keys(request.query).length) throw new RunStoreError('INVALID_REQUEST');
     const key = lookupBody(request.body);
-    return available(() => lookupRunCreation(database, digest(request), key));
+    return available(() => lookupRunCreation(database, digest(request), key, expectedProfile(request)));
   });
   app.get<{ Params: { runId: string } }>('/api/v1/runs/:runId', { onRequest: authorize }, async request => {
     const run = await available(() => readStoredRun(database, digest(request), request.params.runId));

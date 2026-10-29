@@ -45,7 +45,7 @@ describe('BOR-032/042: secuencia persistida por partida', () => {
   });
   it('no interpreta estados de ejecución v1 con las reglas v3', () => {
     const run = { ...initial(), engineVersion: 1 };
-    expect(ENGINE_VERSION).toBe(8);
+    expect(ENGINE_VERSION).toBe(14);
     expect(() => confirmAction(definition, run, { type: 'travel', params: { toCityId: 'paris' } })).toThrow(EngineStateError);
   });
 });
@@ -63,7 +63,7 @@ describe('BOR-031/032: vencimiento y objetivos materializados', () => {
     // Estado controlado de unidad; no es una demostración de ruta legal completa.
     const run = { ...initial(), detentions: sample.detained, recoveredObjects: sample.recovered, minute: definition.deadlineMinutes - 1 };
     const before = structuredClone(run);
-    const finished = resolveAction(definition, run, { type: 'finish', params: { confirmed: true } });
+    const finished = confirmAction(definition, run, { type: 'finish', params: {} });
     const expired = resolveAction(definition, run, { type: 'wait', params: { minutes: 1 } });
     if (finished.status !== 'case_closed' || expired.status !== 'case_closed') throw new Error('Expected closed case');
     expect(finished.report.result).toBe(sample.expected);
@@ -75,7 +75,7 @@ describe('BOR-031/032: vencimiento y objetivos materializados', () => {
   });
   it('no acepta objetivos precompletados de la definición como efectos del jugador', () => {
     const forged = { ...definition, objectives: definition.objectives.map(objective => ({ ...objective, achieved: true })) };
-    const result = resolveAction(forged, createInitialRun(forged, 'synthetic', 'synthetic', hashDefinition(forged)), { type: 'finish', params: { confirmed: true } });
+    const result = confirmAction(forged, createInitialRun(forged, 'synthetic', 'synthetic', hashDefinition(forged)), { type: 'finish', params: {} });
     expect(result).toMatchObject({ status: 'case_closed', report: { result: 'unresolved', objectivesAchieved: [] } });
     expect(forged.objectives.every(objective => objective.achieved)).toBe(true);
   });
@@ -110,7 +110,7 @@ describe('BOR-031/032: vencimiento y objetivos materializados', () => {
     expect(run).toEqual(before);
   });
   it('confirmar después del cierre no mueve estado ni genera eventos', () => {
-    const closed = resolveAction(definition, initial(), { type: 'finish', params: { confirmed: true } });
+    const closed = confirmAction(definition, initial(), { type: 'finish', params: {} });
     expect(confirmAction(definition, closed.run, { type: 'travel', params: { toCityId: 'paris' } }))
       .toMatchObject({ status: 'impossible', run: closed.run, events: [] });
   });

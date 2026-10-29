@@ -1,3 +1,7 @@
+import { validateShape } from './validation-shape.js';
+import { validateExecutableContent } from './validation-content.js';
+import { validateKnowledge } from './validation-knowledge.js';
+import { validateMap } from './validation-map.js';
 import type { ValidationReport } from './types.js';
 import { check, identifier, integer, isRecord, records, strings, text, type DataRecord } from './validation-fields.js';
 import { validateEntities, type EntityGroups } from './validation-entities.js';
@@ -46,16 +50,20 @@ export function validateCaseDefinition(def: unknown): { valid: boolean; errors: 
   if (!isRecord(def)) return { valid: false, errors: ['La definición debe ser un objeto.'] };
   metadata(def, errors);
   const groups = collections(def, errors);
+  validateShape(def, groups, errors);
   validateEntities(groups, errors);
   validateReferences(groups, errors);
   validateEvidenceGraph(groups.evidence, errors);
   validateStart(groups, errors);
+  validateMap(groups, errors);
+  validateKnowledge(def, groups, errors);
+  validateExecutableContent(def, errors);
   report(def.validationReport, errors);
   return { valid: errors.length === 0, errors };
 }
 
 /** Solo declara la etapa estructural solicitada; no confía en certificados externos. */
 export function createValidationReport(errors: string[]): ValidationReport {
-  return { validatorVersion: '1.1.0', scenarios: ['structural'], errors: [...errors],
+  return { validatorVersion: '1.5.0', scenarios: ['structural'], errors: [...errors],
     status: errors.length === 0 ? 'validated' : 'rejected' };
 }

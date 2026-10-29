@@ -25,7 +25,10 @@ try {
   assert.match(await page.text(), /Meridiano-cero/);
   const module = await fetch(base + '/src/main.tsx');
   assert.equal(module.status, 200);
-  assert.match(await module.text(), /Comprobar API/);
+  assert.match(await module.text(), /createRoot/);
+  const archive = await fetch(base + '/src/archive/Archive.tsx');
+  assert.equal(archive.status, 200);
+  assert.match(await archive.text(), /Archivo de partidas/);
   const health = await fetch(base + '/api/v1/health');
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { status: 'ok' });

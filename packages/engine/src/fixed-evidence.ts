@@ -81,6 +81,8 @@ export function revealTalk(def: CaseDefinition, run: CaseRun, npcId: string, top
     const markers = ['identity:' + npcId, 'location:' + npcId];
     return { ...run, discoveries: [...run.discoveries, ...markers.filter(marker => !run.discoveries.includes(marker))] };
   }
-  if (npcId === 'lucia' && topicId === 'caja' && (run.npcRelations.lucia ?? 0) > 0) return revealEvidence(def, run, 'EV-09', run.minute, 'talk');
+  const witness = def.npcs.find(npc => npc.id === npcId);
+  const knowsBox = witness?.knowledge.includes('tomas-moved-box') === true;
+  if (npcId === 'lucia' && topicId === 'caja' && knowsBox && (run.npcRelations.lucia ?? 0) > 0) return revealEvidence(def, run, 'EV-09', run.minute, 'talk');
   return run;
 }

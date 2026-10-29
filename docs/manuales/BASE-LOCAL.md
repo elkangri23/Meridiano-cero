@@ -18,7 +18,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-Abrir http://127.0.0.1:5173. La pantalla base comprueba HTTP; no crea todavía detective ni partida. La API escucha en 127.0.0.1:3000. GET /api/v1/health devuelve proceso vivo; GET /api/v1/ready exige DB y migraciones exactas.
+Abrir http://127.0.0.1:5173. La raíz muestra el archivo real de la sesión, con filtros y páginas. Entrar en desarrollo local solicita sesión explícita cuando LOCAL_DEV_AUTH_ENABLED=true; la creación de partidas requiere selección y botón explícitos y no inicia todavía la investigación. La API escucha en 127.0.0.1:3000. GET /api/v1/health devuelve proceso vivo; GET /api/v1/ready exige DB y migraciones exactas.
 
 setup:local crea .env y .local-secrets con contraseñas aleatorias. No imprime ni sobrescribe secretos existentes. Si hay configuración previa, revisar/conservar, no borrar para repetir un comando. .env.example solo es una plantilla sin credenciales. No ejecutar docker compose config para compartir su salida junto a archivos privados.
 
@@ -89,7 +89,7 @@ El servicio nuevo es interno; la existencia de tablas no habilita rutas de juego
 
 ## Probar catálogo e inicio por API
 
-Entrega posterior a la persistencia interna: ya están registrados catálogo, detalle, creación y lectura de partidas iniciales. Ejecutar setup, PostgreSQL, db:migrate y API según los pasos anteriores. La UI todavía no consume estas rutas. Ejemplo PowerShell para el entorno local de desarrollo autorizado, con API en 3000 y Origin configurado en 5173:
+Entrega posterior a la persistencia interna: ya están registrados catálogo, detalle, creación y lectura de partidas iniciales. Ejecutar setup, PostgreSQL, db:migrate y API según los pasos anteriores. La UI consume sesión y listado propio; también ofrece catálogo/creación recuperable; lectura inicial permanece en API, sin investigación conectada. Ejemplo PowerShell para el entorno local de desarrollo autorizado, con API en 3000 y Origin configurado en 5173:
 
 ~~~powershell
 $meridianoApi = 'http://127.0.0.1:3000/api/v1'
@@ -114,3 +114,26 @@ El proceso real emite JSON request.completed en stdout por allowlist. No incluye
 SIGINT/SIGTERM comparten una parada: draining cierra readiness/admisión; Fastify drena y su onClose cierra el pool una sola vez. Presupuesto inicial de 10 segundos; al agotarse o fallar cierre se fuerza salida. Una escritura interrumpida queda potencialmente incierta: recuperar la misma intención, sin afirmar rollback. El presupuesto se ha probado en unidad; falta el ensayo completo con proceso/supervisor/IA en vuelo. [Auditoría y pendientes](../quality/AUDITORIA-7962014.md).
 
 Las rutas de juego comprueban también compatibilidad de esquema: no basta con mirar readiness desde fuera. Crear/leer partida valida el ledger dentro de la transacción y mantiene el lock de migración compartido; el migrador usa el mismo lock exclusivo. Una versión desconocida o checksum distinto bloquea el juego con 503 y conserva los datos. No ejecutar SQL de migración histórica a mano para forzar compatibilidad.
+
+## Archivo web conectado
+
+Con DB/migraciones y API/Vite activos, abrir la raíz del puerto web. Sin sesión no se carga ninguna partida ni se autentica automáticamente. En build de desarrollo se ofrece Entrar en desarrollo local; requiere backend habilitado y Origin igual al puerto Vite configurado. Si se cambia a 5174, PUBLIC_ORIGIN debe coincidir antes de arrancar API.
+
+El archivo permite Todas/Activas/Cerradas, Anterior/Siguiente y Actualizar. El título procede del catálogo público y la fecha es operativa, no tiempo del caso. Página vacía no indica fallo; error no se presenta como guardado o cierre completados. Cerrar sesión oculta perfil/lista y solo confirma al recibir respuesta; si falla, reintentar el cierre. No se guardan CSRF o estado de partidas en localStorage/sessionStorage. Solo la referencia mínima de creación por cuenta se conserva en sessionStorage.
+
+Nueva partida permite seleccionar caso y crear; investigación, guardados, login público o configuración IA siguen sin conectar a esta pantalla. /prototype mantiene la muestra separada. [Evidencia y límites](../quality/T3-03-archivo-conectado.md).
+
+## Crear partida desde web
+
+Entrar con la sesión local habilitada, elegir un expediente disponible y activar Crear partida. Se conserva una referencia antes de enviar; si storage está bloqueado no se envía una intención nueva. Solo la consulta de registro confirmado muestra éxito. Actualizar obtiene el listado actual; no hay todavía entrada a investigación/progreso.
+
+Si el resultado es incierto, conservar la pestaña o recargarla: Comprobar creación no reenvía, Reintentar misma creación reutiliza clave y caso. Un no encontrado no prueba rollback. No limpiar manualmente la referencia ni crear con otra clave para resolver un timeout. Preparar otra creación solo aparece tras confirmación. Cerrar sesión elimina la referencia de esa cuenta sin cancelar necesariamente una creación ya enviada; al volver, revisar el archivo.
+
+SessionStorage es de pestaña/origen: no promete recuperación por clave tras cerrar la pestaña. No contiene CSRF, cookies o texto privado. [Evidencia del ensayo con pérdida de acuse y recarga](../quality/T3-creacion-web-recuperable.md).
+
+
+## Consultar una partida inicial
+
+Desde una fila del archivo, Consultar solicita la ficha real a la API. Muestra ubicación pública, descripción y reloj/plazo; no ejecuta acciones ni avanza minutos. Cerrar ficha vuelve al archivo y Cancelar consulta de ficha descarta la lectura pendiente.
+
+Actualmente se admiten solo partidas sin progreso. Si no puede abrirse, no se restaura ni se crea automáticamente otra partida: actualiza el archivo para comprobar la sesión/disponibilidad. La investigación y los guardados siguen pendientes. [Alcance y verificación](../quality/T3-ficha-inicial-conectada.md).

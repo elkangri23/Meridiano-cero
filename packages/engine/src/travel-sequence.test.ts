@@ -70,7 +70,7 @@ describe('T2-04: secuencia real de viajes', () => {
     expect(result.status).toBe('applied');
     expect(result.run.tripCount).toBe(Number.MAX_SAFE_INTEGER);
     expect(() => resolveAction(def, result.run, travel('madrid'))).toThrow('TRAVEL_SEQUENCE_INVALID');
-    const closed = confirmAction(def, result.run, { type: 'finish', params: { confirmed: true } });
+    const closed = confirmAction(def, result.run, { type: 'finish', params: {} });
     expect(closed.status).toBe('case_closed');
     expect(closed.run.tripCount).toBe(Number.MAX_SAFE_INTEGER);
   });

@@ -119,3 +119,68 @@ La definición y su hash original no cambian. Los inicios v1–v6 no tenían est
 ## Compatibilidad de tiempos en v8
 
 Un hash de definición y una semilla no identifican por sí solos una secuencia temporal entre versiones del motor. La persistencia conserva engineVersion=8 junto a definición/hash; cambiar el mezclador no cambia hechos del caso ni autoriza reinterpretar progreso v7. API solo reconoce inicios v1–v7 en su forma virgen conocida, manteniendo tripCount de v7 y sin añadirlo a v1–v6. La lectura no escribe ni migra. [Verificación](../quality/T2-retrasos-maximos-v8.md).
+
+## Continuación T2: intervenciones en lotes v9
+
+Detain/recover se incorporan al vocabulario interno de secuencias con parámetros cerrados, usando los resolutores individuales y sus costes/permisos. Preview sin efectos, pausa/continuación sin duplicar prefijo y plazo exacto conservados. Las rutas A/B agrupan la intervención final, con semillas base y retrasos máximos. Inicios v1–v8 legibles sin escritura; progreso anterior conservado/rechazado. [Pruebas y límites](../quality/T2-intervenciones-lotes-v9.md).
+
+No cierra T2/T3: quedan otros tipos de lote, reglas/vocabularios y aceptación; API de acciones, guardados y UI conectada siguen pendientes.
+
+## Continuación T2: viajes en lotes v10
+
+Travel se incorpora con parámetros cerrados y el mismo resolutor individual. Preview/continuación usan duración base sin leer seed; la confirmación aplica retrasos reales y revalida pasos. Pausa/serialización no repiten viajes ni índices; el plazo impide llegada y resto. Rutas A/B agrupan el desplazamiento inicial e intervención final. Inicios v1–v9 legibles sin escritura; progreso previo conservado/rechazado. [Evidencia y límites](../quality/T2-viajes-lotes-v10.md).
+
+T2/T3 siguen abiertos: cierre/comunicaciones en lotes, reglas/vocabularios y aceptación; acciones HTTP, proyección de progreso, guardados y UI conectada siguen pendientes.
+
+## Continuación T2: cierre confirmado en lotes v11
+
+Finish interno admite solo params vacío; preview siempre exige confirmación si alcanzaría el cierre, incluso sin coste, sin informe prospectivo. Confirmar usa el cierre individual y termina la secuencia sin efectos posteriores; pausa/dependencias/cancelación y prioridad del plazo verificadas. Rutas A/B incluyen cierre agrupado. Inicios v1–v10 legibles sin escritura, progreso previo conservado/rechazado. [Evidencia y límites](../quality/T2-cierre-lotes-v11.md).
+
+T2/T3 siguen abiertos por comunicaciones en lote, reglas/vocabularios y aceptación, API de acciones, proyección de progreso, guardados y UI. Primer resultado oficial y carrera no se implementan dentro del motor.
+
+## Continuación T2: comunicaciones simuladas v12
+
+Communicate individual/en lote usa parámetros cerrados y contacto interno conocido; envío gratuito, copia privada, cupo/duplicados y acuse neutral a +30 del reloj interno. No interpreta texto ni inventa resultados factuales. Snapshot acotado a 32768 unidades UTF-16 por paso para admitir texto de 4000 escapado; ocho pasos y demás validaciones se conservan. Inicios v1–v11 legibles sin escritura; progreso anterior conservado/rechazado. [Evidencia y límites](../quality/T2-comunicaciones-v12.md).
+
+El vocabulario interno de lotes admite los tipos de acción iniciales, pero no implica cierre de T2/T3: comunicaciones factuales/equipo, reglas/expedientes y aceptación siguen pendientes, además de API de acciones, guardados y UI.
+
+## Navegabilidad estructural del mapa: validador 1.2
+
+Toda ciudad declarada debe tener al menos un lugar accessible=true y ser alcanzable desde la primera ciudad mediante travelDurations dirigidos. No se infiere ruta inversa ni se exige vuelta al inicio. Una cadena de ciudades es válida si alcanza todas; ciudades inaccesibles no se aceptan como decoración en este esquema jugable. Lugares cerrados pueden coexistir con otro acceso disponible en su ciudad.
+
+La comprobación usa solo referencias de ciudades declaradas y costes positivos enteros válidos; no usa IA, red, recursión ni campos del reporte externo como aprobación. Se ejecuta en la validación estructural antes de crear nuevas partidas, sin modificar definición, contenido/hash o datos guardados. Una creación previa autorizada mantiene su replay antes de evaluar disponibilidad actual.
+
+Esta conectividad no demuestra rutas de investigación, regreso, solución, coste total dentro del plazo ni dos alternativas independientes. No cierra validación de conocimientos NPC, solución o vocabulario de reglas/payloads. Motor v12 no cambia; createValidationReport identifica validador 1.2.0 y solo etapa structural.
+
+[Verificación y límites del mapa](../quality/T2-navegabilidad-mapa.md).
+
+## Referencias de conocimientos y solución: validador 1.3
+
+Facts del formato heredado se tratan como IDs ASCII únicos. Knowledge de cada NPC contiene IDs únicos que deben existir en facts. La solución general debe referenciar un NPC por su ID; no se infiere por nombre visible o substring.
+
+Compatibilidad explícita del expediente Astrolabio original: sus tokens históricos de conocimiento siguen admitidos únicamente para el NPC correspondiente y el ID de ese caso. Son vocabulario legado reconocido, no equivalencias inventadas con hechos ni aprobación de conversación factual. Sus alias canónicos de sospechosos se comparten entre validador y motor; la solución canónica exige que el NPC correspondiente exista. El fixture y hash originales no se reescriben. Cambiar un nombre visible no cambia identidad, y un alias de otro caso no recibe esta excepción.
+
+La validación es estructural: referencias válidas no prueban veracidad, condiciones de revelación o solvencia. Vocabulario declarativo de reglas/payloads y conversación completa siguen pendientes. Validador 1.3.0, motor v12 sin cambio semántico; nueva creación inválida se rechaza sin filas, pero una intención previa autorizada conserva su replay antes de disponibilidad actual. Las tablas de compatibilidad son privadas del backend y no se exportan desde contratos públicos ni se envían a IA/UI.
+
+[Verificación y límites de referencias 1.3](../quality/T2-referencias-conocimiento.md).
+
+## Continuación T2: permiso de testimonio v13
+
+Se corrige la revelación EV-09 de Lucía: exige conocimiento declarado tomas-moved-box además de tema/cooperación/presencia. Retirar conocimiento no conserva prueba, admisibilidad o procedencia. Identificación propia presencial permanece separada. Rutas A/B sin conocimiento/cooperación de Lucía mantienen máximos 545/575 sin pistas inyectadas. Motor v13, inicios v1–v12 legibles sin escritura y progreso antiguo conservado/rechazado. [Evidencia y límites](../quality/T2-permisos-testimonio-v13.md).
+
+T2/T3 siguen abiertos por política completa de conversación, reglas/payloads y solvencia/aceptación, además de API de acciones, guardados y UI conectada.
+
+## Puerta de contenido ejecutable: validador 1.4
+
+El formato 1 no interpreta rules como código ni lenguaje de expresiones. Para Astrolabio admite exactamente el conjunto de tres declaraciones históricas del original, sin duplicados, ausencias, añadidos o variantes de texto. Son un manifiesto de compatibilidad con resolutores fijos existentes, no un parser de esas cadenas. Su orden puede variar sin cambiar aceptación; el hash conserva el orden original de arrays. Otros casos solo admiten rules vacío hasta contar con formato declarativo versionado y resolutor compatible.
+
+ScheduledResults de una definición debe estar vacío: createInitialRun todavía no incorpora esas entradas, por lo que aceptarlas declararía efectos que se descartan. No se admiten tipos/payloads conocidos del runtime como atajo. Esto no afecta a solicitudes que el motor crea durante acciones ni elimina la funcionalidad futura: programación inicial exige contrato/versionado, referencias, límites y pruebas antes de habilitarse.
+
+Rechazar contenido ignorado produce CASE_NOT_READY sin filas nuevas; replay previo autorizado mantiene su prioridad. Se conserva expediente/hash/seed original, motor v13 y lectura de partidas sin cambios. Validador 1.4.0 conserva etapa structural; no acredita solvencia, condiciones de conversación o compilación de un DSL genérico. No eval, scripts, descargas o I/O del contenido.
+
+[Verificación y límites de la puerta 1.4](../quality/T2-contenido-ejecutable.md).
+
+
+## Formato cerrado de la validación 1.5
+
+El esquema 1 admite exactamente los campos actuales de CaseDefinition, entidades y ValidationReport. Campos desconocidos o ausentes se rechazan; no se descartan silenciosamente. En particular, añadir políticas NPC o efectos sin consumidor no permite aprobarlos como implementados. Nuevas extensiones necesitan contrato versionado y ejecución verificada. Los límites y comprobaciones previas se conservan; scheduledResults inicial sigue vacío y el manifiesto fijo no equivale a un DSL. [Implementación y pruebas](../quality/T2-formato-cerrado.md).

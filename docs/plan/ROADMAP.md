@@ -90,3 +90,90 @@ Motor v8 mantiene hash/seed originales, pero cambia resultados temporales por ve
 Implementado POST /api/v1/run-creations/lookup: clave original en cuerpo cerrado, sesión revalidada en transacción, Origin/CSRF y propiedad actual. Devuelve solo metadatos de creación confirmada. Un 404 puede ser provisional y nunca autoriza una nueva clave. Siete pruebas de integración adicionales incluyen barreras reales de creación en vuelo y revocación; 45 PostgreSQL/HTTP en total. [Contrato, evidencia y límites](../quality/T3-06-localizador-creacion.md).
 
 T3-06 permanece en curso: faltan operaciones de acciones, guardados/cierre, retención/purga y recuperación conectada de UI. No se habilitan acciones HTTP ni se declara la fase 3 completada.
+
+## Continuación T2: intervenciones en lotes v9
+
+Detain/recover se incorporan al vocabulario interno de secuencias con parámetros cerrados, usando los resolutores individuales y sus costes/permisos. Preview sin efectos, pausa/continuación sin duplicar prefijo y plazo exacto conservados. Las rutas A/B agrupan la intervención final, con semillas base y retrasos máximos. Inicios v1–v8 legibles sin escritura; progreso anterior conservado/rechazado. [Pruebas y límites](../quality/T2-intervenciones-lotes-v9.md).
+
+No cierra T2/T3: quedan otros tipos de lote, reglas/vocabularios y aceptación; API de acciones, guardados y UI conectada siguen pendientes.
+
+## Continuación T2: viajes en lotes v10
+
+Travel se incorpora con parámetros cerrados y el mismo resolutor individual. Preview/continuación usan duración base sin leer seed; la confirmación aplica retrasos reales y revalida pasos. Pausa/serialización no repiten viajes ni índices; el plazo impide llegada y resto. Rutas A/B agrupan el desplazamiento inicial e intervención final. Inicios v1–v9 legibles sin escritura; progreso previo conservado/rechazado. [Evidencia y límites](../quality/T2-viajes-lotes-v10.md).
+
+T2/T3 siguen abiertos: cierre/comunicaciones en lotes, reglas/vocabularios y aceptación; acciones HTTP, proyección de progreso, guardados y UI conectada siguen pendientes.
+
+## Continuación T2: cierre confirmado en lotes v11
+
+Finish interno admite solo params vacío; preview siempre exige confirmación si alcanzaría el cierre, incluso sin coste, sin informe prospectivo. Confirmar usa el cierre individual y termina la secuencia sin efectos posteriores; pausa/dependencias/cancelación y prioridad del plazo verificadas. Rutas A/B incluyen cierre agrupado. Inicios v1–v10 legibles sin escritura, progreso previo conservado/rechazado. [Evidencia y límites](../quality/T2-cierre-lotes-v11.md).
+
+T2/T3 siguen abiertos por comunicaciones en lote, reglas/vocabularios y aceptación, API de acciones, proyección de progreso, guardados y UI. Primer resultado oficial y carrera no se implementan dentro del motor.
+
+## Continuación T2: comunicaciones simuladas v12
+
+Communicate individual/en lote usa parámetros cerrados y contacto interno conocido; envío gratuito, copia privada, cupo/duplicados y acuse neutral a +30 del reloj interno. No interpreta texto ni inventa resultados factuales. Snapshot acotado a 32768 unidades UTF-16 por paso para admitir texto de 4000 escapado; ocho pasos y demás validaciones se conservan. Inicios v1–v11 legibles sin escritura; progreso anterior conservado/rechazado. [Evidencia y límites](../quality/T2-comunicaciones-v12.md).
+
+El vocabulario interno de lotes admite los tipos de acción iniciales, pero no implica cierre de T2/T3: comunicaciones factuales/equipo, reglas/expedientes y aceptación siguen pendientes, además de API de acciones, guardados y UI.
+
+## Continuación T2-01: navegabilidad estructural 1.2
+
+Se rechazan ciudades sin lugar accesible o inalcanzables desde el inicio por rutas dirigidas válidas; sin inferir inversas ni exigir retorno. Cola iterativa acotada y errores sin datos privados. Nueva creación usa la puerta existente, conserva replay previo autorizado y no crea filas para mapas inválidos. Validador 1.2.0, motor v12 y hash original sin cambios. [Pruebas y límites](../quality/T2-navegabilidad-mapa.md).
+
+T2-01 sigue en curso por referencias de conocimientos/solución, vocabulario declarativo y solvencia. Conectividad no acredita rutas de investigación ni aceptación del caso. No se habilitan acciones HTTP, guardados o generador.
+
+## Continuación T2-01: referencias estructurales 1.3
+
+Facts exige IDs únicos y knowledge apunta a ellos sin duplicados. Solución general referencia NPC existente. El original conserva excepción explícita de tokens/aliases históricos, compartiendo perfil de sospechosos entre validador y motor, sin reinterpretar nombres o reescribir hash. Nuevas intenciones inválidas no crean filas; replay previo autorizado conservado. Validador 1.3.0, motor v12 sin cambio semántico. [Pruebas y límites](../quality/T2-referencias-conocimiento.md).
+
+T2-01 sigue abierto por condiciones de conocimiento/conversación, reglas/payloads declarativos y solvencia. La compatibilidad legada no equivale a validar todo ese modelo ni habilita API/UI/guardados o generador.
+
+## Continuación T2: permiso de testimonio v13
+
+Se corrige la revelación EV-09 de Lucía: exige conocimiento declarado tomas-moved-box además de tema/cooperación/presencia. Retirar conocimiento no conserva prueba, admisibilidad o procedencia. Identificación propia presencial permanece separada. Rutas A/B sin conocimiento/cooperación de Lucía mantienen máximos 545/575 sin pistas inyectadas. Motor v13, inicios v1–v12 legibles sin escritura y progreso antiguo conservado/rechazado. [Evidencia y límites](../quality/T2-permisos-testimonio-v13.md).
+
+T2/T3 siguen abiertos por política completa de conversación, reglas/payloads y solvencia/aceptación, además de API de acciones, guardados y UI conectada.
+
+## Continuación T2-01: contenido ejecutable reconocido 1.4
+
+Rules acepta solo manifiesto original completo para Astrolabio; otros casos solo rules vacío hasta disponer de formato ejecutable. ScheduledResults inicial no vacío se rechaza porque el motor lo ignoraba; solicitudes creadas por acciones se conservan. CASE_NOT_READY sin filas nuevas y replay propio previo preservado. Validador 1.4.0, motor v13 y hash original sin cambios. [Evidencia y límites](../quality/T2-contenido-ejecutable.md).
+
+T2-01 sigue abierto: no DSL o programación inicial implementados ni solvencia acreditada por este manifiesto. Se mantienen en alcance reglas/políticas generales y aceptación, API/guardados/UI y generador posteriores.
+
+## Continuación T3-02: lista de partidas propias
+
+GET /api/v1/runs añade metadata propia paginada y filtro active/closed, con sesión revalidada, cursor ligado a cuenta/filtro y keyset sin perder microsegundos. Ancla/página en una consulta; sin estado privado ni escritura. Nueve pruebas PostgreSQL/HTTP cubren aislamiento, paginación y revocación real. [Evidencia y límites](../quality/T3-02-lista-partidas.md).
+
+T3-02 sigue en curso; no habilita acciones, proyección de progreso, guardados o UI por adelantado. T2 mantiene sus pendientes. Motor v13 y validador 1.4 sin cambios.
+
+## Continuación T3-03: archivo conectado
+
+La raíz web consulta sesión y archivo reales, con entrada local explícita dev, filtros/páginas, estados vacíos/error y logout. DTO validado, cuenta vinculada a cada página, CSRF en memoria y descarte de respuestas tardías. Diseño MS-DOS y revisión de escritorio/móvil/teclado con datos sintéticos. [Evidencia y límites](../quality/T3-03-archivo-conectado.md).
+
+T3-03 permanece en curso. T3-07 inicia trabajo parcial de estados/cancelación del archivo, sin cerrar dependencias o recuperación de acciones. No investigación completa, ventanas, guardados o registro público anticipados. T2 y motor v13/validador 1.4 conservan su alcance.
+
+## Continuación T3: creación web recuperable
+
+Catálogo público y selección explícita crean partida desde el archivo. Localizador mínimo validado en sessionStorage por cuenta/pestaña, sin credenciales; lookup confirma resultado, 404/error conserva referencia y reintento explícito usa mismo caso/clave. Precondición de cuenta verificada en SQL para impedir mutación bajo otra cuenta. [Evidencia y límites](../quality/T3-creacion-web-recuperable.md).
+
+Ensayo de navegador con acuse/primer lookup perdidos, recarga y comprobación: un POST, dos lookups y una única partida real sintética. T3-03/06/07 siguen abiertos por progreso, acciones, guardados y reconciliación completa. Motor v13/validador 1.4 sin cambios.
+
+
+## Continuación T3: ficha inicial conectada
+
+El archivo permite consultar por GET una partida propia en su estado inicial: reloj/plazo, ubicación y ciudades visibles. Decoder público cerrado rechaza progreso, replay de creación, datos privados y otra referencia. Cerrar/cancelar, logout y cambio de filtro descartan respuestas tardías; las consultas no mutan ni avanzan el reloj. [Evidencia y límites](../quality/T3-ficha-inicial-conectada.md).
+
+T3-03/T3-07 siguen en curso: la lectura inicial no equivale a reanudar progreso ni a investigar. Motor v13/validador 1.4 y fixture sin cambios. Revisión manual específica de esta ficha y juego completo pendientes.
+
+
+## Continuación T2-01: formato cerrado 1.5
+
+Se rechazan campos adicionales o ausentes en raíz, entidades y reporte, evitando aprobar políticas/efectos que el motor ignora. Errores sin claves/valores privados; creación nueva inválida sin filas y replay propio previo conservado. [Evidencia y límites](../quality/T2-formato-cerrado.md).
+
+Validador 1.5.0, motor v13 y original/hash sin cambios. No implementa DSL, condiciones NPC o solvencia. T2-01 y tareas de integración T3 permanecen abiertas.
+
+
+## Continuación T2-05: cierre individual v14
+
+finish individual exige params vacío; resolve devuelve preview sin efectos y solo confirmAction cierra. confirmed/result u otros campos no sustituyen aprobación. Lotes usan el mismo cierre de dominio sin fabricar flags. Inicios v1–v13 legibles sin escritura; progreso previo preservado/rechazado. [Evidencia y límites](../quality/T2-cierre-individual-v14.md).
+
+Motor v14, validador 1.5 y original/hash sin cambios. T2/T3 siguen abiertos por reglas y aceptación, acciones HTTP, proyección de progreso y guardados.

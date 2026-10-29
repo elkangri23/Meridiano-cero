@@ -1,6 +1,6 @@
 # Meridiano-cero
 
-Videojuego de investigación internacional; A.C.M.E. es el nombre provisional. Estado integrado al 2026-10-28: base PostgreSQL con migrador y sesión local, motor implementado, prototipo MS-DOS/pixel art y servicios IA independientes del proveedor. No hay todavía investigación completa conectada, guardados manuales ni evaluación real del modelo.
+Videojuego de investigación internacional; A.C.M.E. es el nombre provisional. Estado de desarrollo al 2026-10-29: base PostgreSQL con migrador y sesión local, motor, archivo web conectado MS-DOS, prototipo pixel art separado y frontera IA independiente del proveedor. No hay todavía investigación completa conectada, guardados manuales ni evaluación real del modelo.
 
 ## Estado y contratos
 
@@ -28,6 +28,8 @@ La base vigente usa compose.yaml (solo PostgreSQL en 127.0.0.1:15432); API y Vit
 
 Web: http://127.0.0.1:5173. API: http://127.0.0.1:3000/api/v1/health. Readiness comprueba DB y migraciones esperadas. Sesión de desarrollo solo en loopback, sin registro público ni contraseñas por defecto.
 
+La raíz web permite consultar partidas propias, filtrar activas/cerradas y navegar páginas. En desarrollo, Entrar en desarrollo local solicita explícitamente la sesión cuando está habilitada en backend; al abrir no crea ninguna. Actualizar recupera la sesión existente y Cerrar sesión retira los datos. Nueva partida permite elegir un expediente disponible y crear una partida. Si se pierde la respuesta conserva su referencia en la pestaña para comprobar/reintentar la misma creación; no abre todavía la investigación. [Archivo](docs/quality/T3-03-archivo-conectado.md) y [creación recuperable](docs/quality/T3-creacion-web-recuperable.md).
+
 El prototipo de desarrollo está en /prototype del puerto Vite; para 5174: pnpm --filter @meridiano/web dev --port 5174. Usa datos sintéticos, sin IA ni partidas conectadas, y se excluye de producción.
 
 ## Verificación e integración
@@ -52,3 +54,6 @@ python3 scripts/verify_docs.py
 - [Integración de los documentos y diferencias entre versiones](docs/meridi/DOCUMENTOS.md)
 
 **Recuperación parcial del chat:** se han obtenido cinco intercambios recientes y el usuario ha aportado los dos Word GDD/TAD, conservados íntegros. Falta únicamente el historial anterior del chat; los documentos no son una transcripción de ese historial.
+
+
+Desde el archivo también puedes consultar la ficha inicial de una partida propia, sin avanzar su reloj. La reanudación con progreso y las órdenes siguen pendientes. [Entrega y límites de lectura](docs/quality/T3-ficha-inicial-conectada.md).

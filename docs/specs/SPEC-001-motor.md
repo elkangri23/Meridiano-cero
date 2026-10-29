@@ -129,3 +129,52 @@ Se registra engineVersion=7 por corregir la secuencia y añadir contador persist
 La mezcla aritmética anterior solo producía 15/21/27/33/39 minutos y correlacionaba los dos primeros índices, por lo que no permitía el escenario máximo de SPEC-003. V8 mezcla seed e índice persistido en 32 bits sin estado global; un resultado de 0–99 activa retraso en cinco resultados nominales, con minutos enteros entre 15 y 45. No usa Math.random, reloj real ni un algoritmo de seguridad. La frecuencia por muestra/partida no se promete exactamente 5%; es una política nominal reproducible del juego.
 
 Cambiar algoritmo exige engineVersion=8. Mantener la semilla no implica preservar tiempos entre motores diferentes: el progreso anterior se conserva/rechaza y solo los inicios vírgenes v1–v7 se leen sin escritura. Definición, seed y hash originales no cambian. Los previews no consultan ni exponen el sorteo. Una variante sintética con seed=14194 produce +45 en ambos primeros viajes y permite verificar 545/575 minutos reales de motor, no una tabla de costes alterada.
+
+## Continuación T2: intervenciones en lotes v9
+
+Detain/recover se incorporan al vocabulario interno de secuencias con parámetros cerrados, usando los resolutores individuales y sus costes/permisos. Preview sin efectos, pausa/continuación sin duplicar prefijo y plazo exacto conservados. Las rutas A/B agrupan la intervención final, con semillas base y retrasos máximos. Inicios v1–v8 legibles sin escritura; progreso anterior conservado/rechazado. [Pruebas y límites](../quality/T2-intervenciones-lotes-v9.md).
+
+No cierra T2/T3: quedan otros tipos de lote, reglas/vocabularios y aceptación; API de acciones, guardados y UI conectada siguen pendientes.
+
+## Viajes en lotes v10: contrato de ejecución
+
+El paso travel admite únicamente toCityId ASCII de 1–128 caracteres. El lote conserva validación cerrada, máximo ocho pasos y grafo interno. Cada ruta se resuelve desde la posición producida por el paso anterior. Confirmar usa el mismo resolutor de viaje individual, con tripCount persistido, maduración de solicitudes y plazo exclusivo.
+
+La simulación de preview del lote y su continuación usa duración base de viajes, sin consultar la semilla ni el retraso. El preview devuelve únicamente la partida original, sin eventos prospectivos, y advierte que los viajes pueden retrasarse y cambiar la viabilidad posterior. No ofrece pistas ni garantiza efectos futuros. Si ya hay coste de viaje, una pausa/cierre prospectivo tampoco devuelve el estado simulado. En ejecución confirmada sí se usan retrasos reales y se comprueba cada paso sobre ese resultado; el plazo o una imposibilidad conservan sus reglas de cierre/pausa.
+
+Pausa/serialización no repiten viajes aplicados ni vuelven a consumir su índice; cancelar descarta pendientes. No se habilitan acciones HTTP, migración automática de progreso ni recuperación por clave de acciones. Motor v10; lectura de inicios completos v1–v9 sin escritura, progreso anterior conservado/rechazado. Cierre y comunicaciones siguen fuera del lote.
+
+[Verificación y límites de viajes en lotes](../quality/T2-viajes-lotes-v10.md).
+
+## Cierre en lotes v11: contrato
+
+Finish como paso admite exclusivamente params vacío; no acepta confirmed ni resultado proporcionado. La aprobación pertenece a confirmAction del lote, no a un flag del paso. Resolver un lote que alcanzaría finish siempre devuelve confirmation_required, incluso a coste cero, con partida original y sin eventos/informe prospectivo. El preview advierte del cierre cuando lo alcanzaría en su simulación base. Al confirmar, el adaptador interno invoca el mismo cierre individual con aprobación interna; no crea una regla alternativa de evaluación.
+
+Cerrar termina inmediatamente la secuencia: se descarta el resto, pendingBatch=null, sin batch_completed ni efectos posteriores. Si un paso previo falla, pausa y conserva prefijo; finish dependiente se omite, mientras un finish independiente solo se puede ejecutar tras nueva confirmación de continuación. Cancelar no cierra. Si el plazo vence antes de finish, prevalece cierre por deadline y no se emite finish.
+
+Motor v11; inicios v1–v10 reconocidos sin reescritura y progreso anterior conservado/rechazado. No habilita endpoints ni primer resultado oficial/carrera, que siguen siendo responsabilidad del servicio transaccional pendiente. Comunicaciones aún fuera del lote.
+
+[Verificación y límites del cierre en lotes](../quality/T2-cierre-lotes-v11.md).
+
+## Comunicaciones simuladas v12: contrato inicial
+
+Communicate individual y en lote recibe exactamente channel, recipientId y requestText. Canal call/whatsapp/sms/email/fax; contacto NPC del caso fijo conocido tras conversación previa (npcRelations propia existente); texto no vacío de hasta 4000 unidades UTF-16. No teléfonos/emails/URLs como destinatario ni aliases recipient/content. Disponibilidad contextual falla con mensaje genérico. Son canales internos simulados; no hay I/O, envío real ni proveedor IA.
+
+Envío gratuito crea solicitud privada a +30 minutos de juego con payload copiado. Duplicado exacto pendiente no reserva otro hueco; cupo 32 y contadores seguros conservados. Tiempo real no entrega nada. Al madurar se registra exclusivamente un acuse neutral por ID de solicitud, sin respuesta factual libre, efecto de orden, evidencia o consejo. Respuestas factuales del equipo e interpretación de requestText quedan pendientes de reglas declarativas: no fingir implementación de esos resultados.
+
+Comparte validación y resolutor entre acción individual, lote y payload al madurar. Forma cerrada de todo el lote antes de efectos; pausa/reanudación no reenvía prefijo. Snapshot admite hasta 32768 unidades UTF-16 por paso (antes 4096), máximo ocho: 4000 caracteres escapados en JSON necesitan hasta 24000 más metadatos. El límite se comprueba antes de JSON.parse; parámetros y reason siguen limitados. No es límite HTTP ni habilita acciones externas.
+
+Motor v12 distingue contrato/payload ampliado. Inicios completos v1–v11 se leen sin escritura; progreso anterior conservado/rechazado. Definición/hash/seed originales sin cambios. No cierra T2/T3, comunicaciones factuales, guardados o UI.
+
+[Verificación y límites de comunicaciones v12](../quality/T2-comunicaciones-v12.md).
+
+## Continuación T2: permiso de testimonio v13
+
+Se corrige la revelación EV-09 de Lucía: exige conocimiento declarado tomas-moved-box además de tema/cooperación/presencia. Retirar conocimiento no conserva prueba, admisibilidad o procedencia. Identificación propia presencial permanece separada. Rutas A/B sin conocimiento/cooperación de Lucía mantienen máximos 545/575 sin pistas inyectadas. Motor v13, inicios v1–v12 legibles sin escritura y progreso antiguo conservado/rechazado. [Evidencia y límites](../quality/T2-permisos-testimonio-v13.md).
+
+T2/T3 siguen abiertos por política completa de conversación, reglas/payloads y solvencia/aceptación, además de API de acciones, guardados y UI conectada.
+
+
+## Ejecución v14: cierre individual sin flag de aprobación
+
+Sustituye la vía histórica confirmed=true de finish individual. Sus params son un objeto vacío: resolveAction solo devuelve confirmación requerida y confirmAction revalida/cierra. Campos adicionales se rechazan sin transición; un segundo cierre no emite eventos. El cierre de lotes comparte el resolutor de dominio sin fabricar flags. Sin cambios de coste/informe o apertura HTTP. Inicios históricos legibles sin reescritura en API y progreso incompatible preservado/rechazado. [Pruebas y límites](../quality/T2-cierre-individual-v14.md).

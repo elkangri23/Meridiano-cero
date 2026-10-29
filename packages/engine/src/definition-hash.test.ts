@@ -25,7 +25,7 @@ describe('integridad del expediente antes de persistirlo', () => {
     const run = createInitialRun(astrolabioDefinition, 'synthetic', 'synthetic', digest);
     expect(run.definitionHash).toBe(expected);
     expect(run.engineVersion).toBe(ENGINE_VERSION);
-    expect(ENGINE_VERSION).toBe(8);
+    expect(ENGINE_VERSION).toBe(14);
   });
   it.each([undefined, '', 'not-a-hash', 'X'.repeat(64), 42])('el motor rechaza una huella ausente o mal formada sin calcularla: %s', value => {
     expect(() => createInitialRun(astrolabioDefinition, 'synthetic', 'synthetic', value as unknown as string))

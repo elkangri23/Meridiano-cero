@@ -10,9 +10,10 @@ describe('BOR-051: admisión de solicitudes de juego', () => {
     for (let index = 0; index < MAX_PENDING_REQUESTS; index++) {
       run.pendingRequests.push({ id: 'synthetic-' + index, type: 'communicate', dueMinute: 30, payload: {} });
     }
+    run.npcRelations.lucia = 7;
     // Estado controlado de unidad para saturar; no es una ruta de aceptación.
     const before = structuredClone(run);
-    expect(() => resolveAction(def, run, { type: 'communicate', params: { channel: 'interno', recipient: 'equipo', content: 'sintético' } }))
+    expect(() => resolveAction(def, run, { type: 'communicate', params: { channel: 'call', recipientId: 'lucia', requestText: 'sintético' } }))
       .toThrow(EngineStateError);
     expect(run).toEqual(before);
   });

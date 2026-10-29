@@ -89,3 +89,26 @@ Accesibilidad y aspecto MS-DOS/pixel art se verifican con los subcasos UI del [c
 ## Bordes y funcionamiento ante fallos
 
 El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.
+
+## Archivo conectado de consulta: entrega T3-03
+
+La raíz web muestra el archivo real de la sesión: estado anónimo, entrada local de desarrollo explícita solo en build dev, carga, lista vacía, listado, filtro activo/cerrado/todos, anterior/siguiente y errores operativos. Permite selección/creación recuperable según el contrato de creación web; no ejecuta órdenes; no presenta investigación, guardados o registro público como disponibles. La ruta /prototype conserva la muestra separada de desarrollo.
+
+Presentación MS-DOS de paleta limitada, monospace, bordes rectos/dobles, sin tarjetas redondeadas ni efectos modernos. Tabla con título público del expediente, referencia, estado y fecha; si no hay ficha de catálogo se informa sin inventar nombre. Controles nativos, foco visible y desplazamiento de tabla en pantalla estrecha. No muestra CSRF, secretos, estado privado, versión del motor o metadatos internos no útiles al jugador.
+
+El cliente valida respuestas HTTP antes de usarlas. Listado incluye profileId de la sesión SQL y caseTitle público/null para vincular página a la cuenta y evitar hardcodear títulos. Respuestas tardías se descartan por generación y cancelación; cambiar filtro, refrescar, cerrar sesión o desmontar invalida petición anterior. Sin polling o reintentos automáticos de autenticación. No credenciales, CSRF o estado de partida en localStorage/sessionStorage; se admite el localizador mínimo de creación por cuenta en sessionStorage según API-juego.
+
+Cerrar sesión oculta inmediatamente perfil/lista, usa CSRF solo en memoria y no anuncia éxito si falla la respuesta. Un fallo de cierre permite reintentar sin mostrar datos anteriores. Un fallo al abrir sesión no se reenvía automáticamente: refrescar GET /me permite recuperar el resultado. La cuenta que acompaña una página debe coincidir con /me, o se descarta la página.
+
+[Pruebas y límites del archivo conectado](../quality/T3-03-archivo-conectado.md).
+
+## Selección y creación recuperable
+
+Nueva partida usa catálogo público validado. Selección obligatoria y acción explícita; no disponibilidad/ID desconocido no dispara POST. Durante envío bloquea doble activación. Referencia pendiente sobrevive a recarga de pestaña: Comprobar solo consulta y Reintentar misma creación conserva caso/clave. No ofrece otra clave o partida por deducción de un 404. Después de confirmación, Actualizar obtiene metadata actual; Preparar otra creación es una nueva decisión explícita.
+
+El estado visible no contiene clave o CSRF; el localizador mínimo por cuenta no representa un guardado. Fallo de storage bloquea intención nueva. Logout limpia solo esa referencia de cuenta, sin implicar cancelación de una escritura que ya se envió. [Pruebas y límites](../quality/T3-creacion-web-recuperable.md).
+
+
+## Consulta inicial conectada, entrega parcial T3
+
+El archivo ofrece Consultar sobre cada partida de la página propia. GET inicial autorizado muestra referencia, revisión, ubicación, descripción y ciudades públicas; ninguna consulta avanza tiempo. La ficha rechaza progreso no soportado y no reutiliza la respuesta histórica de creación. Cancelar/cerrar invalida consultas tardías; logout/cambio de filtro retiran la selección. Foco al título al abrir y devolución al botón de origen al cerrar, sin modal ni comandos ficticios. Contrato y límites en [evidencia de ficha inicial](../quality/T3-ficha-inicial-conectada.md). No sustituye las ventanas de investigación exigidas para el primer caso jugable.

@@ -1,3 +1,4 @@
+import { isInitialPlayerViewDto } from '@meridiano/contracts';
 import { Writable } from 'node:stream';
 import { createTelemetry } from '../telemetry.ts';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -124,6 +125,8 @@ describe('catálogo e inicio por HTTP con PostgreSQL real', () => {
   it('otra instancia HTTP reanuda y otro usuario no accede', async () => {
     const expected = await app.inject({ url: '/api/v1/runs/' + runId, headers });
     expect(expected.statusCode).toBe(200);
+    expect(isInitialPlayerViewDto(expected.json())).toBe(true);
+    expect(expected.headers['cache-control']).toBe('no-store');
     const secondDatabase = createDatabase(config.databaseUrl);
     const second = createApp({ config, database: secondDatabase });
     try {
@@ -136,20 +139,37 @@ describe('catálogo e inicio por HTTP con PostgreSQL real', () => {
     }
   });
 
-  it('inicios v1/v2/v3/v4/v5/v6/v7 siguen legibles sin reescritura; progreso v1 se conserva y falla cerrado', async () => {
+  it('precondición de cuenta se comprueba en transacción sin convertir el header en autoridad', async () => {
+    const key = randomUUID();
+    const payload = { caseId, idempotencyKey: key };
+    const before = await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [player.id]);
+    const wrong = { ...headers, 'x-expected-profile-id': other.id };
+    const blocked = await app.inject({ method: 'POST', url: '/api/v1/runs', headers: wrong, payload });
+    expect(blocked.statusCode).toBe(409); expect(blocked.json().error.code).toBe('SESSION_CHANGED');
+    expect((await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [player.id])).rows).toEqual(before.rows);
+    expect((await owner.pool.query('SELECT count(*)::int AS n FROM run_creations WHERE owner_id=$1 AND idempotency_key=$2', [player.id, key])).rows[0].n).toBe(0);
+    expect((await app.inject({ method: 'POST', url: '/api/v1/runs', headers: { ...headers, 'x-expected-profile-id': 'invalid' }, payload })).statusCode).toBe(400);
+    const created = await app.inject({ method: 'POST', url: '/api/v1/runs', headers: { ...headers, 'x-expected-profile-id': player.id }, payload });
+    expect(created.statusCode).toBe(201);
+    expect((await app.inject({ method: 'POST', url: '/api/v1/run-creations/lookup', headers: wrong, payload: { idempotencyKey: key } })).statusCode).toBe(409);
+    const recovered = await app.inject({ method: 'POST', url: '/api/v1/run-creations/lookup', headers: { ...headers, 'x-expected-profile-id': player.id }, payload: { idempotencyKey: key } });
+    expect(recovered.statusCode).toBe(200); expect(recovered.json().runId).toBe(created.json().runId);
+  });
+
+  it('inicios v1/v2/v3/v4/v5/v6/v7/v8/v9/v10/v11/v12/v13 siguen legibles sin reescritura; progreso v1 se conserva y falla cerrado', async () => {
     const response = await app.inject({ method: 'POST', url: '/api/v1/runs', headers, payload: { caseId, idempotencyKey: randomUUID() } });
     expect(response.statusCode).toBe(201);
     const id = response.json().runId;
     const stored = await owner.pool.query<{ engine_state: Record<string, unknown>; engine_version: number }>('SELECT engine_state,engine_version FROM runs WHERE id=$1', [id]);
     const row = stored.rows[0];
     if (!row) throw new Error('Missing synthetic run');
-    expect(row.engine_version).toBe(8);
+    expect(row.engine_version).toBe(14);
     expect(row.engine_state.eventOrdinal).toBe(0);
     expect(row.engine_state.tripCount).toBe(0);
     const oldInitial: Record<string, unknown> = { ...row.engine_state };
     delete oldInitial.tripCount;
-    for (const version of [2, 3, 4, 5, 6, 7]) {
-      const previous = { ...(version === 7 ? row.engine_state : oldInitial), engineVersion: version };
+    for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]) {
+      const previous = { ...(version >= 7 ? row.engine_state : oldInitial), engineVersion: version };
       await owner.pool.query('UPDATE runs SET engine_version=$1,engine_state=$2::jsonb WHERE id=$3', [version, JSON.stringify(previous), id]);
       expect((await app.inject({ url: '/api/v1/runs/' + id, headers })).statusCode).toBe(200);
       const preserved = await owner.pool.query('SELECT engine_version,engine_state FROM runs WHERE id=$1', [id]);

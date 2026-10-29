@@ -132,6 +132,71 @@ describe('creación de partidas en PostgreSQL aislado', () => {
     expect(ledger.rows[0].n).toBe(0);
   });
 
+  it('mapa desconectado no crea filas y conserva replay de intención previa autorizada', async () => {
+    const candidate = structuredClone(astrolabioDefinition);
+    candidate.travelDurations = candidate.travelDurations.filter(route => route.fromCityId !== 'madrid');
+    const originalKey = key();
+    const original = await createStoredRun(database, digest, astrolabioDefinition, originalKey);
+    expect((await createStoredRun(database, digest, candidate, originalKey)).run.id).toBe(original.run.id);
+    const before = await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]]);
+    const intent = key();
+    await expect(createStoredRun(database, digest, candidate, intent)).rejects.toMatchObject({ code: 'CASE_NOT_READY' });
+    expect((await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]])).rows).toEqual(before.rows);
+    expect((await owner.pool.query('SELECT count(*)::int AS n FROM run_creations WHERE owner_id=$1 AND idempotency_key=$2', [profiles[0], intent])).rows[0].n).toBe(0);
+  });
+
+  it('referencias de solución/conocimiento inválidas rechazan nuevas intenciones sin perder replay previo', async () => {
+    const originalKey = key();
+    const original = await createStoredRun(database, digest, astrolabioDefinition, originalKey);
+    const candidates = [
+      { ...structuredClone(astrolabioDefinition), solution: 'synthetic-missing-suspect' },
+      { ...structuredClone(astrolabioDefinition), npcs: astrolabioDefinition.npcs.map(npc => ({ ...npc, knowledge: ['synthetic-missing-fact'] })) },
+    ];
+    const before = await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]]);
+    for (const candidate of candidates) {
+      expect((await createStoredRun(database, digest, candidate, originalKey)).run.id).toBe(original.run.id);
+      const intent = key();
+      await expect(createStoredRun(database, digest, candidate, intent)).rejects.toMatchObject({ code: 'CASE_NOT_READY' });
+      expect((await owner.pool.query('SELECT count(*)::int AS n FROM run_creations WHERE owner_id=$1 AND idempotency_key=$2', [profiles[0], intent])).rows[0].n).toBe(0);
+    }
+    expect((await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]])).rows).toEqual(before.rows);
+  });
+
+  it('contenido no ejecutable no crea filas y conserva replay previo de intención autorizada', async () => {
+    const originalKey = key();
+    const original = await createStoredRun(database, digest, astrolabioDefinition, originalKey);
+    const candidates = [
+      { ...structuredClone(astrolabioDefinition), rules: ['synthetic-unknown-operator'] },
+      { ...structuredClone(astrolabioDefinition), scheduledResults: [{ id: 'synthetic-scheduled', type: 'communicate', dueMinute: 30, payload: {} }] },
+    ];
+    const before = await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]]);
+    for (const candidate of candidates) {
+      expect((await createStoredRun(database, digest, candidate, originalKey)).run.id).toBe(original.run.id);
+      const intent = key();
+      await expect(createStoredRun(database, digest, candidate, intent)).rejects.toMatchObject({ code: 'CASE_NOT_READY' });
+      expect((await owner.pool.query('SELECT count(*)::int AS n FROM run_creations WHERE owner_id=$1 AND idempotency_key=$2', [profiles[0], intent])).rows[0].n).toBe(0);
+    }
+    expect((await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]])).rows).toEqual(before.rows);
+  });
+
+  it('campos no soportados no crean filas y no impiden recuperar una intención propia anterior', async () => {
+    const originalKey = key();
+    const original = await createStoredRun(database, digest, astrolabioDefinition, originalKey);
+    const candidates = [
+      { ...structuredClone(astrolabioDefinition), disclosureRules: [{ factId: 'EV-09' }] },
+      { ...structuredClone(astrolabioDefinition), npcs: astrolabioDefinition.npcs.map(npc => ({ ...npc, cooperationRules: { pressure: 10 } })) },
+      { ...structuredClone(astrolabioDefinition), validationReport: { ...astrolabioDefinition.validationReport, approvedPolicies: true } },
+    ];
+    const before = await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]]);
+    for (const candidate of candidates) {
+      expect((await createStoredRun(database, digest, candidate, originalKey)).run.id).toBe(original.run.id);
+      const intent = key();
+      await expect(createStoredRun(database, digest, candidate, intent)).rejects.toMatchObject({ code: 'CASE_NOT_READY' });
+      expect((await owner.pool.query('SELECT count(*)::int AS n FROM run_creations WHERE owner_id=$1 AND idempotency_key=$2', [profiles[0], intent])).rows[0].n).toBe(0);
+    }
+    expect((await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]])).rows).toEqual(before.rows);
+  });
+
   it('valida y persiste una copia estable aunque el llamador cambie su definición mientras espera SQL', async () => {
     const candidate = structuredClone(astrolabioDefinition);
     const expectedHash = hashDefinition(candidate);
@@ -143,16 +208,16 @@ describe('creación de partidas en PostgreSQL aislado', () => {
     expect((await readStoredRun(database, digest, result.run.id)).definitionHash).toBe(expectedHash);
   });
 
-  it('fallo de preparación del hash no bloquea replay autorizado ni deja escritura nueva', async () => {
+  it('extensión no serializable se rechaza antes del hash sin bloquear replay autorizado', async () => {
     const originalKey = key();
     const original = await createStoredRun(database, digest, astrolabioDefinition, originalKey);
-    const candidate = structuredClone(astrolabioDefinition);
-    // Payload privado no serializable: la forma aún es válida; no es importación JSON.
-    candidate.scheduledResults = [{ id: 'synthetic-unhashable', type: 'communicate', dueMinute: 1, payload: 1n }];
+    // Extensión sintética privada no serializable, no una importación JSON.
+    // El formato cerrado ahora rechaza esa extensión antes de preparar el hash.
+    const candidate = { ...structuredClone(astrolabioDefinition), syntheticUnhashable: 1n };
     expect((await createStoredRun(database, digest, candidate, originalKey)).run.id).toBe(original.run.id);
     const before = await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]]);
     const intent = key();
-    await expect(createStoredRun(database, digest, candidate, intent)).rejects.toMatchObject({ code: 'DEPENDENCY_UNAVAILABLE' });
+    await expect(createStoredRun(database, digest, candidate, intent)).rejects.toMatchObject({ code: 'CASE_NOT_READY' });
     const after = await owner.pool.query('SELECT count(*)::int AS n FROM runs WHERE owner_id=$1', [profiles[0]]);
     expect(after.rows).toEqual(before.rows);
     const ledger = await owner.pool.query('SELECT count(*)::int AS n FROM run_creations WHERE owner_id=$1 AND idempotency_key=$2', [profiles[0], intent]);

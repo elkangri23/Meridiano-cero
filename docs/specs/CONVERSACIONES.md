@@ -116,3 +116,18 @@ Cargar un guardado restaura memoria, trato e historial de ese instante. El regis
 ## Aceptación de conversación
 
 Casos granulares en [T3-aceptacion-detallada](../quality/T3-aceptacion-detallada.md). Requieren modelo real para juzgar comprensión y estilo, y dobles adversariales para garantizar fronteras. No se acepta una evaluación que apruebe solo porque cada error acaba en una plantilla segura.
+
+## Revelación del testimonio fijo: ejecución v13
+
+El tema caja de Lucía solo puede revelar EV-09 si su definición conserva el token histórico tomas-moved-box y la relación vigente es mayor que cero, además de presencia/disponibilidad ya exigidas al conversar. Retirar el token, sustituirlo por otro hecho o cooperación cero no revela prueba, admisibilidad ni procedencia; el turno puede quedar como intercambio sin hechos. Otro NPC o tema no hereda ese permiso.
+
+El tema identidad solo registra identidad/ubicación del propio NPC presente, como identificación verificable en la interacción. No concede identidad ajena, verdad o solución, ni requiere conocer un hecho privado sobre el robo. No se condiciona esa identificación observable al permiso de testimonio de Lucía para evitar equiparar silencio sobre el robo con anonimato físico.
+
+Esta corrección no implementa la política completa de presión/cobertura, afirmaciones versionadas o memoria semántica. Motor v13 por cambiar autorización factual: inicios completos v1–v12 pueden leerse sin escritura, progreso anterior conservado/rechazado. Caso/hash originales y validador 1.3 sin cambios. Las rutas materiales A/B deben seguir resolubles sin conocimiento/cooperación de Lucía, incluidos retrasos máximos.
+
+[Pruebas y límites de la autorización v13](../quality/T2-permisos-testimonio-v13.md).
+
+
+## Puerta estructural del expediente 1.5
+
+El esquema vigente no contiene todavía la política completa descrita arriba. Añadir disclosureRules, cooperationRules o campos equivalentes a raíz/NPC se rechaza como formato no soportado, en vez de conservarlos e ignorarlos durante el juego. La entrega [formato cerrado](../quality/T2-formato-cerrado.md) no implementa esas reglas ni sustituye su futura spec, versionado y consumidor de motor.

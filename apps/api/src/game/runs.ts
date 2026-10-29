@@ -7,7 +7,7 @@ import { validateCaseDefinition, type CaseDefinition } from '@meridiano/case-sch
 import { createInitialRun } from '@meridiano/engine';
 import type { Database } from '../database/connection.ts';
 
-export type RunStoreErrorCode = 'SESSION_REQUIRED' | 'NOT_FOUND' | 'IDEMPOTENCY_CONFLICT' | 'INVALID_REQUEST' |
+export type RunStoreErrorCode = 'SESSION_REQUIRED' | 'SESSION_CHANGED' | 'NOT_FOUND' | 'IDEMPOTENCY_CONFLICT' | 'INVALID_REQUEST' |
   'CASE_NOT_READY' | 'DEPENDENCY_UNAVAILABLE' | 'ORIGIN_REJECTED' | 'CSRF_REJECTED';
 
 export class RunStoreError extends Error {
@@ -54,15 +54,17 @@ async function requireCompatibleSchema(client: PoolClient): Promise<void> {
   if (!matchesMigrationLedger(expected, ledger.rows)) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
 }
 
-async function inSession<T>(database: Database, digest: string,
-  work: (client: PoolClient, ownerId: string) => Promise<T>): Promise<T> {
+export async function inSession<T>(database: Database, digest: string,
+  work: (client: PoolClient, ownerId: string) => Promise<T>, expectedOwnerId?: string): Promise<T> {
   const client = await database.pool.connect();
   let discard = false;
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL lock_timeout = '2s'");
     await requireCompatibleSchema(client);
-    const result = await work(client, await sessionOwner(client, digest));
+    const ownerId = await sessionOwner(client, digest);
+    if (expectedOwnerId !== undefined && expectedOwnerId !== ownerId) throw new RunStoreError('SESSION_CHANGED');
+    const result = await work(client, ownerId);
     await client.query('COMMIT');
     return result;
   } catch (error) {
@@ -78,7 +80,7 @@ function preparedHash(definition: CaseDefinition): string | undefined {
 }
 
 export async function createStoredRun(database: Database, sessionDigest: string,
-  definition: CaseDefinition, idempotencyKey: string): Promise<{ run: StoredRun; replayed: boolean }> {
+  definition: CaseDefinition, idempotencyKey: string, expectedOwnerId?: string): Promise<{ run: StoredRun; replayed: boolean }> {
   if (!isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
   const candidate = structuredClone(definition);
   const structureValid = validateCaseDefinition(candidate).valid;
@@ -108,7 +110,7 @@ export async function createStoredRun(database: Database, sessionDigest: string,
     const run = result.rows[0];
     if (!run) throw new Error('RUN_INSERT_FAILED');
     return { run, replayed: false };
-  });
+  }, expectedOwnerId);
 }
 
 async function ownedRun(client: PoolClient, ownerId: string, id: string): Promise<StoredRun> {
@@ -123,7 +125,7 @@ export function readStoredRun(database: Database, sessionDigest: string, runId: 
   return inSession(database, sessionDigest, (client, ownerId) => ownedRun(client, ownerId, runId));
 }
 
-export function lookupRunCreation(database: Database, sessionDigest: string, key: string): Promise<RunCreationLookupDto> {
+export function lookupRunCreation(database: Database, sessionDigest: string, key: string, expectedOwnerId?: string): Promise<RunCreationLookupDto> {
   if (!isIdempotencyKey(key)) throw new RunStoreError('INVALID_REQUEST');
   return inSession(database, sessionDigest, async (client, ownerId) => {
     // Solo filas confirmadas y recurso todavía propio; no leer engine_state.
@@ -134,5 +136,5 @@ export function lookupRunCreation(database: Database, sessionDigest: string, key
     const creation = result.rows[0];
     if (!creation) throw new RunStoreError('NOT_FOUND');
     return { schemaVersion: 1, kind: 'create_run', status: 'committed', runId: creation.runId };
-  });
+  }, expectedOwnerId);
 }

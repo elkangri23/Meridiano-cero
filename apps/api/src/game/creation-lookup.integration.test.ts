@@ -144,7 +144,7 @@ describe('T3-06: localizar creación propia sin respuesta original', () => {
   });
   it('sesión caducada no recupera creaciones propias y las claves no aparecen en telemetría', async () => {
     const key = intent(); expect((await create(expired, key)).statusCode).toBe(201);
-    await owner.pool.query("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE token_hash=$1", [tokenDigest(expired.token)]);
+    await owner.pool.query("UPDATE sessions SET created_at=now()-interval '2 hours',expires_at=now()-interval '1 second' WHERE token_hash=$1", [tokenDigest(expired.token)]);
     expect((await lookup(expired, key)).statusCode).toBe(401);
     const logs = lines.join('');
     for (const value of [...keys, ...actors.flatMap(actor => [actor.id, actor.token, actor.csrf]), 'SYNTHETIC_PRIVATE_MARKER', '/run-creations/lookup']) expect(logs).not.toContain(value);

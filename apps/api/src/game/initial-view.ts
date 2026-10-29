@@ -41,7 +41,7 @@ function storedDefinition(id: string) {
 
 function expectedInitial(initial: ReturnType<typeof createInitialRun>, engineVersion: number): unknown {
   if (engineVersion === ENGINE_VERSION) return initial;
-  if (engineVersion === 7) return { ...initial, engineVersion };
+  if ([7, 8, 9, 10, 11, 12, 13].includes(engineVersion)) return { ...initial, engineVersion };
   if (![1, 2, 3, 4, 5, 6].includes(engineVersion)) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
   // Solo igualdad completa con la forma virgen de cada versión, sin escribir.
   const legacy: Record<string, unknown> = { ...initial, engineVersion };

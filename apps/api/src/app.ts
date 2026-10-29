@@ -35,7 +35,7 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof RunStoreError) {
       const statuses = {
-        SESSION_REQUIRED: 401, NOT_FOUND: 404, IDEMPOTENCY_CONFLICT: 409, INVALID_REQUEST: 400,
+        SESSION_REQUIRED: 401, SESSION_CHANGED: 409, NOT_FOUND: 404, IDEMPOTENCY_CONFLICT: 409, INVALID_REQUEST: 400,
         CASE_NOT_READY: 409, DEPENDENCY_UNAVAILABLE: 503, ORIGIN_REJECTED: 403, CSRF_REJECTED: 403,
       } as const;
       return reply.code(statuses[error.code]).send({ error: { code: error.code, message: 'No se pudo completar la solicitud.', requestId: request.id } });

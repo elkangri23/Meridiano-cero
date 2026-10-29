@@ -259,3 +259,71 @@ POST /api/v1/run-creations/lookup es una consulta sin escritura. Recibe exactame
 Sin creación visible para esa cuenta devuelve 404 NOT_FOUND, igual si la clave es ajena. Bajo READ COMMITTED, una creación aún en vuelo puede no ser visible: el 404 no afirma rollback ni autoriza otra clave. Conservar intención original y reintentar su misma clave; no se adquiere el lock de creación ni se inventa estado pending a partir de memoria de proceso. Repetir lookup nunca crea partida, modifica ledger ni consume otra intención.
 
 La capacidad pública creationLookup=true anuncia esta ruta en recovery; operationLookup=false sigue indicando que no existe consulta general de operaciones de acción. UI/sessionStorage, tombstones/purga y recuperación de acciones/cargas/cierre siguen pendientes. Esta consulta por clave no amplía la lectura de partidas iniciales a progreso ni evita su fallo cerrado.
+
+## Compatibilidad inicial v9
+
+Nuevas partidas registran motor v9; inicios completos v1–v8 se leen sin reescritura y progreso anterior se conserva/rechaza. La ampliación interna de lotes con detención/recuperación no añade rutas públicas: preview/commit, DTO de progreso y persistencia de acciones siguen pendientes. [Evidencia](../quality/T2-intervenciones-lotes-v9.md).
+
+## Compatibilidad inicial v10
+
+Creación persiste motor v10. Se reconoce la forma inicial completa v1–v9 sin escritura y se conserva/rechaza progreso antiguo. Travel se admite en lotes del motor, sin ruta pública de acciones o consulta de operación general. El preview de secuencias no debe filtrar el retraso ni estados prospectivos; el servicio de preview/commit sigue pendiente. [Evidencia](../quality/T2-viajes-lotes-v10.md).
+
+## Compatibilidad inicial v11
+
+Creación persiste motor v11; lectura de inicios completos v1–v10 sin escritura y progreso anterior conservado/rechazado. Finish en lote interno admite params vacío; el adaptador de confirmación aplica aprobación interna al resolutor individual, sin aceptar confirmed del cliente. No habilita acciones/cierre HTTP, operaciones ni registro oficial anticipadamente. [Evidencia](../quality/T2-cierre-lotes-v11.md).
+
+## Compatibilidad inicial v12 y comunicaciones internas
+
+Creación persiste motor v12; lectura inicial completa v1–v11 sin escritura y progreso anterior conservado/rechazado. Communicate del motor se alinea con channel/recipientId/requestText; canales/contactos del caso fijo y acuse neutral, sin respuesta factual ni envío externo. No rutas HTTP de acción ni DTO de progreso habilitados. [Evidencia y límites](../quality/T2-comunicaciones-v12.md).
+
+## Puerta estructural del mapa 1.2
+
+Creación nueva rechaza mapas sin alcance dirigido desde el inicio o ciudad sin lugar accesible; CASE_NOT_READY sin filas nuevas. Replay autorizado previo conserva su orden antes de disponibilidad actual. Motor v12 y lectura de partidas sin cambios; conectividad no equivale a solvencia, generador o importación. [Evidencia](../quality/T2-navegabilidad-mapa.md).
+
+## Puerta de referencias 1.3
+
+Creación nueva rechaza solución/NPC y conocimiento/hecho incoherentes sin insertar filas. Compatibilidad explícita del original y replay autorizado previo conservados, sin exponer aliases o conocimientos privados en DTO/errores. Motor v12 sin cambio de ejecución; API de acciones y conversación siguen pendientes. [Evidencia](../quality/T2-referencias-conocimiento.md).
+
+## Compatibilidad inicial v13
+
+Creación persiste motor v13; inicios completos v1–v12 legibles sin escritura y progreso anterior conservado/rechazado. La corrección de permiso factual de Lucía no habilita conversación/acciones HTTP ni proyección de progreso. Nunca completar factIds con una prueba que el motor no haya autorizado. [Evidencia](../quality/T2-permisos-testimonio-v13.md).
+
+## Puerta de contenido reconocido 1.4
+
+Nueva creación rechaza reglas que no corresponden al manifiesto soportado o programación inicial no consumida. CASE_NOT_READY sin nuevas filas, con replay autorizado anterior a disponibilidad actual. No se añaden endpoints o ejecución de contenido remoto; motor v13 y lectura de partidas sin cambios. [Evidencia](../quality/T2-contenido-ejecutable.md).
+
+## Lista de partidas propias: contrato de entrega T3-02
+
+GET /api/v1/runs exige sesión actual y no-store. Admite solo limit (1–100, defecto 25), status opcional active/closed y cursor. Devuelve {profileId,items,nextCursor}; cada resumen contiene exactamente runId, caseId, caseTitle público/null, status, version (revisión HTTP) y createdAt RFC3339. No incluye rama histórica, reloj, payload, informe, conversación, solución o hash. Identificar un recurso no significa que su progreso sea proyectable por GET /runs/:runId.
+
+Orden descendente por created_at e id, keyset sin OFFSET. Cursor v1.scope.runId, tratado opaco por cliente: scope all/active/closed debe coincidir con el filtro; runId ancla debe existir entre recursos propios de ese ámbito. No contiene credenciales o autoridad, no necesita firma para conceder permisos: siempre se revalida contra DB y cuenta actual. Cursor ajeno, inexistente, de filtro distinto o malformado produce el mismo INVALID_REQUEST. Puede cambiarse el tamaño de página conservando ámbito; no se promete snapshot inmutable de toda la lista.
+
+Ancla y página se leen en una única consulta y snapshot SQL; la comparación usa timestamp original de PostgreSQL, no el creadoAt redondeado a milisegundos del DTO. Inserciones más recientes no se incorporan al continuar hacia atrás; cambios de estado o borrado de ancla pueden exigir reiniciar lista. No hay cursores de otra cuenta autorizados por adivinación de UUID. Filtros/valores se parametrizan y límite se valida antes de SQL.
+
+Sesión/esquema revalidados en la transacción compartida existente; no se lee engine_state completo, solo su status autorizado para filtro/resumen. Una fila visible con estado/metadatos no soportados falla cerrado, no se inventa una partida inicial. La lista no habilita acciones, guardados, reporte o registro oficial y no sustituye recuperación por clave de intención.
+
+[Pruebas y límites del listado propio](../quality/T3-02-lista-partidas.md).
+
+## Vínculo del listado con el archivo web
+
+La respuesta de GET /runs se amplía a {profileId,items,nextCursor}; profileId se obtiene de la misma sesión transaccional que autoriza las filas, nunca de query. Cada resumen añade caseTitle público de catálogo o null si no hay ficha conocida. No se adivina título desde definición privada ni se duplica en web. El cliente compara profileId con su sesión antes de mostrar datos para descartar respuestas de otra cuenta; esta comprobación no sustituye la autorización del servidor. Se conserva todo el contrato de cursores, filtros y no-store.
+
+## Creación web y contexto de cuenta
+
+La web elige desde GET /cases, no envía definición o ownerId. Antes de POST /runs conserva en sessionStorage un localizador por cuenta y origen: schemaVersion=1, profileId, caseId, idempotencyKey aleatoria. Sin CSRF, cookies, prompts o texto privado. Validación cerrada y tamaño acotado; si no puede conservarlo no envía la creación. El localizador se conserva si se pierde respuesta y se borra solo tras confirmar por lookup o al cerrar explícitamente esa cuenta; cerrar no prueba cancelación/rollback de una creación ya enviada.
+
+POST /runs y POST /run-creations/lookup admiten X-Expected-Profile-Id opcional para clientes anteriores; la web lo envía siempre. Es una precondición, nunca autoridad: formato UUID válido y comparación con propietario obtenido de sesión dentro de la transacción, antes del ledger. Mismatch produce 409 SESSION_CHANGED sin escritura; cambiar a la cuenta esperada exige autenticación real, no otro valor de header.
+
+La creación web no usa una proyección inicial histórica como vista de progreso. Tras el envío consulta lookup con la misma clave y contexto; solo el registro confirmado permite mostrar éxito y actualizar archivo. 404/timeout mantienen incertidumbre. Comprobar no reenvía POST; Reintentar misma creación consulta antes y solo puede reenviar mismo caseId/clave. No hay nueva clave automática al refrescar, tras error o al cambiar filtro. Recarga de la pestaña recupera localizador de esa cuenta y exige acción explícita para comprobar/reintentar.
+
+Elegir/crear no inicia investigación conectada ni acciones de motor. Una cuenta distinta no carga localizadores ajenos. Logout elimina únicamente la referencia de la cuenta actual en su namespace, nunca limpia todo el almacenamiento del navegador. El estado visible no incluye clave de intención o CSRF.
+
+[Pruebas y límites de creación web](../quality/T3-creacion-web-recuperable.md).
+
+
+## Consumidor web de GET inicial
+
+La entrega parcial de [ficha inicial conectada](../quality/T3-ficha-inicial-conectada.md) consume GET /runs/:runId mediante InitialPlayerViewDto y validación cerrada compartida. Exige revisión uno, minuto cero y ausencia de progreso; no acepta el campo replayed de POST /runs. El ID recibido debe coincidir con el solicitado. El frontend no transforma errores/503 en un inicio inventado y ninguna consulta ejecuta acciones. El DTO ampliado y las rutas de progreso mantienen su estado pendiente.
+
+
+El motor v14 ya aplica params vacío y confirmación separada para finish individual y lotes. Esto corrige la vía interna confirmed=true; no implementa por sí solo la ruta HTTP de cierre, token de preview, autorización, transacción o primer resultado oficial. [Evidencia](../quality/T2-cierre-individual-v14.md).

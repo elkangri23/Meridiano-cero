@@ -1,8 +1,10 @@
 # Estado integrado del proyecto
 
-Estado vigente de la continuación: motor v8 con retrasos máximos reales y rutas A/B verificadas en 455/545 y 485/575 minutos; integridad de servidor y validador 1.1. Pasan lint/imports globales, 407 pruebas generales y 45 PostgreSQL/HTTP. El commit c4a86cd consolida v6 y 8f9c288 registra v7/v8. T3-06 incorpora consulta segura de creaciones por la clave original, con evidencia transaccional. Formato histórico y E2E/aceptación funcional completa siguen pendientes. [Motor v8](../quality/T2-retrasos-maximos-v8.md) y [recuperación de creaciones](../quality/T3-06-localizador-creacion.md). Las cifras de integración inicial que siguen son históricas.
+Estado vigente: motor v14 y validador 1.5; rutas A/B verificadas con tiempos base/máximos 455/545 y 485/575. T3 conecta archivo, catálogo, creación web recuperable y consulta de ficha inicial por cuenta/pestaña; conserva lectura inicial y recuperación por clave en API. Pasan lint/imports globales, 603 pruebas generales y 60 PostgreSQL/HTTP. Calidad de formato histórica, juego conectado y aceptación completa siguen pendientes.
 
-Actualizado: 2026-10-29. Combinación de main 6298be7 (incluye la base 6f43ba2) y codex/t3-04-integracion-ia 3a28abd, preparada en worktree separado para integrar en main. [Evidencia de integración](../quality/INTEGRACION-T3-04.md). Las instantáneas previas de T1/T3 conservan su alcance histórico.
+Últimas evidencias: [cierre individual v14](../quality/T2-cierre-individual-v14.md), [formato cerrado 1.5](../quality/T2-formato-cerrado.md), [ficha inicial conectada](../quality/T3-ficha-inicial-conectada.md), [contenido reconocido 1.4](../quality/T2-contenido-ejecutable.md), [permisos del testimonio v13](../quality/T2-permisos-testimonio-v13.md) y [lista propia](../quality/T3-02-lista-partidas.md) y [archivo web](../quality/T3-03-archivo-conectado.md) y [creación recuperable](../quality/T3-creacion-web-recuperable.md). c4a86cd consolida v6, 8f9c288 registra v7/v8 y 42aaa42 el localizador de creación; los avances posteriores se consolidan para su integración en main por autorización expresa del usuario. Las cifras de integración inicial siguientes son históricas.
+
+Actualizado: 2026-10-29. La línea consolidada incluye main 6298be7 (base 6f43ba2), codex/t3-04-integracion-ia 3a28abd y los avances de motor/API/web posteriores. El usuario autoriza integrarlos en main y mantenerla como única rama. [Evidencia de integración](../quality/INTEGRACION-T3-04.md). Las instantáneas previas de T1/T3 conservan su alcance histórico.
 
 El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y verificaciones de la combinación, sin declarar el juego terminado.
 
@@ -11,11 +13,11 @@ El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y
 | Área | Disponible | Pendiente |
 |---|---|---|
 | Base | Seis proyectos de producto más la raíz pnpm | No distribución del juego completa |
-| API | Health/readiness, sesión local, catálogo, creación/lectura inicial y localización por clave propia | Preview/commit, lista de partidas, reportes y guardados |
+| API | Health/readiness, sesión local, catálogo, creación/lectura inicial, lista propia paginada y localización por clave | Preview/commit, proyección de progreso, reportes y guardados |
 | DB | Migrador activo, roles locales, partidas y ledger de creación transaccional | Operaciones de acciones, manuales y primer resultado; src/db conservado como histórico no activo |
-| Motor | Ejecución v8: evidencias/órdenes, costes, lotes con solicitudes/esperas, viajes persistidos y ambas rutas con retrasos máximos | Lotes de viaje/intervención/cierre/comunicaciones, dependencias en API, reglas/vocabularios y aceptación completa |
-| Expediente | Validador estructural 1.1 y referencias/ciclos; creación valida copia estable | Referencias NPC/solución, operadores/payloads y solvencia general |
-| UI | Prototipo de desarrollo en /prototype | Flujo conectado, ventanas, manuales, preferencias persistidas y revisión accesible |
+| Motor | Ejecución v14: cierre individual con confirmación separada y conocimiento específico para testimonio, evidencias/órdenes, costes, lotes con solicitudes/esperas, viajes, detención/recuperación, cierre y acuses de comunicación y ambas rutas con retrasos máximos | Comunicaciones factuales/equipo, dependencias en API, reglas/vocabularios y aceptación completa |
+| Expediente | Validador estructural 1.5: formato cerrado, referencias/ciclos, mapa, conocimientos/solución y contenido reconocido; creación valida copia estable | Condiciones NPC/conversación, operadores/payloads y solvencia general |
+| UI | Archivo MS-DOS en raíz (sesión/lista/filtros/páginas/catálogo/creación recuperable y ficha inicial); prototipo separado en /prototype | Investigación conectada, ventanas, manuales, preferencias persistidas y accesibilidad completa |
 | IA | Frontera AiProvider, adaptador Ollama y doble, memoria factual y evaluación CLI | Adaptadores externos, configuración y conexión al juego |
 | CI | Workflow único con controles de base/seguridad y corpus IA | La ejecución local global no está verde |
 

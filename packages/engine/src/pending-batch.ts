@@ -1,3 +1,4 @@
+import { isCommunicationParams } from './communications.js';
 import { isEvidenceSelection } from './warrants.js';
 import type { Action, BatchStep } from './types.js';
 import { EngineStateError } from './state-error.js';
@@ -15,6 +16,8 @@ const fields = {
   talk: { required: 'npcId', optional: ['topicId'] },
   analyze: { required: 'evidenceId', optional: [] },
   query: { required: 'topicId', optional: [] },
+  recover: { required: 'objectId', optional: [] },
+  travel: { required: 'toCityId', optional: [] },
 } as const;
 
 function identifierParams(type: keyof typeof fields, params: Data): boolean {
@@ -25,11 +28,23 @@ function identifierParams(type: keyof typeof fields, params: Data): boolean {
   return rule.optional.every(key => params[key] === undefined || id(params[key]));
 }
 
-const supportedTypes = new Set([...Object.keys(fields), 'wait', 'request_warrant']);
+const supportedTypes = new Set([...Object.keys(fields), 'wait', 'request_warrant', 'detain', 'finish', 'communicate']);
+
+function detentionParams(params: Data): boolean {
+  if (Object.keys(params).sort().join(',') !== 'locationId,mode,suspectId,warrantId') return false;
+  return params.mode === 'interactive' && ['suspectId', 'warrantId', 'locationId'].every(key => id(params[key]));
+}
+
+function waitParams(params: Data): boolean {
+  return Object.keys(params).join(',') === 'minutes' && typeof params.minutes === 'number' &&
+    Number.isSafeInteger(params.minutes) && params.minutes > 0;
+}
 
 function validParams(type: string, params: Data): boolean {
-  if (type === 'wait') return Object.keys(params).join(',') === 'minutes' &&
-    typeof params.minutes === 'number' && Number.isSafeInteger(params.minutes) && params.minutes > 0;
+  if (type === 'communicate') return isCommunicationParams(params);
+  if (type === 'finish') return Object.keys(params).length === 0;
+  if (type === 'detain') return detentionParams(params);
+  if (type === 'wait') return waitParams(params);
   if (type === 'request_warrant') return Object.keys(params).sort().join(',') === 'evidenceIds,suspectId' &&
     id(params.suspectId) && isEvidenceSelection(params.evidenceIds);
   return Object.hasOwn(fields, type) && identifierParams(type as keyof typeof fields, params);
@@ -99,7 +114,7 @@ function coherent(steps: BatchStep[]): boolean {
 }
 
 function parseStep(record: unknown, ordinal: number): BatchStep {
-  if (typeof record !== 'string' || record.length > 4096) throw new EngineStateError('BATCH_STATE_INVALID');
+  if (typeof record !== 'string' || record.length > 32768) throw new EngineStateError('BATCH_STATE_INVALID');
   let value: unknown;
   try { value = JSON.parse(record); }
   catch { throw new EngineStateError('BATCH_STATE_INVALID'); }
