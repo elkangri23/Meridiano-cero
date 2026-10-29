@@ -53,3 +53,7 @@ Exportar: dueño autorizado confirma que contiene solución. Aviso de spoilers; 
 ## Aceptación
 
 T4-01 a T4-06. Probar caso bueno, insoluble, referencia rota, geografía inventada, tono no permitido, presupuesto agotado, reinicio durante etapa, lease vencido, cancelación, importación maliciosa y exportación autorizada. Todos los fallos deben impedir jugar y dejar estado operativo recuperable.
+
+## Bordes y funcionamiento ante fallos
+
+El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.

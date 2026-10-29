@@ -1,5 +1,9 @@
 # Documentación de implementación
 
+Revisión de bordes de ejecución: [hallazgos y 90 escenarios](quality/BORDES-EJECUCION.md), [contrato de resiliencia](specs/RESILIENCIA.md), [observabilidad y residencia de datos](specs/OBSERVABILIDAD-Y-DATOS.md). Las nuevas tareas están en BACKLOG y TAREAS; son trabajo pendiente de implementación y verificación.
+
+[Evidencia y límites de esta revisión documental](quality/REVISION-BORDES.md).
+
 Actualizado: 2026-10-28. Base PostgreSQL con migrador/sesión, motor, prototipo y servicios IA combinados. [Estado integrado](plan/ESTADO.md), [registro de merge](quality/INTEGRACION-T3-04.md): 157 pruebas correctas y controles globales heredados pendientes. API de partidas, guardados y evaluación real siguen sin conectar.
 
 ## Orden de lectura

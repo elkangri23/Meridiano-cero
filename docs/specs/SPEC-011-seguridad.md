@@ -69,3 +69,7 @@ La revisión previa a público ampliará la selección ASVS con autenticación, 
 ## Proveedores personales en VPS
 
 DEC-019 permite claves personales opcionales, sin eliminar el proveedor común. Es un alcance de implementación pendiente: requiere cifrado y aislamiento por cuenta, autorización de operaciones sobre conexiones y destinos habilitados por administrador. Aportar una clave no permite que el usuario imponga una URL arbitraria al servidor. El [contrato de proveedores](IA-proveedores.md) concreta fronteras y aceptación; no se declara implementado por documentarlo.
+
+## Bordes y funcionamiento ante fallos
+
+El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.

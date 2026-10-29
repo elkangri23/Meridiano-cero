@@ -42,3 +42,7 @@ ACC-020/022/025/027/028/033. T7-01 fija parámetros; T7-02 implementa cuentas/pr
 DEC-019 establece para la primera versión pública proveedor común del administrador y conexión personal opcional por usuario. La experiencia sin claves sigue disponible. El usuario puede elegir otro proveedor habilitado y aportar su propia clave; esto no habilita endpoints arbitrarios ni comparte credenciales con otras cuentas.
 
 Aplicar [contrato de proveedores](IA-proveedores.md): resolución explícita, cifrado y aislamiento de claves, consumo separado, límites de recursos también con claves propias y ausencia de fallback silencioso entre conexiones. T7-02 debe incluir configuración/cambio/borrado de credenciales personales antes de declarar entregado ese alcance.
+
+## Bordes y funcionamiento ante fallos
+
+El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.

@@ -72,3 +72,7 @@ DEC-016: ante una orden ambigua, pedir aclaración siempre antes de actuar. No a
 El primer caso mantiene actos factuales restringidos; incertidumbre/error honesto solo se habilitan con afirmaciones atribuidas modeladas en la definición. No se implementa esa cláusula del GDD dejando al modelo inventar una equivocación.
 
 [API-juego](API-juego.md) concreta aclaración previa y tokens; [aceptación T3](../quality/T3-aceptacion-detallada.md) define pruebas granulares y condiciones para no confundir fallback con calidad.
+
+## Bordes y funcionamiento ante fallos
+
+El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.

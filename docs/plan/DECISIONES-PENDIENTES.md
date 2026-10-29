@@ -53,3 +53,7 @@ Quedan tareas técnicas: transporte real FreeLLMAPI, capacidades de cada adaptad
 Los contratos de [API](../specs/API-juego.md), [guardados](../specs/GUARDADOS.md) y [conversaciones](../specs/CONVERSACIONES.md) ya definen campos, estados, validaciones, errores y recuperación. La cantidad de manuales está confirmada en DEC-021. No se requieren más preguntas de producto para implementar esas fronteras.
 
 Siguen pendientes la medición del proveedor real elegido, las reglas/datos concretos de cooperación y cobertura del fixture (sin improvisar umbrales universales), la compatibilidad de transportes externos y el equilibrio numérico de carrera. La generación y la operación pública mantienen sus propios parámetros por calibrar. Documentar los contratos no resuelve esos ensayos ni cierra T3-01 completo.
+
+## Cierre operativo de bordes (2026-10-28)
+
+T3-06 cierra consulta por clave y compactación de operaciones conservando deduplicación y privacidad. T3-08 mide deadlines, breaker y drenaje; T4-07 fija admisión y conciliación; T6-05 valida RPO/RTO; T7-05 valida SLO, capacidad y alertas; T7-06 cierra residencia y retención por clase/proveedor. Los valores de [resiliencia](../specs/RESILIENCIA.md) y [observabilidad/datos](../specs/OBSERVABILIDAD-Y-DATOS.md) son propuestas, no métricas logradas. No se modifica equilibrio, caducidad de manuales ni selección de conexión.

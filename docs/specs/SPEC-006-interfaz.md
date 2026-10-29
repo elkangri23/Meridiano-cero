@@ -85,3 +85,7 @@ GET /me entrega settingsVersion y preferencias; PATCH /settings acepta expectedS
 windowLayout solo contiene windowIds permitidos, estado y posiciones relativas finitas normalizadas al área. Una revisión de settings no modifica version del juego. Las preferencias se aplican por usuario y no retroceden al cargar un save. Contraste/paletas, TTS/audio e idiomas se amplían en sus fases sin perder compatibilidad del objeto de preferencias.
 
 Accesibilidad y aspecto MS-DOS/pixel art se verifican con los subcasos UI del [catálogo detallado](../quality/T3-aceptacion-detallada.md). El prototipo actual aún no implementa este contrato completo.
+
+## Bordes y funcionamiento ante fallos
+
+El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.

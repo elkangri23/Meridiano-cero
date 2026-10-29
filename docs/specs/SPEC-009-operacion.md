@@ -208,3 +208,7 @@ para esconder el fallo.
 ## Estado de implementación de base
 
 T1-03 implementa Compose, roles mínimos, migración explícita con hashes/bloqueo, perfil y sesiones persistentes. T1-04 añade controles locales y workflow; no CI remota ejecutada. [Procedimiento vigente](../manuales/BASE-LOCAL.md), [evidencia T1-03](../quality/T1-03-evidencia.md) y [T1-04](../quality/T1-04-evidencia.md). Los apartados de selección de entorno describen observaciones históricas; no implican cambios en WSL.
+
+## Bordes y funcionamiento ante fallos
+
+El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.

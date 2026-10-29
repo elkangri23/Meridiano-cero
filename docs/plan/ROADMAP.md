@@ -25,4 +25,6 @@ Entregar alcance realizado, requisitos/pruebas, comandos y resultados, limitacio
 
 ## Bloqueos de lanzamiento
 
+Puertas adicionales de la revisión de bordes: fase 3 exige T3-06/T3-07/T3-08 junto a T3-05; fase 4 exige T4-07 junto a T4-06; fase 5 exige T5-07 junto a T5-06; fase 6 exige T6-05 junto a T6-04; fase 7 exige T7-05/T7-06 junto a T7-04. No constituyen fases nuevas ni implementación entregada. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) concreta sus pruebas; las dependencias del backlog impiden cerrar el hito solo con su prueba feliz.
+
 Ningún hallazgo crítico/alto aplicable abierto; restauración probada; autoría/licencias y privacidad resueltas; endpoint público de IA verificado; costes y corte global ensayados. No publicar repositorio ni desplegar VPS como efecto lateral de cerrar documentación.

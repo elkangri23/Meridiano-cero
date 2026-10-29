@@ -207,3 +207,7 @@ DEC-016 obliga a aclarar la orden ambigua antes de generar un plan ejecutable. N
 La versión HTTP de concurrencia pertenece al agregado persistido y no se copia del snapshot interno del motor al restaurar. Narración, memoria y eventos se vinculan a rama/operación. Los esquemas ejecutables se implementarán una sola vez en contratos/validación; no mantener dos validadores divergentes por frontend y backend.
 
 Las pruebas previstas se desglosan en [aceptación T3](../quality/T3-aceptacion-detallada.md), con distinción explícita entre contrato y ejecución.
+
+## Bordes y funcionamiento ante fallos
+
+El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.

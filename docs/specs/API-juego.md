@@ -154,6 +154,8 @@ POST /runs/:runId/finish usa el mismo cuerpo de commit y exige un token cuyo pla
 
 ## Transacción, idempotencia y peticiones inciertas
 
+Precisión de recuperación y privacidad: el [contrato de resiliencia](RESILIENCIA.md) exige resolver también la pérdida de respuesta anterior a conocer operationId, define conservación de deduplicación y obliga a reautorizar el contenido de un replay histórico. Tras cargar una rama activa, el replay de un cierre anterior no devuelve su informe ni solución; devuelve metadatos seguros de la operación y permite refrescar la proyección actual. Esta precisión prevalece sobre cualquier interpretación de «resultado histórico» como copia indiscriminada del DTO original. Contrato de consulta por clave pendiente de cerrar en T3-06.
+
 Orden obligatorio en escritura:
 
 1. Validar sesión, Origin/CSRF y forma del cuerpo.

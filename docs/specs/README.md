@@ -1,5 +1,7 @@
 # Registro de especificaciones
 
+Ampliación transversal 2026-10-28: [resiliencia](RESILIENCIA.md) y [observabilidad, residencia y ciclo de datos](OBSERVABILIDAD-Y-DATOS.md), con [90 escenarios de borde](../quality/BORDES-EJECUCION.md). Son anexos de las doce specs existentes, con contratos propuestos y tareas pendientes; no acreditan capacidades operativas implementadas.
+
 Actualizado: 2026-10-28. Las doce specs tienen contenido desarrollado. El [estado de ejecución](../plan/ESTADO.md) se mantiene separado del estado del contrato. Definida es contrato documental; propuesta indica valores que deben cerrarse en su tarea, no código aprobado.
 
 | ID | Sistema y documento | Estado | Tarea de cierre |

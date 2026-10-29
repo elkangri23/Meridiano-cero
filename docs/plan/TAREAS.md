@@ -1,5 +1,53 @@
 # Tareas detalladas de implementación
 
+## T3-06
+
+Contratos: SPEC-002/004/008/011, [resiliencia](../specs/RESILIENCIA.md). Cerrar consulta autenticada por clave, respuesta histórica reautorizada, retención/tombstones y recuperación sin guardar tokens en web. Consolidar esquema activo antes de añadir constraints. Implementar unicidad y atomicidad para operaciones, saves y primer resultado, incluida revocación concurrente.
+
+Salida: escenarios asignados en [catálogo](../quality/BORDES-EJECUCION.md) con dos conexiones PostgreSQL y barreras antes/después de commit; demostrar cero duplicados y ausencia de informe secreto en replay tras carga. Probar tanto pérdida de respuesta como commit ambiguo. Evidencia separa unidad e integración real; no cerrar con mocks de repositorio.
+
+## T3-07
+
+Contratos: SPEC-004/006 y anexos API/guardados/resiliencia. Implementar estados idle, preview, confirming, awaiting_result, uncertain, refreshing, unauthenticated y degraded como estados de UI, sin trasladar reglas de dominio al cliente. Cada transición define controles habilitados, foco, anuncio accesible y conservación de intención. Cambiar cuenta borra estado privado previo; cambiar rama invalida respuestas antiguas.
+
+Salida: E2E de doble envío, offline/recarga, reconexión, respuestas invertidas, logout y storage bloqueado; comprobación manual de teclado, IME, zoom y ventanas recuperables. No exigir arrastre para operar. Adjuntar comportamiento observado y diferencias entre prueba automatizada y revisión humana.
+
+## T3-08
+
+Contratos: SPEC-005/009/011 y [observabilidad/datos](../specs/OBSERVABILIDAD-Y-DATOS.md). Consolidar transporte consumido y política de retry/deadline/abort. Implementar límites de respuesta, breaker acotado, fallback, queries/probes finitos y apagado idempotente. Añadir eventos JSON por allowlist, correlación y métricas locales sin secretos; no activar serialización indiscriminada de requests.
+
+Salida: proveedor doble que cuelga/trunca/ignora abort, PostgreSQL lento, señales repetidas y collector caído no generan trabajo ilimitado; centinelas privados ausentes en todos los sumideros. Medir latencias y presupuesto de apagado. Evaluación real de modelo sigue separada; no se acredita por el doble.
+
+## T4-07
+
+Contratos: SPEC-007/010 y resiliencia. Diseñar CAS/fencing y terminales, checkpoint versionado, límites de cola/admisión, reserva y conciliación de consumo desconocido. Fijar política de duplicados JSON y límites de parseo/simulación. Validar independencia real de rutas. No añadir un segundo sistema de colas por defecto.
+
+Salida: dos workers reales con barreras reproducen lease vencido, cancelación/publicación, muerte tras checkpoint y corte global. Solo una publicación, reserva conciliable y ningún envío nuevo tras corte. Importaciones hostiles sintéticas rechazadas sin fetch ni cambios al expediente previo. Ensayo de equidad con dos usuarios y saturación documentada.
+
+## T5-07
+
+Contratos: SPEC-001/002/006/008. Ampliar corpus de propiedades con semillas reproducibles y límites del reloj/grafo/lotes; comprobar carrera versionada y consecuencias plausibles. Detectar cualquier ambigüedad de reglas antes de codificar expectativas nuevas. Verificar UI con nombres/textos largos, traducción faltante, RTL, TTS, audio bloqueado y rama restaurada.
+
+Salida: invariantes del catálogo demostrados con motor puro, integración cuando afecte persistencia y revisión manual accesible. Cada ruta fallida tiene un contraejemplo mínimo. No usar número de tests como sustituto de cobertura de reglas ni afirmar comprensión exhaustiva de lenguaje natural.
+
+## T6-05
+
+Contratos: SPEC-009/011 y resiliencia. Fijar objetivos de recuperación medibles, inventario de backup y versiones compatibles. Ensayar disco lleno, migración interrumpida, backup corrupto, clave ausente y restauración anterior a operaciones confirmadas. Añadir modo de recuperación sin egreso y comprobaciones previas a reapertura.
+
+Salida: runbook ejecutado en destino aislado, partida/manual/oficial recuperados, reintento previo sin duplicación, jobs conciliados, RPO/RTO medidos y pérdida eventual explicitada. Conservar evidencia de restauración fallida segura. No tocar instalación WSL, volúmenes originales ni secretos reales.
+
+## T7-05
+
+Contratos: SPEC-010/011 y observabilidad. Calibrar presupuestos, SLO y alertas con carga sintética declarada (usuarios, tamaño de partida, mezcla de acciones y duración). Separar cuota legítima de saturación global, disponibilidad del juego de IA y cero tráfico de éxito. Comprobar corte antes de cada envío, incluso retry.
+
+Salida: paneles y alertas probados en canal configurado, con deduplicación, recuperación y caída del propio exportador. Registrar umbrales elegidos, latencias, capacidad máxima segura y responsable de incidentes. No prometer SLA por resultados locales ni enviar notificaciones a terceros sin autorización/configuración.
+
+## T7-06
+
+Contratos: SPEC-009/010/011 y observabilidad/datos. Completar ficha de residencia/retención por proveedor con evidencia vigente, revisar política de privacidad y fijar plazos por clase. Implementar exportación consistente, borrado concurrente, registro mínimo de supresiones y keyVersion/rotación. Diferenciar eliminación activa de expiración en backups.
+
+Salida: dos cuentas sintéticas demuestran aislamiento; borrar durante generación impide recreación; restore aplica supresiones antes de egreso; rotación mantiene lectura autorizada sin filtrar claves; pérdida de clave deja partidas accesibles y conexiones marcadas. Revisión jurídica/políticas externas no se sustituye por pruebas técnicas.
+
 El [backlog](BACKLOG.md) es la fuente de estado, dependencias y entregable. Este documento concreta pasos y criterio de salida por tarea, sin duplicar estados. Requisitos se heredan de la [matriz](REQUISITOS.md). La implementación y las dependencias vigentes se consultan en el backlog y el [estado consolidado](ESTADO.md); ninguna tarea se considera terminada por existir esta descripción.
 
 T1-01 cierra la base; E4-01/E5-01/E6-01/E7-01 revisan y cierran la spec de su fase antes de sus tareas T. Son gates de preparación, no sustitutos del hito completo. Usar [plantilla de evidencia](../templates/evidencia.md) al ejecutar.
