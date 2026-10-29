@@ -1,3 +1,6 @@
+import type { FinalReport } from '@meridiano/contracts';
+export type { FinalReport, PlayerView } from '@meridiano/contracts';
+
 // Tipos puros del expediente. Sin secretos de solución en PlayerView.
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
@@ -92,11 +95,13 @@ export interface CaseRun {
   definitionId: string;
   definitionHash: string;
   engineVersion: number;
+  eventOrdinal: number;
   version: number;
   minute: number;
   status: CaseStatus;
   position: { cityId: string; locationId: string };
   discoveries: string[];
+  evidenceRecords?: Record<string, { revealedMinute: number; origin: string; method: string; collectedMinute?: number }>;
   inventory: string[];
   admissibility: Record<string, boolean>;
   npcRelations: Record<string, number>;
@@ -106,29 +111,5 @@ export interface CaseRun {
   detentions: string[];
   recoveredObjects: string[];
   pendingBatch: string[] | null;
-  finalReport: FinalReport | null;
-}
-
-export interface FinalReport {
-  result: 'complete' | 'partial' | 'incorrect' | 'unresolved';
-  objectivesAchieved: string[];
-  reason: 'finished' | 'deadline';
-  minute: number;
-}
-
-export interface PlayerView {
-  runId: string;
-  version: number;
-  minute: number;
-  deadlineMinutes: number;
-  position: { cityId: string; locationId: string };
-  visibleCities: string[];
-  discoveredLocations: string[];
-  discoveredObjects: string[];
-  dossier: string[];
-  conversation: string[];
-  pendingRequests: ScheduledResult[];
-  warrants: string[];
-  detentions: string[];
   finalReport: FinalReport | null;
 }

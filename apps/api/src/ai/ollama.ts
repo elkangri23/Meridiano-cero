@@ -113,6 +113,17 @@ function requestBody(input: AiRequest, model: string): string {
   return body;
 }
 
+async function beforeAbort<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  let listener: () => void = () => {};
+  const cancelled = new Promise<never>((_resolve, reject) => {
+    listener = () => reject(new AiError('cancelled'));
+    if (signal.aborted) listener();
+    else signal.addEventListener('abort', listener, { once: true });
+  });
+  try { return await Promise.race([work, cancelled]); }
+  finally { signal.removeEventListener('abort', listener); }
+}
+
 export function createOllamaProvider(options: OllamaOptions): AiProvider {
   const origin = localOrigin(options.origin ?? 'http://127.0.0.1:11434');
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$/.test(options.model)) throw new Error('Modelo no válido.');
@@ -121,6 +132,7 @@ export function createOllamaProvider(options: OllamaOptions): AiProvider {
     throw new Error('Timeout Ollama fuera de rango.');
   }
   const send = options.fetch ?? fetch;
+  let active = false;
   return {
     providerId: 'ollama', model: options.model,
     async request(input: AiRequest): Promise<AiResponse> {
@@ -132,7 +144,12 @@ export function createOllamaProvider(options: OllamaOptions): AiProvider {
       const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal;
       try {
         signal.throwIfAborted();
-        const envelope = await exchange(send, origin + '/api/chat', body, signal);
+        if (active) throw new AiError('unavailable');
+        active = true;
+        // No liberar el cupo cuando solo vence el watchdog: transporte hostil
+        // puede ignorar abort. Permanece ocupado hasta acabar, sin cola.
+        const work = exchange(send, origin + '/api/chat', body, signal).finally(() => { active = false; });
+        const envelope = await beforeAbort(work, signal);
         signal.throwIfAborted();
         return decodeEnvelope(envelope, options.model, Math.round(performance.now() - started));
       } catch (error) {

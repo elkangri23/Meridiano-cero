@@ -21,7 +21,7 @@ export function minutesUntilDeadline(minute: number, deadline: number): number {
 // Seeded PRNG para retrasos de viaje
 export function seededDelay(seed: number, tripIndex: number): number {
   // Determinista: mismo seed + tripIndex = mismo retraso
-  const hash = (seed * 31 + tripIndex * 17) % 100;
+  const hash = (((seed % 100) * 31 + (tripIndex % 100) * 17) % 100 + 100) % 100;
   // 5% de probabilidad de retraso (hash < 5)
   if (hash < 5) {
     // Retraso de 15-45 minutos

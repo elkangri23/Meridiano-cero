@@ -76,3 +76,9 @@ El primer caso mantiene actos factuales restringidos; incertidumbre/error honest
 ## Bordes y funcionamiento ante fallos
 
 El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.
+
+## Continuación de calidad del adaptador alternativo
+
+La fábrica ya valida configuración; el doble es determinista y falla cerrado ante ambigüedad/objetivo no ofrecido, sin generar casos ficticiamente aprobados. Ollama devuelve payload decodificado y conserva uso desconocido, con validación estructural de salidas y errores normalizados. Los tests de ai-adapters se incorporan a la suite general.
+
+No se conecta este paquete a la API ni se sustituye el adaptador activo: faltan codec factual, políticas de transporte y presupuesto común. Un mock correcto y un fetch sintético no acreditan IA real ni compatibilidad FreeLLMAPI. [Contrato actualizado](IA-proveedores.md) y [evidencia](../quality/T3-adaptadores-calidad.md).

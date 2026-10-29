@@ -8,7 +8,9 @@ module.exports = {
     { name: 'web-isolation', severity: 'error', from: { path: '^apps/web/' }, to: { path: '^(apps/api/|packages/(engine|case-schema|ai-adapters|case-generator)/)' } },
     { name: 'api-not-web', severity: 'error', from: { path: '^apps/api/' }, to: { path: '^apps/web/' } },
     { name: 'public-contracts-only', severity: 'error', from: { path: '^packages/contracts/' }, to: { path: '^(apps/|packages/(?!contracts/))' } },
-    { name: 'engine-pure', severity: 'error', from: { path: '^packages/engine/' }, to: { dependencyTypes: ['core', 'npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-no-pkg', 'npm-unknown'] } },
+    { name: 'engine-no-server-integrity', severity: 'error', from: { path: '^packages/engine/', pathNot: '[.]test[.](ts|js)$' }, to: { path: '^packages/case-schema/(src|dist)/server[.](ts|js)$' } },
+    { name: 'schema-root-pure', severity: 'error', from: { path: '^packages/case-schema/(src|dist)/index[.](ts|js)$' }, to: { path: '^packages/case-schema/(src|dist)/server[.](ts|js)$' } },
+    { name: 'engine-pure', severity: 'error', from: { path: '^packages/engine/', pathNot: '[.]test[.]ts$' }, to: { dependencyTypes: ['core', 'npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-no-pkg', 'npm-unknown'] } },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

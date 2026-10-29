@@ -190,9 +190,15 @@ importers:
 
   apps/api:
     dependencies:
+      '@meridiano/case-schema':
+        specifier: workspace:*
+        version: link:../../packages/case-schema
       '@meridiano/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@meridiano/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
@@ -245,13 +251,17 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  packages/case-schema: {}
-
-  packages/contracts:
+  packages/case-schema:
     dependencies:
-      '@meridiano/case-schema':
+      '@meridiano/contracts':
         specifier: workspace:*
-        version: link:../case-schema
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+
+  packages/contracts: {}
 
   packages/engine:
     dependencies:

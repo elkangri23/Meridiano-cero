@@ -80,3 +80,37 @@ Docker puede estar iniciándose: esperar estado running y repetir up --wait ante
 Audit conocido: una moderada de esbuild transitivo de Drizzle Kit, sin altas/críticas en la consulta registrada. No ejecutar su servidor/studio; actualizar tooling compatible antes de distribución o habilitar esa función. No está resuelta ni oculta por un override.
 
 La CI está definida, pero no se ha hecho push ni ejecutado remotamente. El hito acredita base técnica local; no conformidad ASVS global, IA, motor ni accesibilidad completa del juego.
+
+## Persistencia inicial T3-02
+
+El único esquema registrado en Drizzle es src/database/schema.ts; db:migrate consume apps/api/migrations mediante su ledger y comprueba hashes. src/db es un árbol histórico no activo: no aplicar sus SQL manualmente ni mezclar su tabla migrations con base_migrations. Las migraciones nuevas añaden partidas y claves de creación; no requieren borrar el volumen ni recrear perfiles.
+
+El servicio nuevo es interno; la existencia de tablas no habilita rutas de juego o guardados en el navegador. [Evidencia](../quality/T3-02-persistencia.md). Para ensayos aislados se reserva el puerto loopback 15434 además del 15433 habitual de pruebas; la base local de uso sigue en 15432. No reutilizar un proyecto/volumen de prueba ajeno para aplicar migraciones nuevas. Configuración y credenciales permanecen fuera de Git.
+
+## Probar catálogo e inicio por API
+
+Entrega posterior a la persistencia interna: ya están registrados catálogo, detalle, creación y lectura de partidas iniciales. Ejecutar setup, PostgreSQL, db:migrate y API según los pasos anteriores. La UI todavía no consume estas rutas. Ejemplo PowerShell para el entorno local de desarrollo autorizado, con API en 3000 y Origin configurado en 5173:
+
+~~~powershell
+$meridianoApi = 'http://127.0.0.1:3000/api/v1'
+$meridianoLogin = Invoke-RestMethod -Method Post -Uri "$meridianoApi/auth/local-session" -Headers @{ Origin='http://127.0.0.1:5173' } -ContentType 'application/json' -Body '{}' -SessionVariable meridianoCookies
+$meridianoHeaders = @{ Origin='http://127.0.0.1:5173'; 'X-CSRF-Token'=$meridianoLogin.csrfToken }
+Invoke-RestMethod -Uri "$meridianoApi/cases" -WebSession $meridianoCookies
+$meridianoIntent = @{ caseId='astrolabio-tres-ciudades'; idempotencyKey=[guid]::NewGuid().ToString() } | ConvertTo-Json
+$meridianoRun = Invoke-RestMethod -Method Post -Uri "$meridianoApi/runs" -WebSession $meridianoCookies -Headers $meridianoHeaders -ContentType 'application/json' -Body $meridianoIntent
+Invoke-RestMethod -Uri "$meridianoApi/runs/$($meridianoRun.runId)" -WebSession $meridianoCookies
+~~~
+
+Si se pierde la respuesta de creación, reutilizar meridianoIntent con la misma clave; no generar otra. Las cookies permanecen en la sesión HTTP y CSRF en memoria, sin copiar claves a archivos. Adaptar los puertos al entorno configurado, nunca habilitar bootstrap local en un VPS público.
+
+Esta entrega solo inicia/recupera estado inicial: canSave/canLoad=false, sin acciones ni guardados disponibles. Un estado incompatible responde 503 sin modificarlo. No es todavía una investigación jugable. [Alcance y pruebas](../quality/T3-02-http-inicial.md).
+
+## Límites y diagnóstico local de resiliencia
+
+La admisión de producto tiene 32 peticiones en curso por instancia; al saturarse responde 503 con Retry-After sin una segunda cola HTTP. PostgreSQL tiene cinco conexiones y hasta 25 esperas; un exceso se rechaza. Readiness comparte trabajo entre probes y no abre otro si venció su watchdog mientras sigue una query. Los timeouts nativos de conexión/query/statement siguen activos; el watchdog no demuestra cancelación SQL.
+
+El proceso real emite JSON request.completed en stdout por allowlist. No incluye URL, cuerpos, cookies, CSRF, claves o SQL. Contadores e histogramas locales tienen dimensiones fijas y separan health/readiness de solicitudes de producto; todavía no calculan un SLO de tráfico elegible. Si el stream falla o no drena, descarta sin cola creciente. El contador de descarte no acredita entrega remota y la rotación/retención del supervisor debe configurarse antes de distribución/público; no existe un collector obligatorio.
+
+SIGINT/SIGTERM comparten una parada: draining cierra readiness/admisión; Fastify drena y su onClose cierra el pool una sola vez. Presupuesto inicial de 10 segundos; al agotarse o fallar cierre se fuerza salida. Una escritura interrumpida queda potencialmente incierta: recuperar la misma intención, sin afirmar rollback. El presupuesto se ha probado en unidad; falta el ensayo completo con proceso/supervisor/IA en vuelo. [Auditoría y pendientes](../quality/AUDITORIA-7962014.md).
+
+Las rutas de juego comprueban también compatibilidad de esquema: no basta con mirar readiness desde fuera. Crear/leer partida valida el ledger dentro de la transacción y mantiene el lock de migración compartido; el migrador usa el mismo lock exclusivo. Una versión desconocida o checksum distinto bloquea el juego con 503 y conserva los datos. No ejecutar SQL de migración histórica a mano para forzar compatibilidad.

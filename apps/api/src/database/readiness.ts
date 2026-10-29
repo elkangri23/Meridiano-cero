@@ -1,8 +1,8 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Database } from './connection.ts';
-import { migrationFiles } from './migrations.ts';
+import { migrationFiles, matchesMigrationLedger } from './migrations.ts';
 
-export function createReadiness(database: Database) {
+export function createReadiness(database: Database, timeoutMs = 5000) {
   const expected = migrationFiles().catch(() => undefined);
   let active: Promise<boolean> | undefined;
   async function check(): Promise<boolean> {
@@ -10,15 +10,17 @@ export function createReadiness(database: Database) {
       const files = await expected;
       if (!files) return false;
       const rows = await database.pool.query<{ name: string; hash: string }>('SELECT name, hash FROM base_migrations ORDER BY name');
-      return files.length === rows.rows.length && files.every((file, index) =>
-        rows.rows[index]?.name === file.name && rows.rows[index]?.hash === file.hash);
+      return matchesMigrationLedger(files, rows.rows);
     } catch { return false; }
   }
   return () => {
     if (!active) {
       const timeout = new AbortController();
-      active = Promise.race([check(), delay(5000, false, { signal: timeout.signal })])
-        .finally(() => { timeout.abort(); active = undefined; });
+      const work = check();
+      active = Promise.race([work, delay(timeoutMs, false, { signal: timeout.signal })]);
+      // Si vence el watchdog, conservar single-flight hasta que termine la query.
+      // El timeout de pg/servidor limita SQL; el watchdog no promete cancelarlo.
+      void work.finally(() => { timeout.abort(); active = undefined; });
     }
     return active;
   };

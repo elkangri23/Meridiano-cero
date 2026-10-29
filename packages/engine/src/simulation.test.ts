@@ -1,312 +1,234 @@
-import { describe, it, expect } from 'vitest';
-import { createInitialRun, resolveAction, confirmAction, canIssueWarrant } from './index.js';
-import { astrolabioDefinition } from './fixtures/case-astrolabio.js';
+import { hashDefinition } from '@meridiano/case-schema/server';
+import { describe, expect, it } from 'vitest';
+import { createInitialRun, resolveAction, confirmAction, canIssueWarrant, astrolabioDefinition } from './index.js';
+import type { Action, ActionResult } from './index.js';
+import type { CaseDefinition } from '@meridiano/case-schema';
 
-describe('T2-06: simulación de rutas independientes sin IA', () => {
-  // ── Ruta A (técnica): EV-02, EV-03, EV-04, EV-05 ──────────────────────
+// Único origen de estado: createInitialRun y resultados del motor. El helper
+// representa aprobación explícita del jugador si el motor solicita confirmación.
+function scenario(def: CaseDefinition = astrolabioDefinition) {
+  let run = createInitialRun(def, 'synthetic-owner', 'synthetic-run', hashDefinition(def));
+  function attempt(type: Action['type'], params: Action['params']): ActionResult {
+    const action = { type, params };
+    const before = structuredClone(run);
+    let result = resolveAction(def, run, action);
+    if (result.status === 'confirmation_required') {
+      expect(result.run).toEqual(before);
+      expect(result.events).toEqual([]);
+      result = confirmAction(def, run, action);
+    }
+    if (result.status === 'applied' || result.status === 'case_closed') run = result.run;
+    return result;
+  }
+  function step(type: Action['type'], params: Action['params']) {
+    const result = attempt(type, params);
+    if (result.status !== 'applied' && result.status !== 'case_closed') throw new Error('Unexpected action outcome: ' + type + '/' + result.status);
+    return result;
+  }
+  return { step, attempt, read: () => structuredClone(run) };
+}
+type Scenario = ReturnType<typeof scenario>;
+function prepareA(s: Scenario) {
+  s.step('inspect', { targetId: 'MAD-SALA' });
+  s.step('inspect', { targetId: 'MAD-SALA', elementId: 'cerradura' });
+  s.step('collect', { evidenceId: 'EV-02' });
+  s.step('analyze', { evidenceId: 'EV-02' });
+  s.step('travel', { toCityId: 'paris' });
+  s.step('query', { topicId: 'herramienta-hv17' });
+  s.step('query', { topicId: 'traslado-ines' });
+  s.step('wait', { minutes: 30 });
+}
+function order(s: Scenario, suspectId: string, evidenceIds: string[]) {
+  s.step('request_warrant', { suspectId, evidenceIds });
+  s.step('wait', { minutes: 30 });
+}
+function detain(s: Scenario, suspectId: 'ines' | 'tomas') {
+  s.step('talk', { npcId: suspectId, topicId: 'identidad' });
+  s.step('detain', { suspectId, warrantId: 'warrant:' + suspectId,
+    locationId: suspectId === 'ines' ? 'LIS-ALM' : 'MAD-SALA', mode: 'interactive' });
+}
+function finishOriginal(s: Scenario) {
+  detain(s, 'ines');
+  s.step('recover', { objectId: 'astrolabio-original' });
+  return s.step('finish', { confirmed: true });
+}
+function routeA(def: CaseDefinition) {
+  const s = scenario(def); prepareA(s);
+  order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
+  s.step('travel', { toCityId: 'lisboa' });
+  finishOriginal(s);
+  return s.read();
+}
+function routeB(def: CaseDefinition) {
+  const s = scenario(def);
+  s.step('inspect', { targetId: 'MAD-SALA' });
+  s.step('inspect', { targetId: 'MAD-SALA', elementId: 'caja' });
+  s.step('collect', { evidenceId: 'EV-06' });
+  s.step('travel', { toCityId: 'paris' });
+  s.step('query', { topicId: 'firma-sello' });
+  s.step('wait', { minutes: 30 });
+  s.step('travel', { toCityId: 'lisboa' });
+  s.step('query', { topicId: 'custodia-envio' });
+  s.step('wait', { minutes: 30 });
+  order(s, 'ines', ['EV-06', 'EV-07', 'EV-08']);
+  finishOriginal(s);
+  return s.read();
+}
 
-  it('Ruta A: completa con detención de Inés y recuperación', () => {
-    let run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-a');
-    const def = astrolabioDefinition;
+function routeWithBatches(def: CaseDefinition, route: 'A' | 'B') {
+  const s = scenario(def);
+  const technical = route === 'A';
+  const opening: Action[] = [
+    { type: 'inspect', params: { targetId: 'MAD-SALA' } },
+    { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: technical ? 'cerradura' : 'caja' } },
+    { type: 'collect', params: { evidenceId: technical ? 'EV-02' : 'EV-06' } },
+  ];
+  if (technical) opening.push({ type: 'analyze', params: { evidenceId: 'EV-02' } });
+  s.step('batch', { steps: opening });
+  s.step('travel', { toCityId: 'paris' });
+  if (technical) s.step('batch', { steps: [
+    { type: 'query', params: { topicId: 'herramienta-hv17' } },
+    { type: 'query', params: { topicId: 'traslado-ines' } },
+    { type: 'wait', params: { minutes: 30 } },
+    { type: 'request_warrant', params: { suspectId: 'ines', evidenceIds: ['EV-03', 'EV-04', 'EV-05'] } },
+    { type: 'wait', params: { minutes: 30 } },
+  ] });
+  else s.step('batch', { steps: [{ type: 'query', params: { topicId: 'firma-sello' } }, { type: 'wait', params: { minutes: 30 } }] });
+  s.step('travel', { toCityId: 'lisboa' });
+  if (!technical) s.step('batch', { steps: [
+    { type: 'query', params: { topicId: 'custodia-envio' } }, { type: 'wait', params: { minutes: 30 } },
+    { type: 'request_warrant', params: { suspectId: 'ines', evidenceIds: ['EV-06', 'EV-07', 'EV-08'] } },
+    { type: 'wait', params: { minutes: 30 } },
+  ] });
+  finishOriginal(s);
+  return s.read();
+}
 
-    // 1. Inspect general MAD-SALA (10 min)
-    let r = resolveAction(def, run, { type: 'inspect', params: { targetId: 'MAD-SALA' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 2. Inspect cerradura (20 min)
-    r = resolveAction(def, run, { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: 'cerradura' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 3. Collect EV-02
-    r = resolveAction(def, run, { type: 'collect', params: { evidenceId: 'EV-02' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 4. Viaje Madrid→París (180 min) - confirmar
-    r = resolveAction(def, run, { type: 'travel', params: { toCityId: 'paris' } });
-    expect(r.status).toBe('confirmation_required');
-    r = confirmAction(def, run, { type: 'travel', params: { toCityId: 'paris' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 5. Analyze EV-02 (resultado a +90 min)
-    r = resolveAction(def, run, { type: 'analyze', params: { evidenceId: 'EV-02' } });
-    expect(r.status).toBe('confirmation_required');
-    r = confirmAction(def, run, { type: 'analyze', params: { evidenceId: 'EV-02' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 6. Query herramienta HV-17 en París (+30 min)
-    r = resolveAction(def, run, { type: 'query', params: { topic: 'herramienta HV-17' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 7. Query traslado Inés en París (+30 min)
-    r = resolveAction(def, run, { type: 'query', params: { topic: 'traslado ines' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 8. Esperar a que maduren las solicitudes
-    r = resolveAction(def, run, { type: 'wait', params: { minutes: 90 } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 9. Request warrant para Inés
-    r = resolveAction(def, run, { type: 'request_warrant', params: { suspectId: 'ines' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 10. Esperar orden
-    r = resolveAction(def, run, { type: 'wait', params: { minutes: 30 } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // Verificar que se emitió la orden
-    expect(run.warrants.length).toBeGreaterThan(0);
-
-    // 11. Viaje París→Lisboa (150 min)
-    r = resolveAction(def, run, { type: 'travel', params: { toCityId: 'lisboa' } });
-    expect(r.status).toBe('confirmation_required');
-    r = confirmAction(def, run, { type: 'travel', params: { toCityId: 'lisboa' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 12. Detener a Inés (requiere ubicación conocida)
-    run = { ...run, discoveries: [...run.discoveries, 'location:ines'] };
-    r = resolveAction(def, run, { type: 'detain', params: { suspectId: 'ines' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 13. Recuperar original en L-7
-    r = resolveAction(def, run, { type: 'recover', params: { objectId: 'astrolabio-original' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 14. Finish
-    r = resolveAction(def, run, { type: 'finish', params: { confirmed: true } });
-    expect(r.status).toBe('case_closed');
-    if (r.status === 'case_closed') {
-      expect(r.report.result).toBe('complete');
+describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
+  it.each([1, 42])('ruta A completa con semilla %s sin pruebas exclusivas B', seed => {
+    const def = { ...astrolabioDefinition, seed,
+      evidence: astrolabioDefinition.evidence.filter(evidence => !['EV-06', 'EV-07', 'EV-08'].includes(evidence.id)) };
+    const run = routeA(def);
+    expect(run.finalReport?.result).toBe('complete');
+    expect(run.minute).toBe(seed === 1 ? 455 : 482);
+    for (const id of ['EV-06', 'EV-07', 'EV-08']) expect([...run.discoveries, ...run.inventory]).not.toContain(id);
+    expect(run.evidenceRecords?.['EV-03']).toMatchObject({ revealedMinute: 120, method: 'analyze', origin: 'MAD-SALA' });
+    expect(run.position).toEqual({ cityId: 'lisboa', locationId: 'LIS-ALM' });
+  });
+  it.each([1, 42])('ruta B completa con semilla %s sin pruebas exclusivas A', seed => {
+    const def = { ...astrolabioDefinition, seed,
+      evidence: astrolabioDefinition.evidence.filter(evidence => !['EV-02', 'EV-03', 'EV-04', 'EV-05'].includes(evidence.id)) };
+    const run = routeB(def);
+    expect(run.finalReport?.result).toBe('complete');
+    expect(run.minute).toBe(seed === 1 ? 485 : 512);
+    for (const id of ['EV-02', 'EV-03', 'EV-04', 'EV-05']) expect([...run.discoveries, ...run.inventory]).not.toContain(id);
+    expect(run.evidenceRecords?.['EV-07']?.method).toBe('query');
+  });
+  it('mismas acciones y semilla producen el mismo expediente de partida', () => {
+    expect(routeA(astrolabioDefinition)).toEqual(routeA(astrolabioDefinition));
+  });
+  it('recoger una prueba oculta o inexistente no modifica el estado', () => {
+    const s = scenario(); const before = s.read();
+    for (const evidenceId of ['EV-02', 'EV-03', 'EV-11', 'unknown']) {
+      expect(s.attempt('collect', { evidenceId })).toMatchObject({ status: 'impossible', run: before, events: [], reason: 'Evidencia no disponible.' });
     }
   });
-
-  // ── Ruta B (documental): EV-06, EV-07, EV-08 ──────────────────────────
-
-  it('Ruta B: completa con detención de Inés y recuperación', () => {
-    let run = createInitialRun(astrolabioDefinition, 'owner-2', 'run-b');
-    const def = astrolabioDefinition;
-
-    // 1. Inspect general MAD-SALA
-    let r = resolveAction(def, run, { type: 'inspect', params: { targetId: 'MAD-SALA' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 2. Inspect caja (20 min)
-    r = resolveAction(def, run, { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: 'caja' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 3. Collect EV-06
-    r = resolveAction(def, run, { type: 'collect', params: { evidenceId: 'EV-06' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 4. Viaje Madrid→París
-    r = confirmAction(def, run, { type: 'travel', params: { toCityId: 'paris' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 5. Query firma/sello EV-06 en París
-    r = resolveAction(def, run, { type: 'query', params: { topic: 'firma sello EV-06' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 6. Esperar resultado
-    r = resolveAction(def, run, { type: 'wait', params: { minutes: 30 } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 7. Viaje París→Lisboa
-    r = confirmAction(def, run, { type: 'travel', params: { toCityId: 'lisboa' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 8. Query custodia del envío en Lisboa
-    r = resolveAction(def, run, { type: 'query', params: { topic: 'custodia envio' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 9. Esperar resultado
-    r = resolveAction(def, run, { type: 'wait', params: { minutes: 30 } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 10. Request warrant
-    r = resolveAction(def, run, { type: 'request_warrant', params: { suspectId: 'ines' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 11. Esperar orden
-    r = resolveAction(def, run, { type: 'wait', params: { minutes: 30 } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    expect(run.warrants.length).toBeGreaterThan(0);
-
-    // 12. Detener a Inés
-    run = { ...run, discoveries: [...run.discoveries, 'location:ines'] };
-    r = resolveAction(def, run, { type: 'detain', params: { suspectId: 'ines' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 13. Recuperar original
-    r = resolveAction(def, run, { type: 'recover', params: { objectId: 'astrolabio-original' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // 14. Finish
-    r = resolveAction(def, run, { type: 'finish', params: { confirmed: true } });
-    expect(r.status).toBe('case_closed');
-    if (r.status === 'case_closed') {
-      expect(r.report.result).toBe('complete');
+  it('análisis no consume envío y revela únicamente al madurar', () => {
+    const s = scenario();
+    s.step('inspect', { targetId: 'MAD-SALA', elementId: 'cerradura' });
+    s.step('collect', { evidenceId: 'EV-02' });
+    const minute = s.read().minute;
+    s.step('analyze', { evidenceId: 'EV-02' });
+    expect(s.read().minute).toBe(minute);
+    expect(s.read().discoveries).not.toContain('EV-03');
+    s.step('wait', { minutes: 89 }); expect(s.read().discoveries).not.toContain('EV-03');
+    s.step('wait', { minutes: 1 }); expect(s.read().discoveries).toContain('EV-03');
+    expect(s.attempt('collect', { evidenceId: 'EV-03' }).status).toBe('impossible');
+  });
+  it('no acepta consultas arbitrarias, tipos coaccionados ni consultas desde otra ciudad', () => {
+    const s = scenario(); const before = s.read();
+    for (const params of [{ topicId: 'herramienta-hv17' }, { topicId: '__proto__' }, { topicId: 123 }, { topic: 'herramienta HV-17' }]) {
+      expect(s.attempt('query', params)).toMatchObject({ status: 'impossible', run: before, events: [] });
     }
   });
-
-  // ── Independencia de rutas ──────────────────────────────────────────────
-
-  it('Ruta A sin evidencias exclusivas de B completa', () => {
-    const def = { ...astrolabioDefinition, evidence: astrolabioDefinition.evidence.filter((e) => !['EV-06', 'EV-07', 'EV-08'].includes(e.id)) };
-    const run = createInitialRun(def, 'owner-a', 'run-a2');
-    expect(run.status).toBe('active');
-    // Verificar que EV-06/07/08 no están en la definición
-    const ids = def.evidence.map((e) => e.id);
-    expect(ids).not.toContain('EV-06');
-    expect(ids).not.toContain('EV-07');
-    expect(ids).not.toContain('EV-08');
+  it('orden insuficiente se deniega después de 30 min sin cerrar ni consultar culpa', () => {
+    const s = scenario();
+    s.step('talk', { npcId: 'lucia', topicId: 'caja' });
+    expect(s.read().discoveries).toContain('EV-09');
+    s.step('request_warrant', { suspectId: 'tomas', evidenceIds: ['EV-09'] });
+    s.step('wait', { minutes: 29 }); expect(s.read().warrants).toEqual([]);
+    const result = s.step('wait', { minutes: 1 });
+    expect(result.events.some(event => event.type === 'warrant_denied')).toBe(true);
+    expect(s.read().warrants).toEqual([]);
+    expect(s.read().status).toBe('active');
+  });
+  it('una orden de inocente puede concederse con hechos verdaderos y acabar en incorrect', () => {
+    const s = scenario();
+    s.step('talk', { npcId: 'lucia', topicId: 'caja' });
+    s.step('query', { topicId: 'accesos-tomas' }); s.step('wait', { minutes: 30 });
+    order(s, 'tomas', ['EV-09', 'EV-10']);
+    detain(s, 'tomas');
+    const result = s.step('finish', { confirmed: true });
+    expect(result.run.finalReport?.result).toBe('incorrect');
+  });
+  it('no usa pruebas omitidas ni permite modificar la selección ya enviada', () => {
+    const s = scenario(); prepareA(s);
+    const selected = ['EV-03', 'EV-04'];
+    s.step('request_warrant', { suspectId: 'ines', evidenceIds: selected });
+    selected.push('EV-05');
+    s.step('wait', { minutes: 30 });
+    expect(s.read().warrants).toContain('warrant:ines');
+    expect(s.read().warrants).not.toContain('warrant:access');
+    order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
+    expect(s.read().warrants).toContain('warrant:access');
+  });
+  it('omitir una prueba necesaria no se suple con otras conocidas', () => {
+    const s = scenario(); prepareA(s);
+    order(s, 'ines', ['EV-03']);
+    expect(s.read().warrants).not.toContain('warrant:ines');
+  });
+  it('la suficiencia no depende de la solución secreta', () => {
+    const s = scenario(); prepareA(s);
+    const altered = { ...astrolabioDefinition, solution: 'another-person' };
+    expect(canIssueWarrant(altered, s.read(), 'ines', ['EV-03', 'EV-04'])).toBe(true);
+    expect(canIssueWarrant(astrolabioDefinition, s.read(), 'ines', ['EV-03', 'EV-04'])).toBe(true);
+  });
+  it('no lava la inadmisibilidad de una fuente con el laboratorio', () => {
+    const def = { ...astrolabioDefinition,
+      evidence: astrolabioDefinition.evidence.map(evidence => evidence.id === 'EV-02' ? { ...evidence, admissible: false } : evidence) };
+    const s = scenario(def); prepareA(s);
+    expect(s.read().admissibility['EV-03']).toBe(false);
+    order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
+    expect(s.read().warrants).not.toContain('warrant:ines');
+  });
+  it('no detiene sin confirmar identidad ni recupera por adivinar un objeto', () => {
+    const s = scenario(); prepareA(s); order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
+    s.step('travel', { toCityId: 'lisboa' });
+    expect(s.attempt('detain', { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'interactive' }).status).toBe('impossible');
+    expect(s.attempt('recover', { objectId: 'another-object' }).status).toBe('impossible');
+    detain(s, 'ines');
+    expect(s.step('finish', { confirmed: true }).run.finalReport?.result).toBe('partial');
+  });
+  it('plazo alcanzado no revela el registro situado exactamente en ese minuto', () => {
+    const s = scenario({ ...astrolabioDefinition, deadlineMinutes: 30 });
+    s.step('query', { topicId: 'accesos-tomas' });
+    s.step('wait', { minutes: 30 });
+    expect(s.read().status).toBe('closed');
+    expect(s.read().discoveries).not.toContain('EV-10');
+  });
+  it('sin investigación el cierre confirmado es unresolved', () => {
+    expect(scenario().step('finish', { confirmed: true }).run.finalReport?.result).toBe('unresolved');
+  });
+  it.each([{ route: 'A' as const, seed: 1 }, { route: 'A' as const, seed: 42 }, { route: 'B' as const, seed: 1 }, { route: 'B' as const, seed: 42 }])('ruta $route en lotes equivale a acciones sueltas, semilla $seed', ({ route, seed }) => {
+    const excluded = route === 'A' ? ['EV-06', 'EV-07', 'EV-08'] : ['EV-02', 'EV-03', 'EV-04', 'EV-05'];
+    const def = { ...astrolabioDefinition, seed, evidence: astrolabioDefinition.evidence.filter(evidence => !excluded.includes(evidence.id)) };
+    const individual = route === 'A' ? routeA(def) : routeB(def);
+    const batched = routeWithBatches(def, route);
+    expect(batched.finalReport?.result).toBe('complete');
+    expect(batched).toMatchObject({ minute: individual.minute, position: individual.position,
+      discoveries: individual.discoveries, inventory: individual.inventory, admissibility: individual.admissibility,
+      evidenceRecords: individual.evidenceRecords, warrants: individual.warrants, detentions: individual.detentions,
+      recoveredObjects: individual.recoveredObjects, finalReport: individual.finalReport, pendingRequests: [], pendingBatch: null });
   });
 
-  it('Ruta B sin evidencias exclusivas de A completa', () => {
-    const def = { ...astrolabioDefinition, evidence: astrolabioDefinition.evidence.filter((e) => !['EV-02', 'EV-03', 'EV-04', 'EV-05'].includes(e.id)) };
-    const ids = def.evidence.map((e) => e.id);
-    expect(ids).not.toContain('EV-02');
-    expect(ids).not.toContain('EV-03');
-    expect(ids).not.toContain('EV-04');
-    expect(ids).not.toContain('EV-05');
-  });
-
-  // ── Variantes negativas ─────────────────────────────────────────────────
-
-  it('Variente: detención errónea de Tomás (inocente)', () => {
-    let run = createInitialRun(astrolabioDefinition, 'owner-3', 'run-tomas');
-    const def = astrolabioDefinition;
-
-    // Obtener EV-09 + EV-10 (suficiente para orden de Tomás, pero no acredita robo)
-    run = { ...run, inventory: ['EV-09', 'EV-10'], admissibility: { 'EV-09': true, 'EV-10': true } };
-
-    // Request warrant para Tomás
-    let r = resolveAction(def, run, { type: 'request_warrant', params: { suspectId: 'tomas' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // Esperar orden
-    r = resolveAction(def, run, { type: 'wait', params: { minutes: 30 } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    expect(run.warrants).toContain('warrant:tomas');
-
-    // Detener a Tomás
-    run = { ...run, discoveries: [...run.discoveries, 'location:tomas'] };
-    r = resolveAction(def, run, { type: 'detain', params: { suspectId: 'tomas' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied') run = r.run;
-
-    // Finish → incorrect (inocente detenido)
-    r = resolveAction(def, run, { type: 'finish', params: { confirmed: true } });
-    expect(r.status).toBe('case_closed');
-    if (r.status === 'case_closed') {
-      expect(r.report.result).toBe('incorrect');
-    }
-  });
-
-  it('Variante: orden denegada (solo EV-09)', () => {
-    let run = createInitialRun(astrolabioDefinition, 'owner-4', 'run-denied');
-    const def = astrolabioDefinition;
-
-    run = { ...run, inventory: ['EV-09'], admissibility: { 'EV-09': true } };
-
-    // canIssueWarrant debe ser false con solo EV-09
-    expect(canIssueWarrant(def, run, 'tomas')).toBe(false);
-  });
-
-  it('Variante: vencimiento por plazo', () => {
-    let run = createInitialRun(astrolabioDefinition, 'owner-5', 'run-deadline');
-    const def = astrolabioDefinition;
-
-    // Avanzar hasta 2870
-    run = { ...run, minute: 2870, version: run.version + 1 };
-
-    // Esperar 20 min → vence a 2880
-    const r = resolveAction(def, run, { type: 'wait', params: { minutes: 20 } });
-    expect(r.status).toBe('case_closed');
-    if (r.status === 'case_closed') {
-      expect(r.report.reason).toBe('deadline');
-    }
-  });
-
-  it('Variante: recuperación por fuerza (irregular)', () => {
-    let run = createInitialRun(astrolabioDefinition, 'owner-6', 'run-force');
-    const def = astrolabioDefinition;
-
-    // Simular entrada forzada
-    run = { ...run, discoveries: [...run.discoveries, 'forced-entry'] };
-
-    const r = resolveAction(def, run, { type: 'recover', params: { objectId: 'astrolabio-original' } });
-    expect(r.status).toBe('applied');
-    if (r.status === 'applied' && r.events.length > 0) {
-      expect(r.events[0]!.payload.irregular).toBe(true);
-    }
-  });
-
-  it('Variante: parcial (solo detención, sin recuperación)', () => {
-    let run = createInitialRun(astrolabioDefinition, 'owner-7', 'run-partial');
-    const def = astrolabioDefinition;
-
-    // Simular detención de Inés sin recuperación
-    run = { ...run, detentions: ['ines-valera'], version: run.version + 1 };
-
-    // Marcar objetivo de detención como logrado (el motor lo hace en finish)
-    const r = resolveAction(def, run, { type: 'finish', params: { confirmed: true } });
-    expect(r.status).toBe('case_closed');
-    if (r.status === 'case_closed') {
-      expect(r.report.result).toBe('partial');
-    }
-  });
-
-  it('Variante: unresolved (sin objetivos)', () => {
-    let run = createInitialRun(astrolabioDefinition, 'owner-8', 'run-unresolved');
-    const def = astrolabioDefinition;
-
-    const r = resolveAction(def, run, { type: 'finish', params: { confirmed: true } });
-    expect(r.status).toBe('case_closed');
-    if (r.status === 'case_closed') {
-      expect(r.report.result).toBe('unresolved');
-    }
-  });
-
-  it('Determinismo: misma semilla, mismo resultado', () => {
-    const run1 = createInitialRun(astrolabioDefinition, 'owner-9', 'run-det1');
-    const run2 = createInitialRun(astrolabioDefinition, 'owner-9', 'run-det2');
-    expect(run1.definitionHash).toBe(run2.definitionHash);
-  });
-
-  it('No hay movimiento autónomo del sospechoso', () => {
-    // El motor no avanza tiempo por sí solo; solo las acciones del jugador lo hacen
-    const run = createInitialRun(astrolabioDefinition, 'owner-10', 'run-auto');
-    expect(run.minute).toBe(0);
-    // Sin acciones, el minuto sigue en 0
-    expect(run.minute).toBe(0);
-  });
 });

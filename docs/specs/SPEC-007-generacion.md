@@ -57,3 +57,7 @@ T4-01 a T4-06. Probar caso bueno, insoluble, referencia rota, geografía inventa
 ## Bordes y funcionamiento ante fallos
 
 El [contrato de resiliencia](RESILIENCIA.md) y el [plan de observabilidad y residencia de datos](OBSERVABILIDAD-Y-DATOS.md) desarrollan las condiciones de fallo y medidas aplicables. El [catálogo de bordes](../quality/BORDES-EJECUCION.md) asigna pruebas y tareas por fase. Son contratos propuestos pendientes de implementación y verificación.
+
+## Reutilización parcial del validador 1.1
+
+T2 incorpora comprobaciones de tipos/referencias y aplica los límites de 20 ciudades, 100 lugares, 100 NPC y 1.000 evidencias antes de recorrerlos. Las demás listas se acotan internamente a 2.048 y los textos a 16.384 caracteres; rechazar, nunca truncar. No existe importador activo: tamaño bruto, profundidad JSON, operadores, geografía, simulación, publicación y jobs siguen pendientes. El reporte incluido por el archivo no concede aprobación y la revisión IA no sustituye los controles deterministas. [Evidencia](../quality/T2-validacion-expedientes.md).

@@ -1,6 +1,7 @@
+import { hashDefinition } from '@meridiano/case-schema/server';
 import { describe, it, expect } from 'vitest';
 import { validateCaseDefinition } from '@meridiano/case-schema';
-import { astrolabioDefinition, hashDefinition, createInitialRun } from './index.js';
+import { astrolabioDefinition, createInitialRun } from './index.js';
 
 describe('astrolabio fixture', () => {
   it('passes validation', () => {
@@ -15,7 +16,7 @@ describe('astrolabio fixture', () => {
     expect(astrolabioDefinition.validationReport.status).toBe('validated');
   });
 
-  it('has two independent routes (rutas A and B)', () => {
+  it('contiene las evidencias de ambas rutas; la solvencia se prueba en simulation.test', () => {
     // Route A: EV-02, EV-03, EV-04, EV-05
     // Route B: EV-06, EV-07, EV-08
     const routeA = ['EV-02', 'EV-03', 'EV-04', 'EV-05'];
@@ -27,7 +28,7 @@ describe('astrolabio fixture', () => {
   });
 
   it('creates initial run', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     expect(run.minute).toBe(0);
     expect(run.status).toBe('active');
     expect(run.definitionId).toBe('astrolabio-tres-ciudades');

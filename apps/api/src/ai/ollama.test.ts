@@ -83,3 +83,15 @@ describe('Cancelación al completar el transporte', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('transporte que ignora abort', () => {
+  it('responde timeout y conserva el cupo sin acumular llamadas colgadas', async () => {
+    const send = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
+    const instance = provider(send, 10);
+    await expect(instance.request(request)).rejects.toMatchObject({ code: 'timeout' });
+    for (let index = 0; index < 20; index++) {
+      await expect(instance.request(request)).rejects.toMatchObject({ code: 'unavailable' });
+    }
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+});

@@ -1,6 +1,6 @@
 # API de juego: contratos detallados de SPEC-004
 
-Revisión: 2026-10-28. Contrato para implementar T3-02/T3-03/T3-04; no endpoints entregados. Amplía SPEC-002/004/005/006, ADR-003/007 y DEC-013 a DEC-021. Los contratos de sesión de SPEC-004 siguen vigentes; este anexo concreta juego, guardados y recuperación.
+Revisión: 2026-10-29. Contrato de T3-02/T3-03/T3-04; catálogo y creación/lectura inicial entregados parcialmente, resto pendiente. Amplía SPEC-002/004/005/006, ADR-003/007 y DEC-013 a DEC-021. Los contratos de sesión de SPEC-004 siguen vigentes; este anexo concreta juego, guardados y recuperación.
 
 ## Convenciones y validación
 
@@ -97,7 +97,7 @@ requestText y text tienen el límite general de 4000. channel es call, whatsapp,
 
 No se admiten type batch anidado ni batch_decision como item: items representa el lote plano; la decisión se tramita en su ruta con batchId. No aceptar dueMinute, duration, admissible, revealedFacts, confirmed, cooperation o cualquier otro efecto calculado por servidor.
 
-La adaptación al motor existente es trabajo pendiente: hoy usa Record<string,unknown>, algunos nombres difieren y no valida todos estos campos. En particular, las pruebas seleccionadas de una orden, políticas de conversación, modo de detención y gestiones deben integrarse sin fingir que basta copiar params. El preview actual de viajes revela retraso seeded; no puede serializarse como el DTO público previsto.
+La adaptación al motor existente es trabajo pendiente: hoy usa Record<string,unknown>, algunos nombres difieren y no valida todos estos campos. En particular, las pruebas seleccionadas de una orden, políticas de conversación, modo de detención y gestiones deben integrarse sin fingir que basta copiar params. El preview interno de viajes ya oculta el sorteo seeded, pero no equivale al DTO público previsto ni puede serializarse sin adaptación.
 
 El preview nunca modifica partida, memoria NPC ni reloj. Puede persistir metadatos operativos de la petición o del token. La salida tiene una de estas variantes:
 
@@ -206,10 +206,38 @@ Clarification/impossible son HTTP 200 en un preview válido, no 422. Un timeout 
 
 ## Diferencias respecto al código actual
 
-PlayerViewDto, control de rama/revisión HTTP, ownership de partidas, operaciones persistidas y rutas de juego aún no existen. La API actual solo acredita su base. Los tipos públicos definitivos y validadores se implementarán juntos en contracts sin importar CaseDefinition al bundle. Las pruebas de aceptación del [catálogo detallado](../quality/T3-aceptacion-detallada.md) deberán demostrar estas reglas.
+El catálogo y la creación/lectura de partidas iniciales ya tienen rutas, ownership, rama/revisión persistidas e idempotencia de creación. PlayerViewDto general para transiciones, preview/commit, operaciones de acciones y guardados aún no existen. Los tipos públicos definitivos y validadores se implementarán juntos en contracts sin importar CaseDefinition al bundle. Las pruebas de aceptación del [catálogo detallado](../quality/T3-aceptacion-detallada.md) deberán demostrar estas reglas.
 
 ## Idempotencia al crear una partida
 
 POST /runs todavía no tiene runId para bloquear o usar como ámbito. Su registro de creación utiliza unicidad por usuario+idempotencyKey, con kind=create_run y digest del cuerpo validado. En una transacción se reserva esa clave, se crea la partida y se vincula su runId al resultado. Dos solicitudes iguales concurrentes generan una única partida.
 
 Una clave de creación con otro caseId devuelve IDEMPOTENCY_CONFLICT. Reintentar una creación ya confirmada devuelve la identidad de la misma partida; si ha avanzado, la UI consulta GET /runs/:runId para obtener el estado actual y no lo sustituye por la vista inicial histórica. La unicidad de otras operaciones sigue siendo por usuario+partida+idempotencyKey.
+
+## Avance parcial del 2026-10-29
+
+La proyección heredada del motor ya elimina payload/tipo interno de solicitudes y oculta informes en ramas activas; sus contratos públicos se separan de case-schema. No equivale a PlayerViewDto v1 de este documento: faltan revisión HTTP, rama, nombres/textos autorizados y servicios transaccionales. No enviar la definición privada para completar esos campos desde web. Evidencia: [continuación T3-02](../quality/T3-02-proyeccion.md).
+
+## Entrega HTTP inicial del 2026-10-29
+
+Implementados GET /cases, GET /cases/:caseId, POST /runs y GET /runs/:runId, con sesión y no-store. La creación exige Origin/CSRF y exactamente caseId/idempotencyKey; devuelve 201 con InitialPlayerViewDto y replayed=false, o 200 con replayed=true si ya se confirmó la intención. El DTO conserva los campos de la proyección objetivo, pero su subtipo actual solo admite estado inicial activo sin acciones: listas narrativas vacías, informe/resultado oficial null y capacidades de manuales deshabilitadas explícitamente. No habilita rutas de acción ni guardados por anticipación.
+
+La proyección comprueba hash, versión del motor, revisión y estado inicial completo. Un estado distinto o incompatible devuelve 503 DEPENDENCY_UNAVAILABLE conservando los datos; no se convierte en otra partida inicial ni se muestra contenido sin proyectar. El proyector general deberá sustituir esta restricción junto con las transiciones antes de habilitar acciones. En guiado se muestran las tres ciudades, conforme a SPEC-003; solo el lugar inicial es visible.
+
+Catálogo actual: un caso fijo. limit admite 1..100, defecto 25; la respuesta contiene un elemento y nextCursor=null. No se emiten cursores; cualquier cursor recibido es inválido, no se acepta como ruta o SQL. La paginación opaca ligada a filtros deberá implementarse al ampliar el catálogo. GET /runs (lista), reportes, operaciones y resto del contrato siguen pendientes. [Pruebas y límites](../quality/T3-02-http-inicial.md).
+
+## Puerta estructural de nuevas partidas
+
+La creación inicial valida una copia estable de CaseDefinition antes de esperar SQL; invalidez produce CASE_NOT_READY sin escritura de runs/run_creations. Dentro de la transacción, sesión, esquema y deduplicación mantienen su orden: recuperar creación previa autorizada precede al rechazo por disponibilidad actual. El catálogo calcula canStart con el validador, no solo con el status del reporte. Esto no habilita expedientes externos ni equivale a validar su solvencia. [Pruebas y límites](../quality/T2-validacion-expedientes.md).
+
+## Dependencias internas de lotes y adaptación pendiente
+
+La ejecución v5 usa una matriz interna por ordinal para lotes básicos de inspección/recogida/conversación. No se añade dependencies/dependsOn al item público, que sigue admitiendo exactamente type/params. El servicio debe construir y validar relaciones por la intención autorizada; no confiar en un grafo aportado por el modelo o cliente. Si la relación es ambigua, aclarar el conjunto antes de cualquier efecto. Sin independencia demostrada, usar cadena conservadora.
+
+La continuación interna ya solicita preview incluso si el resto cuesta cero, omite dependientes fallidos transitivamente y conserva aplicados tras pausa/serialización. Adaptar batchId, revisión/rama, token de confirmación, idempotencia y persistencia sigue pendiente de T3-02/T3-06; no basta exponer resolveAction. Viajes/órdenes u otros tipos aún no se aceptan en el lote del motor. [Verificación](../quality/T2-dependencias-lotes-v5.md).
+
+## Lotes internos de solicitudes v6
+
+El motor permite también analyze/query/wait/request_warrant con los mismos parámetros internos y resolutores de la acción individual. La API aún debe adaptar la unión pública, autorización, rama/revisión, confirmación y persistencia. No se añade nueva ruta ni se permite configurar dependencias desde un cliente. Enviar no espera automáticamente; el preview presenta únicamente estimación, sin pendientes prospectivos o hechos no confirmados.
+
+RUN_VERSION_INVALID es un error operativo del estado/contador del motor, distinto de VERSION_CONFLICT del agregado HTTP; no mapearlo a un hecho del mundo ni afirmar que se guardó una transición. [Resultados y límites](../quality/T2-lotes-solicitudes-v6.md).

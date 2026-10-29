@@ -13,6 +13,12 @@ export async function migrationFiles() {
     return { name, sql, hash: createHash('sha256').update(sql).digest('hex') };
   }));
 }
+export function matchesMigrationLedger(expected: readonly { name: string; hash: string }[],
+  actual: readonly { name: string; hash: string }[]): boolean {
+  return expected.length === actual.length && expected.every((file, index) =>
+    actual[index]?.name === file.name && actual[index]?.hash === file.hash);
+}
+
 export async function migrate(connectionString: string): Promise<void> {
   const files = await migrationFiles();
   const client = await connect(connectionString);

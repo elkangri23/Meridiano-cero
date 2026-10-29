@@ -15,6 +15,20 @@
       "when": 1793181526859,
       "tag": "0001_local_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793256092101,
+      "tag": "0002_run_creation",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793256401186,
+      "tag": "0003_run_permissions",
+      "breakpoints": true
     }
   ]
 }

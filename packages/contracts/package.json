@@ -13,8 +13,5 @@
     "dev": "tsc --watch --preserveWatchOutput",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@meridiano/case-schema": "workspace:*"
   }
 }

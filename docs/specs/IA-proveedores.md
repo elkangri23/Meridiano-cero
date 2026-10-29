@@ -84,3 +84,15 @@ Ambos modos conservan límites de concurrencia, tamaños, rate limit y consumo d
 - Un modelo real supera evaluación del primer caso; conexión y mocks no acreditan calidad.
 
 Tareas: T3-01/T3-04 cierran selección y contratos del primer caso; T6-01/T6-04 cubren configuración y distribución independientes; T7-01/T7-02/T7-03 cubren catálogo público, claves personales y cuotas. Las decisiones de producto ya están confirmadas; solo se solicita URL/modelo real cuando sea necesario para una prueba de transporte concreta.
+
+## Saneamiento del paquete alternativo de adaptadores
+
+El paquete ai-adapters sigue sin ser el transporte consumido por el juego/API. La fábrica valida configuración sin any, rechaza campos desconocidos y no hace red al construir proveedores. Ollama admite un origen HTTP(S) sin credenciales, path, query o fragmento; modelo no vacío; timeout de 1–60.000 ms, 0–2 reintentos y capacidad declarada de 1–131.072 tokens. Defaults conservados: localhost:11434, llama3.1:8b, 60 s, un reintento y 8.192 tokens. Son límites estructurales de configuración, no certifican un modelo instalado, presupuesto global ni destino seguro para un VPS. No se descarga ningún modelo.
+
+El doble es determinista: sin red, azar, reloj ni latencia artificial; no inventa uso de tokens. Solo propone una acción existente cuya intención/objetivo explícitos coinciden de forma única; sin coincidencia, con varias o con intención compuesta pide aclaración y no produce acción ejecutable. Acota texto a 4.096 caracteres y ofertas a 64 para este intérprete sintético. Es un doble limitado, no una evaluación de comprensión de modelos reales.
+
+La conversación no añade hechos ni cooperación y la narración no inventa factIds. validateCase aplica estructura/referencias deterministas, sin certificar solvencia. El doble no anuncia capacidad de generación; si se invoca generateCase devuelve rechazo explícito, sin expediente ni reporte de rutas ficticio.
+
+El transporte alternativo devuelve JSON interpretado, no el sobre del fabricante. Salida no JSON, sobre mal formado y confianza/parámetros inválidos se rechazan sin reintentar. Se distinguen cancelación e invalidez. Uso ausente/inválido permanece desconocido; total solo si ambos conteos observados son válidos. Errores públicos normalizados sin cuerpo del proveedor; causas internas no deben serializarse. payload admite null en fallo en el tipo común, como ya ocurría en ejecución. InterpretActionInput reutiliza PlayerView público sin informe y deja de declarar payload/tipo privado en pendientes.
+
+**Puerta pendiente antes de conectar:** unificar con los codecs factuales y transporte de apps/api; política SSRF/DNS/redirecciones, límite de bytes, presupuesto total, concurrencia y watchdog ante transporte que ignore abort. El timeout nativo se combina con cancelación y cubre lectura, pero no acredita cancelación física ni deadline independiente de transporte hostil. Las comprobaciones de forma no autorizan hechos, acciones o generación por sí solas. [Pruebas y límites](../quality/T3-adaptadores-calidad.md).

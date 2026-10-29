@@ -43,3 +43,9 @@ Cambios de motor requieren escenarios de comportamiento, no tests que repitan la
 Criterios aceptados; pruebas ejecutadas y registradas; revisión KISS/DRY/responsabilidades; seguridad asociada; cero código muerto o secretos; documentación coherente; limitaciones visibles. No llamar completa una fase parcial ni afirmar cumplimiento OWASP por tener un workflow.
 
 Dependencia nueva: necesidad, alternativa simple, licencia, versión, mantenimiento y uso documentados en el cambio. Retirar la dependencia si desaparece su consumidor.
+
+## Frontera de integridad del expediente
+
+La entrada @meridiano/case-schema/server usa Node crypto para integridad y solo se consume desde servidor/pruebas. Motor recibe huella preparada y no importa esa entrada, ni directa ni por reexportación de la raíz de case-schema. Dependency-cruiser comprueba ambas fronteras además de las prohibiciones existentes; no se relaja engine-pure para aceptar Node.
+
+Un artefacto sin manifest, módulo de tipos ni consumidores no se convierte en UI de producto para silenciar lint. Se retira el componente obsoleto packages/web/RetroScreen tras comprobar ausencia de imports; la aplicación vigente es apps/web y su prototipo usa datos públicos. No se elimina documentación histórica ni originales. [Evidencia y controles](../quality/T2-motor-puro-integridad.md).

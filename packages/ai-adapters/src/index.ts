@@ -1,3 +1,4 @@
+import type { PlayerView } from '@meridiano/case-schema';
 // AI Adapters - Contratos y tipos para integración de IA
 // SPEC-005: Integración de IA y fidelidad narrativa
 
@@ -37,7 +38,7 @@ export interface AILimits {
 }
 
 export interface AIResponse<T = unknown> {
-  payload: T;
+  payload: T | null;
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
@@ -119,26 +120,7 @@ export interface NPCPersona {
 
 export interface InterpretActionInput {
   text: string;
-  playerView: {
-    runId: string;
-    version: number;
-    minute: number;
-    deadlineMinutes: number;
-    position: { cityId: string; locationId: string };
-    visibleCities: string[];
-    discoveredLocations: string[];
-    discoveredObjects: string[];
-    dossier: string[];
-    conversation: string[];
-    pendingRequests: ReadonlyArray<{
-      id: string;
-      dueMinute: number;
-      type: string;
-      payload: unknown;
-    }>;
-    warrants: string[];
-    detentions: string[];
-  };
+  playerView: Omit<PlayerView, 'finalReport'>;
   availableActions: ReadonlyArray<{
     type: string;
     params: Record<string, unknown>;

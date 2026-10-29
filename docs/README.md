@@ -47,3 +47,5 @@ Plantillas: [spec](templates/spec.md), [ADR](templates/adr.md), [tarea](template
 [API](specs/API-juego.md), [guardados](specs/GUARDADOS.md), [conversaciones](specs/CONVERSACIONES.md) y [68 subcasos de aceptación](quality/T3-aceptacion-detallada.md). Incluyen campos, validaciones, errores, transacciones, reintentos y comportamiento entre ramas. El código actual aún debe adaptarse; no son pruebas ejecutadas ni cierre automático de tareas.
 
 [Revisión de contradicciones y mejoras de coste bajo/medio](quality/REVISION-CONTRATOS-T3.md), con alcance de rama y pendientes previos a integración.
+
+Revisión de implementación y cumplimiento parcial del commit normativo: [auditoría de 7962014](quality/AUDITORIA-7962014.md), con seguimiento de los 90 escenarios.

@@ -63,3 +63,49 @@ El retroceso narrativo no rebobina la versión de concurrencia del servidor ni e
 [GUARDADOS](GUARDADOS.md) define la unidad de autoguardado, límites, registros, endpoints y carga atómica. No hace falta crear copias periódicas para el autoguardado: cada transición confirmada ya deja durable el último estado. Los snapshots manuales son independientes e inmutables salvo sus metadatos.
 
 [API-juego](API-juego.md) define PlayerViewDto público con rama/revisión del agregado, nombres autorizados y solicitudes sin payload interno. No equivale a serializar el tipo PlayerView heredado. El esquema actual requiere adaptación antes de conectar la UI; los anexos no certifican esa integración.
+
+## Compatibilidad de ejecución v2
+
+El estado de motor v2 contiene eventOrdinal y registra engineVersion=2; la definición inmutable continúa en formato engineCompatibility=1. El servicio persiste la versión real del estado creado, no copia el número del formato de definición a engineVersion.
+
+Las partidas iniciales v1 existentes tienen un adaptador de lectura explícito: solo se acepta igualdad completa con el estado virgen conocido (revisión/versión inicial, minuto cero, sin progreso y sin contador v2). La lectura no escribe, migra ni reinicia ese registro. Un estado v1 con progreso o versión desconocida se conserva y falla cerrado. Antes de habilitar acciones sobre una partida v1 deberá existir migración/transición de versión probada; no restaurar puntos antiguos por eliminación de campos.
+
+[Pruebas y límites de esta entrega](../quality/T2-eventos-plazo-v2.md). El contrato de guardado deberá incluir contador/versión en snapshot y digest, además de los campos anteriores.
+
+## Compatibilidad y procedencia en ejecución v3
+
+El estado nuevo usa engineVersion=3 y conserva eventOrdinal. evidenceRecords es un mapa opcional por ID revelado con revealedMinute, origin y method; collectedMinute aparece al recoger físicamente. El primer hallazgo conserva su procedencia, sin reescribirla al repetir una acción. Una derivación no convierte una fuente marcada inadmisible en prueba válida. Los registros son estado privado: no deben serializarse por defecto en HTTP.
+
+La lectura inicial admite v1 y v2 únicamente cuando el registro completo coincide con su estado virgen conocido, sin reescribirlo. El progreso de esas versiones permanece conservado y no se ejecuta con v3. Versiones desconocidas o estados iniciales alterados fallan cerrado. La proyección HTTP sigue siendo InitialPlayerViewDto; no hay proyección general ni guardados conectados. [Evidencia v3](../quality/T2-evidencias-ordenes-v3.md).
+
+## Compatibilidad de ejecución v4
+
+La forma del estado inicial no cambia respecto a v3, salvo engineVersion=4. Los registros iniciales v1/v2/v3 se reconocen por igualdad completa con su forma virgen conocida, sin actualización SQL ni reinicio. El motor rechaza ejecutarlos directamente; progreso y snapshots antiguos necesitan migración probada. Los tiempos de procedencia se materializan al terminar acciones confirmadas. [Evidencia v4](../quality/T2-costes-confirmaciones-v4.md).
+
+## Validador estructural 1.1 y creación de partidas
+
+La implementación comprueba metadatos/versiones, campos anidados, enteros seguros y booleanos sin coerción; IDs únicos globales de entidades; ciudades de lugares/NPC y viajes; origen de evidencias (ciudad o lugar); referencias de procedencia y ausencia de ciclos; rutas no duplicadas ni hacia la misma ciudad. Exige ciudades, lugares y objetivos no vacíos. El punto inicial heredado es primera ciudad/primera localización: deben coincidir y ser accesibles. No se infiere una posición alternativa silenciosamente.
+
+Límites aplicados antes de recorrer las colecciones: 20 ciudades, 100 lugares, 100 NPC y 1.000 evidencias, conforme a SPEC-007; máximo interno 2.048 entradas en las demás listas y 16.384 caracteres por string textual. IDs ASCII de 1–128 caracteres. Esto acota el trabajo de esta etapa sobre datos ya parseados; no implementa aún límite de archivo 2 MiB ni profundidad 32 del importador futuro. Un límite excedido es rechazo técnico, sin recortar contenido.
+
+Los errores usan nombres de campo, sin reproducir solución, textos privados o IDs suministrados. El reporte externo requiere estructura coherente y cero errores, pero no sustituye estas comprobaciones. createValidationReport usa validatorVersion=1.1.0, copia el array de errores y solo acredita structural: no añade rutas o simulación no ejecutadas.
+
+La API calcula validación sobre una copia privada estable antes de esperar SQL. Una creación nueva falla con CASE_NOT_READY si es inválida; no crea partida ni intención. La autorización/deduplicación transaccional se conserva: un replay autorizado de creación ya confirmada se resuelve antes de exigir disponibilidad actual del expediente. El catálogo comprueba esta validación para canStart. No hay importador ni catálogo dinámico activo.
+
+**Alcance pendiente:** NPC knowledge y solution usan vocabularios heredados que no equivalen todos a facts o IDs NPC; no se afirma que sus referencias estén cerradas. Falta migración explícita del formato/contenido para normalizarlas, sin reescribir el caso original. Rules sigue siendo texto no ejecutado por este validador, y scheduledResults.payload requiere contratos por tipo antes de admitir expedientes externos. Conectividad/solvencia completa del grafo de viajes, operadores declarativos, coherencia semántica y aprobación por simulación no se certifican. [Verificación y pendientes](../quality/T2-validacion-expedientes.md).
+
+## Integridad en una entrada exclusiva de servidor
+
+hashDefinition se importa desde @meridiano/case-schema/server, sin reexportarla por la raíz pura ni por engine. Conserva exactamente canonicalización y SHA-256 nativo anteriores: orden recursivo de claves, orden de arrays preservado y exclusión de validationReport volátil. El hash del fixture original se fija en una regresión contra su valor anterior al cambio.
+
+La API calcula una sola huella sobre su copia estable antes de esperar SQL, la usa en estado/fila y revalida la igualdad al proyectar un inicio almacenado. El navegador no suministra la definición ni esta autoridad de integridad. Un hash válido no es firma de procedencia ni aprobación de solvencia. No se modifica contenido, seed, hash, versión de ejecución o registros antiguos; inicios v1/v2/v3 mantienen su lectura estricta sin reescritura. [Pruebas](../quality/T2-motor-puro-integridad.md).
+
+Si no puede prepararse la huella actual, el servicio conserva primero la recuperación autorizada por clave; solo una intención nueva falla operativamente, sin escritura. No se calcula otra huella sobre una definición modificada después de validar.
+
+## Compatibilidad de ejecución v5
+
+Estado nuevo engineVersion=5; la definición mantiene engineCompatibility=1 y su hash original. La forma del estado inicial solo cambia en la versión. La API reconoce inicios vírgenes v1/v2/v3/v4 mediante comparación completa y no actualiza sus filas; progreso antiguo se conserva y rechaza. Metadata de lote v5 incluye dependencias verificables, estados/ordinales y motivos acotados; no se reconstruye desde prosa o reglas improvisadas al cargar. [Pruebas y límites](../quality/T2-dependencias-lotes-v5.md).
+
+## Compatibilidad de ejecución v6
+
+Estado nuevo engineVersion=6; formato de definición sigue engineCompatibility=1 y hash original. Se añade lectura estricta de inicios v5 a las de v1–v4 sin actualizar filas; progreso antiguo se conserva/rechaza. Metadata de lote conserva dependencias/estados y admite los cuatro nuevos tipos con parámetros cerrados. Una solicitud applied representa envío, no disponibilidad de su resultado; el snapshot debe preservar por separado los pendientes y sus vencimientos. [Pruebas v6](../quality/T2-lotes-solicitudes-v6.md).

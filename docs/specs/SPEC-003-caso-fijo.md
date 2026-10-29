@@ -1,6 +1,6 @@
 # SPEC-003 El astrolabio de las tres ciudades
 
-Estado: propuesta concreta de fixture para revisión de hito; no caso implementado. 2026-10-27.
+Estado: caso fijo parcialmente implementado; aceptación de hito pendiente. Revisión de ejecución v4: 2026-10-29.
 Requisitos GDD §3–12. T2-02 y T2-06. Referencias ACC-001/008/009/010/012.
 
 ## Experiencia y verdad fijada
@@ -66,3 +66,31 @@ Complete: original recuperado e Inés detenida, sin inocentes detenidos. Partial
 Variante plazo: avanzar hasta 2.870 y ejecutar inspección pendiente de 20; cierre a 2.880 sin nueva evidencia. Variante orden denegada: solicitar con solo EV-09 no cierra. Variante presión: Lucía deja de colaborar; ambas rutas materiales siguen abiertas. Variante irregular: recuperar por fuerza exige preview de consecuencias, sin instrucciones reales de intrusión.
 
 El informe muestra verdad, cronología y pruebas omitidas solo al cerrar. Los porcentajes globales de tipos de detención, carrera y catálogo cultural quedan para fase 5; no se consideran probados por este fixture.
+
+## Contrato ejecutable v3 y aceptación pendiente
+
+Los IDs de consulta estructurada son los siguientes; no se interpretan cadenas libres como permisos:
+
+| topicId | Presencia | Condición adicional | Resultado |
+|---|---|---|---|
+| herramienta-hv17 | PAR-ARCH | EV-03 conocida | EV-04 |
+| traslado-ines | PAR-ARCH | Ninguna adicional | EV-05 |
+| firma-sello | PAR-ARCH | EV-06 conocida | EV-07 |
+| custodia-envio | LIS-ALM | EV-05 o EV-07 conocida | EV-08 |
+| accesos-tomas | MAD-SALA | Ninguna adicional | EV-10 |
+
+Todos maduran a +30 minutos. Hablar con Lucía sobre topicId=caja revela EV-09 si coopera; topicId=identidad confirma identidad y ubicación del interlocutor presente. No se entrega el conocimiento privado completo del NPC. La traducción de lenguaje natural a estos IDs pertenece al adaptador, sin ampliar sus permisos.
+
+Solicitar orden requiere evidenceIds explícitos. Inés: EV-03/04 o EV-06/07/08; Tomás: EV-09/10. La orden de acceso exige además EV-05 u EV-08 incluida en esa selección, conocida y admisible. Se distingue prueba poseída de prueba ofrecida al juzgado.
+
+Las simulaciones actuales encadenan ambas rutas sin insertar pistas en CaseRun, incluso eliminando las evidencias exclusivas de la otra ruta. Esto verifica obtención, solicitudes, autoridad y desenlace, **no cierra ACC-008/009**: todavía faltan los costes materiales y confirmaciones de esta spec. Los 455/485 minutos y máximos de retraso anteriores siguen siendo objetivos, no duraciones acreditadas por v3. Las semillas sintéticas ensayadas no sustituyen el ensayo de todos los extremos del retraso. [Resultados y límites](../quality/T2-evidencias-ordenes-v3.md).
+
+## Verificación de costes en ejecución v4
+
+Las rutas encadenadas ahora cobran las inspecciones, detención y recuperación de esta spec y solicitan aprobación antes del coste. Sin pruebas exclusivas de la otra ruta, semilla sintética 1: A=455 minutos, B=485; semilla original 42: A=482, B=512 por retraso determinista. El laboratorio madura a minuto 120 en la ruta A: se envía después de los primeros 30 minutos de inspección, con demora de 90. No cambia la semilla del expediente existente.
+
+Esto acredita los tiempos base y las variantes ensayadas, pero no cierra por sí solo ACC-008/009 ni la fase: faltan los extremos de retraso, validador y demás puertas de calidad. El generador seeded heredado no acredita la variante máxima de +45 por tramo; no se redefine el equilibrio silenciosamente para hacer pasar ese objetivo. [Registro v4](../quality/T2-costes-confirmaciones-v4.md).
+
+## Rutas con lotes programados v6
+
+Se ejecutan ambas rutas agrupando inspección/recogida/laboratorio y consultas/esperas/órdenes, manteniendo viajes/detención/recuperación/cierre como acciones individuales. Variantes de semillas 1/42 sin pruebas exclusivas de la otra ruta: mismos minutos, evidencias/procedencia, admisibilidad, órdenes y desenlace que la secuencia individual. Los controles de lote agregan eventos/revisión internos propios; no se igualan artificialmente esos contadores. Esto no acredita aún lotes de viaje, máximos de retraso ni E2E. [Verificación](../quality/T2-lotes-solicitudes-v6.md).

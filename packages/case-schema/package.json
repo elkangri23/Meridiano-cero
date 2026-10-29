@@ -7,11 +7,21 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
     }
   },
   "scripts": {
     "dev": "tsc --watch --preserveWatchOutput",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@meridiano/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2"
   }
 }

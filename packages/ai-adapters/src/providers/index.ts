@@ -1,3 +1,4 @@
+import { parseOllamaConfig } from './ollama-config.js';
 export { OllamaProvider, createOllamaProvider, type OllamaConfig } from './ollama.js';
 export { DeterministicMockProvider, createDeterministicMockProvider } from './mock.js';
 
@@ -13,12 +14,12 @@ export interface ProviderRegistry {
 export function createProvider(providerId: ProviderId, config?: Record<string, unknown>): AIProvider {
   switch (providerId) {
     case 'ollama':
-      return new OllamaProvider(config as any);
+      return new OllamaProvider(parseOllamaConfig(config));
     case 'mock':
     case 'mock-deterministic':
       return new DeterministicMockProvider();
     default:
-      throw new Error(`Proveedor desconocido: ${providerId}. Disponibles: ollama, mock`);
+      throw new Error('Proveedor no disponible.');
   }
 }
 

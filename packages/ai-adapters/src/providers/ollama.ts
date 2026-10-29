@@ -1,3 +1,6 @@
+import { validateOllamaOutput } from './ollama-output.js';
+import { parseOllamaConfig, type OllamaConfig } from './ollama-config.js';
+export type { OllamaConfig } from './ollama-config.js';
 import type {
   AIProvider,
   AIContext,
@@ -6,14 +9,6 @@ import type {
   ProviderId,
   AIContext as AIContextType,
 } from '../index.ts';
-
-export interface OllamaConfig {
-  baseUrl: string;
-  defaultModel: string;
-  timeoutMs: number;
-  maxRetries: number;
-  maxContextTokens: number;
-}
 
 interface OllamaChatRequest {
   model: string;
@@ -29,15 +24,21 @@ interface OllamaChatRequest {
 }
 
 interface OllamaChatResponse {
-  model: string;
-  created_at: string;
-  message: { role: 'assistant'; content: string };
-  done: boolean;
-  total_duration?: number;
-  load_duration?: number;
-  prompt_eval_count?: number;
-  eval_count?: number;
-  eval_duration?: number;
+  message: { content: string };
+  done: true;
+  prompt_eval_count?: unknown;
+  eval_count?: unknown;
+}
+
+function responseObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function decodeEnvelope(value: unknown): OllamaChatResponse {
+  if (!responseObject(value) || value.done !== true || !responseObject(value.message)) throw new Error('INVALID_OUTPUT');
+  if (typeof value.message.content !== 'string') throw new Error('INVALID_OUTPUT');
+  return { done: true, message: { content: value.message.content },
+    prompt_eval_count: value.prompt_eval_count, eval_count: value.eval_count };
 }
 
 function buildSystemPrompt(functionName: AIFunction, context: AIContextType): string {
@@ -112,17 +113,42 @@ Verifica: estructura, referencias, dos rutas independientes, costes, plazo.`,
   return `${functionInstructions[functionName]}\n\nInput:\n${JSON.stringify(input, null, 2)}`;
 }
 
-function parseJSONResponse<T>(text: string): T {
-  try {
-    // Intentar extraer JSON de la respuesta (puede venir con markdown o texto extra)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as T;
-    }
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error('INVALID_OUTPUT: No se pudo parsear JSON de la respuesta');
-  }
+function parseJSONResponse(text: string): unknown {
+  try { return JSON.parse(text); }
+  catch { throw new Error('INVALID_OUTPUT'); }
+}
+
+type ChatResult = { data: OllamaChatResponse; payload: unknown };
+
+function tokenCount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+}
+
+function responseUsage(data: OllamaChatResponse): AIResponse['usage'] {
+  const prompt = tokenCount(data.prompt_eval_count);
+  const completion = tokenCount(data.eval_count);
+  if (prompt === undefined && completion === undefined) return undefined;
+  const total = prompt !== undefined && completion !== undefined ? tokenCount(prompt + completion) : undefined;
+  return { ...(prompt !== undefined ? { promptTokens: prompt } : {}),
+    ...(completion !== undefined ? { completionTokens: completion } : {}),
+    ...(total !== undefined ? { totalTokens: total } : {}) };
+}
+
+function successfulResponse<T>(response: ChatResult, start: number): AIResponse<T> {
+  const usage = responseUsage(response.data);
+  return { payload: response.payload as T, ...(usage ? { usage } : {}),
+    latencyMs: Math.max(0, performance.now() - start), finishReason: 'stop' };
+}
+
+function failedResponse<T>(start: number): AIResponse<T> {
+  return { payload: null, latencyMs: Math.max(0, performance.now() - start), finishReason: 'error',
+    error: { code: 'MODEL_UNAVAILABLE', message: 'El proveedor no está disponible.' } };
+}
+
+function terminalFailure(error: unknown, context: AIContext): Error | undefined {
+  if (context.cancellationSignal?.aborted) return new Error('CANCELLED', { cause: error });
+  if (error instanceof Error && error.message.startsWith('INVALID_OUTPUT')) return new Error('INVALID_OUTPUT', { cause: error });
+  return undefined;
 }
 
 export class OllamaProvider implements AIProvider {
@@ -140,58 +166,27 @@ export class OllamaProvider implements AIProvider {
   private config: OllamaConfig;
 
   constructor(config: OllamaConfig) {
-    this.config = config;
-    this.maxContextTokens = config.maxContextTokens;
-    this.defaultModel = config.defaultModel;
+    this.config = parseOllamaConfig(config);
+    this.maxContextTokens = this.config.maxContextTokens;
+    this.defaultModel = this.config.defaultModel;
   }
 
   async execute<T>(context: AIContext): Promise<AIResponse<T>> {
-    const startTime = Date.now();
-    let lastError: Error | null = null;
-
+    const startTime = performance.now();
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
       try {
+        context.cancellationSignal?.throwIfAborted();
         const prompt = buildPrompt(context.function, context.authorizedContext);
         const systemPrompt = buildSystemPrompt(context.function, context);
-
         const response = await this.callOllamaChat(context.function, systemPrompt, prompt, context);
-        const latencyMs = Date.now() - startTime;
-
-        return {
-          payload: response as T,
-          usage: {
-            promptTokens: response.prompt_eval_count ?? 0,
-            completionTokens: response.eval_count ?? 0,
-            totalTokens: (response.prompt_eval_count ?? 0) + (response.eval_count ?? 0),
-          },
-          latencyMs,
-          finishReason: response.done ? 'stop' : 'length',
-        };
+        return successfulResponse<T>(response, startTime);
       } catch (error) {
-        lastError = error as Error;
-
-        // No reintentar en errores de validación de salida
-        if ((error as Error).message.startsWith('INVALID_OUTPUT')) {
-          throw error;
-        }
-
-        // Esperar antes de reintentar (backoff exponencial)
-        if (attempt < this.config.maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-        }
+        const terminal = terminalFailure(error, context);
+        if (terminal) throw terminal;
+        if (attempt < this.config.maxRetries) await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
       }
     }
-
-    const latencyMs = Date.now() - startTime;
-    return {
-      payload: null as T,
-      latencyMs,
-      finishReason: 'error',
-      error: {
-        code: lastError?.message?.startsWith('TRANSPORT') ? 'TRANSPORT_ERROR' : 'MODEL_UNAVAILABLE',
-        message: lastError?.message ?? 'Error desconocido tras reintentos',
-      },
-    };
+    return failedResponse<T>(startTime);
   }
 
   private async callOllamaChat(
@@ -199,7 +194,7 @@ export class OllamaProvider implements AIProvider {
     systemPrompt: string,
     prompt: string,
     context: AIContext
-  ): Promise<OllamaChatResponse & { prompt_eval_count?: number; eval_count?: number }> {
+  ): Promise<ChatResult> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
@@ -221,93 +216,39 @@ export class OllamaProvider implements AIProvider {
             top_k: 40,
           },
         } as OllamaChatRequest),
-        signal: context.cancellationSignal ?? controller.signal,
+        signal: context.cancellationSignal ? AbortSignal.any([context.cancellationSignal, controller.signal]) : controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`TRANSPORT_ERROR: ${response.status} ${errorText}`);
+        throw new Error('TRANSPORT_ERROR');
       }
 
-      const data = await response.json() as OllamaChatResponse;
-
-      if (!data.done) {
-        throw new Error('MODEL_UNAVAILABLE: Respuesta incompleta');
-      }
+      const data = decodeEnvelope(await response.json());
 
       // Parsear el contenido JSON de la respuesta del modelo
-      const content = data.message?.content ?? '';
+      const content = data.message.content;
       const parsed = parseJSONResponse(content);
 
       // Validar según la función
-      this.validateOutput(context.function, parsed);
+      validateOllamaOutput(context.function, parsed);
 
-      return {
-        ...data,
-        prompt_eval_count: data.prompt_eval_count,
-        eval_count: data.eval_count,
-      } as OllamaChatResponse & { prompt_eval_count?: number; eval_count?: number };
+      return { data, payload: parsed };
     } finally {
       clearTimeout(timeoutId);
     }
   }
 
-  private validateOutput(functionName: AIFunction, output: unknown): void {
-    const requiredFields: Record<AIFunction, string[]> = {
-      interpretAction: ['actionType', 'params', 'confidence'],
-      narrateResult: ['narrative', 'factReferences', 'style'],
-      converse: ['text', 'actOfSpeech'],
-      generateCase: ['definition', 'validationReport'],
-      validateCase: ['valid', 'errors'],
-    };
-
-    const fields = requiredFields[functionName];
-    if (!fields) {
-      throw new Error(`INVALID_OUTPUT: función desconocida '${functionName}'`);
-    }
-    for (const field of fields) {
-      if (!(field in (output as Record<string, unknown>))) {
-        throw new Error(`INVALID_OUTPUT: Falta campo requerido '${field}' para ${functionName}`);
-      }
-    }
-
-    // Validaciones específicas
-    switch (functionName) {
-      case 'interpretAction': {
-        const out = output as { actionType: string; confidence: number };
-        const validActions = ['inspect', 'collect', 'talk', 'travel', 'analyze', 'communicate', 'query', 'wait', 'request_warrant', 'detain', 'recover', 'finish', 'batch'];
-        if (!validActions.includes(out.actionType)) {
-          throw new Error(`INVALID_OUTPUT: actionType inválido '${out.actionType}'`);
-        }
-        if (out.confidence < 0 || out.confidence > 1) {
-          throw new Error(`INVALID_OUTPUT: confidence fuera de rango [0,1]`);
-        }
-        break;
-      }
-      case 'converse': {
-        const out = output as { actOfSpeech: string };
-        const validActs = ['inform', 'question', 'refusal', 'evasion', 'silence'];
-        if (!validActs.includes(out.actOfSpeech)) {
-          throw new Error(`INVALID_OUTPUT: actOfSpeech inválido '${out.actOfSpeech}'`);
-        }
-        break;
-      }
-    }
-  }
-
   async healthCheck(): Promise<{ available: boolean; latencyMs?: number; error?: string }> {
-    const startTime = Date.now();
+    const startTime = performance.now();
     try {
       const response = await fetch(`${this.config.baseUrl}/api/tags`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
       });
-      const latencyMs = Date.now() - startTime;
+      const latencyMs = Math.max(0, performance.now() - startTime);
       return { available: response.ok, latencyMs };
-    } catch (error) {
-      return { available: false, error: (error as Error).message };
+    } catch {
+      return { available: false, error: 'El proveedor no está disponible.' };
     }
   }
 
@@ -318,13 +259,5 @@ export class OllamaProvider implements AIProvider {
 }
 
 export function createOllamaProvider(config: Partial<OllamaConfig> = {}): OllamaProvider {
-  const defaultConfig: OllamaConfig = {
-    baseUrl: 'http://localhost:11434',
-    defaultModel: 'llama3.1:8b',
-    timeoutMs: 60000,
-    maxRetries: 1,
-    maxContextTokens: 8192,
-    ...config,
-  };
-  return new OllamaProvider(defaultConfig);
+  return new OllamaProvider(parseOllamaConfig(config));
 }

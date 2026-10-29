@@ -95,6 +95,7 @@ describe('PostgreSQL real y sesión sintética', () => {
     try {
       await owner.pool.query("INSERT INTO base_migrations(name,hash) VALUES ('9999_future.sql',$1)", ['0'.repeat(64)]);
       expect((await app.inject('/api/v1/ready')).statusCode).toBe(503);
+      expect((await app.inject('/api/v1/cases')).statusCode).toBe(503);
       await expect(migrate(migrationUrl)).rejects.toThrow('SCHEMA_INCOMPATIBLE');
     } finally {
       await owner.pool.query("DELETE FROM base_migrations WHERE name='9999_future.sql'");

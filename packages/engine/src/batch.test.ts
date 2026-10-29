@@ -1,10 +1,12 @@
+import { hashDefinition } from '@meridiano/case-schema/server';
+import { acceptAction as resolveAction } from './test-actions.js';
 import { describe, it, expect } from 'vitest';
-import { createInitialRun, resolveAction } from './index.js';
+import { createInitialRun } from './index.js';
 import { astrolabioDefinition } from './fixtures/case-astrolabio.js';
 
 describe('inspect/collect/talk', () => {
   it('inspect general reveals location', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const result = resolveAction(astrolabioDefinition, run, { type: 'inspect', params: { targetId: 'MAD-SALA' } });
     expect(result.status).toBe('applied');
     if (result.status === 'applied') {
@@ -13,32 +15,31 @@ describe('inspect/collect/talk', () => {
   });
 
   it('inspect specific with elementId', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
-    const result = resolveAction(astrolabioDefinition, run, { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: 'vitrina' } });
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
+    const result = resolveAction(astrolabioDefinition, run, { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: 'cerradura' } });
     expect(result.status).toBe('applied');
   });
 
-  it('collect adds evidence with admissibility', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
-    const result = resolveAction(astrolabioDefinition, run, { type: 'collect', params: { evidenceId: 'EV-01' } });
+  it('collect adds a visible physical evidence with admissibility', () => {
+    const initial = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
+    const inspected = resolveAction(astrolabioDefinition, initial, { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: 'cerradura' } });
+    const result = resolveAction(astrolabioDefinition, inspected.run, { type: 'collect', params: { evidenceId: 'EV-02' } });
     expect(result.status).toBe('applied');
-    if (result.status === 'applied') {
-      expect(result.run.inventory).toContain('EV-01');
-      expect(result.run.admissibility['EV-01']).toBe(true);
-    }
+    expect(result.run.inventory).toContain('EV-02');
+    expect(result.run.admissibility['EV-02']).toBe(true);
   });
 
-  it('collect duplicate is impossible', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
-    const r1 = resolveAction(astrolabioDefinition, run, { type: 'collect', params: { evidenceId: 'EV-01' } });
-    if (r1.status === 'applied') {
-      const r2 = resolveAction(astrolabioDefinition, r1.run, { type: 'collect', params: { evidenceId: 'EV-01' } });
-      expect(r2.status).toBe('impossible');
-    }
+  it('collect duplicate is impossible without applying anything', () => {
+    const initial = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
+    const inspected = resolveAction(astrolabioDefinition, initial, { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: 'cerradura' } });
+    const collected = resolveAction(astrolabioDefinition, inspected.run, { type: 'collect', params: { evidenceId: 'EV-02' } });
+    expect(collected.status).toBe('applied');
+    const duplicate = resolveAction(astrolabioDefinition, collected.run, { type: 'collect', params: { evidenceId: 'EV-02' } });
+    expect(duplicate).toMatchObject({ status: 'impossible', run: collected.run, events: [] });
   });
 
   it('talk records conversation', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const result = resolveAction(astrolabioDefinition, run, { type: 'talk', params: { npcId: 'lucia' } });
     expect(result.status).toBe('applied');
     if (result.status === 'applied') {
@@ -48,7 +49,7 @@ describe('inspect/collect/talk', () => {
   });
 
   it('talk to unknown NPC is impossible', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const result = resolveAction(astrolabioDefinition, run, { type: 'talk', params: { npcId: 'unknown' } });
     expect(result.status).toBe('impossible');
   });
@@ -56,25 +57,25 @@ describe('inspect/collect/talk', () => {
 
 describe('batch sequences', () => {
   it('batch executes multiple steps', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const result = resolveAction(astrolabioDefinition, run, {
       type: 'batch',
       params: {
         steps: [
-          { type: 'inspect', params: { targetId: 'MAD-SALA' } },
-          { type: 'collect', params: { evidenceId: 'EV-01' } },
+          { type: 'inspect', params: { targetId: 'MAD-SALA', elementId: 'cerradura' } },
+          { type: 'collect', params: { evidenceId: 'EV-02' } },
         ],
       },
     });
     expect(result.status).toBe('applied');
     if (result.status === 'applied') {
       expect(result.run.discoveries).toContain('MAD-SALA');
-      expect(result.run.inventory).toContain('EV-01');
+      expect(result.run.inventory).toContain('EV-02');
     }
   });
 
   it('batch pauses on impossible step', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const result = resolveAction(astrolabioDefinition, run, {
       type: 'batch',
       params: {
@@ -93,7 +94,7 @@ describe('batch sequences', () => {
   });
 
   it('cancel rest of paused batch', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const paused = resolveAction(astrolabioDefinition, run, {
       type: 'batch',
       params: {
@@ -116,7 +117,7 @@ describe('batch sequences', () => {
   });
 
   it('continue independent steps after pause', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const paused = resolveAction(astrolabioDefinition, run, {
       type: 'batch',
       params: {
@@ -125,6 +126,7 @@ describe('batch sequences', () => {
           { type: 'collect', params: { evidenceId: 'EV-999' } }, // impossible
           { type: 'talk', params: { npcId: 'lucia' } }, // independent, should run
         ],
+        dependencies: [[], [], []],
       },
     });
     if (paused.status === 'batch_paused') {
@@ -141,7 +143,7 @@ describe('batch sequences', () => {
   });
 
   it('batch with no steps is impossible', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const result = resolveAction(astrolabioDefinition, run, {
       type: 'batch',
       params: { steps: [] },
@@ -149,18 +151,20 @@ describe('batch sequences', () => {
     expect(result.status).toBe('impossible');
   });
 
-  it('batch with more than 10 steps is impossible', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
-    const steps = Array.from({ length: 11 }, () => ({ type: 'inspect', params: { targetId: 'MAD-SALA' } }));
+  it('batch with nine steps is rejected without executing a prefix', () => {
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
+    const steps = Array.from({ length: 9 }, () => ({ type: 'inspect', params: { targetId: 'MAD-SALA' } }));
     const result = resolveAction(astrolabioDefinition, run, {
       type: 'batch',
       params: { steps },
     });
     expect(result.status).toBe('impossible');
+    expect(result.run).toEqual(run);
+    expect(result.events).toEqual([]);
   });
 
   it('batch decision without pending batch is impossible', () => {
-    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1');
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
     const result = resolveAction(astrolabioDefinition, run, {
       type: 'batch_decision',
       params: { decision: 'cancel' },

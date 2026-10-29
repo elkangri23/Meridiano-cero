@@ -1,6 +1,6 @@
 # Backlog de implementación
 
-Fecha de actualización: 2026-10-28. Responsable por defecto: agente implementador de la tarea, con revisión del usuario por hito. F0 es la entrega documental, no código de producto. T1-01 a T1-04 tienen entrega técnica de base incorporada desde main, con evidencia histórica F1; la integración actual conserva esos módulos y distingue controles globales pendientes. T2 figura completada en el registro de origen, con bloqueos globales explícitos. T3-04 está en curso; T3-05 espera E2E/modelo real. [Estado consolidado de este worktree](ESTADO.md). E4–E7 son tareas de preparación de fase; sus tareas de ejecución T4–T7 están desglosadas más abajo y pendientes de cierre técnico. Cada tarea hereda requisitos desde [REQUISITOS](REQUISITOS.md), specs desde el [registro](../specs/README.md) y ADR según su sistema.
+Fecha de actualización: 2026-10-28. Responsable por defecto: agente implementador de la tarea, con revisión del usuario por hito. F0 es la entrega documental, no código de producto. T1-01 a T1-04 tienen entrega técnica de base incorporada desde main, con evidencia histórica F1; la integración actual conserva esos módulos y distingue controles globales pendientes. T2 conserva evidencia histórica, pero sus tareas se reabren por defectos funcionales del motor y validación, además de calidad global. T3-04 está en curso; T3-05 espera E2E/modelo real. [Estado consolidado de este worktree](ESTADO.md). E4–E7 son tareas de preparación de fase; sus tareas de ejecución T4–T7 están desglosadas más abajo y pendientes de cierre técnico. Cada tarea hereda requisitos desde [REQUISITOS](REQUISITOS.md), specs desde el [registro](../specs/README.md) y ADR según su sistema.
 
 Estados: pendiente → preparada (spec cerrada y dependencias satisfechas) → en curso → en revisión → completada; bloqueada exige causa y desbloqueo. Completar requiere evidencia y criterios, no solo archivos existentes.
 
@@ -9,19 +9,19 @@ Estados: pendiente → preparada (spec cerrada y dependencias satisfechas) → e
 | T1-01 | 1 | Completada | F0 | Cerrar SPEC-004/009 para base: sesión local loopback, API v1, configuración y migraciones; precisar controles SPEC-011 | docs/specs; contratos de base y lista de versiones soportadas | ACC-020/024/039 | BYPASS local nunca en modo público; sin credenciales universales |
 | T1-02 | 1 | Completada | T1-01 | Inicializar Git y workspace pnpm mínimo; web/API, contratos públicos y engine solo cuando consumidos; TS strict y límites de imports | manifiestos, configuración TS/lint, README de arranque | ACC-025/040 | No crear worker ni shared sin uso; no commit/push automáticos |
 | T1-03 | 1 | Completada | T1-02 | Compose para PostgreSQL y servicios base; Drizzle, primera migración, configuración validada, health/readiness y datos persistentes | infra/configuración y migraciones probadas desde instalación limpia | ACC-024/039 | DB no pública; secretos fuera de Git; no borrar volúmenes existentes |
-| T1-04 | 1 | Completada | T1-03 | CI con tipos/lint/imports/pruebas, lockfile, escaneo secretos/dependencias y evidencia de base | workflow reproducible y registro F1 | ACC-025/040 | No afirmar análisis ejecutado si GitHub aún no existe; ejecutar equivalente local |
-| T2-01 | 2 | Completada | T1-04 | Implementar contrato de CaseDefinition/CaseRun/PlayerView y validador; cerrar detalles de SPEC-001/002 sin cambiar reglas | case-schema y tipos públicos separados; pruebas negativas | ACC-001/002/015/017 | Nunca exportar definición secreta al bundle web |
-| T2-02 | 2 | Completada | T2-01 | Codificar fixture de SPEC-003, condiciones y acciones; validar referencias y ambas rutas | fixture versionado y reporte determinista | ACC-008/009/017 | Cálculos documentales no sustituyen simulaciones; texto seguro |
-| T2-03 | 2 | Completada | T2-02 | Resolver inspect/collect/talk y lotes con pausa/cancelación/reanudación; proveniencia y admisibilidad | engine puro y escenarios de inventario/secuencias | ACC-002/004/005/011 | Sin invención ni cobro por omitidas; no red en engine |
-| T2-04 | 2 | Completada | T2-03 | Reloj, viajes seeded, solicitudes paralelas y eventos ordenados; preview y vencimiento | reglas de tiempo y tests de borde | ACC-006/007/017 | Plazo gana empate; no usar reloj de pared en partida |
-| T2-05 | 2 | Completada | T2-04 | Órdenes sin oráculo de culpa, detención, recuperación y cierre confirmado/informe | reglas y resultados del caso fijo | ACC-010/012/036 | La detención no cierra; no filtrar verdad antes del informe |
-| T2-06 | 2 | Completada | T2-05 | Simular dos rutas independientes, error, parcial, vencimiento y retrasos; demostrar motor sin IA | guiones y registro F2 | ACC-008/009/012/017 | Revisar costes reales frente a SPEC-003; ningún test marcado pasado sin ejecutar |
-| T3-01 | 3 | Completada | T2-06 | Cerrar SPEC-004/005/006 para primer caso; modelo real del proveedor disponible, errores, wireframes, foco, DTO y presupuestos | specs completas para integración y conjunto de evaluación | ACC-016/018/019/038 | No elegir modelo por test de conexión; confirmar disponibilidad sin instalar a ciegas |
-| T3-02 | 3 | Completada | T3-01 | API sesión local, ownership, proyección, preview/commit, transacciones, guardado y ActionLog | servicios API/DB y pruebas con dos usuarios/pestañas | ACC-013/014/015/020/021 | Cliente no manda owner; fallo narración no reejecuta acciones |
-| T3-03 | 3 | Completada | T3-02 | Pantalla retro funcional, comandos, mapa 3 ciudades, dossier, comunicaciones/lab, confirmaciones e informe | UI responsive con teclado/foco y preferencias legibles | ACC-003/004/012/019 | Sin píxeles ocultos ni sugerencias de culpable; no inventar catálogo global |
+| T1-04 | 1 | En revisión | T1-03 | CI con tipos/lint/imports/pruebas, lockfile, escaneo secretos/dependencias y evidencia de base | workflow reproducible y registro F1 | ACC-025/040 | No afirmar análisis ejecutado si GitHub aún no existe; ejecutar equivalente local |
+| T2-01 | 2 | En curso | T1-04 | Implementar contrato de CaseDefinition/CaseRun/PlayerView y validador; cerrar detalles de SPEC-001/002 sin cambiar reglas | case-schema y tipos públicos separados; pruebas negativas | ACC-001/002/015/017 | Nunca exportar definición secreta al bundle web |
+| T2-02 | 2 | En revisión | T2-01 | Codificar fixture de SPEC-003, condiciones y acciones; validar referencias y ambas rutas | fixture versionado y reporte determinista | ACC-008/009/017 | Cálculos documentales no sustituyen simulaciones; texto seguro |
+| T2-03 | 2 | En curso | T2-02 | Resolver inspect/collect/talk y lotes con pausa/cancelación/reanudación; proveniencia y admisibilidad | engine puro y escenarios de inventario/secuencias | ACC-002/004/005/011 | Sin invención ni cobro por omitidas; no red en engine |
+| T2-04 | 2 | En curso | T2-03 | Reloj, viajes seeded, solicitudes paralelas y eventos ordenados; preview y vencimiento | reglas de tiempo y tests de borde | ACC-006/007/017 | Plazo gana empate; no usar reloj de pared en partida |
+| T2-05 | 2 | En curso | T2-04 | Órdenes sin oráculo de culpa, detención, recuperación y cierre confirmado/informe | reglas y resultados del caso fijo | ACC-010/012/036 | La detención no cierra; no filtrar verdad antes del informe |
+| T2-06 | 2 | En curso | T2-05 | Simular dos rutas independientes, error, parcial, vencimiento y retrasos; demostrar motor sin IA | guiones y registro F2 | ACC-008/009/012/017 | Revisar costes reales frente a SPEC-003; ningún test marcado pasado sin ejecutar |
+| T3-01 | 3 | En curso | T2-06 | Cerrar SPEC-004/005/006 para primer caso; modelo real del proveedor disponible, errores, wireframes, foco, DTO y presupuestos | specs completas para integración y conjunto de evaluación | ACC-016/018/019/038 | No elegir modelo por test de conexión; confirmar disponibilidad sin instalar a ciegas |
+| T3-02 | 3 | En curso | T3-01 | API sesión local, ownership, proyección, preview/commit, transacciones, guardado y ActionLog | servicios API/DB y pruebas con dos usuarios/pestañas | ACC-013/014/015/020/021 | Cliente no manda owner; fallo narración no reejecuta acciones |
+| T3-03 | 3 | En curso | T3-02 | Pantalla retro funcional, comandos, mapa 3 ciudades, dossier, comunicaciones/lab, confirmaciones e informe | UI responsive con teclado/foco y preferencias legibles | ACC-003/004/012/019 | Sin píxeles ocultos ni sugerencias de culpable; no inventar catálogo global |
 | T3-04 | 3 | En curso | T3-03 | Contrato independiente del proveedor, adaptadores y mock de CI, interpretación y narración limitadas, memoria NPC y fallback factual | integración IA y registro de evaluación real | ACC-005/016/018/038 | No pasar expediente completo; limitar texto libre que contradiga hechos |
 | T3-05 | 3 | Pendiente | T3-04, T3-06, T3-07, T3-08 | E2E ambas rutas, guardar/reanudar, keyboard y revisión humana del caso | registro F3 con demostración y límites | ACC-008/009/014/019 | Accesibilidad completa queda fase 5; no presentar hito como v1 |
-| E4-01 | 4 | Completada | T3-05 | Cerrar SPEC-007 y desglosar generador, jobs, capacidades, import/export y simulación | spec, tareas y reporte de casos aceptados/rechazados | ACC-023/027/029/034 | Worker recuperable; no ejecutar contenido de expedientes |
+| E4-01 | 4 | Pendiente | T3-05 | Cerrar SPEC-007 y desglosar generador, jobs, capacidades, import/export y simulación | spec, tareas y reporte de casos aceptados/rechazados | ACC-023/027/029/034 | Worker recuperable; no ejecutar contenido de expedientes |
 | E5-01 | 5 | Pendiente | T4-06 | Cerrar SPEC-008 y ampliar SPEC-006; completar GDD y evaluar calidad | tareas por variedad/catálogo/carrera/irregularidades/audio/idiomas/accesibilidad | ACC-003/005/019/029/030/031/036/037 | Sin recortes silenciosos del GDD; licencias de arte verificadas |
 | E6-01 | 6 | Pendiente | T5-06 | Cerrar SPEC-009 distribución; setup/admin, proveedores, migraciones, backup/restore y autoría/licencias | instalación independiente y manual operativo probado | ACC-026/032/035 | No publicar avisos con nombre no confirmado; probar restauración |
 | E7-01 | 7 | Pendiente | T6-04 | Cerrar SPEC-010; proveedor público verificado, registro/recuperación, consumo, privacidad, alertas y revisión OWASP | tareas de público y registro de preparación para lanzamiento | ACC-020/022/024/025/027/028/033 | Crítico/alto aplicable bloquea; despliegue no automático |
@@ -32,12 +32,12 @@ Las filas E son preparación/cierre de la fase; las T siguientes implementan sus
 
 | ID | Fase | Estado | Depende de | Objetivo / alcance | Entregable | Pruebas | Riesgo / restricción |
 |---|---|---|---|---|---|---|---|
-| T4-01 | 4 | Completada | E4-01 | Implementar pipeline por etapas con checkpoint y esquema de expediente | servicio generador y validadores de etapa | ACC-001/017/029/034 | No publicar borradores ni usar salida semántica como único validador |
-| T4-02 | 4 | Completada | T4-01 | Validadores de coherencia, conocimiento, contenido y geografía | reportes por ID y rechazo explícito | ACC-002/029/034 | Sin corrección silenciosa en partida |
-| T4-03 | 4 | Completada | T4-02 | Simulador de rutas alternativas, error, cooperación y retrasos | suite de solvencia con presupuestos | ACC-008/009/034 | No confundir simulación de rutas con prueba exhaustiva de toda conversación |
-| T4-04 | 4 | Completada | T4-03 | Worker/cola PostgreSQL con leases, deduplicación, cancelación y recuperación | jobs persistentes con cuotas reservadas | ACC-027/034 | Doble worker no debe publicar duplicado ni exceder presupuesto |
-| T4-05 | 4 | Completada | T4-04 | Import/export JSON versionado validado y autorización | intercambio con límites y aviso de spoilers | ACC-015/023 | No ejecutar código ni descargar URLs del archivo |
-| T4-06 | 4 | Completada | T4-05, T4-07 | Probar roles/proveedores y fixture generado de punta a punta | registro F4 y corpus real de generación | ACC-029/034/038 | Cambiar proveedor no altera casos ya fijados |
+| T4-01 | 4 | Pendiente | E4-01 | Implementar pipeline por etapas con checkpoint y esquema de expediente | servicio generador y validadores de etapa | ACC-001/017/029/034 | No publicar borradores ni usar salida semántica como único validador |
+| T4-02 | 4 | Pendiente | T4-01 | Validadores de coherencia, conocimiento, contenido y geografía | reportes por ID y rechazo explícito | ACC-002/029/034 | Sin corrección silenciosa en partida |
+| T4-03 | 4 | Pendiente | T4-02 | Simulador de rutas alternativas, error, cooperación y retrasos | suite de solvencia con presupuestos | ACC-008/009/034 | No confundir simulación de rutas con prueba exhaustiva de toda conversación |
+| T4-04 | 4 | Pendiente | T4-03 | Worker/cola PostgreSQL con leases, deduplicación, cancelación y recuperación | jobs persistentes con cuotas reservadas | ACC-027/034 | Doble worker no debe publicar duplicado ni exceder presupuesto |
+| T4-05 | 4 | Pendiente | T4-04 | Import/export JSON versionado validado y autorización | intercambio con límites y aviso de spoilers | ACC-015/023 | No ejecutar código ni descargar URLs del archivo |
+| T4-06 | 4 | Pendiente | T4-05, T4-07 | Probar roles/proveedores y fixture generado de punta a punta | registro F4 y corpus real de generación | ACC-029/034/038 | Cambiar proveedor no altera casos ya fijados |
 | T5-01 | 5 | Pendiente | E5-01 | Completar catálogo de parámetros y validación Familiar/General | variedad de delito/dificultad/duración/región/SORPRÉNDEME | ACC-029 | No asumir que más texto aumenta dificultad; medir |
 | T5-02 | 5 | Pendiente | T5-01 | Catálogo geográfico verificable, viajes, atlas y modos de exploración | destinos culturales separados de pistas y buscador accesible | ACC-003/019 | No cobertura universal falsa ni datos culturales inventados |
 | T5-03 | 5 | Pendiente | T5-02 | Equipo recurrente, canales, archivos y consultas completos | NPC y gestiones con conocimiento/tiempos definidos | ACC-005/007/037 | Ningún compañero sugiere siguiente pista |
@@ -61,9 +61,9 @@ Añadido el 2026-10-28 por petición de desarrollo documental. Todas las tareas 
 
 | ID | Fase | Estado | Depende de | Objetivo / alcance | Entregable | Pruebas | Riesgo / restricción |
 |---|---|---|---|---|---|---|---|
-| T3-06 | 3 | Pendiente | T3-02 | Recuperación incierta, replays autorizados, retención de claves y concurrencia de guardados/cierre | Contrato de consulta por clave, esquema consolidado y pruebas transaccionales | ACC-013/014/015/021; BOR-001/020 y BOR-088 | Sin informe antiguo en rama activa; no persistir tokens en navegador |
+| T3-06 | 3 | En curso | T3-02 | Recuperación incierta, replays autorizados, retención de claves y concurrencia de guardados/cierre | Contrato de consulta por clave, esquema consolidado y pruebas transaccionales | ACC-013/014/015/021; BOR-001/020 y BOR-088 | Sin informe antiguo en rama activa; no persistir tokens en navegador |
 | T3-07 | 3 | Pendiente | T3-03, T3-06 | Estados UI ante fallo, orden de respuestas, logout, teclado y reconexión | Flujo conectado de recuperación sin duplicar intención | ACC-019/020/021; BOR-067/072 | No cola offline ni avance por reloj real |
-| T3-08 | 3 | Pendiente | T3-04, T3-06 | Presupuestos y cancelación, cierre/probes acotados, telemetría mínima sanitizada | Política de transporte única y señales operativas locales | ACC-018/024/028/038; BOR-043/056 y BOR-075/082 | Sin collector obligatorio ni fallback de credencial |
+| T3-08 | 3 | En curso | T3-04, T3-06 | Presupuestos y cancelación, cierre/probes acotados, telemetría mínima sanitizada | Política de transporte única y señales operativas locales | ACC-018/024/028/038; BOR-043/056 y BOR-075/082 | Sin collector obligatorio ni fallback de credencial |
 | T4-07 | 4 | Pendiente | T4-05, T3-08 | Fencing, terminales, reservas, equidad e importación robusta | Recuperación persistente de jobs y pruebas de carreras | ACC-023/027/034; BOR-057/066 y BOR-089 | No nueva infraestructura sin necesidad; sin publicación doble |
 | T5-07 | 5 | Pendiente | T5-05, T3-07 | Propiedades del motor, límites de catálogo/carrera y UI completa | Corpus de bordes funcionales y revisión manual accesible | ACC-006/007/019/030/036/037; BOR-030/042 y BOR-073/074 | No fijar equilibrio ni nuevas reglas silenciosamente |
 | T6-05 | 6 | Pendiente | T6-03, T4-07 | Desastre, actualización compatible y recursos agotados | Restore aislado con RPO/RTO medidos y runbook ejecutado | ACC-014/024/026/032; BOR-077/079, BOR-085/090 | Nunca sobre volumen sano ni con IA/correo real por defecto |
@@ -128,3 +128,63 @@ git add docs/plan/BACKLOG.md && git commit -m "docs: actualizar BACKLOG - fases 
 ## Integración de bordes en main (2026-10-29)
 
 Se conservan los estados registrados en main 5a98ec1 y se incorporan las nuevas tareas y dependencias de la revisión de bordes. Las marcas previas de completado no acreditan los nuevos escenarios: en particular, el refuerzo T4-07 permanece pendiente aunque T4-06 conserve su estado histórico. La aceptación ampliada exige evidencia de las nuevas puertas; este merge solo integra documentación.
+
+## Inspección y continuación del 2026-10-29
+
+Todas las ramas locales existentes están contenidas en main 5c58a79; no quedaron merges pendientes. Las marcas de completado de T3-01/02/03 y E4/T4 carecían de implementación/evidencia correspondiente y se corrigen: T3 continúa en curso y fase 4 pendiente. No existen rutas de partidas registradas ni worker/generador consumidos.
+
+T3-02 continúa con saneamiento de la proyección existente: contratos públicos independientes, solicitudes sin payload, informe solo en rama cerrada y copias sin referencias mutables al estado. Es una entrega parcial del motor, no PlayerViewDto v1 completo ni autorización HTTP. Pendientes: agregado/revisión/rama, esquema activo único, transacciones y API de partidas antes de conectar UI. Véase el registro de continuación en quality.
+
+Continuación de persistencia T3-02: esquema activo ampliado y servicio privado de creación/lectura con sesión e idempotencia, probado con PostgreSQL sintético real. Estado sigue en curso; no hay endpoints de partidas ni manuales entregados. [Registro de pruebas y límites](../quality/T3-02-persistencia.md).
+
+Entrega HTTP inicial de T3-02: catálogo/detalle y creación/lectura inicial autenticados, DTO sin secretos, CSRF y deduplicación. [Evidencia](../quality/T3-02-http-inicial.md). Las notas anteriores sin endpoints describen sus entregas históricas; estado actual en ESTADO. Pendientes preview/commit, proyección general, operaciones, guardados y UI; T3-02 continúa en curso.
+
+## Auditoría normativa de 7962014
+
+Revisión completa del catálogo y fronteras implementadas en [AUDITORIA-7962014](../quality/AUDITORIA-7962014.md). **No se acredita cumplimiento total.** Se reabre T1-04 por calidad global; T2-01/03/04/05/06 están en curso y T2-02 en revisión por los hallazgos reproducidos de validación, costes, ordinal compartido, suficiencia de orden y simulaciones con descubrimientos inyectados. Se conservan sus pruebas históricas sin usarlas como aceptación del caso completo.
+
+T3-06/08 pasan a en curso por esta continuación autorizada: barrera real de revocación, pérdida TCP del acuse de COMMIT, admisión/pool acotados, readiness single-flight, parada idempotente y telemetría local sanitizada. Sus dependencias de cierre permanecen: todavía faltan acciones/saves, localizador por clave, presupuesto/consumo y ensayo de proceso/proveedor/UI. Antes de preview/commit público, corregir el motor y rehacer las rutas sin alterar estado desde el test. No se borran funcionalidades del alcance ni se modifican decisiones de producto.
+
+## Continuación de motor v2
+
+T2-04/05: eliminada secuencia global, contador persistible por partida, evaluación común de finish/deadline y viaje interrumpido sin llegada. Motor de ejecución v2, lectura explícita de inicios v1 sin reescribir datos. [Evidencia y límites](../quality/T2-eventos-plazo-v2.md). Permanecen en curso: costes y materialización de evidencias, suficiencia de órdenes, rutas legítimas y dispatcher/calidad pendientes. Las 207 pruebas generales y 35 de integración no cierran por sí solas esos criterios.
+
+## Continuación: evidencias y órdenes v3
+
+Se implementan hallazgos físicos/contextuales, procedencia, laboratorio programado (+90), consultas paralelas (+30), órdenes basadas en selección explícita y admisibilidad, y requisitos de presencia/identidad. Ambas rutas del caso se simulan sin insertar pistas en el estado, incluidas variantes que eliminan las pruebas exclusivas de la otra ruta. El motor no consulta la solución para conceder órdenes y limita las solicitudes pendientes a 32. La API crea estados v3 y conserva lectura estricta de inicios v1/v2 sin reescritura.
+
+Esto corrige parte de los hallazgos funcionales de órdenes/rutas, sin cerrar T2-03/04/05/06 ni recalificar toda la matriz BOR. Faltan costes materiales, confirmaciones y lotes completos; ACC-008/009 no se da por aceptado. Continúan pendientes calidad global, DTO de progreso, acciones HTTP, guardados y E2E. El siguiente trabajo es costes/preview/lotes antes de conectar acciones web. Los registros anteriores son instantáneas históricas; [la evidencia v3](../quality/T2-evidencias-ordenes-v3.md) recoge el alcance vigente y las comprobaciones de esta continuación.
+
+## Continuación: costes y confirmaciones v4
+
+Se corrigen costes materiales del caso fijo, confirmación de espera/inspección/detención/recuperación y de lotes costosos. El plazo interrumpe sin aplicar efecto terminal ni resto del lote; reanudar no repite el prefijo. Las rutas naturales acreditan tiempos base A=455/B=485 con semilla 1 y A=482/B=512 con semilla 42, sin cambiar el expediente original. Los inicios antiguos v1/v2/v3 siguen legibles sin reescritura, con nueva ejecución v4.
+
+T2 permanece abierto: lotes de otras acciones/dependencias, extremos de retraso, validación y calidad global aún pendientes. Tampoco están habilitados acciones HTTP, guardados o E2E. La siguiente prioridad es resolver estas fronteras y la calidad antes de conectar progreso web. [Verificación y límites v4](../quality/T2-costes-confirmaciones-v4.md); las notas v2/v3 anteriores son evidencia histórica, no el estado vigente.
+
+## Continuación: validación estructural y puerta de creación
+
+T2-01 amplía validación de campos anidados, referencias, ciclos de procedencia, posición inicial y límites. Se elimina la complejidad 71 del validador, manteniendo máximo diez mediante responsabilidades usadas. Creación nueva valida una copia estable del expediente; rechaza sin partida/intención, conservando replay autorizado antes de disponibilidad. No cambia motor v4, contenido/hash del fixture ni datos guardados.
+
+La tarea sigue en curso: faltan vocabulario/referencias NPC y solución, operadores/payloads declarativos y solvencia general. No se cierra calidad global ni se habilitan acciones HTTP o importación. [Resultados y límites de esta continuación](../quality/T2-validacion-expedientes.md).
+
+## Continuación: calidad de adaptadores alternativos
+
+T1-04/T3-04: se elimina any de fábrica y complejidad excesiva de mock/Ollama mediante responsabilidades utilizadas; configuración validada, doble determinista y sin aprobación ficticia, payload real y consumo desconocido preservado. Pruebas del paquete incluidas en suite general. No se conecta al juego ni se cierra T3-04: falta unificar codecs/políticas y evaluar proveedor real. [Resultados y límites](../quality/T3-adaptadores-calidad.md).
+
+## Continuación: integridad fuera del motor y retirada de código muerto
+
+Se mueve hashDefinition a la entrada exclusiva de servidor de case-schema; el motor recibe huella preparada, valida forma y deja de depender de Node crypto. Se conserva el hash previo del fixture y engineVersion=4, sin migrar registros. Se añaden reglas que impiden reintroducir la entrada de servidor en el motor/raíz pura. Tipos Node ya fijados se declaran como dependencia de desarrollo de case-schema, sin biblioteca de ejecución nueva.
+
+Se retira RetroScreen obsoleto tras comprobar que no tiene manifest/consumidores y que importa tipos inexistentes/datos privados. Apps/web y /prototype no cambian; no se conecta el componente ni se excluye código para ocultar errores. [Verificación y límites](../quality/T2-motor-puro-integridad.md). No se cierran T1-04/T2/T3 por esta limpieza: formato histórico, funcionalidades y aceptación pendientes conservan sus puertas.
+
+## Continuación: dependencias y reanudación de lotes v5
+
+T2-03: matriz interna de dependencias previas, cadena conservadora por defecto, omisiones transitivas sin coste y preview obligatorio para continuar incluso con cero minutos. Se validan acciones/params, grafo y coherencia del snapshot, con lectura acotada de metadata. Historial aplicado/fallido/omitido no se reintenta; nuevas imposibilidades pausan y el plazo descarta el resto.
+
+Se registra motor v5; los inicios vírgenes v1–v4 se leen sin modificar, y el progreso antiguo se preserva/rechaza. Caso y hash originales, costes y rutas individuales se conservan. Siguen pendientes otros tipos de lote, adaptación API/UI, guardados y puertas de calidad/aceptación. [Resultados y límites](../quality/T2-dependencias-lotes-v5.md). No se marca completada T2 por esta entrega parcial.
+
+## Continuación: lotes de solicitudes y esperas v6
+
+T2-03/04/05: lotes admiten analyze/query/wait/request_warrant mediante los mismos resolutores individuales. No hay espera implícita; dependencias representan pasos enviados/aplicados, no resultados disponibles. Pausa, continuación confirmada, cuotas internas y plazo se conservan; selección de evidencias comparte validación y los contadores fallan cerrado ante invalidez/desbordamiento.
+
+Motor v6; inicios v1–v5 legibles sin modificar y progreso antiguo preservado/rechazado. Las dos rutas en lotes conservan tiempos y hechos de las versiones individuales. T2 permanece abierto por otros tipos de lote, retrasos máximos, vocabulario/reglas y aceptación; API/UI/guardados aún pendientes. [Evidencia v6](../quality/T2-lotes-solicitudes-v6.md).

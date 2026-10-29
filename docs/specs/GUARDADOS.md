@@ -117,3 +117,23 @@ La carga no oculta al jugador que está en práctica. El informe muestra resulta
 | Se cancela el navegador tras commit | Estado aplicado se recupera; no prometer rollback del servidor |
 
 Los errores públicos no incluyen snapshot, hashes privados ni detalles de SQL. No ejecutar pruebas sobre guardados reales del usuario. Aceptación granular en [T3 detallada](../quality/T3-aceptacion-detallada.md).
+
+## Estado de ejecución v2
+
+Los snapshots v2 deberán conservar eventOrdinal junto a engineVersion, estado y hash. La secuencia del motor puede restaurarse con su snapshot en una rama nueva; no sustituye ni rebobina la revisión HTTP o ActionLog permanente. No eliminar el contador ni cambiar engineVersion para forzar compatibilidad. La lectura estricta de inicios v1 entregada en API no es una migración de manuales ni habilita ejecución de progreso v1 bajo reglas v2. [Pruebas de ejecución y compatibilidad](../quality/T2-eventos-plazo-v2.md).
+
+## Evolución a ejecución v3
+
+Los futuros snapshots v3 deben preservar eventOrdinal y evidenceRecords cuando exista, incluidos minutos, procedencia, método y recogida. No reconstruir admisibilidad o conocimiento desde prosa IA. No eliminar campos o cambiar engineVersion para cargar progreso antiguo. La compatibilidad de lectura de inicios v1/v2 no es una migración de snapshots ni habilita guardado/carga en la API actual. [Estado del motor v3](../quality/T2-evidencias-ordenes-v3.md).
+
+## Evolución a ejecución v4
+
+Los futuros snapshots deben conservar versión real, contador, procedencia y lote pendiente. La ejecución v4 valida el lote serializado antes de reanudar y pide nueva confirmación si el resto consume tiempo. Esta validación de motor no implementa guardados ni protección transaccional de revisión/rama. Lectura de inicios v1/v2/v3 no equivale a migrar progreso o manuales. [Estado v4](../quality/T2-costes-confirmaciones-v4.md).
+
+## Evolución a ejecución v5
+
+Los futuros snapshots preservan dependsOn y estados applied/impossible/skipped/pending de cada paso. Una restauración no cambia skipped a pending ni deduce independencia ausente; el contador de eventos y revisión/rama mantienen sus responsabilidades separadas. El motor valida hasta ocho registros, 4.096 caracteres por registro y motivo de hasta 512, rechazando corrupción sin modificar el estado. Continuar necesita confirmación nueva incluso con cero minutos; el historial aplicado no se repite. Estas pruebas de serialización del motor no implementan guardados/manuales ni un reinicio DB de lotes. [Evidencia v5](../quality/T2-dependencias-lotes-v5.md).
+
+## Evolución a ejecución v6
+
+Snapshot de lote y solicitudes son estados diferentes: un paso analyze/query/request_warrant puede estar applied mientras su resultado sigue pendiente. Guardar/reanudar no reenvía esa solicitud ni adelanta reloj para completarla. Una espera independiente confirmada puede madurarla; el paso fallido anterior no se reintenta por ello. Los futuros guardados deben conservar versiones/counter seguros y rechazar corrupción sin recrear datos. Sigue sin API de guardados ni migración de progreso antiguo. [Evidencia v6](../quality/T2-lotes-solicitudes-v6.md).

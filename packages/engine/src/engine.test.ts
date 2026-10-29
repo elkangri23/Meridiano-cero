@@ -1,5 +1,6 @@
+import { hashDefinition } from '@meridiano/case-schema/server';
 import { describe, it, expect } from 'vitest';
-import { createInitialRun, resolveAction, confirmAction, hashDefinition, projectToPlayerView } from './index.js';
+import { createInitialRun, resolveAction, confirmAction, projectToPlayerView } from './index.js';
 import type { CaseDefinition } from '@meridiano/case-schema';
 
 const def: CaseDefinition = {
@@ -28,14 +29,14 @@ const def: CaseDefinition = {
 
 describe('engine', () => {
   it('creates initial run at minute 0', () => {
-    const run = createInitialRun(def, 'owner-1', 'run-1');
+    const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
     expect(run.minute).toBe(0);
     expect(run.status).toBe('active');
     expect(run.version).toBe(1);
   });
 
   it('inspect reveals location', () => {
-    const run = createInitialRun(def, 'owner-1', 'run-1');
+    const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
     const result = resolveAction(def, run, { type: 'inspect', params: { targetId: 'loc-1' } });
     expect(result.status).toBe('applied');
     if (result.status === 'applied') {
@@ -44,7 +45,7 @@ describe('engine', () => {
   });
 
   it('collect adds to inventory', () => {
-    const run = createInitialRun(def, 'owner-1', 'run-1');
+    const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
     const result = resolveAction(def, run, { type: 'collect', params: { evidenceId: 'ev-1' } });
     expect(result.status).toBe('applied');
     if (result.status === 'applied') {
@@ -53,13 +54,13 @@ describe('engine', () => {
   });
 
   it('travel requires confirmation', () => {
-    const run = createInitialRun(def, 'owner-1', 'run-1');
+    const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
     const result = resolveAction(def, run, { type: 'travel', params: { toCityId: 'city-2' } });
     expect(result.status).toBe('confirmation_required');
   });
 
   it('confirm travel advances minute', () => {
-    const run = createInitialRun(def, 'owner-1', 'run-1');
+    const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
     const result = confirmAction(def, run, { type: 'travel', params: { toCityId: 'city-2' } });
     expect(result.status).toBe('applied');
     if (result.status === 'applied') {
@@ -69,7 +70,7 @@ describe('engine', () => {
   });
 
   it('finish closes case', () => {
-    const run = createInitialRun(def, 'owner-1', 'run-1');
+    const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
     const result = resolveAction(def, run, { type: 'finish', params: { confirmed: true } });
     expect(result.status).toBe('case_closed');
     if (result.status === 'case_closed') {
@@ -86,7 +87,7 @@ describe('engine', () => {
   });
 
   it('projectToPlayerView hides solution', () => {
-    const run = createInitialRun(def, 'owner-1', 'run-1');
+    const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
     const view = projectToPlayerView(def, run);
     expect(view).not.toHaveProperty('solution');
     expect(view.runId).toBe('run-1');
