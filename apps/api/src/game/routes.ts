@@ -1,3 +1,4 @@
+import { isIdempotencyKey } from '@meridiano/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
@@ -5,7 +6,7 @@ import { createSessionStore, tokenDigest } from '../auth/store.ts';
 import { cookieToken, matches } from '../auth/session-security.ts';
 import { caseSummary, findCase, listCases } from './catalog.ts';
 import { initialPlayerView } from './initial-view.ts';
-import { createStoredRun, readStoredRun, RunStoreError } from './runs.ts';
+import { createStoredRun, readStoredRun, lookupRunCreation, RunStoreError } from './runs.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -17,8 +18,15 @@ function createBody(value: unknown): { caseId: string; idempotencyKey: string } 
   if (keys !== 'caseId,idempotencyKey') throw new RunStoreError('INVALID_REQUEST');
   const { caseId, idempotencyKey } = value;
   if (typeof caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(caseId) ||
-      typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{16,128}$/.test(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
+      !isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
   return { caseId, idempotencyKey };
+}
+
+function lookupBody(value: unknown): string {
+  if (!isRecord(value) || Object.keys(value).join(',') !== 'idempotencyKey' || !isIdempotencyKey(value.idempotencyKey)) {
+    throw new RunStoreError('INVALID_REQUEST');
+  }
+  return value.idempotencyKey;
 }
 
 async function available<T>(work: () => Promise<T>): Promise<T> {
@@ -60,6 +68,11 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     const definition = findCase(body.caseId);
     const result = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey));
     return reply.code(result.replayed ? 200 : 201).send({ ...initialPlayerView(result.run), replayed: result.replayed });
+  });
+  app.post<{ Querystring: Record<string, unknown> }>('/api/v1/run-creations/lookup', { onRequest: authorize }, async request => {
+    if (Object.keys(request.query).length) throw new RunStoreError('INVALID_REQUEST');
+    const key = lookupBody(request.body);
+    return available(() => lookupRunCreation(database, digest(request), key));
   });
   app.get<{ Params: { runId: string } }>('/api/v1/runs/:runId', { onRequest: authorize }, async request => {
     const run = await available(() => readStoredRun(database, digest(request), request.params.runId));

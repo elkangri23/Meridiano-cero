@@ -30,7 +30,7 @@ export function initialPlayerView(run: StoredRun): InitialPlayerViewDto {
     locations: [publicLocation], objects: [], dossier: [], conversation: [], pendingRequests: [],
     warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
     saveCapabilities: { manualLimit: 10, manualCount: 0, canSave: false, canLoad: false },
-    recovery: { retryCreationWithSameKey: true, operationLookup: false },
+    recovery: { retryCreationWithSameKey: true, creationLookup: true, operationLookup: false },
   };
 }
 

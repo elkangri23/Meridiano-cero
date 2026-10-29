@@ -34,7 +34,7 @@ ACC-008/009 quedan verificados en el nivel motor para estos recorridos/costes. E
 - scripts/verify_docs.py: 84 Markdown, referencias/grafo válidos y hashes de DOCX originales intactos. Integridad documental, no certificación de producto/ASVS.
 - El checker de formato sigue fallando en nueve archivos heredados; se corrige únicamente newline del test del reloj modificado, sin reescribir SQL antiguo ni rebajar el checker.
 
-Se detuvo solo el contenedor sintético de este proyecto conservando volumen; base preexistente 15433 y WSL sin cambios. Avances v7/v8 permanecen posteriores al checkpoint c4a86cd y sin nuevos commits, merges ni push.
+Se detuvo solo el contenedor sintético de este proyecto conservando volumen; base preexistente 15433 y WSL sin cambios. Avances v7/v8 posteriores al checkpoint c4a86cd; registrados después en el commit 8f9c288 por petición del usuario. Sin merge ni push.
 
 ## Límites
 

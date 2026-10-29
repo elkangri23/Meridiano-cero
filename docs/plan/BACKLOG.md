@@ -143,7 +143,7 @@ Entrega HTTP inicial de T3-02: catálogo/detalle y creación/lectura inicial aut
 
 Revisión completa del catálogo y fronteras implementadas en [AUDITORIA-7962014](../quality/AUDITORIA-7962014.md). **No se acredita cumplimiento total.** Se reabre T1-04 por calidad global; T2-01/03/04/05/06 están en curso y T2-02 en revisión por los hallazgos reproducidos de validación, costes, ordinal compartido, suficiencia de orden y simulaciones con descubrimientos inyectados. Se conservan sus pruebas históricas sin usarlas como aceptación del caso completo.
 
-T3-06/08 pasan a en curso por esta continuación autorizada: barrera real de revocación, pérdida TCP del acuse de COMMIT, admisión/pool acotados, readiness single-flight, parada idempotente y telemetría local sanitizada. Sus dependencias de cierre permanecen: todavía faltan acciones/saves, localizador por clave, presupuesto/consumo y ensayo de proceso/proveedor/UI. Antes de preview/commit público, corregir el motor y rehacer las rutas sin alterar estado desde el test. No se borran funcionalidades del alcance ni se modifican decisiones de producto.
+T3-06/08 pasan a en curso por esta continuación autorizada: barrera real de revocación, pérdida TCP del acuse de COMMIT, admisión/pool acotados, readiness single-flight, parada idempotente y telemetría local sanitizada. Sus dependencias de cierre permanecen: todavía faltan acciones/saves, recuperación general por clave, presupuesto/consumo y ensayo de proceso/proveedor/UI. Antes de preview/commit público, corregir el motor y rehacer las rutas sin alterar estado desde el test. No se borran funcionalidades del alcance ni se modifican decisiones de producto.
 
 ## Continuación de motor v2
 
@@ -200,3 +200,9 @@ Motor v7; inicios v1–v6 legibles en su forma histórica sin reescritura, progr
 T2-04/06: se corrige la mezcla seeded para alcanzar 45 minutos y permitir máximos consecutivos. Variante sintética normal seed=14194 verifica rutas independientes A=545/B=575; semillas 1/42, base 455/485. Se prueban lotes equivalentes, plazo exacto y negativa de Lucía sin softlock, sin modificar duraciones ni inyectar conocimiento.
 
 Motor v8 mantiene hash/seed originales, pero cambia resultados temporales por versión. Inicios v1–v7 legibles sin escritura; progreso previo se conserva/rechaza. ACC-008/009 tienen evidencia de motor, E2E pendiente. T2 sigue abierto por otros lotes, reglas/vocabularios y puertas globales; no se declara fase completada. [Verificación y límites](../quality/T2-retrasos-maximos-v8.md).
+
+## Continuación T3-06: localizador de creación
+
+Implementado POST /api/v1/run-creations/lookup: clave original en cuerpo cerrado, sesión revalidada en transacción, Origin/CSRF y propiedad actual. Devuelve solo metadatos de creación confirmada. Un 404 puede ser provisional y nunca autoriza una nueva clave. Siete pruebas de integración adicionales incluyen barreras reales de creación en vuelo y revocación; 45 PostgreSQL/HTTP en total. [Contrato, evidencia y límites](../quality/T3-06-localizador-creacion.md).
+
+T3-06 permanece en curso: faltan operaciones de acciones, guardados/cierre, retención/purga y recuperación conectada de UI. No se habilitan acciones HTTP ni se declara la fase 3 completada.

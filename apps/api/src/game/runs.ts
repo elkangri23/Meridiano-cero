@@ -1,3 +1,4 @@
+import { isIdempotencyKey, type RunCreationLookupDto } from '@meridiano/contracts';
 import { hashDefinition } from '@meridiano/case-schema/server';
 import { migrationFiles, matchesMigrationLedger } from '../database/migrations.ts';
 import { createHash, randomUUID } from 'node:crypto';
@@ -78,7 +79,7 @@ function preparedHash(definition: CaseDefinition): string | undefined {
 
 export async function createStoredRun(database: Database, sessionDigest: string,
   definition: CaseDefinition, idempotencyKey: string): Promise<{ run: StoredRun; replayed: boolean }> {
-  if (!/^[A-Za-z0-9._:-]{16,128}$/.test(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
+  if (!isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
   const candidate = structuredClone(definition);
   const structureValid = validateCaseDefinition(candidate).valid;
   const definitionHash = structureValid ? preparedHash(candidate) : undefined;
@@ -120,4 +121,18 @@ async function ownedRun(client: PoolClient, ownerId: string, id: string): Promis
 
 export function readStoredRun(database: Database, sessionDigest: string, runId: string): Promise<StoredRun> {
   return inSession(database, sessionDigest, (client, ownerId) => ownedRun(client, ownerId, runId));
+}
+
+export function lookupRunCreation(database: Database, sessionDigest: string, key: string): Promise<RunCreationLookupDto> {
+  if (!isIdempotencyKey(key)) throw new RunStoreError('INVALID_REQUEST');
+  return inSession(database, sessionDigest, async (client, ownerId) => {
+    // Solo filas confirmadas y recurso todavía propio; no leer engine_state.
+    const result = await client.query<{ runId: string }>(
+      `SELECT c.run_id AS "runId" FROM run_creations c
+       JOIN runs r ON r.id=c.run_id AND r.owner_id=c.owner_id
+       WHERE c.owner_id=$1 AND c.idempotency_key=$2`, [ownerId, key]);
+    const creation = result.rows[0];
+    if (!creation) throw new RunStoreError('NOT_FOUND');
+    return { schemaVersion: 1, kind: 'create_run', status: 'committed', runId: creation.runId };
+  });
 }

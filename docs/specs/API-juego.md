@@ -249,3 +249,13 @@ tripCount forma parte del estado privado, no de params ni del DTO público inici
 ## Compatibilidad inicial v8
 
 Nuevas partidas registran v8. Lectura de inicios antiguos v1–v7 reconoce forma completa histórica sin modificarla; progreso anterior se rechaza conservando datos. El cálculo de retraso no se obtiene de datos enviados por cliente y el preview sigue sin revelar el sorteo. Las rutas de acciones/guardados siguen pendientes. [Pruebas](../quality/T2-retrasos-maximos-v8.md).
+
+## Recuperación de creación por clave: T3-06
+
+POST /api/v1/run-creations/lookup es una consulta sin escritura. Recibe exactamente {idempotencyKey}, sin query, cuerpo JSON de límites generales. Usa POST para no colocar el localizador en URL/logs de acceso. Exige sesión vigente, Origin exacto y CSRF, además de comprobar sesión/esquema/propiedad de nuevo en la transacción. Clave de 16–128 caracteres ASCII con las mismas reglas de creación; no es credencial y no sustituye autorización.
+
+200 devuelve exclusivamente {schemaVersion:1,kind:"create_run",status:"committed",runId}. No devuelve clave, digest, proyección histórica, rama, informe, versión privada ni estado del motor; el cliente solicita después la vista actual. Funciona aunque la proyección del estado no sea compatible, porque localiza un resultado durable propio, no declara que el juego sea proyectable.
+
+Sin creación visible para esa cuenta devuelve 404 NOT_FOUND, igual si la clave es ajena. Bajo READ COMMITTED, una creación aún en vuelo puede no ser visible: el 404 no afirma rollback ni autoriza otra clave. Conservar intención original y reintentar su misma clave; no se adquiere el lock de creación ni se inventa estado pending a partir de memoria de proceso. Repetir lookup nunca crea partida, modifica ledger ni consume otra intención.
+
+La capacidad pública creationLookup=true anuncia esta ruta en recovery; operationLookup=false sigue indicando que no existe consulta general de operaciones de acción. UI/sessionStorage, tombstones/purga y recuperación de acciones/cargas/cierre siguen pendientes. Esta consulta por clave no amplía la lectura de partidas iniciales a progreso ni evita su fallo cerrado.

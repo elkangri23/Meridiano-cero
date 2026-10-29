@@ -1,6 +1,6 @@
 # Estado integrado del proyecto
 
-Estado vigente de la continuación: motor v8 con retrasos máximos reales y rutas A/B verificadas en 455/545 y 485/575 minutos; integridad de servidor y validador 1.1. Pasan lint/imports globales, 407 pruebas generales y 38 PostgreSQL/HTTP. El commit c4a86cd consolida v6; v7/v8 son posteriores y siguen sin commit. Formato histórico y E2E/aceptación funcional completa siguen pendientes. [Última evidencia y límites](../quality/T2-retrasos-maximos-v8.md). Las cifras de integración inicial que siguen son históricas.
+Estado vigente de la continuación: motor v8 con retrasos máximos reales y rutas A/B verificadas en 455/545 y 485/575 minutos; integridad de servidor y validador 1.1. Pasan lint/imports globales, 407 pruebas generales y 45 PostgreSQL/HTTP. El commit c4a86cd consolida v6 y 8f9c288 registra v7/v8. T3-06 incorpora consulta segura de creaciones por la clave original, con evidencia transaccional. Formato histórico y E2E/aceptación funcional completa siguen pendientes. [Motor v8](../quality/T2-retrasos-maximos-v8.md) y [recuperación de creaciones](../quality/T3-06-localizador-creacion.md). Las cifras de integración inicial que siguen son históricas.
 
 Actualizado: 2026-10-29. Combinación de main 6298be7 (incluye la base 6f43ba2) y codex/t3-04-integracion-ia 3a28abd, preparada en worktree separado para integrar en main. [Evidencia de integración](../quality/INTEGRACION-T3-04.md). Las instantáneas previas de T1/T3 conservan su alcance histórico.
 
@@ -11,7 +11,7 @@ El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y
 | Área | Disponible | Pendiente |
 |---|---|---|
 | Base | Seis proyectos de producto más la raíz pnpm | No distribución del juego completa |
-| API | Health/readiness, sesión local, catálogo y creación/lectura inicial de partidas | Preview/commit, lista de partidas, reportes y guardados |
+| API | Health/readiness, sesión local, catálogo, creación/lectura inicial y localización por clave propia | Preview/commit, lista de partidas, reportes y guardados |
 | DB | Migrador activo, roles locales, partidas y ledger de creación transaccional | Operaciones de acciones, manuales y primer resultado; src/db conservado como histórico no activo |
 | Motor | Ejecución v8: evidencias/órdenes, costes, lotes con solicitudes/esperas, viajes persistidos y ambas rutas con retrasos máximos | Lotes de viaje/intervención/cierre/comunicaciones, dependencias en API, reglas/vocabularios y aceptación completa |
 | Expediente | Validador estructural 1.1 y referencias/ciclos; creación valida copia estable | Referencias NPC/solución, operadores/payloads y solvencia general |

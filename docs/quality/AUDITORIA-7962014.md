@@ -227,3 +227,7 @@ Motor v7; inicios v1–v6 legibles en su forma histórica sin reescritura, progr
 T2-04/06: se corrige la mezcla seeded para alcanzar 45 minutos y permitir máximos consecutivos. Variante sintética normal seed=14194 verifica rutas independientes A=545/B=575; semillas 1/42, base 455/485. Se prueban lotes equivalentes, plazo exacto y negativa de Lucía sin softlock, sin modificar duraciones ni inyectar conocimiento.
 
 Motor v8 mantiene hash/seed originales, pero cambia resultados temporales por versión. Inicios v1–v7 legibles sin escritura; progreso previo se conserva/rechaza. ACC-008/009 tienen evidencia de motor, E2E pendiente. T2 sigue abierto por otros lotes, reglas/vocabularios y puertas globales; no se declara fase completada. [Verificación y límites](../quality/T2-retrasos-maximos-v8.md).
+
+## Avance parcial T3-06: consulta de creación
+
+El localizador por clave revalida sesión/esquema y propiedad en transacción, usa SQL parametrizado y DTO explícito sin estado privado. Se comparte el validador de claves con creación y rutas, sin dependencias nuevas ni capas vacías. Las barreras PostgreSQL verifican revocación concurrente y 404 provisional antes del commit. [Evidencia y límites](T3-06-localizador-creacion.md). Esta entrega no cierra las obligaciones de operaciones/guardados, UI, retención ni certifica cumplimiento completo de OWASP/ASVS o del commit normativo.

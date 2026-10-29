@@ -72,5 +72,17 @@ export interface InitialPlayerViewDto {
   finalReport: null;
   officialResult: null;
   saveCapabilities: { manualLimit: 10; manualCount: 0; canSave: false; canLoad: false };
-  recovery: { retryCreationWithSameKey: true; operationLookup: false };
+  recovery: { retryCreationWithSameKey: true; creationLookup: true; operationLookup: false };
+}
+
+/** Localizador durable propio, sin clave, estado privado ni proyección histórica. */
+export interface RunCreationLookupDto {
+  schemaVersion: 1;
+  kind: 'create_run';
+  status: 'committed';
+  runId: string;
+}
+
+export function isIdempotencyKey(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{16,128}$/.test(value);
 }
