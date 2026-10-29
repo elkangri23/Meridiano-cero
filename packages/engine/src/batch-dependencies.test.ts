@@ -128,7 +128,7 @@ describe('T2-03: dependencias conservadoras de lotes', () => {
     const action: Action = { type: 'batch_decision', params: { decision: { toString: () => 'continue_independent' } } };
     expect(resolveAction(def, paused.run, action)).toMatchObject({ status: 'impossible', run: paused.run, events: [] });
   });
-  it.each([4, 5])('rechaza ejecución v%s sin reinterpretar progreso antiguo', engineVersion => {
+  it.each([4, 5, 6, 7])('rechaza ejecución v%s sin reinterpretar progreso antiguo', engineVersion => {
     const run = { ...initial(), engineVersion };
     expect(() => confirmAction(def, run, batch([talk]))).toThrow(EngineStateError);
   });

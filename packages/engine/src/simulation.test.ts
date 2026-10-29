@@ -53,14 +53,11 @@ function finishOriginal(s: Scenario) {
   return s.step('finish', { confirmed: true });
 }
 function routeA(def: CaseDefinition) {
-  const s = scenario(def); prepareA(s);
-  order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
-  s.step('travel', { toCityId: 'lisboa' });
+  const s = scenario(def); prepareRoute(s, 'A');
   finishOriginal(s);
   return s.read();
 }
-function routeB(def: CaseDefinition) {
-  const s = scenario(def);
+function prepareB(s: Scenario) {
   s.step('inspect', { targetId: 'MAD-SALA' });
   s.step('inspect', { targetId: 'MAD-SALA', elementId: 'caja' });
   s.step('collect', { evidenceId: 'EV-06' });
@@ -71,6 +68,15 @@ function routeB(def: CaseDefinition) {
   s.step('query', { topicId: 'custodia-envio' });
   s.step('wait', { minutes: 30 });
   order(s, 'ines', ['EV-06', 'EV-07', 'EV-08']);
+}
+function prepareRoute(s: Scenario, route: 'A' | 'B') {
+  if (route === 'B') { prepareB(s); return; }
+  prepareA(s);
+  order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
+  s.step('travel', { toCityId: 'lisboa' });
+}
+function routeB(def: CaseDefinition) {
+  const s = scenario(def); prepareRoute(s, 'B');
   finishOriginal(s);
   return s.read();
 }
@@ -105,22 +111,22 @@ function routeWithBatches(def: CaseDefinition, route: 'A' | 'B') {
 }
 
 describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
-  it.each([1, 42])('ruta A completa con semilla %s sin pruebas exclusivas B', seed => {
+  it.each([1, 42, 14194])('ruta A completa con semilla %s sin pruebas exclusivas B', seed => {
     const def = { ...astrolabioDefinition, seed,
       evidence: astrolabioDefinition.evidence.filter(evidence => !['EV-06', 'EV-07', 'EV-08'].includes(evidence.id)) };
     const run = routeA(def);
     expect(run.finalReport?.result).toBe('complete');
-    expect(run.minute).toBe(seed === 1 ? 455 : 482);
+    expect(run.minute).toBe(seed === 14194 ? 545 : 455);
     for (const id of ['EV-06', 'EV-07', 'EV-08']) expect([...run.discoveries, ...run.inventory]).not.toContain(id);
     expect(run.evidenceRecords?.['EV-03']).toMatchObject({ revealedMinute: 120, method: 'analyze', origin: 'MAD-SALA' });
     expect(run.position).toEqual({ cityId: 'lisboa', locationId: 'LIS-ALM' });
   });
-  it.each([1, 42])('ruta B completa con semilla %s sin pruebas exclusivas A', seed => {
+  it.each([1, 42, 14194])('ruta B completa con semilla %s sin pruebas exclusivas A', seed => {
     const def = { ...astrolabioDefinition, seed,
       evidence: astrolabioDefinition.evidence.filter(evidence => !['EV-02', 'EV-03', 'EV-04', 'EV-05'].includes(evidence.id)) };
     const run = routeB(def);
     expect(run.finalReport?.result).toBe('complete');
-    expect(run.minute).toBe(seed === 1 ? 485 : 512);
+    expect(run.minute).toBe(seed === 14194 ? 575 : 485);
     for (const id of ['EV-02', 'EV-03', 'EV-04', 'EV-05']) expect([...run.discoveries, ...run.inventory]).not.toContain(id);
     expect(run.evidenceRecords?.['EV-07']?.method).toBe('query');
   });
@@ -219,7 +225,7 @@ describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
   it('sin investigación el cierre confirmado es unresolved', () => {
     expect(scenario().step('finish', { confirmed: true }).run.finalReport?.result).toBe('unresolved');
   });
-  it.each([{ route: 'A' as const, seed: 1 }, { route: 'A' as const, seed: 42 }, { route: 'B' as const, seed: 1 }, { route: 'B' as const, seed: 42 }])('ruta $route en lotes equivale a acciones sueltas, semilla $seed', ({ route, seed }) => {
+  it.each([{ route: 'A' as const, seed: 1 }, { route: 'A' as const, seed: 42 }, { route: 'B' as const, seed: 1 }, { route: 'B' as const, seed: 42 }, { route: 'A' as const, seed: 14194 }, { route: 'B' as const, seed: 14194 }])('ruta $route en lotes equivale a acciones sueltas, semilla $seed', ({ route, seed }) => {
     const excluded = route === 'A' ? ['EV-06', 'EV-07', 'EV-08'] : ['EV-02', 'EV-03', 'EV-04', 'EV-05'];
     const def = { ...astrolabioDefinition, seed, evidence: astrolabioDefinition.evidence.filter(evidence => !excluded.includes(evidence.id)) };
     const individual = route === 'A' ? routeA(def) : routeB(def);
@@ -229,6 +235,26 @@ describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
       discoveries: individual.discoveries, inventory: individual.inventory, admissibility: individual.admissibility,
       evidenceRecords: individual.evidenceRecords, warrants: individual.warrants, detentions: individual.detentions,
       recoveredObjects: individual.recoveredObjects, finalReport: individual.finalReport, pendingRequests: [], pendingBatch: null });
+  });
+
+  it.each([{ route: 'A' as const, deadline: 545 }, { route: 'B' as const, deadline: 575 }])('máximo y plazo exacto de ruta $route interrumpe recuperación sin inventar éxito', ({ route, deadline }) => {
+    const s = scenario({ ...astrolabioDefinition, seed: 14194, deadlineMinutes: deadline });
+    prepareRoute(s, route); detain(s, 'ines');
+    const result = s.step('recover', { objectId: 'astrolabio-original' });
+    expect(result).toMatchObject({ status: 'case_closed', report: { result: 'partial', reason: 'deadline', minute: deadline } });
+    expect(result.run.detentions).toContain('ines');
+    expect(result.run.recoveredObjects).toEqual([]);
+    expect(result.run.discoveries).not.toContain('EV-11');
+  });
+  it.each([{ route: 'A' as const, minutes: 545 }, { route: 'B' as const, minutes: 575 }])('ruta $route sigue abierta con Lucía sin cooperación y ambos retrasos máximos', ({ route, minutes }) => {
+    const def = { ...astrolabioDefinition, seed: 14194,
+      npcs: astrolabioDefinition.npcs.map(npc => npc.id === 'lucia' ? { ...npc, cooperation: 0 } : npc) };
+    const s = scenario(def);
+    s.step('talk', { npcId: 'lucia', topicId: 'caja' });
+    expect(s.read().discoveries).not.toContain('EV-09');
+    prepareRoute(s, route); finishOriginal(s);
+    expect(s.read().finalReport?.result).toBe('complete');
+    expect(s.read().minute).toBe(minutes);
   });
 
 });

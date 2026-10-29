@@ -137,3 +137,11 @@ Los futuros snapshots preservan dependsOn y estados applied/impossible/skipped/p
 ## Evolución a ejecución v6
 
 Snapshot de lote y solicitudes son estados diferentes: un paso analyze/query/request_warrant puede estar applied mientras su resultado sigue pendiente. Guardar/reanudar no reenvía esa solicitud ni adelanta reloj para completarla. Una espera independiente confirmada puede madurarla; el paso fallido anterior no se reintenta por ello. Los futuros guardados deben conservar versiones/counter seguros y rechazar corrupción sin recrear datos. Sigue sin API de guardados ni migración de progreso antiguo. [Evidencia v6](../quality/T2-lotes-solicitudes-v6.md).
+
+## Evolución a ejecución v7
+
+Los futuros snapshots conservan tripCount junto a seed/definición, minuto y ordinal. Restaurar una rama recupera su secuencia determinista, no suma visitas de otras ramas ni rebobina auditoría operativa/resultado oficial. Si falta contador de una versión que lo exige, rechazar compatibilidad; no deducirlo de destinos descubiertos. La prueba de serialización en memoria no implementa guardados/reinicio DB de progreso. Lectura inicial v1–v6 sin escritura no es migración de snapshots. [Evidencia v7](../quality/T2-secuencia-viajes-v7.md).
+
+## Evolución de reglas temporales v8
+
+Un futuro snapshot debe reproducirse con su versión de motor, seed y contador de viajes, no solamente su hash de definición. V8 cambia el cálculo de retrasos; no reetiquetar manuales/progreso antiguo para cargarlo. La lectura inicial v1–v7 sin escritura no es migración de guardados. La mezcla de juego no es mecanismo de autenticación, integridad o cifrado. [Evidencia v8](../quality/T2-retrasos-maximos-v8.md).

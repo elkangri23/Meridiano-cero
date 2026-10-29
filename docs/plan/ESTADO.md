@@ -1,6 +1,6 @@
 # Estado integrado del proyecto
 
-Estado vigente de la continuación: motor v6 con lotes de análisis, consultas, esperas y órdenes; integridad de servidor y validador 1.1. Pasan lint/imports globales, 384 pruebas generales y 38 PostgreSQL/HTTP. Formato histórico y aceptación funcional completa siguen pendientes; no hay primer caso conectado en navegador. [Última evidencia y límites](../quality/T2-lotes-solicitudes-v6.md). Las cifras de integración inicial que siguen son históricas.
+Estado vigente de la continuación: motor v8 con retrasos máximos reales y rutas A/B verificadas en 455/545 y 485/575 minutos; integridad de servidor y validador 1.1. Pasan lint/imports globales, 407 pruebas generales y 38 PostgreSQL/HTTP. El commit c4a86cd consolida v6; v7/v8 son posteriores y siguen sin commit. Formato histórico y E2E/aceptación funcional completa siguen pendientes. [Última evidencia y límites](../quality/T2-retrasos-maximos-v8.md). Las cifras de integración inicial que siguen son históricas.
 
 Actualizado: 2026-10-29. Combinación de main 6298be7 (incluye la base 6f43ba2) y codex/t3-04-integracion-ia 3a28abd, preparada en worktree separado para integrar en main. [Evidencia de integración](../quality/INTEGRACION-T3-04.md). Las instantáneas previas de T1/T3 conservan su alcance histórico.
 
@@ -13,7 +13,7 @@ El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y
 | Base | Seis proyectos de producto más la raíz pnpm | No distribución del juego completa |
 | API | Health/readiness, sesión local, catálogo y creación/lectura inicial de partidas | Preview/commit, lista de partidas, reportes y guardados |
 | DB | Migrador activo, roles locales, partidas y ledger de creación transaccional | Operaciones de acciones, manuales y primer resultado; src/db conservado como histórico no activo |
-| Motor | Ejecución v6: evidencias/órdenes, costes, rutas y lotes dependientes con solicitudes/esperas | Lotes de viaje/intervención/cierre/comunicaciones, dependencias en API, extremos de retraso y reglas genéricas |
+| Motor | Ejecución v8: evidencias/órdenes, costes, lotes con solicitudes/esperas, viajes persistidos y ambas rutas con retrasos máximos | Lotes de viaje/intervención/cierre/comunicaciones, dependencias en API, reglas/vocabularios y aceptación completa |
 | Expediente | Validador estructural 1.1 y referencias/ciclos; creación valida copia estable | Referencias NPC/solución, operadores/payloads y solvencia general |
 | UI | Prototipo de desarrollo en /prototype | Flujo conectado, ventanas, manuales, preferencias persistidas y revisión accesible |
 | IA | Frontera AiProvider, adaptador Ollama y doble, memoria factual y evaluación CLI | Adaptadores externos, configuración y conexión al juego |
@@ -142,3 +142,15 @@ Lotes siguen limitados a inspect/collect/talk; matriz privada no se acepta en la
 Motor v6 añade análisis, consultas, esperas y órdenes en lote sin duplicar reglas ni esperar implícitamente. Conserva dependencias, pausas y protección del plazo, con validación compartida de selección y contadores seguros. Ambas rutas agrupadas mantienen minutos/hechos/desenlace; inicios v1–v5 permanecen legibles sin escritura, progreso antiguo no se migra.
 
 Viajes/detención/recuperación/cierre/comunicaciones siguen fuera del lote; API/UI/guardados y aceptación completa continúan pendientes. [Verificación vigente](../quality/T2-lotes-solicitudes-v6.md).
+
+## Continuación después del commit c4a86cd: viajes v7
+
+Se registró el checkpoint v6 en el commit autorizado c4a86cd. Después se corrige una secuencia estancada de viajes repetidos: tripCount persistido, preview sin reserva, reanudación determinista y guardas de capacidad. Motor v7, inicios antiguos v1–v6 legibles sin rellenar el contador ni reescribirlos. Cambios nuevos posteriores al commit, sin merge/push.
+
+No se cambia el algoritmo seeded ni hash/seed original; las rutas del caso mantienen costes conocidos. El resto de puertas T2/T3 sigue abierto. [Verificación actual](../quality/T2-secuencia-viajes-v7.md).
+
+## Continuación: máximos y presupuesto temporal v8
+
+El motor v8 produce retrasos de hasta 45 con un mezclador reproducible y muestra ambas rutas con máximos consecutivos en ejecución real de motor: A=545/B=575. Base con semillas 1 y original 42: 455/485. Mismos hechos y resultados individuales/agrupados; plazo exacto impide recuperación terminal y cooperación cero de Lucía no cierra rutas materiales.
+
+Se conservan definición/hash/seed; el cambio temporal queda versionado y no se aplica a progreso antiguo. Inicios v1–v7 legibles sin escritura. [Evidencia vigente](../quality/T2-retrasos-maximos-v8.md). El checkpoint Git sigue siendo c4a86cd (v6); este avance es posterior, sin nuevos commits ni integración.

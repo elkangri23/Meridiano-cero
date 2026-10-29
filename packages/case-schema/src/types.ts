@@ -96,6 +96,7 @@ export interface CaseRun {
   definitionHash: string;
   engineVersion: number;
   eventOrdinal: number;
+  tripCount: number;
   version: number;
   minute: number;
   status: CaseStatus;

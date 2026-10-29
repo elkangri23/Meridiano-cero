@@ -6,14 +6,14 @@ import { validateCaseDefinition, createValidationReport } from '@meridiano/case-
 
 describe('regresiones del contraste con 7962014', () => {
   it('preview de viaje no revela el retraso sorteado ni modifica estado', () => {
-    const delayed = { ...astrolabioDefinition, seed: 0 };
+    const delayed = { ...astrolabioDefinition, seed: 14194 };
     const normal = { ...astrolabioDefinition, seed: 42 };
     const action = { type: 'travel', params: { toCityId: 'paris' } } as const;
     const firstRun = createInitialRun(delayed, 'synthetic', 'synthetic-run', hashDefinition(delayed));
     const before = structuredClone(firstRun);
     const first = resolveAction(delayed, firstRun, action);
     const second = resolveAction(normal, createInitialRun(normal, 'synthetic', 'synthetic-run', hashDefinition(normal)), action);
-    expect(seededDelay(0, 0)).not.toBe(seededDelay(42, 0));
+    expect(seededDelay(14194, 0)).not.toBe(seededDelay(42, 0));
     expect(first.status).toBe('confirmation_required');
     if (first.status !== 'confirmation_required' || second.status !== 'confirmation_required') throw new Error('Missing preview');
     expect(first.preview).toEqual(second.preview);

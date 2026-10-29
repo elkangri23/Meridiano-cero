@@ -241,3 +241,11 @@ La continuación interna ya solicita preview incluso si el resto cuesta cero, om
 El motor permite también analyze/query/wait/request_warrant con los mismos parámetros internos y resolutores de la acción individual. La API aún debe adaptar la unión pública, autorización, rama/revisión, confirmación y persistencia. No se añade nueva ruta ni se permite configurar dependencias desde un cliente. Enviar no espera automáticamente; el preview presenta únicamente estimación, sin pendientes prospectivos o hechos no confirmados.
 
 RUN_VERSION_INVALID es un error operativo del estado/contador del motor, distinto de VERSION_CONFLICT del agregado HTTP; no mapearlo a un hecho del mundo ni afirmar que se guardó una transición. [Resultados y límites](../quality/T2-lotes-solicitudes-v6.md).
+
+## Contador privado de viajes v7
+
+tripCount forma parte del estado privado, no de params ni del DTO público inicial. Nuevas partidas persisten v7/counter cero; inicios antiguos v1–v6 se leen sin añadir campos a sus filas. TRAVEL_SEQUENCE_INVALID es un fallo operativo de contador/capacidad, no una consecuencia narrativa ni un VERSION_CONFLICT HTTP. Las rutas de acciones siguen pendientes, sin exponer resolve/confirm directamente. [Pruebas](../quality/T2-secuencia-viajes-v7.md).
+
+## Compatibilidad inicial v8
+
+Nuevas partidas registran v8. Lectura de inicios antiguos v1–v7 reconoce forma completa histórica sin modificarla; progreso anterior se rechaza conservando datos. El cálculo de retraso no se obtiene de datos enviados por cliente y el preview sigue sin revelar el sorteo. Las rutas de acciones/guardados siguen pendientes. [Pruebas](../quality/T2-retrasos-maximos-v8.md).

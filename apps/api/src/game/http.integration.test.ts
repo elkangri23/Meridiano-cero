@@ -136,17 +136,20 @@ describe('catálogo e inicio por HTTP con PostgreSQL real', () => {
     }
   });
 
-  it('inicios v1/v2/v3/v4/v5 siguen legibles sin reescritura; progreso v1 se conserva y falla cerrado', async () => {
+  it('inicios v1/v2/v3/v4/v5/v6/v7 siguen legibles sin reescritura; progreso v1 se conserva y falla cerrado', async () => {
     const response = await app.inject({ method: 'POST', url: '/api/v1/runs', headers, payload: { caseId, idempotencyKey: randomUUID() } });
     expect(response.statusCode).toBe(201);
     const id = response.json().runId;
     const stored = await owner.pool.query<{ engine_state: Record<string, unknown>; engine_version: number }>('SELECT engine_state,engine_version FROM runs WHERE id=$1', [id]);
     const row = stored.rows[0];
     if (!row) throw new Error('Missing synthetic run');
-    expect(row.engine_version).toBe(6);
+    expect(row.engine_version).toBe(8);
     expect(row.engine_state.eventOrdinal).toBe(0);
-    for (const version of [2, 3, 4, 5]) {
-      const previous = { ...row.engine_state, engineVersion: version };
+    expect(row.engine_state.tripCount).toBe(0);
+    const oldInitial: Record<string, unknown> = { ...row.engine_state };
+    delete oldInitial.tripCount;
+    for (const version of [2, 3, 4, 5, 6, 7]) {
+      const previous = { ...(version === 7 ? row.engine_state : oldInitial), engineVersion: version };
       await owner.pool.query('UPDATE runs SET engine_version=$1,engine_state=$2::jsonb WHERE id=$3', [version, JSON.stringify(previous), id]);
       expect((await app.inject({ url: '/api/v1/runs/' + id, headers })).statusCode).toBe(200);
       const preserved = await owner.pool.query('SELECT engine_version,engine_state FROM runs WHERE id=$1', [id]);
@@ -157,7 +160,7 @@ describe('catálogo e inicio por HTTP con PostgreSQL real', () => {
       const untouched = await owner.pool.query('SELECT engine_state FROM runs WHERE id=$1', [id]);
       expect(untouched.rows[0].engine_state).toEqual(progressedPrevious);
     }
-    const legacy: Record<string, unknown> = { ...row.engine_state, engineVersion: 1 };
+    const legacy: Record<string, unknown> = { ...oldInitial, engineVersion: 1 };
     delete legacy.eventOrdinal;
     await owner.pool.query('UPDATE runs SET engine_version=1,engine_state=$1::jsonb WHERE id=$2', [JSON.stringify(legacy), id]);
     expect((await app.inject({ url: '/api/v1/runs/' + id, headers })).statusCode).toBe(200);

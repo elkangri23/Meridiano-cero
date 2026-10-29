@@ -18,14 +18,11 @@ export function minutesUntilDeadline(minute: number, deadline: number): number {
   return Math.max(0, deadline - minute);
 }
 
-// Seeded PRNG para retrasos de viaje
+// Mezcla reproducible para el juego; nunca usar para secretos o autenticación.
 export function seededDelay(seed: number, tripIndex: number): number {
-  // Determinista: mismo seed + tripIndex = mismo retraso
-  const hash = (((seed % 100) * 31 + (tripIndex % 100) * 17) % 100 + 100) % 100;
-  // 5% de probabilidad de retraso (hash < 5)
-  if (hash < 5) {
-    // Retraso de 15-45 minutos
-    return 15 + (hash * 6);
-  }
-  return 0;
+  let value = (seed >>> 0) ^ Math.imul((tripIndex >>> 0) + 1, 0x9e3779b9);
+  value = Math.imul(value ^ (value >>> 16), 0x7feb352d);
+  value = Math.imul(value ^ (value >>> 15), 0x846ca68b);
+  const roll = ((value ^ (value >>> 16)) >>> 0) % 100;
+  return roll < 5 ? 15 + Math.round(roll * 7.5) : 0;
 }

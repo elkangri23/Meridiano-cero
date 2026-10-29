@@ -1,6 +1,6 @@
 # Catálogo de aceptación
 
-Todos los escenarios de producto están NO EJECUTADOS. Se implementarán en las tareas correspondientes. Para cada ejecución conservar revisión, comando/procedimiento y resultado. Las evaluaciones de IA real no se sustituyen por un mock.
+Este catálogo define los resultados objetivo; no declara todos sus niveles ejecutados. La evidencia versionada registra revisión, comando/procedimiento, resultado y límites. Superar pruebas del motor no acredita API/E2E, y una evaluación sintética no sustituye IA real. Los escenarios sin evidencia aplicable siguen pendientes.
 
 | ID | Escenario y resultado esperado | Nivel |
 |---|---|---|
@@ -60,3 +60,7 @@ No todos los tipos de prueba son automáticos. La conformidad de accesibilidad r
 ## Desglose verificable del primer caso
 
 Los ACC compuestos se desarrollan en [68 subcasos de aceptación T3](T3-aceptacion-detallada.md): API/autorización, guardados, memoria NPC, proveedores y UI. El documento define precondición, resultado y tipo de prueba. Son escenarios a implementar; no se suman a las 146 pruebas ya ejecutadas ni acreditan por sí solos los ACC completos.
+
+## Evidencia parcial de rutas del caso fijo
+
+ACC-008/009 tienen verificación de motor de tiempos base 455/485 y máximos 545/575, sin pruebas exclusivas de la otra ruta, con acciones individuales y lotes admitidos. También se ensayan plazo exacto y cooperación reducida bajo retraso máximo. El nivel E2E permanece pendiente; no se cierra aceptación global ni tareas por esta tabla. [Evidencia v8](T2-retrasos-maximos-v8.md).

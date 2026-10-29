@@ -18,7 +18,7 @@ import type {
 } from '@meridiano/case-schema';
 
 /** Versión de ejecución; admite el formato de definición engineCompatibility=1. */
-export const ENGINE_VERSION = 6;
+export const ENGINE_VERSION = 8;
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
 
@@ -77,10 +77,12 @@ function makeEvent(minute: number, type: string, payload: Record<string, unknown
 function requireRunCounters(run: CaseRun): void {
   if (!Number.isSafeInteger(run.version) || run.version < 1) throw new EngineStateError('RUN_VERSION_INVALID');
   if (!Number.isSafeInteger(run.eventOrdinal) || run.eventOrdinal < 0) throw new EngineStateError('EVENT_SEQUENCE_INVALID');
+  if (!Number.isSafeInteger(run.tripCount) || run.tripCount < 0) throw new EngineStateError('TRAVEL_SEQUENCE_INVALID');
 }
 
 function requireTransitionVersion(before: CaseRun, after: CaseRun): void {
   if (!Number.isSafeInteger(after.version) || after.version < before.version) throw new EngineStateError('RUN_VERSION_INVALID');
+  if (!Number.isSafeInteger(after.tripCount) || after.tripCount < before.tripCount) throw new EngineStateError('TRAVEL_SEQUENCE_INVALID');
 }
 
 function completeTransition(run: CaseRun, action: Action, work: () => ActionResult): ActionResult {
@@ -330,6 +332,12 @@ function resolveTalk(def: CaseDefinition, run: CaseRun, action: Action): ActionR
   return { status: 'applied', run: res.run, events: res.events };
 }
 
+function nextTripCount(run: CaseRun): number {
+  const count = run.tripCount + 1;
+  if (!Number.isSafeInteger(count)) throw new EngineStateError('TRAVEL_SEQUENCE_INVALID');
+  return count;
+}
+
 function previewTravel(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
   const toCityId = action.params.toCityId;
   if (typeof toCityId !== 'string') {
@@ -341,6 +349,7 @@ function previewTravel(def: CaseDefinition, run: CaseRun, action: Action): Actio
   if (!duration) {
     return { status: 'impossible', run, events: [], reason: 'No hay ruta disponible.' };
   }
+  nextTripCount(run);
   const baseCost = duration.minutes;
   const preview: ActionPreview = {
     actionType: 'travel',
@@ -491,9 +500,9 @@ function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action): Actio
   if (!duration) {
     return { status: 'impossible', run, events: [], reason: 'No hay ruta disponible.' };
   }
+  const confirmedTrips = nextTripCount(run);
   const baseCost = duration.minutes;
-  const tripIndex = run.discoveries.filter((d) => d.startsWith('travel:')).length;
-  const delay = seededDelay(def.seed, tripIndex);
+  const delay = seededDelay(def.seed, run.tripCount);
   const totalCost = baseCost + delay;
   const newMinute = advanceMinute(run.minute, totalCost, def.deadlineMinutes);
   const expired = hasExpired(newMinute, def.deadlineMinutes);
@@ -506,6 +515,7 @@ function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action): Actio
     ...run,
     version: run.version + 1,
     minute: newMinute,
+    tripCount: confirmedTrips,
     position: expired ? { ...run.position } : { cityId: toCityId, locationId: def.locations.find(location => location.cityId === toCityId && location.accessible)?.id ?? '' },
     discoveries: expired ? [...run.discoveries] : newDiscoveries,
   };
@@ -541,6 +551,7 @@ export function createInitialRun(
     definitionHash,
     engineVersion: ENGINE_VERSION,
     eventOrdinal: 0,
+    tripCount: 0,
     version: 1,
     minute: 0,
     status: 'active',

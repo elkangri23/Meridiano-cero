@@ -117,3 +117,15 @@ Los nuevos tipos conservan matriz/dependencias, máximo ocho, metadata acotada, 
 La selección de evidencias usa una comprobación compartida de forma para acción individual, lote y payload persistido: 1–16 IDs ASCII únicos, sin listas dispersas. La disponibilidad/conocimiento/admisibilidad sigue siendo contextual y no se sustituye por esa comprobación.
 
 Versión de partida y ordinal son enteros seguros; una versión inválida o un resultado que desborde/regrese produce RUN_VERSION_INVALID operativo sin devolver transición. La validación se aplica antes de trabajar y al resultado prospectivo antes de ocultarlo detrás de una confirmación, además del resultado final. No es VERSION_CONFLICT HTTP ni una penalización ficticia. [Verificación de solicitudes en lotes](../quality/T2-lotes-solicitudes-v6.md).
+
+## Secuencia persistida de viajes v7
+
+CaseRun incorpora tripCount, inicialmente cero: cuenta viajes confirmados, también si el plazo los interrumpe. El índice de retraso seeded es el contador anterior a ese viaje, nunca el número de destinos descubiertos. Confirmar incrementa una vez; preview, ruta imposible y acciones sin viaje no lo incrementan. Serializar/reanudar conserva la secuencia; repetir ciudades no congela ni reinicia el sorteo. Contador inválido o agotado produce TRAVEL_SEQUENCE_INVALID operativo, sin transición.
+
+Se registra engineVersion=7 por corregir la secuencia y añadir contador persistido. Los inicios v1–v6 se reconocen con su forma histórica completa, sin tripCount y sin reescritura; su progreso no se migra ni se ejecuta automáticamente. La definición, seed, hash y función de retraso permanecen iguales. No se deduce contador perdido desde descubrimientos: no representan todas las visitas.
+
+## Retrasos completos y presupuesto máximo v8
+
+La mezcla aritmética anterior solo producía 15/21/27/33/39 minutos y correlacionaba los dos primeros índices, por lo que no permitía el escenario máximo de SPEC-003. V8 mezcla seed e índice persistido en 32 bits sin estado global; un resultado de 0–99 activa retraso en cinco resultados nominales, con minutos enteros entre 15 y 45. No usa Math.random, reloj real ni un algoritmo de seguridad. La frecuencia por muestra/partida no se promete exactamente 5%; es una política nominal reproducible del juego.
+
+Cambiar algoritmo exige engineVersion=8. Mantener la semilla no implica preservar tiempos entre motores diferentes: el progreso anterior se conserva/rechaza y solo los inicios vírgenes v1–v7 se leen sin escritura. Definición, seed y hash originales no cambian. Los previews no consultan ni exponen el sorteo. Una variante sintética con seed=14194 produce +45 en ambos primeros viajes y permite verificar 545/575 minutos reales de motor, no una tabla de costes alterada.

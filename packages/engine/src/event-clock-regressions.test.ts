@@ -45,7 +45,7 @@ describe('BOR-032/042: secuencia persistida por partida', () => {
   });
   it('no interpreta estados de ejecución v1 con las reglas v3', () => {
     const run = { ...initial(), engineVersion: 1 };
-    expect(ENGINE_VERSION).toBe(6);
+    expect(ENGINE_VERSION).toBe(8);
     expect(() => confirmAction(definition, run, { type: 'travel', params: { toCityId: 'paris' } })).toThrow(EngineStateError);
   });
 });

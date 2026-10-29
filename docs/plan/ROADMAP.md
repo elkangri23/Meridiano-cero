@@ -72,3 +72,15 @@ Se registra motor v5; los inicios vírgenes v1–v4 se leen sin modificar, y el 
 T2-03/04/05: lotes admiten analyze/query/wait/request_warrant mediante los mismos resolutores individuales. No hay espera implícita; dependencias representan pasos enviados/aplicados, no resultados disponibles. Pausa, continuación confirmada, cuotas internas y plazo se conservan; selección de evidencias comparte validación y los contadores fallan cerrado ante invalidez/desbordamiento.
 
 Motor v6; inicios v1–v5 legibles sin modificar y progreso antiguo preservado/rechazado. Las dos rutas en lotes conservan tiempos y hechos de las versiones individuales. T2 permanece abierto por otros tipos de lote, retrasos máximos, vocabulario/reglas y aceptación; API/UI/guardados aún pendientes. [Evidencia v6](../quality/T2-lotes-solicitudes-v6.md).
+
+## Continuación: secuencia persistida de viajes v7
+
+Tras el commit autorizado c4a86cd (checkpoint v6), T2-04 corrige el índice de retrasos: tripCount persistido sustituye el recuento de destinos distintos, que se estancaba al repetir ciudades. Preview/ruta imposible no consumen índice; serialización conserva secuencia. Se cuentan salidas confirmadas incluso si el plazo interrumpe, sin llegada indebida.
+
+Motor v7; inicios v1–v6 legibles en su forma histórica sin reescritura, progreso anterior preservado/rechazado. No cambian función seeded, seed/hash del caso ni tiempos de las rutas A/B. El trabajo posterior al checkpoint queda separado del commit anterior. [Evidencia y límites](../quality/T2-secuencia-viajes-v7.md). Otros lotes, retrasos máximos, reglas/vocabularios, API/UI/guardados y aceptación siguen pendientes.
+
+## Continuación: máximos de retraso y rutas v8
+
+T2-04/06: se corrige la mezcla seeded para alcanzar 45 minutos y permitir máximos consecutivos. Variante sintética normal seed=14194 verifica rutas independientes A=545/B=575; semillas 1/42, base 455/485. Se prueban lotes equivalentes, plazo exacto y negativa de Lucía sin softlock, sin modificar duraciones ni inyectar conocimiento.
+
+Motor v8 mantiene hash/seed originales, pero cambia resultados temporales por versión. Inicios v1–v7 legibles sin escritura; progreso previo se conserva/rechaza. ACC-008/009 tienen evidencia de motor, E2E pendiente. T2 sigue abierto por otros lotes, reglas/vocabularios y puertas globales; no se declara fase completada. [Verificación y límites](../quality/T2-retrasos-maximos-v8.md).

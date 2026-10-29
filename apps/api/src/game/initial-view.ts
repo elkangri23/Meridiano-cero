@@ -41,10 +41,11 @@ function storedDefinition(id: string) {
 
 function expectedInitial(initial: ReturnType<typeof createInitialRun>, engineVersion: number): unknown {
   if (engineVersion === ENGINE_VERSION) return initial;
-  if (engineVersion === 2 || engineVersion === 3 || engineVersion === 4 || engineVersion === 5) return { ...initial, engineVersion };
-  if (engineVersion !== 1) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-  // V1 solo se reconoce por igualdad completa con un inicio virgen conocido.
-  const legacy: Record<string, unknown> = { ...initial, engineVersion: 1 };
-  delete legacy.eventOrdinal;
+  if (engineVersion === 7) return { ...initial, engineVersion };
+  if (![1, 2, 3, 4, 5, 6].includes(engineVersion)) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  // Solo igualdad completa con la forma virgen de cada versión, sin escribir.
+  const legacy: Record<string, unknown> = { ...initial, engineVersion };
+  delete legacy.tripCount;
+  if (engineVersion === 1) delete legacy.eventOrdinal;
   return legacy;
 }

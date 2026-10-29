@@ -94,3 +94,11 @@ Esto acredita los tiempos base y las variantes ensayadas, pero no cierra por sí
 ## Rutas con lotes programados v6
 
 Se ejecutan ambas rutas agrupando inspección/recogida/laboratorio y consultas/esperas/órdenes, manteniendo viajes/detención/recuperación/cierre como acciones individuales. Variantes de semillas 1/42 sin pruebas exclusivas de la otra ruta: mismos minutos, evidencias/procedencia, admisibilidad, órdenes y desenlace que la secuencia individual. Los controles de lote agregan eventos/revisión internos propios; no se igualan artificialmente esos contadores. Esto no acredita aún lotes de viaje, máximos de retraso ni E2E. [Verificación](../quality/T2-lotes-solicitudes-v6.md).
+
+## Aceptación temporal de motor v8
+
+La variante sintética seed=14194 produce +45 minutos reales en cada uno de los dos tramos mediante el mezclador normal; no se altera travelDurations ni se usa un resolver simulado. Ruta A sin pruebas exclusivas B completa en 545; B sin pruebas exclusivas A, en 575. Semillas 1 y original 42 completan ahora en 455/485, por la política v8 versionada; las cifras previas de seed=42 son evidencia histórica de otros motores.
+
+Las rutas agrupadas y las individuales coinciden en hechos, procedencia y desenlace. Con deadline=545/575, recuperar empata con el plazo y no materializa el original: resultado partial con Inés detenida. Con Lucía a cooperación cero, su conversación no revela EV-09 y ambas rutas materiales siguen resolviéndose incluso con los dos máximos.
+
+Esto verifica el componente de motor ACC-008/009 y los escenarios temporales indicados; E2E, integración completa y aceptación de hito siguen pendientes. La variante es entrada sintética de pruebas, no nuevo caso publicado ni alteración del fixture original. [Resultados](../quality/T2-retrasos-maximos-v8.md).

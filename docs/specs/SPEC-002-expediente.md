@@ -109,3 +109,13 @@ Estado nuevo engineVersion=5; la definición mantiene engineCompatibility=1 y su
 ## Compatibilidad de ejecución v6
 
 Estado nuevo engineVersion=6; formato de definición sigue engineCompatibility=1 y hash original. Se añade lectura estricta de inicios v5 a las de v1–v4 sin actualizar filas; progreso antiguo se conserva/rechaza. Metadata de lote conserva dependencias/estados y admite los cuatro nuevos tipos con parámetros cerrados. Una solicitud applied representa envío, no disponibilidad de su resultado; el snapshot debe preservar por separado los pendientes y sus vencimientos. [Pruebas v6](../quality/T2-lotes-solicitudes-v6.md).
+
+## Estado de viajes v7
+
+CaseRun añade tripCount entero seguro no negativo, inicialmente cero y persistido con el reloj/contador de eventos. Cuenta salidas confirmadas y no destinos distintos. La capacidad de incrementar se comprueba antes de preview/confirmación de un viaje; agotar viajes no impide cerrar el caso mediante otras reglas válidas.
+
+La definición y su hash original no cambian. Los inicios v1–v6 no tenían este campo: lectura compara su forma completa histórica sin tripCount y no lo rellena en DB. Un progreso antiguo no se reetiqueta como v7 ni deduce contador de marcadores de ciudades. [Verificación](../quality/T2-secuencia-viajes-v7.md).
+
+## Compatibilidad de tiempos en v8
+
+Un hash de definición y una semilla no identifican por sí solos una secuencia temporal entre versiones del motor. La persistencia conserva engineVersion=8 junto a definición/hash; cambiar el mezclador no cambia hechos del caso ni autoriza reinterpretar progreso v7. API solo reconoce inicios v1–v7 en su forma virgen conocida, manteniendo tripCount de v7 y sin añadirlo a v1–v6. La lectura no escribe ni migra. [Verificación](../quality/T2-retrasos-maximos-v8.md).
