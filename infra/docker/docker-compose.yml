@@ -1,0 +1,64 @@
+# Meridiano Cero — Docker Compose Development
+# Uso: docker compose -f infra/docker/docker-compose.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: meridiano-db
+    environment:
+      POSTGRES_USER: meridiano
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meridiano_dev}
+      POSTGRES_DB: meridiano
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridiano -d meridiano"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: meridiano-api
+    environment:
+      DATABASE_URL: postgresql://meridiano:${POSTGRES_PASSWORD:-meridiano_dev}@postgres:5432/meridiano
+      NODE_ENV: development
+      PORT: "3000"
+      # IA local (Ollama en host)
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../../apps/api:/app
+      - /app/node_modules
+    restart: unless-stopped
+    command: ["sh", "-c", "pnpm --filter @meridiano/api db:migrate && pnpm --filter @meridiano/api dev"]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+    container_name: meridiano-web
+    environment:
+      VITE_API_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    volumes:
+      - ../../apps/web:/app
+      - /app/node_modules
+      - /app/dist
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @meridiano/engine... build && pnpm --parallel -r dev",
+    "dev:test": "pnpm --filter @meridiano/engine... build && concurrently \"pnpm --filter @meridiano/api dev\" \"pnpm --filter @meridiano/web dev\"",
     "build": "pnpm -r build",
     "typecheck": "pnpm --filter @meridiano/engine... build && pnpm -r typecheck",
     "lint": "eslint apps packages && pnpm check:imports",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "24.19.2",
+    "concurrently": "^9.0.1",
     "dependency-cruiser": "18.7.0",
     "eslint": "10.13.0",
     "typescript": "6.0.3",

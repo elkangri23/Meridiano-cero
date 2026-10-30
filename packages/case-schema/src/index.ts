@@ -13,3 +13,5 @@ export type { VersionedOutcome, CaseRunSummary, TextSanitizationOptions, Sanitiz
 export { createTTSSession } from './borders.js';
 export { validateCatalogBoundary, validateCareerBoundary } from './catalog-bounds.js';
 export type { CatalogBoundaryResult, CareerBoundaryResult } from './catalog-bounds.js';
+export { runInitialSetup, runHealthChecks, getAdminPanelConfig, type SetupConfig, type AiProviderConfig, type SetupResult, type HealthCheckResult, type AdminPanelConfig } from './setup-admin.js';
+export { hashPassword, verifyPassword } from './auth-utils.js';
