@@ -177,3 +177,7 @@ export interface ValidateCaseOutput {
   valid: boolean;
   errors: string[];
 }
+
+// Re-export from providers
+export { OllamaProvider, createOllamaProvider, type OllamaConfig } from './providers/index.js';
+export { DeterministicMockProvider, createDeterministicMockProvider } from './providers/index.js';

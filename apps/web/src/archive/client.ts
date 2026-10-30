@@ -2,19 +2,22 @@ import { isInitialPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRu
 import type { InitialPlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto } from '@meridiano/contracts';
 
 export type Filter = 'all' | 'active' | 'closed';
+
 export interface ArchiveApi {
   initial(runId: string, signal: AbortSignal): Promise<InitialPlayerViewDto>;
   cases(signal: AbortSignal): Promise<CaseListDto>;
   create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal): Promise<void>;
   lookup(key: string, identity: SessionDto, signal: AbortSignal): Promise<RunCreationLookupDto | null>;
   me(signal: AbortSignal): Promise<SessionDto | null>;
-  connect(signal: AbortSignal): Promise<SessionDto>;
+  connect(signal: AbortSignal): Promise<SessionDto | null>;
   list(filter: Filter, cursor: string | null, signal: AbortSignal): Promise<RunListDto>;
   logout(csrf: string, signal: AbortSignal): Promise<void>;
 }
+
 export class ArchiveError extends Error {
   constructor(readonly kind: 'unavailable' | 'invalid') { super(kind); }
 }
+
 async function boundedJson(response: Response): Promise<unknown> {
   const reader = response.body?.getReader();
   if (!reader) throw new ArchiveError('invalid');
@@ -35,55 +38,108 @@ async function boundedJson(response: Response): Promise<unknown> {
   }
   finally { reader.releaseLock(); }
 }
+
 async function request(path: string, signal: AbortSignal, init: RequestInit = {}): Promise<Response> {
   try {
     return await fetch(path, { ...init, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
       signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]) });
   } catch { throw new ArchiveError('unavailable'); }
 }
-async function read<T>(response: Response, valid: (value: unknown) => value is T): Promise<T> {
+
+function isValidBody(body: unknown): body is Record<string, unknown> {
+  return typeof body === 'object' && body !== null && !Array.isArray(body);
+}
+
+async function read(response: Response): Promise<Record<string, unknown>> {
   if (!response.ok) { await response.body?.cancel(); throw new ArchiveError('unavailable'); }
   const body = await boundedJson(response);
-  if (!valid(body)) throw new ArchiveError('invalid');
+  if (!isValidBody(body)) throw new ArchiveError('invalid');
   return body;
 }
+
+async function readInitialPlayerViewDto(response: Response): Promise<InitialPlayerViewDto> {
+  const body = await read(response);
+  if (!isInitialPlayerViewDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
+
+async function readRunListDto(response: Response): Promise<RunListDto> {
+  const body = await read(response);
+  if (!isRunListDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
+
+async function readCaseListDto(response: Response): Promise<CaseListDto> {
+  const body = await read(response);
+  if (!isCaseListDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
+
+async function readRunCreationLookupDto(response: Response): Promise<RunCreationLookupDto | null> {
+  const body = await read(response);
+  if (!body) return null;
+  if (!isRunCreationLookupDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
+
+
+
+async function readSessionDtoOrNull(response: Response): Promise<SessionDto | null> {
+  const body = await read(response);
+  if (!body) return null;
+  if (!isSessionDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
+
 function mutationHeaders(identity: SessionDto) {
   return { 'content-type': 'application/json', 'x-csrf-token': identity.csrfToken, 'x-expected-profile-id': identity.profile.id };
 }
+
 export const archiveApi: ArchiveApi = {
-  async initial(runId, signal) {
+  async initial(runId: string, signal: AbortSignal): Promise<InitialPlayerViewDto> {
     if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(runId)) throw new ArchiveError('invalid');
-    const view = await read(await request('/api/v1/runs/' + encodeURIComponent(runId), signal), isInitialPlayerViewDto);
+    const response = await request('/api/v1/runs/' + encodeURIComponent(runId), signal);
+    const view = await readInitialPlayerViewDto(response);
     if (view.runId !== runId) throw new ArchiveError('invalid');
     return view;
   },
-  async cases(signal) { return read(await request('/api/v1/cases', signal), isCaseListDto); },
-  async create(caseId, key, identity, signal) {
+
+  async cases(signal: AbortSignal): Promise<CaseListDto> {
+    const response = await request('/api/v1/cases', signal);
+    return readCaseListDto(response);
+  },
+
+  async create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal): Promise<void> {
     const response = await request('/api/v1/runs', signal, { method: 'POST', headers: mutationHeaders(identity), body: JSON.stringify({ caseId, idempotencyKey: key }) });
     await response.body?.cancel();
     if (response.status !== 200 && response.status !== 201) throw new ArchiveError('unavailable');
   },
-  async lookup(key, identity, signal) {
+
+  async lookup(key: string, identity: SessionDto, signal: AbortSignal): Promise<RunCreationLookupDto | null> {
     const response = await request('/api/v1/run-creations/lookup', signal, { method: 'POST', headers: mutationHeaders(identity), body: JSON.stringify({ idempotencyKey: key }) });
     if (response.status === 404) { await response.body?.cancel(); return null; }
-    return read(response, isRunCreationLookupDto);
+    return readRunCreationLookupDto(response);
   },
-  async me(signal) {
+
+  async me(signal: AbortSignal): Promise<SessionDto | null> {
     const response = await request('/api/v1/me', signal);
     if (response.status === 401) { await response.body?.cancel(); return null; }
-    return read(response, isSessionDto);
+    return readSessionDtoOrNull(response);
   },
-  async connect(signal) {
-    return read(await request('/api/v1/auth/local-session', signal,
-      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }), isSessionDto);
+
+  async connect(signal: AbortSignal): Promise<SessionDto | null> {
+    return readSessionDtoOrNull(await request('/api/v1/auth/local-session', signal,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }));
   },
-  async list(filter, cursor, signal) {
+
+  async list(filter: Filter, cursor: string | null, signal: AbortSignal): Promise<RunListDto> {
     const query = new URLSearchParams({ limit: '25' });
     if (filter !== 'all') query.set('status', filter);
     if (cursor !== null) query.set('cursor', cursor);
-    return read(await request('/api/v1/runs?' + query.toString(), signal), isRunListDto);
+    return readRunListDto(await request('/api/v1/runs?' + query.toString(), signal));
   },
-  async logout(csrf, signal) {
+
+  async logout(csrf: string, signal: AbortSignal): Promise<void> {
     const response = await request('/api/v1/auth/logout', signal, { method: 'POST', headers: { 'x-csrf-token': csrf } });
     await response.body?.cancel();
     if (response.status !== 204) throw new ArchiveError('unavailable');

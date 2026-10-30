@@ -190,6 +190,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@meridiano/ai-adapters':
+        specifier: workspace:*
+        version: link:../../packages/ai-adapters
       '@meridiano/case-schema':
         specifier: workspace:*
         version: link:../../packages/case-schema
