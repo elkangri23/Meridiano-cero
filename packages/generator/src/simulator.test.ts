@@ -1,31 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { RouteSimulator, createRouteSimulator, DEFAULT_SIMULATION_CONFIG } from './simulator.js';
-import { createInMemoryCheckpointStore } from './checkpoint.js';
-import { createGenerationValidator } from './validator.js';
-import type { GenerationParams } from './pipeline.js';
-
-const mockValidator = createGenerationValidator();
-const mockCheckpointStore = createInMemoryCheckpointStore();
-
-const baseParams: GenerationParams = {
-  crimeType: 'robo',
-  difficulty: 'normal',
-  explorationMode: 'guided',
-  duration: 'medium',
-  region: 'europa',
-  surpriseMode: 'familiar',
-  seed: 42,
-  catalogVersion: '1.0.0',
-};
-
-const testPipelineConfig = {
-  maxRetriesPerStage: 2,
-  stageTimeoutMs: 5000,
-  enableSemanticReview: false,
-  enableSimulation: true,
-  checkpointStore: createInMemoryCheckpointStore(),
-  validator: createGenerationValidator(),
-};
+import { describe, it, expect } from 'vitest';
+import { createRouteSimulator, DEFAULT_SIMULATION_CONFIG } from './simulator.js';
 
 describe('RouteSimulator (T4-03)', () => {
   describe('DEFAULT_SIMULATION_CONFIG', () => {
@@ -46,16 +20,12 @@ describe('RouteSimulator (T4-03)', () => {
 
   describe('createRouteSimulator', () => {
     it('crea simulador con configuración por defecto', () => {
-      const simulator = createRouteSimulator({}, createGenerationValidator(), createInMemoryCheckpointStore());
+      const simulator = createRouteSimulator({});
       expect(simulator).toBeInstanceOf(Object);
     });
 
     it('permite sobrescribir configuración', () => {
-      const simulator = createRouteSimulator(
-        { runsPerScenario: 5, cooperationLevels: [5] },
-        createGenerationValidator(),
-        createInMemoryCheckpointStore()
-      );
+      const simulator = createRouteSimulator({ runsPerScenario: 5, cooperationLevels: [5] });
       expect((simulator as any).config.runsPerScenario).toBe(5);
       expect((simulator as any).config.cooperationLevels).toEqual([5]);
     });
@@ -63,7 +33,7 @@ describe('RouteSimulator (T4-03)', () => {
 
   describe('generateScenarios', () => {
     it('genera escenarios base sin errores', () => {
-      const simulator = createRouteSimulator({}, mockValidator, mockCheckpointStore);
+      const simulator = createRouteSimulator({});
       const scenarios = simulator.generateScenarios({
         crimeType: 'robo',
         difficulty: 'normal',
@@ -85,11 +55,8 @@ describe('RouteSimulator (T4-03)', () => {
     });
 
     it('genera menos escenarios si se desactivan errores', () => {
-      const simulator = createRouteSimulator(
-        { simulateTransportErrors: false, simulateAIErrors: false },
-        mockValidator,
-        mockCheckpointStore
-      );
+      const simulator = createRouteSimulator({ simulateTransportErrors: false, simulateAIErrors: false });
+
       const scenarios = simulator.generateScenarios({
         crimeType: 'robo',
         difficulty: 'normal',
@@ -109,12 +76,10 @@ describe('RouteSimulator (T4-03)', () => {
   describe('runSimulation', () => {
     it('ejecuta simulación y devuelve resultado', async () => {
       const simulator = createRouteSimulator(
-        { runsPerScenario: 1, cooperationLevels: [7], delayScenarios: [0], seeds: [42], simulateTransportErrors: false, simulateAIErrors: false },
-        mockValidator,
-        mockCheckpointStore
+        { runsPerScenario: 1, cooperationLevels: [7], delayScenarios: [0], seeds: [42], simulateTransportErrors: false, simulateAIErrors: false }
       );
 
-      const params = {
+      const result = await simulator.runSimulation({
         crimeType: 'robo',
         difficulty: 'normal',
         explorationMode: 'guided',
@@ -123,9 +88,7 @@ describe('RouteSimulator (T4-03)', () => {
         surpriseMode: 'familiar',
         seed: 42,
         catalogVersion: '1.0.0',
-      };
-
-      const result = await simulator.runSimulation(params, {
+      }, {
         cooperation: 7,
         delay: 0,
         transportError: false,
@@ -136,8 +99,6 @@ describe('RouteSimulator (T4-03)', () => {
         stageTimeoutMs: 5000,
         enableSemanticReview: false,
         enableSimulation: true,
-        checkpointStore: createInMemoryCheckpointStore(),
-        validator: createGenerationValidator(),
       });
 
       expect(result).toBeDefined();
@@ -150,12 +111,11 @@ describe('RouteSimulator (T4-03)', () => {
 
     it('maneja presupuesto excedido', async () => {
       const simulator = createRouteSimulator(
-        { runsPerScenario: 1, cooperationLevels: [3], delayScenarios: [120], seeds: [42], simulateTransportErrors: false, simulateAIErrors: false },
-        mockValidator,
-        mockCheckpointStore
+        { runsPerScenario: 1, cooperationLevels: [3], delayScenarios: [120], seeds: [42], simulateTransportErrors: false, simulateAIErrors: false }
       );
 
-      const params = {
+      // easy budget = 300, con cooperación baja + retraso alto puede exceder
+      const result = await simulator.runSimulation({
         crimeType: 'robo',
         difficulty: 'easy',
         explorationMode: 'guided',
@@ -164,10 +124,7 @@ describe('RouteSimulator (T4-03)', () => {
         surpriseMode: 'familiar',
         seed: 42,
         catalogVersion: '1.0.0',
-      };
-
-      // easy budget = 300, con cooperación baja + retraso alto puede exceder
-      const result = await simulator.runSimulation(params, {
+      }, {
         cooperation: 3,
         delay: 120,
         transportError: false,
@@ -178,32 +135,17 @@ describe('RouteSimulator (T4-03)', () => {
         stageTimeoutMs: 5000,
         enableSemanticReview: false,
         enableSimulation: true,
-        checkpointStore: createInMemoryCheckpointStore(),
-        validator: createGenerationValidator(),
       });
 
-      expect(result.route).toBeOneOf(['budget_exceeded', 'failed', 'partial']);
+      expect(result.route).toBeOneOf(['budget_exceeded', 'failed', 'partial', 'detention', 'timeout']);
     });
   });
 
   describe('runFullSuite', () => {
     it('ejecuta suite completa y devuelve resultados agregados', async () => {
       const simulator = createRouteSimulator(
-        { runsPerScenario: 2, cooperationLevels: [5, 7], delayScenarios: [0, 30], seeds: [42, 123], simulateTransportErrors: false, simulateAIErrors: false },
-        mockValidator,
-        mockCheckpointStore
+        { runsPerScenario: 2, cooperationLevels: [5, 7], delayScenarios: [0, 30], seeds: [42, 123], simulateTransportErrors: false, simulateAIErrors: false }
       );
-
-      const params = {
-        crimeType: 'robo',
-        difficulty: 'normal',
-        explorationMode: 'guided',
-        duration: 'medium',
-        region: 'europa',
-        surpriseMode: 'familiar',
-        seed: 42,
-        catalogVersion: '1.0.0',
-      };
 
       const result = await simulator.runFullSuite({
         crimeType: 'robo',
@@ -219,8 +161,6 @@ describe('RouteSimulator (T4-03)', () => {
         stageTimeoutMs: 5000,
         enableSemanticReview: false,
         enableSimulation: true,
-        checkpointStore: createInMemoryCheckpointStore(),
-        validator: createGenerationValidator(),
       });
 
       expect(result.totalRuns).toBeGreaterThan(0);

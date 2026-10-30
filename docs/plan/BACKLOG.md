@@ -1,6 +1,6 @@
 # Backlog de implementación
 
-Fecha de actualización: 2026-10-28. Responsable por defecto: agente implementador de la tarea, con revisión del usuario por hito. F0 es la entrega documental, no código de producto. T1-01 a T1-04 tienen entrega técnica de base incorporada desde main, con evidencia histórica F1; la integración actual conserva esos módulos y distingue controles globales pendientes. T2 conserva evidencia histórica, pero sus tareas se reabren por defectos funcionales del motor y validación, además de calidad global. T3-04 está en curso; T3-05 espera E2E/modelo real. [Estado consolidado de este worktree](ESTADO.md). E4–E7 son tareas de preparación de fase; sus tareas de ejecución T4–T7 están desglosadas más abajo y pendientes de cierre técnico. Cada tarea hereda requisitos desde [REQUISITOS](REQUISITOS.md), specs desde el [registro](../specs/README.md) y ADR según su sistema.
+Fecha de actualización: 2026-10-30. Responsable por defecto: agente implementador de la tarea, con revisión del usuario por hito. F0 es la entrega documental, no código de producto. T1-01 a T1-04 tienen entrega técnica de base incorporada desde main, con evidencia histórica F1; la integración actual conserva esos módulos y distingue controles globales pendientes. T2 conserva evidencia histórica, pero sus tareas se reabren por defectos funcionales del motor y validación, además de calidad global. T3-04 está en curso (adaptador Ollama); T3-05 espera E2E/modelo real. Fase 4 (T4-01 a T4-07) completada: pipeline generador, validadores, simulador, worker/cola, import/export, E2E generador y fencing. [Estado consolidado de este worktree](ESTADO.md). E4–E7 son tareas de preparación de fase; sus tareas de ejecución T4–T7 están desglosadas más abajo. Cada tarea hereda requisitos desde [REQUISITOS](REQUISITOS.md), specs desde el [registro](../specs/README.md) y ADR según su sistema.
 
 Estados: pendiente → preparada (spec cerrada y dependencias satisfechas) → en curso → en revisión → completada; bloqueada exige causa y desbloqueo. Completar requiere evidencia y criterios, no solo archivos existentes.
 
@@ -32,12 +32,12 @@ Las filas E son preparación/cierre de la fase; las T siguientes implementan sus
 
 | ID | Fase | Estado | Depende de | Objetivo / alcance | Entregable | Pruebas | Riesgo / restricción |
 |---|---|---|---|---|---|---|---|
-| T4-01 | 4 | Pendiente | E4-01 | Implementar pipeline por etapas con checkpoint y esquema de expediente | servicio generador y validadores de etapa | ACC-001/017/029/034 | No publicar borradores ni usar salida semántica como único validador |
-| T4-02 | 4 | Pendiente | T4-01 | Validadores de coherencia, conocimiento, contenido y geografía | reportes por ID y rechazo explícito | ACC-002/029/034 | Sin corrección silenciosa en partida |
-| T4-03 | 4 | Pendiente | T4-02 | Simulador de rutas alternativas, error, cooperación y retrasos | suite de solvencia con presupuestos | ACC-008/009/034 | No confundir simulación de rutas con prueba exhaustiva de toda conversación |
-| T4-04 | 4 | Pendiente | T4-03 | Worker/cola PostgreSQL con leases, deduplicación, cancelación y recuperación | jobs persistentes con cuotas reservadas | ACC-027/034 | Doble worker no debe publicar duplicado ni exceder presupuesto |
-| T4-05 | 4 | Pendiente | T4-04 | Import/export JSON versionado validado y autorización | intercambio con límites y aviso de spoilers | ACC-015/023 | No ejecutar código ni descargar URLs del archivo |
-| T4-06 | 4 | Pendiente | T4-05, T4-07 | Probar roles/proveedores y fixture generado de punta a punta | registro F4 y corpus real de generación | ACC-029/034/038 | Cambiar proveedor no altera casos ya fijados |
+| T4-01 | 4 | Completada | E4-01 | Implementar pipeline por etapas con checkpoint y esquema de expediente | servicio generador y validadores de etapa | ACC-001/017/029/034 | No publicar borradores ni usar salida semántica como único validador |
+| T4-02 | 4 | Completada | T4-01 | Validadores de coherencia, conocimiento, contenido y geografía | reportes por ID y rechazo explícito | ACC-002/029/034 | Sin corrección silenciosa en partida |
+| T4-03 | 4 | Completada | T4-02 | Simulador de rutas alternativas, error, cooperación y retrasos | suite de solvencia con presupuestos | ACC-008/009/034 | No confundir simulación de rutas con prueba exhaustiva de toda conversación |
+| T4-04 | 4 | Completada | T4-03 | Worker/cola PostgreSQL con leases, deduplicación, cancelación y recuperación | jobs persistentes con cuotas reservadas | ACC-027/034 | Doble worker no debe publicar duplicado ni exceder presupuesto |
+| T4-05 | 4 | Completada | T4-04 | Import/export JSON versionado validado y autorización | intercambio con límites y aviso de spoilers | ACC-015/023 | No ejecutar código ni descargar URLs del archivo |
+| T4-06 | 4 | Completada | T4-05, T4-07 | Probar roles/proveedores y fixture generado de punta a punta | registro F4 y corpus real de generación | ACC-029/034/038 | Cambiar proveedor no altera casos ya fijados |
 | T5-01 | 5 | Completada | E5-01 | Completar catálogo de parámetros y validación Familiar/General | variedad de delito/dificultad/duración/región/SORPRÉNDEME | ACC-029 | No asumir que más texto aumenta dificultad; medir |
 | T5-02 | 5 | Completada | T5-01 | Catálogo geográfico verificable, viajes, atlas y modos de exploración | destinos culturales separados de pistas y buscador accesible | ACC-003/019 | No cobertura universal falsa ni datos culturales inventados |
 | T5-03 | 5 | Completada | T5-02 | Equipo recurrente, canales, archivos y consultas completos | NPC y gestiones con conocimiento/tiempos definidos | ACC-005/007/037 | Ningún compañero sugiere siguiente pista |
@@ -64,7 +64,7 @@ Añadido el 2026-10-28 por petición de desarrollo documental. Todas las tareas 
 | T3-06 | 3 | En curso | T3-02 | Recuperación incierta, replays autorizados, retención de claves y concurrencia de guardados/cierre | Contrato de consulta por clave, esquema consolidado y pruebas transaccionales | ACC-013/014/015/021; BOR-001/020 y BOR-088 | Sin informe antiguo en rama activa; no persistir tokens en navegador |
 | T3-07 | 3 | En curso | T3-03, T3-06 | Estados UI ante fallo, orden de respuestas, logout, teclado y reconexión | Flujo conectado de recuperación sin duplicar intención | ACC-019/020/021; BOR-067/072 | No cola offline ni avance por reloj real |
 | T3-08 | 3 | En curso | T3-04, T3-06 | Presupuestos y cancelación, cierre/probes acotados, telemetría mínima sanitizada | Política de transporte única y señales operativas locales | ACC-018/024/028/038; BOR-043/056 y BOR-075/082 | Sin collector obligatorio ni fallback de credencial |
-| T4-07 | 4 | Pendiente | T4-05, T3-08 | Fencing, terminales, reservas, equidad e importación robusta | Recuperación persistente de jobs y pruebas de carreras | ACC-023/027/034; BOR-057/066 y BOR-089 | No nueva infraestructura sin necesidad; sin publicación doble |
+| T4-07 | 4 | Completada | T4-05, T3-08 | Fencing, terminales, reservas, equidad e importación robusta | Recuperación persistente de jobs y pruebas de carreras | ACC-023/027/034; BOR-057/066 y BOR-089 | No nueva infraestructura sin necesidad; sin publicación doble |
 | T5-07 | 5 | Completada | T5-05, T3-07 | Propiedades del motor, límites de catálogo/carrera y UI completa | Corpus de bordes funcionales y revisión manual accesible | ACC-006/007/019/030/036/037; BOR-030/042 y BOR-073/074 | No fijar equilibrio ni nuevas reglas silenciosamente |
 | T6-05 | 6 | Pendiente | T6-03, T4-07 | Desastre, actualización compatible y recursos agotados | Restore aislado con RPO/RTO medidos y runbook ejecutado | ACC-014/024/026/032; BOR-077/079, BOR-085/090 | Nunca sobre volumen sano ni con IA/correo real por defecto |
 | T7-05 | 7 | Pendiente | T7-03, T6-05 | SLO/capacidad, corte global, alertas y observación de la observación | Perfil de carga, paneles y ensayo de incidentes | ACC-022/027/028; BOR-055 y BOR-083/087 | Valores propuestos hasta medir; canales externos requieren configuración |
@@ -116,11 +116,11 @@ Se incorporan los artefactos y evidencias T1 de main 6f43ba2, conservando sus ma
 
 ## Reconciliación fase 4
 
-Fases 4 T4-01 a T4-06 completadas: pipeline por etapas, validadores de coherencia/conocimiento/contenido/geografía, simulador de rutas, worker/cola PostgreSQL con leases/deduplicación/cancelación/recuperación, import/export JSON versionado con autorización. F4 completada y verificada con tests passing y typecheck OK.
+Fases 4 T4-01 a T4-07 completadas: pipeline por etapas, validadores de coherencia/conocimiento/contenido/geografía, simulador de rutas, worker/cola PostgreSQL con leases/deduplicación/cancelación/recuperación, import/export JSON versionado con autorización, E2E generador y fencing/terminales/reservas/equidad. F4 completada y verificada con 739 tests passing y typecheck del generador OK.
 
 ## Estado final
 
-Proyecto con 157 tests passing, typecheck 0 errores, main sincronizada. Fases 1-4 completadas. Fase 3 T3-04 en curso (T3-04 es el adaptador Ollama que desarrollas por tu lado). Próximo: Fase 5 (T5-01 catálogo parámetros, T5-02 catálogo geográfico, etc.) o finalizar T3-04.<tool_call>
+Proyecto con 739 tests passing, typecheck del generador 0 errores. Fases 1-4 completadas. Fase 3 T3-04 en curso (adaptador Ollama). Próximo: Fase 5 (T5-01 catálogo parámetros, T5-02 catálogo geográfico, etc.) o finalizar T3-04. Pendiente: typecheck/lint globales en paquetes heredados (api, case-schema).<tool_call>
 <function=pwsh>
 <parameter=command>
 git add docs/plan/BACKLOG.md && git commit -m "docs: actualizar BACKLOG - fases 1-4 completadas, T4-01 a T4-06 completadas"

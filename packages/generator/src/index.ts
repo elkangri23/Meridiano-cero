@@ -46,6 +46,43 @@ export {
   createGenerationValidator,
 } from './validator.js';
 
+export {
+  createJobQueue,
+  InMemoryJobQueue,
+} from './worker.js';
+
+export type {
+  GenerationJob,
+  JobStatus,
+  JobQueue,
+  WorkerConfig,
+} from './worker.js';
+
+export {
+  createExport,
+  validateImport,
+  serializeExport,
+  deserializeImport,
+  computeChecksum,
+} from './import-export.js';
+
+export type {
+  CaseExport,
+  ImportResult,
+  ExportResult,
+} from './import-export.js';
+
+export {
+  createFencingManager,
+  FencingManager,
+} from './fencing.js';
+
+export type {
+  FencingToken,
+  Reservation,
+  TerminalState,
+} from './fencing.js';
+
 export type {
   ValidationResult,
   ValidationError,

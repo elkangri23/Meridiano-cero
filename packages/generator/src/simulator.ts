@@ -9,7 +9,7 @@ export type SimulationConfig = {
   simulateAIErrors: boolean;
   seeds: number[];
   maxBudgetByDifficulty: Record<string, number>;
-}
+};
 
 export const DEFAULT_SIMULATION_CONFIG: SimulationConfig = {
   runsPerScenario: 10,
@@ -61,20 +61,9 @@ export interface SimulationSuiteResult {
   detentionRuns: number;
   timeoutRuns: number;
   budgetExceededRuns: number;
-  byDifficulty: Record<string, {
-    total: number;
-    success: number;
-    avgTime: number;
-    avgBudget: number;
-  }>;
-  byCooperation: Record<number, {
-    total: number;
-    success: number;
-  }>;
-  byDelay: Record<number, {
-    total: number;
-    success: number;
-  }>;
+  byDifficulty: Record<string, { total: number; success: number; avgTime: number; avgBudget: number }>;
+  byCooperation: Record<number, { total: number; success: number }>;
+  byDelay: Record<number, { total: number; success: number }>;
   results: RouteSimulationResult[];
   summary: {
     overallSuccessRate: number;
@@ -84,110 +73,91 @@ export interface SimulationSuiteResult {
   };
 }
 
-// ============================================================================
-// Simulador principal
-// ============================================================================
-
 export class RouteSimulator {
   private config: SimulationConfig;
-  private validator: any;
-  private checkpointStore: any;
 
-  constructor(config: Partial<SimulationConfig>, validator: any, checkpointStore: any) {
+  constructor(config: Partial<SimulationConfig>) {
     this.config = { ...DEFAULT_SIMULATION_CONFIG, ...config };
-    this.validator = validator;
-    this.checkpointStore = checkpointStore;
   }
 
-  generateScenarios(params: any): Array<{
-    cooperation: number;
-    delay: number;
-    transportError: boolean;
-    aiError: boolean;
-    seed: number;
-  }> {
+  generateScenarios(_params: any): Array<{ cooperation: number; delay: number; transportError: boolean; aiError: boolean; seed: number }> {
     const scenarios: any[] = [];
 
     for (const cooperation of this.config.cooperationLevels) {
       for (const delay of this.config.delayScenarios) {
         for (const seed of this.config.seeds) {
           scenarios.push({ cooperation, delay, transportError: false, aiError: false, seed });
-          
+
           if (this.config.simulateTransportErrors) {
             scenarios.push({ cooperation, delay, transportError: true, aiError: false, seed });
           }
-          
+
           if (this.config.simulateAIErrors) {
             scenarios.push({ cooperation, delay, transportError: false, aiError: true, seed });
           }
-          
+
           if (this.config.simulateTransportErrors && this.config.simulateAIErrors) {
             scenarios.push({ cooperation, delay, transportError: true, aiError: true, seed });
           }
         }
       }
+    }
 
     return scenarios;
   }
 
-  async runSimulation(params: any, scenario: any, pipelineConfig: any): Promise<any> {
+  async runSimulation(params: any, scenario: any, _pipelineConfig: any): Promise<any> {
     const startTime = Date.now();
-    const scenarioId = `${params.crimeType}-${params.crimeType}-c${scenario.cooperation}-d${scenario.delay}-t${scenario.transportError}-a${scenario.aiError}-s${scenario.seed}`;
-    
-    const budgetLimit = this.config.maxBudgetByDifficulty[params.crimeType] ?? 480;
+    const scenarioId = `${params.difficulty}-${params.crimeType}-c${scenario.cooperation}-d${scenario.delay}-t${scenario.transportError}-a${scenario.aiError}-s${scenario.seed}`;
+
+    const budgetLimit = this.config.maxBudgetByDifficulty[params.difficulty] ?? 480;
     let budgetUsed = 0;
     let completedStages = 0;
     let success = false;
-    let route = 'failed';
+    let route: RouteSimulationResult['route'] = 'failed';
     let error: string | undefined;
 
     try {
-      // Crear borrador inicial
-      const draft = this.createInitialDraft(params);
-      
-      // Simular cada etapa con variaciones
+      this.createInitialDraft(params);
+
       for (let stageNum = 1; stageNum <= 9; stageNum++) {
-        const stageNumCon = stageNum as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
-        
-        // Calcular tiempo y costo de la etapa
-        const stageTime = this.calculateStageTime(stageNum, scenario.cooperation, scenario.delay);
         const stageCost = this.calculateStageCost(stageNum);
         budgetUsed += stageCost;
-        
-        if (budgetUsed > this.config.maxBudgetByDifficulty[params.crimeType] ?? 480) {
+
+        if (budgetUsed > (this.config.maxBudgetByDifficulty[params.difficulty] ?? 480)) {
           throw new Error('Presupuesto excedido');
         }
-        
+
         if (scenario.transportError && Math.random() < 0.15) {
           throw new Error('Error de transporte simulado');
         }
-        
+
         if (scenario.aiError && Math.random() < 0.1) {
           throw new Error('Error de IA simulado');
         }
-        
+
         if (scenario.cooperation < 4 && Math.random() < 0.3) {
           throw new Error('Cooperación insuficiente');
         }
-        
+
         if (stageNum >= 7 && scenario.cooperation < 5 && Math.random() < 0.2) {
           route = 'detention';
           throw new Error('Detención errónea');
         }
-        
+
         completedStages++;
       }
-      
+
       success = true;
       route = 'success';
     } catch (err) {
       success = false;
       error = err instanceof Error ? err.message : String(err);
-      
-      if (error?.includes('Presupuesto')) route = 'budget_exceeded';
-      else if (error?.includes('Detención')) route = 'detention';
+
+      if (error.indexOf('Presupuesto') >= 0) route = 'budget_exceeded';
+      else if (error.indexOf('Detención') >= 0) route = 'detention';
       else if (completedStages >= 5) route = 'partial';
-      else if (error?.includes('timeout') || completedStages === 0) route = 'timeout';
+      else if (error.indexOf('timeout') >= 0 || completedStages === 0) route = 'timeout';
       else route = 'failed';
     }
 
@@ -195,18 +165,18 @@ export class RouteSimulator {
 
     return {
       scenarioId,
-      params: { crimeType: 'robo', difficulty: 'normal', explorationMode: 'guided', duration: 'medium', region: 'europa', surpriseMode: 'familiar', seed: 42, catalogVersion: '1.0.0' },
-      cooperation: 5,
-      delay: 0,
-      transportError: false,
-      aiError: false,
-      seed: 42,
+      params,
+      cooperation: scenario.cooperation,
+      delay: scenario.delay,
+      transportError: scenario.transportError,
+      aiError: scenario.aiError,
+      seed: scenario.seed,
       success,
       completedStages,
       totalTime,
-      budgetUsed: 0,
-      budgetLimit: 480,
-      withinBudget: true,
+      budgetUsed,
+      budgetLimit,
+      withinBudget: budgetUsed <= budgetLimit,
       error,
       route,
     };
@@ -214,7 +184,7 @@ export class RouteSimulator {
 
   calculateStageTime(stageNum: number, cooperation: number, delay: number): number {
     const baseTimes = [0, 15, 10, 20, 15, 10, 10, 20, 15, 10];
-    const base = this.baseTimes[stageNum] || 10;
+    const base = baseTimes[stageNum] || 10;
     const coopFactor = cooperation >= 7 ? 0.8 : cooperation >= 5 ? 1.0 : 1.5;
     return Math.round(base * coopFactor + delay);
   }
@@ -225,11 +195,12 @@ export class RouteSimulator {
   }
 
   createInitialDraft(params: any): any {
+    const now = new Date().toISOString();
     return {
-      id: 'sim-${Date.now()}-${Math.random().toString(36).slice(2, 8)}',
+      id: `sim-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       params,
       status: 'validating',
-      createdAt: new Date().toISOString(),
+      createdAt: now,
       updatedAt: now,
       currentStage: 1,
       stages: Array.from({ length: 9 }, (_, i) => ({
@@ -237,16 +208,17 @@ export class RouteSimulator {
         name: `stage-${i + 1}`,
         status: 'pending' as const,
         retryCount: 0,
-      }));
+      })),
+    };
   }
 
-  runFullSuite(baseParams: any, pipelineConfig: any): Promise<any> {
+  async runFullSuite(baseParams: any, pipelineConfig: any): Promise<any> {
     const scenarios = this.generateScenarios(baseParams);
     const results: any[] = [];
 
     for (const scenario of scenarios) {
       for (let run = 0; run < this.config.runsPerScenario; run++) {
-        const result = this.runSimulation(baseParams, scenario, pipelineConfig);
+        const result = await this.runSimulation(baseParams, scenario, pipelineConfig);
         results.push(result);
       }
     }
@@ -256,12 +228,12 @@ export class RouteSimulator {
 
   aggregateResults(results: any[]): any {
     const totalRuns = results.length;
-    const successfulRuns = results.filter(r => r.success).length;
-    const failedRuns = results.filter(r => r.route === 'failed').length;
-    const partialRuns = results.filter(r => r.route === 'partial').length;
-    const detentionRuns = results.filter(r => r.route === 'detention').length;
-    const timeoutRuns = results.filter(r => r.route === 'timeout').length;
-    const budgetExceededRuns = results.filter(r => r.route === 'budget_exceeded').length;
+    const successfulRuns = results.filter((r: any) => r.success).length;
+    const failedRuns = results.filter((r: any) => r.route === 'failed').length;
+    const partialRuns = results.filter((r: any) => r.route === 'partial').length;
+    const detentionRuns = results.filter((r: any) => r.route === 'detention').length;
+    const timeoutRuns = results.filter((r: any) => r.route === 'timeout').length;
+    const budgetExceededRuns = results.filter((r: any) => r.route === 'budget_exceeded').length;
 
     const byDifficulty: any = {};
     const byCooperation: Record<number, { total: number; success: number }> = {};
@@ -269,19 +241,22 @@ export class RouteSimulator {
 
     for (const r of results) {
       const diff = r.params.difficulty;
-      if (!byDifficulty[diff]) byDifficulty[diff] = { total: 0, success: 0, avgTime: 0, avgBudget: 0 };
-      byDifficulty[diff].total++;
-      if (r.success) byDifficulty[diff].success++;
-      byDifficulty[diff].avgTime += r.totalTime;
-      byDifficulty[diff].avgBudget += r.budgetUsed;
+      const diffAgg = byDifficulty[diff] ?? { total: 0, success: 0, avgTime: 0, avgBudget: 0 };
+      byDifficulty[diff] = diffAgg;
+      diffAgg.total++;
+      if (r.success) diffAgg.success++;
+      diffAgg.avgTime += r.totalTime;
+      diffAgg.avgBudget += r.budgetUsed;
 
-      if (!byCooperation[r.cooperation]) byCooperation[r.cooperation] = { total: 0, success: 0 };
-      byCooperation[r.cooperation].total++;
-      if (r.success) byCooperation[r.cooperation].success++;
+      const coopAgg = byCooperation[r.cooperation] ?? { total: 0, success: 0 };
+      byCooperation[r.cooperation] = coopAgg;
+      coopAgg.total++;
+      if (r.success) coopAgg.success++;
 
-      if (!byDelay[r.delay]) byDelay[r.delay] = { total: 0, success: 0 };
-      byDelay[r.delay].total++;
-      if (r.success) byDelay[r.delay].success++;
+      const delayAgg = byDelay[r.delay] ?? { total: 0, success: 0 };
+      byDelay[r.delay] = delayAgg;
+      delayAgg.total++;
+      if (r.success) delayAgg.success++;
     }
 
     const criticalIssues: string[] = [];
@@ -290,8 +265,8 @@ export class RouteSimulator {
     if (detentionRuns / results.length > 0.15) criticalIssues.push('Demasiadas detenciones erróneas (>15%)');
     if (budgetExceededRuns / results.length > 0.1) criticalIssues.push('Demasiados casos exceden presupuesto (>10%)');
 
-    const avgTime = results.reduce((sum, r) => sum + r.totalTime, 0) / results.length;
-    const avgBudget = results.reduce((sum, r) => sum + r.budgetUsed, 0) / results.length;
+    const avgTime = results.reduce((sum: number, r: any) => sum + r.totalTime, 0) / results.length;
+    const avgBudget = results.reduce((sum: number, r: any) => sum + r.budgetUsed, 0) / results.length;
 
     return {
       config: this.config,
@@ -311,12 +286,11 @@ export class RouteSimulator {
         avgTime,
         avgBudget,
         criticalIssues,
-      };
+      },
     };
   }
 }
 
-// Factory function
-export function createRouteSimulator(config, validator, checkpointStore) {
-  return new RouteSimulator(config, validator, checkpointStore);
+export function createRouteSimulator(config: any) {
+  return new RouteSimulator(config);
 }

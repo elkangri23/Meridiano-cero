@@ -1,10 +1,10 @@
 # Estado integrado del proyecto
 
-Estado vigente: motor v14 y validador 1.5; rutas A/B verificadas con tiempos base/máximos 455/545 y 485/575. T3 conecta archivo, catálogo, creación web recuperable y consulta de ficha inicial por cuenta/pestaña; conserva lectura inicial y recuperación por clave en API. Pasan lint/imports globales, 603 pruebas generales y 60 PostgreSQL/HTTP. Calidad de formato histórica, juego conectado y aceptación completa siguen pendientes.
+Estado vigente: motor v14 y validador 1.5; rutas A/B verificadas con tiempos base/máximos 455/545 y 485/575. T3 conecta archivo, catálogo, creación web recuperable y consulta de ficha inicial por cuenta/pestaña; conserva lectura inicial y recuperación por clave en API. Fase 4 (T4-01 a T4-07) completada: generador (pipeline 9 etapas, checkpoints, validadores), simulador de rutas, worker/cola PostgreSQL, import/export, E2E generador y fencing. 739 pruebas pasando globalmente, typecheck generador OK. Calidad de formato histórica, juego conectado y aceptación completa siguen pendientes.
 
 Últimas evidencias: [cierre individual v14](../quality/T2-cierre-individual-v14.md), [formato cerrado 1.5](../quality/T2-formato-cerrado.md), [ficha inicial conectada](../quality/T3-ficha-inicial-conectada.md), [contenido reconocido 1.4](../quality/T2-contenido-ejecutable.md), [permisos del testimonio v13](../quality/T2-permisos-testimonio-v13.md) y [lista propia](../quality/T3-02-lista-partidas.md) y [archivo web](../quality/T3-03-archivo-conectado.md) y [creación recuperable](../quality/T3-creacion-web-recuperable.md). c4a86cd consolida v6, 8f9c288 registra v7/v8 y 42aaa42 el localizador de creación; los avances posteriores se consolidan para su integración en main por autorización expresa del usuario. Las cifras de integración inicial siguientes son históricas.
 
-Actualizado: 2026-10-29. La línea consolidada incluye main 6298be7 (base 6f43ba2), codex/t3-04-integracion-ia 3a28abd y los avances de motor/API/web posteriores. El usuario autoriza integrarlos en main y mantenerla como única rama. [Evidencia de integración](../quality/INTEGRACION-T3-04.md). Las instantáneas previas de T1/T3 conservan su alcance histórico.
+Actualizado: 2026-10-30. La línea consolidada incluye main 6298be7 (base 6f43ba2), codex/t3-04-integracion-ia 3a28abd y los avances de motor/API/web posteriores. El usuario autoriza integrarlos en main y mantenerla como única rama. [Evidencia de integración](../quality/INTEGRACION-T3-04.md). Las instantáneas previas de T1/T3 conservan su alcance histórico.
 
 El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y verificaciones de la combinación, sin declarar el juego terminado.
 
@@ -19,6 +19,7 @@ El [backlog](BACKLOG.md) conserva dependencias; este documento refleja código y
 | Expediente | Validador estructural 1.5: formato cerrado, referencias/ciclos, mapa, conocimientos/solución y contenido reconocido; creación valida copia estable | Condiciones NPC/conversación, operadores/payloads y solvencia general |
 | UI | Archivo MS-DOS en raíz (sesión/lista/filtros/páginas/catálogo/creación recuperable y ficha inicial); prototipo separado en /prototype | Investigación conectada, ventanas, manuales, preferencias persistidas y accesibilidad completa |
 | IA | Frontera AiProvider, adaptador Ollama y doble, memoria factual y evaluación CLI, validación estricta de campos no autorizados (T3-04) | Adaptadores externos, configuración y conexión al juego |
+| Generador (Fase 4) | Pipeline 9 etapas, checkpoints, validadores coherencia/conocimiento/contenido/geografía, simulador rutas (cooperación, errores, retrasos, presupuestos), worker/cola PostgreSQL (leases, deduplicación, cancelación, recuperación), import/export JSON versionado, fencing/terminales/reservas/equidad, E2E generar→validar→simular→guardar | Integración con API/UI, proveedores reales |
 | CI | Workflow único con controles de base/seguridad y corpus IA | La ejecución local global no está verde |
 
 El artefacto heredado packages/web/RetroScreen fue conservado durante la integración inicial y se retira en esta continuación al verificar ausencia de manifest/consumidores y tipos inexistentes. Solicitaba CaseDefinition/cooperación privados; no se conecta como sustituto del DTO autorizado. La aplicación y el prototipo vigentes en apps/web se conservan. El commit de main 6298be7 añadió packages/ai-adapters durante la verificación y se incorporó sin perderlo. Coexiste con apps/api/src/ai; no está consumido por la API y requiere consolidación de transporte/configuración y revisión de seguridad antes de conectarse.
@@ -26,26 +27,25 @@ El artefacto heredado packages/web/RetroScreen fue conservado durante la integra
 ## Verificación de la combinación
 
 - Instalación congelada correcta, con versiones fijadas; se eliminó una entrada Vite idéntica duplicada que impedía parsear el lockfile de main.
-- Build completo y typecheck completo correctos.
-- 157 pruebas correctas, doce archivos, sin integración PostgreSQL real en esta ejecución.
+- Build completo y typecheck del generador correctos.
+- 739 pruebas correctas, 56 archivos.
 - Lint del módulo IA correcto; corpus determinista de 17 escenarios correcto.
 - Smoke HTTP web/proxy/API y escaneo local por patrones correctos.
-- Lint global: doce errores heredados de main, incluidos complejidad y componente no consumido.
+- Lint global: doce errores heredados de main (api, case-schema), incluidos complejidad y componente no consumido.
 - Imports: siete infracciones heredadas (contratos/case-schema y engine con crypto/tests).
 - Formato: 22 archivos heredados señalados; no se debilitan sus controles.
 - Verificación documental y revisión de diff en el [registro](../quality/INTEGRACION-T3-04.md).
 
-Las 146 pruebas del avance T3-04 y las 71 de main son referencias previas; la combinación tiene 157, no la suma de ambas porque comparten pruebas. Los 68 subcasos detallados siguen siendo escenarios previstos hasta ejecutarse y mapear evidencia.
-
 ## Fases y próximos pasos
 
-T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. T3-01/02/03/04 están en curso; T3-05 espera E2E/modelo real. Fases 4–7 pendientes.
+T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. T3-01/02/03/04 están en curso; T3-05 espera E2E/modelo real. Fase 4 completada (T4-01 a T4-07). Fases 5–7 pendientes.
 
 1. Completar validación, lotes y extremos de retraso del motor; cerrar calidad global antes de habilitar acciones HTTP. Costes, ordinales y tiempos base de rutas ya están comprobados en v4.
 2. Ampliar el DTO inicial y API-juego: preview/commit, operaciones, transiciones y proyección de resultados; la creación inicial ya tiene ownership, rama e idempotencia.
 3. Conectar guardados/manuales, política NPC y UI, manteniendo el primer resultado oficial.
 4. Evaluar el proveedor real disponible cuando haya acceso, sin exigir Ollama en trabajo/VPS.
 5. Ejecutar ambas rutas en navegador, reanudación y teclado conforme al catálogo detallado.
+6. Integrar generador (Fase 4) con API/UI para generación de casos de punta a punta.
 
 ## Arranque vigente
 
