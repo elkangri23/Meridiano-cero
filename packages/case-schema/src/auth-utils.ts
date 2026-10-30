@@ -33,10 +33,14 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   try {
     const parts = storedHash.split('$');
     if (parts.length !== 4 || parts[0] !== '') return false;
-    const iterations = parseInt(parts[1], 10);
+    const iterationsStr = parts[1];
+    const saltStr = parts[2];
+    const hashStr = parts[3];
+    if (!iterationsStr || !saltStr || !hashStr) return false;
+    const iterations = parseInt(iterationsStr, 10);
     if (!Number.isFinite(iterations)) return false;
-    const salt = Uint8Array.from(atob(parts[2]), c => c.charCodeAt(0));
-    const expectedHash = Uint8Array.from(atob(parts[3]), c => c.charCodeAt(0));
+    const salt = Uint8Array.from(atob(saltStr), c => c.charCodeAt(0));
+    const expectedHash = Uint8Array.from(atob(hashStr), c => c.charCodeAt(0));
 
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
