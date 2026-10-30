@@ -38,13 +38,17 @@ describe('npc-catalog', () => {
   it('searchNPCs encuentra por nombre', () => {
     const results = searchNPCs('Luc');
     expect(results.length).toBeGreaterThanOrEqual(1);
-    expect(results[0].name).toBe('Lucía');
+    const first = results[0];
+    expect(first).toBeDefined();
+    expect(first?.name).toBe('Lucía');
   });
 
   it('searchNPCs encuentra por conocimiento', () => {
     const results = searchNPCs('tool-registry');
     expect(results.length).toBeGreaterThanOrEqual(1);
-    expect(results[0].knowledge).toContain('tool-registry');
+    const first = results[0];
+    expect(first).toBeDefined();
+    expect(first?.knowledge).toContain('tool-registry');
   });
 
   it('searchNPCs con consulta vacío devuelve vacío', () => {

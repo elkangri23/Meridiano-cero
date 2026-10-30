@@ -26,7 +26,7 @@ export interface SanctionRecord {
 export interface CaseOutcome {
   result: CaseResult;
   points: number;
-  medal?: string;
+  medal?: string | undefined;
   prestigeDelta: number;
   integrityDelta: number;
   trustDelta: number;

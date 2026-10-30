@@ -86,7 +86,9 @@ describe('career', () => {
     };
     career = applySanction(career, sanction);
     expect(career.sanctions).toHaveLength(1);
-    expect(career.sanctions[0].id).toBe('s1');
+    const addedSanction = career.sanctions[0]!;
+    expect(addedSanction).toBeDefined();
+    expect(addedSanction.id).toBe('s1');
   });
 
   it('resolveSanction marca sanción como resuelta', () => {
@@ -97,7 +99,9 @@ describe('career', () => {
     };
     career = applySanction(career, sanction);
     career = resolveSanction(career, 's1', 200);
-    expect(career.sanctions[0].resolvedAt).toBe(200);
+    const resolvedSanction = career.sanctions[0];
+    expect(resolvedSanction).toBeDefined();
+    expect(resolvedSanction!.resolvedAt).toBe(200);
   });
 
   it('getActiveSanctions filtra sanciones activas', () => {
@@ -108,7 +112,9 @@ describe('career', () => {
     // En el minuto 250, s1 está resuelta (resolvedAt=200 <= 250) y s2 no lo está
     const active = getActiveSanctions(career, 250);
     expect(active).toHaveLength(1);
-    expect(active[0].id).toBe('s2');
+    const activeSanction = active[0];
+    expect(activeSanction).toBeDefined();
+    expect(activeSanction!.id).toBe('s2');
   });
 
   it('getRank devuelve rango correcto', () => {
