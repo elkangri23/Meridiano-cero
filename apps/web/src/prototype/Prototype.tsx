@@ -5,27 +5,57 @@ import type { Tool } from './sample';
 import { Scene } from './Scene';
 import { ToolPanel } from './ToolPanel';
 import { Confirmation } from './Confirmation';
+import { aiApi, type AiInterpretation } from '../ai/client';
+import { AiError } from '../ai/client';
 import './prototype.css';
 
 export function Prototype() {
   const [tool, setTool] = useState<Tool>('dossier');
   const [draft, setDraft] = useState('');
   const [request, setRequest] = useState<string | null>(null);
+  const [interpretation, setInterpretation] = useState<AiInterpretation | null>(null);
   const [notice, setNotice] = useState('Las herramientas no consumen tiempo.');
   const [contrast, setContrast] = useState(false);
   const [scale, setScale] = useState(100);
   const [readableFont, setReadableFont] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+
   function prepare(text: string) {
     setDraft(text); setNotice('Orden preparada en el campo de entrada.');
     input.current?.focus();
   }
-  function submit(event: FormEvent<HTMLFormElement>) {
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft.trim()) setRequest(draft.trim());
+    const text = draft.trim();
+    if (!text) return;
+    setNotice('Interpretando orden...');
+    const controller = new AbortController();
+    try {
+      const result = await aiApi.interpret(text, { location: sampleView.position.cityId, description: sampleView.conversation[0] ?? 'Sin descripción' }, tools.map(t => ({ id: t.id, label: t.label })), controller.signal);
+      setInterpretation(result);
+      if (result.kind === 'actions') {
+        const actionIds = result.actionIds ?? [];
+        setRequest(`Acción: ${actionIds.join(', ')}`);
+        setNotice('Orden interpretada. Revisa y confirma.');
+      } else if (result.kind === 'clarification') {
+        setRequest(null);
+        setNotice(`Aclaración: ${result.message ?? 'Orden ambigua'}`);
+      }
+    } catch (e) {
+      if (e instanceof AiError) {
+        setRequest(null);
+        setNotice(e.kind === 'budget_exceeded' ? 'Orden demasiado larga.' : e.kind === 'cancelled' ? 'Cancelado.' : 'Error de conexión con IA.');
+      } else {
+        setRequest(null);
+        setNotice('Error inesperado.');
+      }
+    }
   }
+
   function confirm() {
     setRequest(null);
+    setInterpretation(null);
     setNotice('Confirmación revisada. La vista de muestra conserva el estado inicial.');
   }
   return <main className="prototype" data-font={readableFont ? 'readable' : 'retro'} data-contrast={contrast ? 'high' : 'normal'} style={{ fontSize: scale + '%' }}>
@@ -49,6 +79,6 @@ export function Prototype() {
       <div className="command-bottom"><p role="status" aria-live="polite">{notice}</p><button className="text-button" type="button" onClick={() => { prepare('Examinar la sala'); }}>Ejemplo de orden</button></div>
     </section>
     <footer className="agency-footer"><span>A.C.M.E. · IDENTIDAD PROVISIONAL</span><span>OBSERVAR · PREGUNTAR · DEDUCIR</span><span>EL MUNDO GUARDA SUS PISTAS</span></footer>
-    <Confirmation request={request} cancel={() => { setRequest(null); }} confirm={confirm} />
+    <Confirmation request={request} interpretation={interpretation} cancel={() => { setRequest(null); }} confirm={confirm} />
   </main>;
 }
