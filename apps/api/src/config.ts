@@ -1,6 +1,10 @@
 export interface BootstrapConfig { host: '127.0.0.1'; port: number }
 export interface AppConfig extends BootstrapConfig {
   origin: string; localAuth: boolean; databaseUrl: string;
+  aiProvider: 'ollama' | 'mock' | 'none';
+  aiBaseUrl?: string;
+  aiModel?: string;
+  aiTimeoutMs?: number;
 }
 function validateOrigin(value: string | undefined): string {
   if (!value) throw new Error('CONFIG_PUBLIC_ORIGIN');
@@ -36,5 +40,15 @@ export function readBootstrapConfig(env: NodeJS.ProcessEnv): BootstrapConfig {
 export function readAppConfig(env: NodeJS.ProcessEnv): AppConfig {
   const http = readHttp(env);
   if (!['true', 'false'].includes(env.LOCAL_DEV_AUTH_ENABLED ?? '')) throw new Error('CONFIG_LOCAL_DEV_AUTH_ENABLED');
-  return { ...http, origin: validateOrigin(env.PUBLIC_ORIGIN), localAuth: env.LOCAL_DEV_AUTH_ENABLED === 'true', databaseUrl: readDatabaseUrl(env.DATABASE_URL) };
+  const aiProvider = env.AI_PROVIDER ?? 'mock';
+  if (!['ollama', 'mock', 'none'].includes(aiProvider)) throw new Error('CONFIG_AI_PROVIDER');
+const cfg: AppConfig = {
+    ...http, origin: validateOrigin(env.PUBLIC_ORIGIN), localAuth: env.LOCAL_DEV_AUTH_ENABLED === 'true',
+    databaseUrl: readDatabaseUrl(env.DATABASE_URL),
+    aiProvider: aiProvider as AppConfig['aiProvider'],
+  };
+  if (env.AI_BASE_URL) cfg.aiBaseUrl = env.AI_BASE_URL;
+  if (env.AI_MODEL) cfg.aiModel = env.AI_MODEL;
+  if (env.AI_TIMEOUT_MS) cfg.aiTimeoutMs = Number(env.AI_TIMEOUT_MS);
+  return cfg;
 }

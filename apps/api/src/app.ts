@@ -2,6 +2,7 @@ import { registerRuntime } from './runtime.ts';
 import type { RuntimeState } from './lifecycle.ts';
 import type { Telemetry } from './telemetry.ts';
 import { registerGameRoutes } from './game/routes.ts';
+import { registerAiRoutes } from './ai/routes.ts';
 import { RunStoreError } from './game/runs.ts';
 import type { AppConfig } from './config.ts';
 import type { Database } from './database/connection.ts';
@@ -28,6 +29,7 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
     });
     registerLocalAuth(app, options.config, options.database);
     registerGameRoutes(app, options.config, options.database, ready);
+    registerAiRoutes(app, options.config, options.database);
   }
   app.setNotFoundHandler((request, reply) => {
     return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Recurso no disponible.', requestId: request.id } });
