@@ -7,10 +7,10 @@ function createMockDb() {
   const instances: any[] = [];
   const baseMigrations: any[] = [{ name: '0000_base', hash: 'abc' }];
   return {
-    query: vi.fn().mockImplementation((sql: string, params?: any[]) => {
+    query: vi.fn().mockImplementation((sql: string, params: any[] = []) => {
       const sqlLower = sql.toLowerCase();
       if (sqlLower.includes('from users where role')) {
-        return Promise.resolve({ rows: users.filter(u => u.role === params?.[0]) });
+        return Promise.resolve({ rows: users.filter(u => u.role === params[0]) });
       }
       if (sqlLower.includes('insert into users')) {
         const row = { id: 'user-1', email: params[0], name: params[2], role: 'admin' };
@@ -69,7 +69,7 @@ describe('setup-admin', () => {
     const db = createMockDb();
     const result = await runInitialSetup({ ...validConfig, adminPassword: 'corta' }, db as any);
     expect(result.success).toBe(false);
-    expect(result.error.toLowerCase()).toContain('contraseña');
+    expect(result.error?.toLowerCase()).toContain('contraseña');
   });
 
   it('runInitialSetup rechaza setup duplicado', async () => {
@@ -77,16 +77,16 @@ describe('setup-admin', () => {
     await runInitialSetup(validConfig, db as any);
     const second = await runInitialSetup(validConfig, db as any);
     expect(second.success).toBe(false);
-    expect(second.error).toContain('ya completado');
+    expect(second.error?.toLowerCase()).toContain('ya completado');
   });
 
   it('runHealthChecks reporta healthy sin IA', async () => {
     const db = createMockDb();
     const health = await runHealthChecks(db as any, undefined);
     expect(health.status).toBe('healthy');
-    expect(health.checks.database.status).toBe('pass');
-    expect(health.checks.migrations.status).toBe('pass');
-    expect(health.checks.ai_provider.status).toBe('pass');
+    expect(health.checks.database?.status).toBe('pass');
+    expect(health.checks.migrations?.status).toBe('pass');
+    expect(health.checks.ai_provider?.status).toBe('pass');
     expect(health.timestamp).toBeDefined();
   });
 
@@ -98,7 +98,7 @@ describe('setup-admin', () => {
       timeoutMs: 100,
     });
     expect(health.status).toBe('degraded');
-    expect(health.checks.ai_provider.status).toBe('warn');
+    expect(health.checks.ai_provider?.status).toBe('warn');
   });
 
   it('getAdminPanelConfig devuelve configuración', async () => {

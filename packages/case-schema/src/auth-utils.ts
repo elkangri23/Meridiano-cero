@@ -33,9 +33,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   try {
     const parts = storedHash.split('$');
     if (parts.length !== 4 || parts[0] !== '') return false;
-    const iterationsStr = parts[1];
-    const saltStr = parts[2];
-    const hashStr = parts[3];
+    const [, iterationsStr, saltStr, hashStr] = parts;
     if (!iterationsStr || !saltStr || !hashStr) return false;
     const iterations = parseInt(iterationsStr, 10);
     if (!Number.isFinite(iterations)) return false;
@@ -61,7 +59,11 @@ export async function verifyPassword(password: string, storedHash: string): Prom
     if (actualHash.length !== expectedHash.length) return false;
     let diff = 0;
     for (let i = 0; i < actualHash.length; i++) {
-      diff |= actualHash[i] ^ expectedHash[i];
+      const a = actualHash[i];
+      const b = expectedHash[i];
+      if (a !== undefined && b !== undefined) {
+        diff |= a ^ b;
+      }
     }
     return diff === 0;
   } catch {

@@ -1,7 +1,7 @@
 // Configuración de setup inicial y administración (T6-01)
 // SPEC-009: instalación nueva sin pnpm ni cuenta central
 
-import { hashPassword, verifyPassword } from './auth-utils.js';
+import { hashPassword } from './auth-utils.js';
 
 export interface SetupConfig {
   adminEmail: string;
@@ -14,7 +14,7 @@ export interface SetupConfig {
 }
 
 export interface AiProviderConfig {
-  type: 'ollama' | 'openai-compatible' | 'freellmapi';
+  type: 'ollama' | 'openai-compatible' | 'freellmapi' | 'disabled';
   baseUrl?: string;
   apiKey?: string;
   model?: string;

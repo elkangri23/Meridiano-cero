@@ -189,7 +189,7 @@ export async function restoreBackup(
 }
 
 export async function measureRPO_RTO(
-  db: any,
+  _db: any,
   config: BackupConfig,
   targetRPOSeconds: number = 86400,
   targetRTOSeconds: number = 3600,
@@ -228,7 +228,7 @@ async function getAllTables(db: any): Promise<string[]> {
   }
 }
 
-async function getModifiedTables(db: any, since: Date): Promise<string[]> {
+async function getModifiedTables(db: any, _since: Date): Promise<string[]> {
   return await getAllTables(db);
 }
 
@@ -265,12 +265,12 @@ function decompress(data: string): string {
   return data;
 }
 
-async function encrypt(data: string, key: string): Promise<string> {
-  return data;
+async function encrypt(_data: string, _key: string): Promise<string> {
+  return _data;
 }
 
-async function decrypt(data: string, key: string): Promise<string> {
-  return data;
+async function decrypt(_data: string, _key: string): Promise<string> {
+  return _data;
 }
 
 async function storeBackup(config: BackupConfig, id: string, data: string): Promise<void> {
@@ -345,8 +345,11 @@ async function getLastBackupMetadata(config: BackupConfig): Promise<BackupMetada
       const files = await fs.readdir(dir);
       const metaFiles = files.filter(f => f.endsWith('.meta.json')).sort().reverse();
       if (metaFiles.length > 0) {
-        const content = await fs.readFile(path.join(dir, metaFiles[0]), 'utf8');
-        return JSON.parse(content);
+        const firstMeta = metaFiles[0];
+        if (firstMeta) {
+          const content = await fs.readFile(path.join(dir, firstMeta), 'utf8');
+          return JSON.parse(content);
+        }
       }
     } catch {
       // no backups

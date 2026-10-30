@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { planMigrations, runHealthReport, checkSaveCompatibility, RUNBOOK_CLEAN_INSTALL, RUNBOOK_MIGRATION_UPGRADE, RUNBOOK_ROLLBACK } from './migration-health.js';
 
-function createMockDb(overrides: Record<string, any> = {}) {
+function createMockDb(_overrides: Record<string, any> = {}) {
   const baseMigrations = [
     { name: '0000_base', hash: 'hash0000' },
     { name: '0001_local_profile', hash: 'hash0001' },
@@ -103,16 +103,16 @@ describe('migration-health', () => {
 
   it('RUNBOOK_CLEAN_INSTALL tiene 10 pasos', () => {
     expect(RUNBOOK_CLEAN_INSTALL).toHaveLength(10);
-    expect(RUNBOOK_CLEAN_INSTALL[0].step).toBe(1);
-    expect(RUNBOOK_CLEAN_INSTALL[9].step).toBe(10);
+    expect(RUNBOOK_CLEAN_INSTALL[0]?.step).toBe(1);
+    expect(RUNBOOK_CLEAN_INSTALL[9]?.step).toBe(10);
   });
 
   it('RUNBOOK_MIGRATION_UPGRADE incluye backup y verificación', () => {
-    expect(RUNBOOK_MIGRATION_UPGRADE[0].action).toContain('Backup');
-    expect(RUNBOOK_MIGRATION_UPGRADE[3].action).toContain('Ejecutar migraciones');
+    expect(RUNBOOK_MIGRATION_UPGRADE[0]?.action).toContain('Backup');
+    expect(RUNBOOK_MIGRATION_UPGRADE[3]?.action).toContain('Ejecutar migraciones');
   });
 
   it('RUNBOOK_ROLLBACK advierte que no es automático', () => {
-    expect(RUNBOOK_ROLLBACK[0].action).toContain('NO está soportado');
+    expect(RUNBOOK_ROLLBACK[0]?.action).toContain('NO está soportado');
   });
 });

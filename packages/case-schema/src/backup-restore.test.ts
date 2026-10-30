@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createBackupConfig, runFullBackup, restoreBackup, measureRPO_RTO, recordRestoreTest, computeChecksum } from './backup-restore.js';
+import { createBackupConfig, runFullBackup, measureRPO_RTO, recordRestoreTest, computeChecksum } from './backup-restore.js';
 
 function createMockDb(tables: string[] = ['profiles', 'sessions', 'runs']) {
   const data: Record<string, any[]> = {

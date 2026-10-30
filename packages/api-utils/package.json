@@ -1,0 +1,19 @@
+{
+  "name": "@meridiano/api-utils",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./launch-checklist": "./src/launch-checklist.ts",
+    "./slo-capacity": "./src/slo-capacity.ts",
+    "./data-residency": "./src/data-residency.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.0",
+    "typescript": "^6.0.0"
+  }
+}
