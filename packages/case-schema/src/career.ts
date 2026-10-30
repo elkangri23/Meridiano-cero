@@ -131,6 +131,9 @@ export function createInitialCareer(profileId: string): CareerRecord {
 }
 
 export function applyOutcome(career: CareerRecord, outcome: CaseOutcome): CareerRecord {
+  const newMedals = outcome.medal && !career.medals.includes(outcome.medal)
+    ? [...career.medals, outcome.medal]
+    : career.medals;
   return {
     ...career,
     prestige: career.prestige + outcome.prestigeDelta,
@@ -138,7 +141,7 @@ export function applyOutcome(career: CareerRecord, outcome: CaseOutcome): Career
     trust: career.trust + outcome.trustDelta,
     totalCases: career.totalCases + 1,
     completedCases: outcome.result === 'complete' ? career.completedCases + 1 : career.completedCases,
-    medals: outcome.medal ? [...career.medals, outcome.medal] : career.medals,
+    medals: newMedals,
   };
 }
 

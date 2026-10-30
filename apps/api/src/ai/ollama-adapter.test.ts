@@ -1,19 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createCompatibleOllamaProvider } from './ollama-adapter.js';
-import type { AiRequest } from './provider.js';
 
-vi.mock('@meridiano/ai-adapters', () => {
-  return {
-    createOllamaProvider: () => ({
-      execute: vi.fn().mockResolvedValue({
-        payload: { text: 'hola' },
-        usage: { promptTokens: 10, completionTokens: 5 },
-        latencyMs: 100,
-        finishReason: 'stop'
-      })
-    })
-  };
-});
+// Mock the ai-adapters module at the top level
+vi.mock('@meridiano/ai-adapters', () => ({
+  createOllamaProvider: () => ({
+    execute: vi.fn().mockResolvedValue({
+      payload: { text: 'hola' },
+      usage: { promptTokens: 10, completionTokens: 5 },
+      latencyMs: 100,
+      finishReason: 'stop',
+    }),
+  }),
+}));
+
+import { createCompatibleOllamaProvider } from './ollama-adapter.js';
 
 describe('ollama-adapter', () => {
   it('mapea correctamente una respuesta exitosa', async () => {
