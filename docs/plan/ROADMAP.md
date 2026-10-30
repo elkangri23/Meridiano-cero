@@ -1,6 +1,6 @@
 # Roadmap por hitos verificables
 
-Sin fechas comprometidas. Estimar una fase cuando su spec esté cerrada y se conozca el entorno. Revisión humana al finalizar cada hito. Estado al 2026-10-30: fases 0-5 completadas en código (F1-F5); fase 3 T3-04 en curso (adaptador Ollama); fases 6-7 pendientes. [Detalle de implementación y evidencia](ESTADO.md). La tabla siguiente describe las puertas objetivo, no certifica su aceptación.
+Sin fechas comprometidas. Estimar una fase cuando su spec esté cerrada y se conozca el entorno. Revisión humana al finalizar cada hito. Estado al 2026-10-30: fases 0-6 completadas en código (F1-F6 excepto T6-04); fase 3 T3-04 en curso (adaptador Ollama); fase 7 T7-04 en curso. [Detalle de implementación y evidencia](ESTADO.md). La tabla siguiente describe las puertas objetivo, no certifica su aceptación.
 
 | Fase | Resultado demostrable | Dependencias | Puerta de salida |
 |---|---|---|---|

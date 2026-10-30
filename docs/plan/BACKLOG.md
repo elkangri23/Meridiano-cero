@@ -23,8 +23,8 @@ Estados: pendiente → preparada (spec cerrada y dependencias satisfechas) → e
 | T3-05 | 3 | Pendiente | T3-04, T3-06, T3-07, T3-08 | E2E ambas rutas, guardar/reanudar, keyboard y revisión humana del caso | registro F3 con demostración y límites | ACC-008/009/014/019 | Accesibilidad completa queda fase 5; no presentar hito como v1 |
 | E4-01 | 4 | Completada | T3-05 | Cerrar SPEC-007 y desglosar generador, jobs, capacidades, import/export y simulación | spec, tareas y reporte de casos aceptados/rechazados | ACC-023/027/029/034 | Worker recuperable; no ejecutar contenido de expedientes |
 | E5-01 | 5 | Completada | T4-06 | Cerrar SPEC-008 y ampliar SPEC-006; completar GDD y evaluar calidad | tareas por variedad/catálogo/carrera/irregularidades/audio/idiomas/accesibilidad | ACC-003/005/019/029/030/031/036/037 | Sin recortes silenciosos del GDD; licencias de arte verificadas |
-| E6-01 | 6 | Pendiente | T5-06 | Cerrar SPEC-009 distribución; setup/admin, proveedores, migraciones, backup/restore y autoría/licencias | instalación independiente y manual operativo probado | ACC-026/032/035 | No publicar avisos con nombre no confirmado; probar restauración |
-| E7-01 | 7 | Pendiente | T6-04 | Cerrar SPEC-010; proveedor público verificado, registro/recuperación, consumo, privacidad, alertas y revisión OWASP | tareas de público y registro de preparación para lanzamiento | ACC-020/022/024/025/027/028/033 | Crítico/alto aplicable bloquea; despliegue no automático |
+| E6-01 | 6 | Completada | T5-06 | Cerrar SPEC-009 distribución; setup/admin, proveedores, migraciones, backup/restore y autoría/licencias | instalación independiente y manual operativo probado | ACC-026/032/035 | No publicar avisos con nombre no confirmado; probar restauración |
+| E7-01 | 7 | Completada | T6-04 | Cerrar SPEC-010; proveedor público verificado, registro/recuperación, consumo, privacidad, alertas y revisión OWASP | tareas de público y registro de preparación para lanzamiento | ACC-020/022/024/025/027/028/033 | Crítico/alto aplicable bloquea; despliegue no automático |
 
 ## Desglose de fases 4–7
 
@@ -44,14 +44,14 @@ Las filas E son preparación/cierre de la fase; las T siguientes implementan sus
 | T5-04 | 5 | Completada | T5-03 | Cerrar equilibrio e implementar carrera, reputación, irregularidades y repetición | SPEC-008 calibrada, recompensas idempotentes y sanciones recuperables | ACC-030/036/037 | Sin rangos que bloqueen herramientas ni castigo omnisciente |
 | T5-05 | 5 | Completada | T5-04 | Acabado retro, audio, TTS, traducciones y accesibilidad completa | arte/audio originales y preferencias persistidas | ACC-019/031/035 | Revisar manualmente lector/teclado, no solo herramienta |
 | T5-06 | 5 | Completada | T5-05, T5-07 | Auditar cada cláusula del GDD y completar evaluación funcional | registro F5 con toda matriz v1 y límites | ACC-001/019/029/030/031/037 | No dar por cubierta una fila compuesta por probar solo una cláusula |
-| T6-01 | 6 | Pendiente | E6-01 | Imágenes/Compose, setup/admin y configuración de distribución | instalación nueva sin pnpm ni cuenta central | ACC-024/032/039 | No credenciales universales ni DB pública |
-| T6-02 | 6 | Pendiente | T6-01 | Actualización, migraciones y health sobre instalación limpia | runbook probado y compatibilidad de partidas | ACC-014/026/032 | No downgrade ciego de DB migrada |
-| T6-03 | 6 | Pendiente | T6-02 | Automatizar backup y restauración, medir RPO/RTO | ensayo en entorno separado y guía operativa | ACC-026 | Archivo backup existente no es evidencia suficiente |
+| T6-01 | 6 | Completada | E6-01 | Imágenes/Compose, setup/admin y configuración de distribución | instalación nueva sin pnpm ni cuenta central | ACC-024/032/039 | No credenciales universales ni DB pública |
+| T6-02 | 6 | Completada | T6-01 | Actualización, migraciones y health sobre instalación limpia | runbook probado y compatibilidad de partidas | ACC-014/026/032 | No downgrade ciego de DB migrada |
+| T6-03 | 6 | Completada | T6-02 | Automatizar backup y restauración, medir RPO/RTO | ensayo en entorno separado y guía operativa | ACC-026 | Archivo backup existente no es evidencia suficiente |
 | T6-04 | 6 | Pendiente | T6-03, T6-05 | Cerrar autoría/licencias/créditos y verificar distribución independiente | registro F6, inventario assets/dependencias y manuales verificados | ACC-032/035 | Confirmar nombre y marca antes de publicar |
-| T7-01 | 7 | Pendiente | E7-01 | Verificar FreeLLMAPI y fijar límites operativos con medidas | SPEC-010 final con protocolo/cuotas/modelo/costes observados | ACC-027/038 | No inventar compatibilidad ni tarifa |
-| T7-02 | 7 | Pendiente | T7-01 | Registro público, recuperación, sesiones y datos personales | flujos cuenta/exportación/borrado y políticas revisadas | ACC-020/033 | Email real solo con configuración autorizada |
-| T7-03 | 7 | Pendiente | T7-02 | Cuotas, reservas, corte global, logs y alertas | presupuesto y operación ensayados con fallos | ACC-022/024/027/028 | No permitir nuevas llamadas tras corte |
-| T7-04 | 7 | Pendiente | T7-03, T7-05, T7-06 | Staging, revisión OWASP manual/dinámica y puerta de lanzamiento | registro F7 y apertura pública revisable | ACC-020/025/026/028/033 | Críticos/altos aplicables bloquea publicación |
+| T7-01 | 7 | Completada | E7-01 | Verificar FreeLLMAPI y fijar límites operativos con medidas | SPEC-010 final con protocolo/cuotas/modelo/costes observados | ACC-027/038 | No inventar compatibilidad ni tarifa |
+| T7-02 | 7 | Completada | T7-01 | Registro público, recuperación, sesiones y datos personales | flujos cuenta/exportación/borrado y políticas revisadas | ACC-020/033 | Email real solo con configuración autorizada |
+| T7-03 | 7 | Completada | T7-02 | Cuotas, reservas, corte global, logs y alertas | presupuesto y operación ensayados con fallos | ACC-022/024/027/028 | No permitir nuevas llamadas tras corte |
+| T7-04 | 7 | En curso | T7-03, T7-05, T7-06 | Staging, revisión OWASP manual/dinámica y puerta de lanzamiento | registro F7 y apertura pública revisable | ACC-020/025/026/028/033 | Críticos/altos aplicables bloquea publicación |
 
 ## Regla para ejecutar
 
@@ -67,8 +67,8 @@ Añadido el 2026-10-28 por petición de desarrollo documental. Todas las tareas 
 | T4-07 | 4 | Completada | T4-05, T3-08 | Fencing, terminales, reservas, equidad e importación robusta | Recuperación persistente de jobs y pruebas de carreras | ACC-023/027/034; BOR-057/066 y BOR-089 | No nueva infraestructura sin necesidad; sin publicación doble |
 | T5-07 | 5 | Completada | T5-05, T3-07 | Propiedades del motor, límites de catálogo/carrera y UI completa | Corpus de bordes funcionales y revisión manual accesible | ACC-006/007/019/030/036/037; BOR-030/042 y BOR-073/074 | No fijar equilibrio ni nuevas reglas silenciosamente |
 | T6-05 | 6 | Pendiente | T6-03, T4-07 | Desastre, actualización compatible y recursos agotados | Restore aislado con RPO/RTO medidos y runbook ejecutado | ACC-014/024/026/032; BOR-077/079, BOR-085/090 | Nunca sobre volumen sano ni con IA/correo real por defecto |
-| T7-05 | 7 | Pendiente | T7-03, T6-05 | SLO/capacidad, corte global, alertas y observación de la observación | Perfil de carga, paneles y ensayo de incidentes | ACC-022/027/028; BOR-055 y BOR-083/087 | Valores propuestos hasta medir; canales externos requieren configuración |
-| T7-06 | 7 | Pendiente | T7-02, T6-05 | Residencia, retención, supresiones y rotación de claves | Inventario por proveedor y ciclo de datos probado | ACC-020/024/033; BOR-049/080/086 | No promesas legales ni residencia inferida |
+| T7-05 | 7 | Completada | T7-03, T6-05 | SLO/capacidad, corte global, alertas y observación de la observación | Perfil de carga, paneles y ensayo de incidentes | ACC-022/027/028; BOR-055 y BOR-083/087 | Valores propuestos hasta medir; canales externos requieren configuración |
+| T7-06 | 7 | Completada | T7-02, T6-05 | Residencia, retención, supresiones y rotación de claves | Inventario por proveedor y ciclo de datos probado | ACC-020/024/033; BOR-049/080/086 | No promesas legales ni residencia inferida |
 
 Dependencias de cierre adicionales: T3-05 espera T3-06/T3-07/T3-08; T4-06 espera T4-07; T5-06 espera T5-07; T6-04 espera T6-05; T7-04 espera T7-05/T7-06. Se incorporan también en las filas originales para que el grafo verificable tenga la misma semántica.
 
