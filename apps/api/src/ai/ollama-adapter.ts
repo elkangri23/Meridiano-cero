@@ -32,7 +32,7 @@ export function createCompatibleOllamaProvider(options: {
             timeoutMs: options.timeoutMs ?? 60000,
             maxRetries: 1,
           },
-          cancellationSignal: input.signal ?? new AbortSignal(),
+          cancellationSignal: input.signal ?? new AbortController().signal,
           requestId: input.requestId,
         });
 

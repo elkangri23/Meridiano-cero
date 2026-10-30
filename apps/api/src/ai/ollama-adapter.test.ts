@@ -18,7 +18,7 @@ describe('ollama-adapter', () => {
   it('mapea correctamente una respuesta exitosa', async () => {
     const adapter = createCompatibleOllamaProvider({ model: 'test-model' });
     const req = {
-      operation: 'converse',
+      operation: 'converse' as const,
       requestId: 'req-1',
       schema: {},
       context: {}
