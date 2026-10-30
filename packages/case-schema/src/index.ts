@@ -15,3 +15,4 @@ export { validateCatalogBoundary, validateCareerBoundary } from './catalog-bound
 export type { CatalogBoundaryResult, CareerBoundaryResult } from './catalog-bounds.js';
 export { runInitialSetup, runHealthChecks, getAdminPanelConfig, type SetupConfig, type AiProviderConfig, type SetupResult, type HealthCheckResult, type AdminPanelConfig } from './setup-admin.js';
 export { hashPassword, verifyPassword } from './auth-utils.js';
+export { planMigrations, runHealthReport, checkSaveCompatibility, RUNBOOK_CLEAN_INSTALL, RUNBOOK_MIGRATION_UPGRADE, RUNBOOK_ROLLBACK, type MigrationPlan, type HealthReport, type SaveCompatibilityResult, type RunbookStep } from './migration-health.js';
