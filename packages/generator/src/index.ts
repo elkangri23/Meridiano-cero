@@ -50,3 +50,14 @@ export type {
   ValidationResult,
   ValidationError,
 } from './validator.js';
+
+export {
+  RouteSimulator,
+  createRouteSimulator,
+} from './simulator.js';
+
+export type {
+  SimulationConfig,
+  RouteSimulationResult,
+  SimulationSuiteResult,
+} from './simulator.js';
