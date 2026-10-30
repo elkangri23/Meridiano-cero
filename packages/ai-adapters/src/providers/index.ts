@@ -1,14 +1,17 @@
 import { parseOllamaConfig } from './ollama-config.js';
 export { OllamaProvider, createOllamaProvider, type OllamaConfig } from './ollama.js';
 export { DeterministicMockProvider, createDeterministicMockProvider } from './mock.js';
+export { FreeLLMAPIProvider, createFreeLLMAPIProvider, type FreeLLMAPIConfig } from './freellmapi.js';
 
 import type { AIProvider, ProviderId } from '../index.js';
 import { OllamaProvider } from './ollama.js';
 import { DeterministicMockProvider } from './mock.js';
+import { FreeLLMAPIProvider } from './freellmapi.js';
 
 export interface ProviderRegistry {
   ollama: OllamaProvider;
   mock: DeterministicMockProvider;
+  freellmapi: FreeLLMAPIProvider;
 }
 
 export function createProvider(providerId: ProviderId, config?: Record<string, unknown>): AIProvider {
@@ -18,6 +21,8 @@ export function createProvider(providerId: ProviderId, config?: Record<string, u
     case 'mock':
     case 'mock-deterministic':
       return new DeterministicMockProvider();
+    case 'freellmapi':
+      return new FreeLLMAPIProvider(config as any);
     default:
       throw new Error('Proveedor no disponible.');
   }
@@ -35,7 +40,13 @@ export async function healthCheckAll(providers: Record<string, AIProvider>): Pro
   return results;
 }
 
-export function createDefaultProviders(config?: { ollamaBaseUrl?: string; ollamaModel?: string }): Record<string, AIProvider> {
+export function createDefaultProviders(config?: {
+  ollamaBaseUrl?: string;
+  ollamaModel?: string;
+  freellmapiApiKey?: string;
+  freellmapiBaseUrl?: string;
+  freellmapiModel?: string;
+}): Record<string, AIProvider> {
   return {
     ollama: new OllamaProvider({
       baseUrl: config?.ollamaBaseUrl ?? 'http://localhost:11434',
@@ -45,5 +56,12 @@ export function createDefaultProviders(config?: { ollamaBaseUrl?: string; ollama
       maxContextTokens: 8192,
     }),
     mock: new DeterministicMockProvider(),
+    freellmapi: new FreeLLMAPIProvider({
+      apiKey: config?.freellmapiApiKey ?? '',
+      baseUrl: config?.freellmapiBaseUrl ?? 'https://api.freellmapi.com/v1',
+      defaultModel: config?.freellmapiModel ?? 'gpt-4o-mini',
+      timeoutMs: 60000,
+      maxRetries: 2,
+    }),
   };
 }

@@ -181,3 +181,4 @@ export interface ValidateCaseOutput {
 // Re-export from providers
 export { OllamaProvider, createOllamaProvider, type OllamaConfig } from './providers/index.js';
 export { DeterministicMockProvider, createDeterministicMockProvider } from './providers/index.js';
+export { FreeLLMAPIProvider, createFreeLLMAPIProvider, type FreeLLMAPIConfig } from './providers/index.js';
