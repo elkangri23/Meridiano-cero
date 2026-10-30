@@ -2,9 +2,9 @@
 // Almacenamiento cifrado de credenciales, selección de proveedor, límites
 
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '../database/connection.ts';
-import { pgTable, uuid, text, timestamp, integer, jsonb, primaryKey, unique } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, integer, jsonb, index, check, unique } from 'drizzle-orm/pg-core';
 
 // Esquema para conexiones IA personales
 export const aiConnections = pgTable('ai_connections', {
@@ -52,7 +52,11 @@ function encryptCredential(credential: string): string {
 }
 
 function decryptCredential(encrypted: string): string {
-  const [ivB64, encryptedB64, authTagB64] = encrypted.split(':');
+  const parts = encrypted.split(':');
+  if (parts.length !== 3) throw new Error('Invalid encrypted format');
+  const ivB64 = parts[0] ?? '';
+  const encryptedB64 = parts[1] ?? '';
+  const authTagB64 = parts[2] ?? '';
   const iv = Buffer.from(ivB64, 'base64');
   const encryptedBuf = Buffer.from(encryptedB64, 'base64');
   const authTag = Buffer.from(authTagB64, 'base64');
@@ -103,8 +107,8 @@ export interface AIConnectionOutput {
   status: string;
   createdAt: string;
   updatedAt: string;
-  lastUsedAt?: string;
-  lastError?: string;
+  lastUsedAt: string | null;
+  lastError?: string | null;
   hasCredential: boolean;
 }
 
@@ -149,7 +153,15 @@ export async function createAIConnection(database: Database, ownerId: string, in
     lastError: aiConnections.lastError,
   });
 
-  return { ...connection, hasCredential: true };
+  if (!connection) throw new Error('Failed to create connection');
+  return {
+    ...connection,
+    isDefault: !!connection.isDefault,
+    hasCredential: true,
+    createdAt: connection.createdAt.toISOString(),
+    updatedAt: connection.updatedAt.toISOString(),
+    lastUsedAt: connection.lastUsedAt?.toISOString() ?? null,
+  };
 }
 
 export async function listAIConnections(database: Database, ownerId: string): Promise<AIConnectionOutput[]> {
@@ -170,7 +182,14 @@ export async function listAIConnections(database: Database, ownerId: string): Pr
     lastError: aiConnections.lastError,
   }).from(aiConnections).where(eq(aiConnections.ownerId, ownerId));
 
-  return connections.map(c => ({ ...c, hasCredential: true }));
+  return connections.map(c => ({
+    ...c,
+    isDefault: !!c.isDefault,
+    hasCredential: true,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+    lastUsedAt: c.lastUsedAt?.toISOString() ?? null,
+  }));
 }
 
 export async function getAIConnection(database: Database, ownerId: string, connectionId: string): Promise<AIConnectionOutput | null> {
@@ -191,13 +210,31 @@ export async function getAIConnection(database: Database, ownerId: string, conne
     lastError: aiConnections.lastError,
   }).from(aiConnections).where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.id, connectionId))).limit(1);
 
-  return connection ? { ...connection, hasCredential: true } : null;
+  if (!connection) return null;
+  return {
+    ...connection,
+    isDefault: !!connection.isDefault,
+    hasCredential: true,
+    createdAt: connection.createdAt.toISOString(),
+    updatedAt: connection.updatedAt.toISOString(),
+    lastUsedAt: connection.lastUsedAt?.toISOString() ?? null,
+  };
 }
 
 export async function getAIConnectionWithCredential(database: Database, ownerId: string, connectionId: string): Promise<{ connection: AIConnectionOutput; credential: string } | null> {
   const [connection] = await database.orm.select().from(aiConnections).where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.id, connectionId))).limit(1);
   if (!connection) return null;
-  return { connection: { ...connection, hasCredential: true }, credential: decryptCredential(connection.encryptedCredential) };
+  return {
+    connection: {
+      ...connection,
+      isDefault: !!connection.isDefault,
+      hasCredential: true,
+      createdAt: connection.createdAt.toISOString(),
+      updatedAt: connection.updatedAt.toISOString(),
+      lastUsedAt: connection.lastUsedAt?.toISOString() ?? null,
+    },
+    credential: decryptCredential(connection.encryptedCredential)
+  };
 }
 
 export async function updateAIConnection(database: Database, ownerId: string, connectionId: string, updates: Partial<AIConnectionInput>): Promise<AIConnectionOutput | null> {
@@ -244,7 +281,14 @@ export async function updateAIConnection(database: Database, ownerId: string, co
       lastError: aiConnections.lastError,
     });
 
-  return connection ? { ...connection, hasCredential: true } : null;
+  return connection ? {
+    ...connection,
+    isDefault: !!connection.isDefault,
+    hasCredential: true,
+    createdAt: connection.createdAt.toISOString(),
+    updatedAt: connection.updatedAt.toISOString(),
+    lastUsedAt: connection.lastUsedAt?.toISOString() ?? null,
+  } : null;
 }
 
 export async function deleteAIConnection(database: Database, ownerId: string, connectionId: string): Promise<boolean> {
@@ -273,7 +317,7 @@ export async function resolveAIConnection(database: Database, ownerId: string, a
     .limit(1);
 
   if (personal.length > 0) {
-    return { connection: personal[0], credential: decryptCredential(personal[0].encryptedCredential) };
+    return { connection: personal[0]!, credential: decryptCredential(personal[0]!.encryptedCredential) };
   }
 
   // 2. Fallback a configuración default del admin
@@ -282,7 +326,7 @@ export async function resolveAIConnection(database: Database, ownerId: string, a
       .where(and(eq(aiConnections.id, adminDefaultConnectionId), eq(aiConnections.status, 'active')))
       .limit(1);
     if (admin.length > 0) {
-      return { connection: admin[0], credential: decryptCredential(admin[0].encryptedCredential) };
+      return { connection: admin[0]!, credential: decryptCredential(admin[0]!.encryptedCredential) };
     }
   }
 

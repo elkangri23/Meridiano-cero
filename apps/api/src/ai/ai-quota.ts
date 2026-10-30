@@ -2,7 +2,7 @@
 
 import { and, eq, gte, lte, sql, sum } from 'drizzle-orm';
 import type { Database } from '../database/connection.ts';
-import { pgTable, uuid, text, timestamp, integer, jsonb, index, unique } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, integer, index, unique, check } from 'drizzle-orm/pg-core';
 
 // Esquema para tracking de uso y cuotas
 export const aiUsage = pgTable('ai_usage', {
@@ -17,7 +17,7 @@ export const aiUsage = pgTable('ai_usage', {
   totalTokens: integer('total_tokens').notNull().default(0),
   latencyMs: integer('latency_ms').notNull(),
   status: text('status').notNull(), // 'success', 'error', 'timeout', 'rate_limited', 'quota_exceeded'
-  errorCode?: text('error_code'),
+  errorCode: text('error_code'),
   requestId: text('request_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [
@@ -101,7 +101,6 @@ export async function checkQuota(
 
   for (const quota of quotas) {
     let scopeMatch = false;
-    let scopeVal = quota.scopeValue;
 
     switch (quota.scope) {
       case 'global':

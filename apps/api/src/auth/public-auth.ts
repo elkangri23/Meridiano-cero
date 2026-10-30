@@ -82,7 +82,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
       const result = await store.create(undefined);
       reply.header('Set-Cookie', 'meridiano_session=' + result.token + '; HttpOnly; SameSite=Lax; Path=/api/v1; Max-Age=28800');
 
-      return { profile: { id: createdProfile.id, displayName: createdProfile.displayName }, csrfToken: result.csrfToken };
+      return { profile: { id: createdProfile!.id, displayName: createdProfile!.displayName }, csrfToken: result.csrfToken };
     } catch (e) {
       return deny(reply, request, 503, 'DEPENDENCY_UNAVAILABLE');
     }
@@ -181,13 +181,13 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     const userRuns = await database.orm.select().from(runs).where(eq(runs.ownerId, session.profile.id));
 
     const exportData = {
-      profile: { id: profile.id, displayName: profile.displayName, role: profile.role },
+      profile: { id: profile!.id, displayName: profile!.displayName, role: profile!.role },
       runs: userRuns.map(r => ({ id: r.id, definitionId: r.definitionId, createdAt: r.createdAt, updatedAt: r.updatedAt })),
       exportedAt: new Date().toISOString(),
     };
 
     reply.header('Content-Type', 'application/json');
-    reply.header('Content-Disposition', `attachment; filename="meridiano-export-${profile.id}.json"`);
+    reply.header('Content-Disposition', `attachment; filename="meridiano-export-${profile!.id}.json"`);
     return exportData;
   });
 
@@ -222,7 +222,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     const profileRows = await database.orm.select().from(profiles).where(eq(profiles.id, session.profile.id)).limit(1);
     if (profileRows.length === 0) return deny(reply, request, 404, 'PROFILE_NOT_FOUND');
 
-    hashToken(password + profileRows[0].localKey);
+    hashToken(password + profileRows[0]!.localKey);
     // En producción: verificar con bcrypt
 
     // Borrado en cascada: sesiones, runs, etc.
