@@ -38,7 +38,7 @@ El artefacto heredado packages/web/RetroScreen fue conservado durante la integra
 
 ## Fases y próximos pasos
 
-T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. T3-01/02/03/04 están en curso; T3-05 espera E2E/modelo real. Fase 4 completada (T4-01 a T4-07). Fases 5–7 pendientes.
+T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. T3-01/02/03/04 están en curso; T3-05 espera E2E/modelo real. Fases 4 y 5 completadas (T4-01 a T4-07, T5-01 a T5-07). Fases 6–7 pendientes.
 
 1. Completar validación, lotes y extremos de retraso del motor; cerrar calidad global antes de habilitar acciones HTTP. Costes, ordinales y tiempos base de rutas ya están comprobados en v4.
 2. Ampliar el DTO inicial y API-juego: preview/commit, operaciones, transiciones y proyección de resultados; la creación inicial ya tiene ownership, rama e idempotencia.
