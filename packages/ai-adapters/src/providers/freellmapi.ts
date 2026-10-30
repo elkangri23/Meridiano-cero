@@ -1,6 +1,6 @@
 import type { AIProvider, AIContext, AIResponse, AIFunction, ProviderId } from '../index.ts';
 
-interface FreeLLMAPIConfig {
+export interface FreeLLMAPIConfig {
   baseUrl: string;
   apiKey: string;
   defaultModel: string;
@@ -20,10 +20,6 @@ interface FreeLLMAPIChatRequest {
 interface FreeLLMAPIChatResponse {
   choices: Array<{ message: { content: string }; finish_reason: string }>;
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
-}
-
-interface FreeLLMAPIModelsResponse {
-  data: Array<{ id: string }>;
 }
 
 function parseJSONResponse(content: string): unknown {
@@ -163,7 +159,7 @@ Revisa coherencia, referencias, presupuesto temporal, dos rutas.`,
 
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
       try {
-        const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+        const httpResponse = await fetch(`${this.config.baseUrl}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -182,13 +178,13 @@ Revisa coherencia, referencias, presupuesto temporal, dos rutas.`,
             : controller.signal,
         });
 
-        if (!response.ok) {
-          if (response.status === 401) throw new Error('UNAUTHORIZED');
-          if (response.status === 429) throw new Error('RATE_LIMITED');
+        if (!httpResponse.ok) {
+          if (httpResponse.status === 401) throw new Error('UNAUTHORIZED');
+          if (httpResponse.status === 429) throw new Error('RATE_LIMITED');
           throw new Error('TRANSPORT_ERROR');
         }
 
-        const data = await response.json() as FreeLLMAPIChatResponse;
+        const data = await httpResponse.json() as FreeLLMAPIChatResponse;
         clearTimeout(timeoutId);
 
         if (!data.choices?.[0]?.message?.content) {
@@ -199,16 +195,17 @@ Revisa coherencia, referencias, presupuesto temporal, dos rutas.`,
         const parsed = parseJSONResponse(content);
         validateFreeLLMAPIOutput(context.function, parsed);
 
-        return {
+        const aiResponse: AIResponse<T> = {
           payload: parsed as T,
           usage: data.usage ? {
             promptTokens: data.usage.prompt_tokens,
             completionTokens: data.usage.completion_tokens,
             totalTokens: data.usage.total_tokens,
-          } : undefined,
-          latencyMs: Date.now() - Date.now(), // Will be overwritten by caller
+          } : { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+          latencyMs: Date.now() - Date.now(),
           finishReason: 'stop',
         };
+        return aiResponse;
       } catch (error: any) {
         lastError = error;
         if (error.name === 'AbortError' || error.message === 'CANCELLED') {
