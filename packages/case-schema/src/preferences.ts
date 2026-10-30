@@ -69,7 +69,7 @@ export function clampRate(value: number): number {
   return Math.min(2, Math.max(0.5, Math.round(value * 100) / 100));
 }
 
-export function normalizePreferences(input: Partial<PresentationPreferences>): PresentationPreferences {
+export function normalizePreferences(input: Partial<PresentationPreferences> | null | undefined): PresentationPreferences {
   const base = createDefaultPreferences();
   if (!input || typeof input !== 'object') return base;
   const fontMode: FontMode = input.fontMode === 'accessible' ? 'accessible' : 'retro';
@@ -83,7 +83,7 @@ export function normalizePreferences(input: Partial<PresentationPreferences>): P
   return {
     version: 1,
     fontMode,
-    textScale: clampScale(input.textScale),
+    textScale: clampScale(input.textScale ?? base.textScale),
     palette,
     language,
     audio: {

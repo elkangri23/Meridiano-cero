@@ -8,3 +8,8 @@ export { RECURRENT_NPCS, COMMUNICATION_CHANNELS, QUERY_TYPES, getNPC, getNPCsByC
 export { calculateCaseOutcome, createInitialCareer, applyOutcome, applySanction, resolveSanction, getActiveSanctions, getRank, type CaseResult, type CareerRecord, type SanctionRecord, type CaseOutcome } from './career.js';
 export { createDefaultPreferences, normalizePreferences, clampScale, clampVolume, clampRate, createPreferenceStore, type PresentationPreferences, type FontMode, type PaletteMode, type Language, type AudioSettings, type TTSSettings, type AccessibilitySettings, type PreferenceStore, type StorageLike } from './preferences.js';
 export { createTTSController, createNoopTTSController, type TTSController, type TTSVoice, type TTSStatus, type TTSOptions } from './audio-tts.js';
+export { CAREER_VERSION, isCareerVersionCompatible, assertCasesIsolated, sanitizeText } from './borders.js';
+export type { VersionedOutcome, CaseRunSummary, TextSanitizationOptions, SanitizedText, TTSSession } from './borders.js';
+export { createTTSSession } from './borders.js';
+export { validateCatalogBoundary, validateCareerBoundary } from './catalog-bounds.js';
+export type { CatalogBoundaryResult, CareerBoundaryResult } from './catalog-bounds.js';

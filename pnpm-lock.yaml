@@ -221,6 +221,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@meridiano/case-schema':
+        specifier: workspace:*
+        version: link:../../packages/case-schema
       '@meridiano/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

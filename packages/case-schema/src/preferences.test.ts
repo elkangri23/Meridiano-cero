@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   createDefaultPreferences, normalizePreferences, clampScale, clampVolume, clampRate,
-  createPreferenceStore, type PresentationPreferences,
+  createPreferenceStore,
 } from './preferences.js';
 
 describe('preferences', () => {

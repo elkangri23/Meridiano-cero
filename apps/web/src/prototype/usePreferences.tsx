@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { createPreferenceStore, type PresentationPreferences } from '@meridiano/case-schema';
 
 const store = createPreferenceStore();
