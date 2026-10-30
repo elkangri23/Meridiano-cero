@@ -285,6 +285,25 @@ importers:
         specifier: 24.19.2
         version: 24.19.2
 
+  packages/generator:
+    dependencies:
+      '@meridiano/case-schema':
+        specifier: workspace:*
+        version: link:../case-schema
+      '@meridiano/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@meridiano/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15))
+
 packages:
 
   '@cacheable/memory@2.2.0':

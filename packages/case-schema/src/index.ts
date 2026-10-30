@@ -16,3 +16,4 @@ export type { CatalogBoundaryResult, CareerBoundaryResult } from './catalog-boun
 export { runInitialSetup, runHealthChecks, getAdminPanelConfig, type SetupConfig, type AiProviderConfig, type SetupResult, type HealthCheckResult, type AdminPanelConfig } from './setup-admin.js';
 export { hashPassword, verifyPassword } from './auth-utils.js';
 export { planMigrations, runHealthReport, checkSaveCompatibility, RUNBOOK_CLEAN_INSTALL, RUNBOOK_MIGRATION_UPGRADE, RUNBOOK_ROLLBACK, type MigrationPlan, type HealthReport, type SaveCompatibilityResult, type RunbookStep } from './migration-health.js';
+export { createBackupConfig, runFullBackup, runIncrementalBackup, restoreBackup, measureRPO_RTO, recordRestoreTest, computeChecksum, type BackupConfig, type BackupMetadata, type RestoreResult, type RPO_RTO_Metrics } from './backup-restore.js';
