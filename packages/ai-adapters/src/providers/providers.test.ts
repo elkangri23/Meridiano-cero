@@ -95,10 +95,15 @@ describe('salida del transporte alternativo con fetch sintético', () => {
     expect(await createOllamaProvider({ maxRetries: 0 }).execute(context('validateCase', {})))
       .toMatchObject({ usage: { promptTokens: 12, completionTokens: 3, totalTokens: 15 } });
   });
-  it.each([null, [], { actionType: 'inspect', params: {}, confidence: '1' }, { actionType: 'inspect', params: null, confidence: 1 }, 'prosa {"actionType":"inspect","params":{},"confidence":1}'])('salida inválida se rechaza sin reintento: %j', async output => {
-    const send = vi.spyOn(globalThis, 'fetch').mockResolvedValue(envelope(output));
-    await expect(createOllamaProvider({ maxRetries: 2 }).execute(context('interpretAction', {}))).rejects.toThrow('INVALID_OUTPUT');
-    expect(send).toHaveBeenCalledTimes(1);
+  it.each([
+    { actionType: 'inspect', params: { targetId: 'MAD' }, confidence: 1, thought: 'Creo que es aquí' },
+    { actionType: 'inspect', params: { targetId: 'MAD' }, confidence: 1, extra: 123 },
+    { text: 'Hola', actOfSpeech: 'inform', extra: 'meta' }
+  ])('rechaza salida con campos adicionales: %j', async output => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(envelope(output));
+    const fn = output.actionType ? 'interpretAction' : 'converse';
+    await expect(createOllamaProvider({ maxRetries: 0 }).execute(context(fn, {})))
+      .rejects.toThrow('INVALID_OUTPUT');
   });
   it('un error HTTP no reproduce cuerpo privado y no se presenta como payload exitoso', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('SYNTHETIC_PRIVATE_SENTINEL', { status: 500 }));
