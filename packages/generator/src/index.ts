@@ -21,6 +21,7 @@ export type {
   PipelineConfig,
   GenerationValidator,
   GeneratorService,
+  CheckpointStore,
 } from './pipeline.js';
 
 export {
@@ -32,7 +33,6 @@ export {
 } from './checkpoint.js';
 
 export type {
-  CheckpointStore,
   CheckpointStorage,
   LeaseConfig,
   LeasedCheckpoint,

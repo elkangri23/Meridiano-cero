@@ -1,8 +1,8 @@
 // Validadores para pipeline de generación (T4-01, T4-02)
 // Coherencia, conocimiento, contenido y geografía
 
-import type { GenerationParams, CaseDraft, GenerationStage, ValidationResult, ValidationError } from './pipeline.js';
-import type { CaseDefinition, CatalogParams, Difficulty, ExplorationMode, ContentMode } from '@meridiano/case-schema';
+import type { GenerationParams, ValidationResult, ValidationError } from './pipeline.js';
+import type { CaseDefinition, Difficulty, ContentMode, ExplorationMode } from '@meridiano/case-schema';
 
 // ============================================================================
 // Constantes de límites (SPEC-007)
@@ -17,6 +17,18 @@ export const GENERATION_LIMITS = {
   maxTextLength: 16384,
   maxFileSizeBytes: 2 * 1024 * 1024, // 2 MiB
 } as const;
+
+// Catálogo de parámetros local (extensión de case-schema CatalogParams)
+export interface GeneratorCatalogParams {
+  crimeType: string;
+  difficulty: Difficulty;
+  explorationMode: ExplorationMode;
+  duration: 'short' | 'medium' | 'long';
+  region: string;
+  contentMode: ContentMode;
+  surpriseMode: 'familiar' | 'general' | 'sorprende';
+  seed: number;
+}
 
 // ============================================================================
 // Validación de parámetros de entrada
@@ -171,7 +183,7 @@ export function validateCaseDraft(draft: { definition?: unknown }): ValidationRe
   // Validaciones estructurales básicas
   if (!def.id || typeof def.id !== 'string') errors.push('id requerido');
   if (!def.schemaVersion || typeof def.schemaVersion !== 'number') errors.push('schemaVersion requerido');
-  if (!def.caseTitle) warnings.push('caseTitle recomendado');
+  if (!def.solution) warnings.push('solution recomendado');
 
   // Validar catálogo de parámetros
   const catalogParams = extractCatalogParams(def);
@@ -197,12 +209,12 @@ export function validateCaseDraft(draft: { definition?: unknown }): ValidationRe
   return { valid: errors.length === 0, errors, warnings };
 }
 
-function extractCatalogParams(def: CaseDefinition): CatalogParams {
+function extractCatalogParams(def: CaseDefinition): GeneratorCatalogParams {
   return {
-    crimeType: 'robo', // Se extraería de la definición real
+    crimeType: 'robo',
     difficulty: def.difficulty,
     explorationMode: def.explorationMode,
-    duration: 'medium', // Se calcularía
+    duration: 'medium',
     region: 'europa',
     surpriseMode: 'familiar',
     seed: def.seed,
@@ -210,7 +222,7 @@ function extractCatalogParams(def: CaseDefinition): CatalogParams {
   };
 }
 
-export function validateCatalogParams(params: CatalogParams): ValidationResult {
+export function validateCatalogParams(params: GeneratorCatalogParams): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -234,7 +246,6 @@ function validateReferences(def: CaseDefinition): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // IDs de ciudades referenciados
   const cityIds = new Set(def.cities.map(c => c.id));
   for (const loc of def.locations) {
     if (!cityIds.has(loc.cityId)) {
@@ -242,19 +253,16 @@ function validateReferences(def: CaseDefinition): ValidationResult {
     }
   }
 
-  // NPCs referencian ciudades
   for (const npc of def.npcs) {
     if (!cityIds.has(npc.cityId)) {
       errors.push(`NPC ${npc.id} referencia ciudad inexistente: ${npc.cityId}`);
     }
   }
 
-  // Evidencias referencian origen
   for (const ev of def.evidence) {
     if (!ev.origin) warnings.push(`Evidencia ${ev.id} sin origen`);
   }
 
-  // Hechos referencian IDs
   const factIds = new Set(def.facts.map(f => f));
   for (const ev of def.evidence) {
     for (const rel of ev.relations) {
@@ -269,12 +277,10 @@ function validateTwoRoutes(def: CaseDefinition): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Verificar que existen al menos dos objetivos independientes
   if (def.objectives.length < 2) {
     errors.push('Se requieren al menos 2 objetivos para dos rutas independientes');
   }
 
-  // Verificar que hay al menos 2 NPCs con conocimiento decisivo
   const decisiveNPCs = def.npcs.filter(npc => 
     npc.knowledge.some(k => k.includes('decisive') || k.includes('clave') || k.includes('truth'))
   ).length;
@@ -283,7 +289,6 @@ function validateTwoRoutes(def: CaseDefinition): ValidationResult {
     warnings.push('Se recomiendan al menos 2 NPCs con conocimiento decisivo para rutas independientes');
   }
 
-  // Verificar que hay pruebas suficientes para cierre
   const decisiveEvidence = def.evidence.filter(e => e.admissible && e.type === 'analysis').length;
   if (decisiveEvidence < 2) {
     warnings.push('Se recomiendan al menos 2 evidencias admisibles de tipo analysis');
@@ -303,10 +308,9 @@ function validateTimeBudget(def: CaseDefinition): ValidationResult {
   };
 
   const budget = difficultyBudget[def.difficulty];
-  const durationFactor = def.duration === 'short' ? 0.7 : def.duration === 'long' ? 1.3 : 1;
+  const durationFactor = def.deadlineMinutes < 300 ? 0.7 : def.deadlineMinutes > 600 ? 1.3 : 1;
   const availableTime = Math.round(budget * durationFactor);
 
-  // Estimar tiempo mínimo necesario
   const minTime = def.locations.length * 15 + def.npcs.length * 10 + def.evidence.length * 5 + def.objectives.length * 30;
 
   if (minTime > availableTime) {
@@ -318,10 +322,6 @@ function validateTimeBudget(def: CaseDefinition): ValidationResult {
   return { valid: errors.length === 0, errors, warnings };
 }
 
-// ============================================================================
-// Validación geográfica
-// ============================================================================
-
 export function validateGeography(def: CaseDefinition, catalog: { cities: Array<{ id: string }> }): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -329,24 +329,18 @@ export function validateGeography(def: CaseDefinition, catalog: { cities: Array<
   const catalogCityIds = new Set(catalog.cities.map(c => c.id));
   const defCityIds = new Set(def.cities.map(c => c.id));
 
-  // Todas las ciudades del caso deben existir en catálogo
   for (const cityId of defCityIds) {
     if (!catalogCityIds.has(cityId)) {
       errors.push(`Ciudad ${cityId} no existe en catálogo geográfico`);
     }
   }
 
-  // Verificar conectividad (al menos una ruta entre ciudades usadas)
   if (def.cities.length > 1) {
     warnings.push('Verificar conectividad entre ciudades en catálogo de rutas');
   }
 
   return { valid: errors.length === 0, errors, warnings };
 }
-
-// ============================================================================
-// Exportar validador compuesto
-// ============================================================================
 
 export function createGenerationValidator() {
   return {

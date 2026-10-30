@@ -219,14 +219,15 @@ export async function runPipeline(
 
   await config.checkpointStore.save(currentDraft);
 
-  for (let stage = currentDraft.currentStage; stage <= MAX_STAGE; stage++) {
-    const checkpoint = currentDraft.stages[stage - 1];
+  for (let stageNum = currentDraft.currentStage; stageNum <= MAX_STAGE; stageNum++) {
+    const stage = stageNum as GenerationStage;
+    const checkpoint = currentDraft.stages[stageNum - 1];
     if (!checkpoint) continue;
     if (checkpoint.status === 'completed') continue;
 
     checkpoint.status = 'running';
     checkpoint.startedAt = new Date().toISOString();
-    currentDraft.currentStage = stage;
+    currentDraft.currentStage = stageNum;
     currentDraft.updatedAt = new Date().toISOString();
 
     await config.checkpointStore.save(currentDraft);
@@ -236,7 +237,7 @@ export async function runPipeline(
       
       const validation = config.validator.validateStageOutput(stage, output);
       if (!validation.valid) {
-        throw new Error(`Validación etapa ${stage} fallida: ${validation.errors.join(', ')}`);
+        throw new Error(`Validación etapa ${stageNum} fallida: ${validation.errors.join(', ')}`);
       }
 
       checkpoint.status = 'completed';
@@ -253,7 +254,7 @@ export async function runPipeline(
         checkpoint.status = 'failed';
         checkpoint.error = err;
         currentDraft.status = 'rejected';
-        currentDraft.error = `Etapa ${stage} falló tras ${checkpoint.retryCount} intentos: ${err}`;
+        currentDraft.error = `Etapa ${stageNum} falló tras ${checkpoint.retryCount} intentos: ${err}`;
         await config.checkpointStore.save(currentDraft);
         return { draft: currentDraft, success: false, error: currentDraft.error };
       }
@@ -264,7 +265,7 @@ export async function runPipeline(
       await config.checkpointStore.save(currentDraft);
       
       // Reintentar la misma etapa
-      stage--;
+      stageNum--;
       continue;
     }
   }
@@ -355,7 +356,7 @@ export function createGeneratorService(config: PipelineConfig): GeneratorService
       if (checkpoint) {
         checkpoint.status = 'pending';
         checkpoint.retryCount = 0;
-        checkpoint.error = undefined;
+        delete checkpoint.error;
       }
       draft.currentStage = stage;
       draft.status = 'validating';
@@ -381,22 +382,3 @@ export interface ValidationError {
   message: string;
   path?: string;
 }
-
-// ============================================================================
-// Constantes
-// ============================================================================
-
-export const MAX_STAGE = 9;
-export const MAX_RETRIES_PER_STAGE = 3;
-
-export const STAGE_NAMES: Record<number, string> = {
-  1: 'fijar_delito_objetivos_verdad_motivaciones',
-  2: 'seleccionar_geografia_catalogo',
-  3: 'definir_npc_conocimiento_relaciones_cronologia',
-  4: 'construir_lugares_grafo_pistas',
-  5: 'fijar_pruebas_laboratorio_tiempos_eventos',
-  6: 'normalizar_json_validar_estructura_referencias',
-  7: 'coherencia_determinista_revision_semantica',
-  8: 'simular_rutas_errores_presupuestos',
-  9: 'persistir_version_hash_reporte_publicar',
-};
