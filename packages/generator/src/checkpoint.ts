@@ -1,7 +1,7 @@
 // Checkpoint store para pipeline de generación (T4-01)
 // Persistencia de estados intermedios con leases y heartbeats
 
-import type { CaseDraft, CheckpointStore, StageCheckpoint } from './pipeline.js';
+import type { CaseDraft, CheckpointStore } from './pipeline.js';
 
 // ============================================================================
 // Interfaz de almacenamiento
@@ -45,25 +45,36 @@ export function createInMemoryCheckpointStore(): CheckpointStore {
 // Implementación con localStorage (para navegador)
 // ============================================================================
 
+function getLocalStorage(): any {
+  if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
+    return (globalThis as any).localStorage;
+  }
+  return null;
+}
+
 export function createLocalStorageCheckpointStore(prefix = 'meridiano-generator-'): CheckpointStore {
   const storage: CheckpointStorage = {
     async get(id: string): Promise<string | null> {
-      if (typeof localStorage === 'undefined') return null;
-      return localStorage.getItem(`${prefix}${id}`);
+      const ls = getLocalStorage();
+      if (!ls) return null;
+      return ls.getItem(`${prefix}${id}`);
     },
     async set(id: string, value: string): Promise<void> {
-      if (typeof localStorage === 'undefined') return;
-      localStorage.setItem(`${prefix}${id}`, value);
+      const ls = getLocalStorage();
+      if (!ls) return;
+      ls.setItem(`${prefix}${id}`, value);
     },
     async delete(id: string): Promise<void> {
-      if (typeof localStorage === 'undefined') return;
-      localStorage.removeItem(`${prefix}${id}`);
+      const ls = getLocalStorage();
+      if (!ls) return;
+      ls.removeItem(`${prefix}${id}`);
     },
     async keys(): Promise<string[]> {
-      if (typeof localStorage === 'undefined') return [];
+      const ls = getLocalStorage();
+      if (!ls) return [];
       const allKeys: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
+      for (let i = 0; i < ls.length; i++) {
+        const key = ls.key(i);
         if (key?.startsWith(prefix)) allKeys.push(key.slice(prefix.length));
       }
       return allKeys;

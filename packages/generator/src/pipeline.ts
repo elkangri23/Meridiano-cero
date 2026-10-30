@@ -1,7 +1,7 @@
 // Pipeline de generación de casos (T4-01)
 // Estados: draft → validating → validated | rejected
 
-import type { CaseDefinition, CatalogParams, Difficulty, ExplorationMode, ContentMode } from '@meridiano/case-schema';
+import type { CaseDefinition, Difficulty, ExplorationMode } from '@meridiano/case-schema';
 import type { CaseRun } from '@meridiano/case-schema';
 
 // ============================================================================
@@ -180,7 +180,7 @@ export function validateGenerationParams(params: GenerationParams): ValidationRe
     errors.push('seed debe ser entero no negativo');
   }
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, warnings: [] };
 }
 
 export function createStageCheckpoint(stage: GenerationStage): StageCheckpoint {
@@ -221,6 +221,7 @@ export async function runPipeline(
 
   for (let stage = currentDraft.currentStage; stage <= MAX_STAGE; stage++) {
     const checkpoint = currentDraft.stages[stage - 1];
+    if (!checkpoint) continue;
     if (checkpoint.status === 'completed') continue;
 
     checkpoint.status = 'running';
@@ -285,14 +286,14 @@ export async function runPipeline(
 
 async function executeStage(
   stage: GenerationStage,
-  draft: CaseDraft,
+  _draft: CaseDraft,
   _config: PipelineConfig
 ): Promise<unknown> {
   // Implementación por defecto - devuelve mock output
   // En implementación real, cada etapa tendría su lógica específica
   switch (stage) {
     case 1:
-      return { crimeType: draft.params.crimeType, objectives: [], truth: '', motivations: '' };
+      return { crimeType: 'robo', objectives: [], truth: '', motivations: '' };
     case 2:
       return { geography: 'selected' };
     case 3:
@@ -308,7 +309,7 @@ async function executeStage(
     case 8:
       return { simulation: true };
     case 9:
-      return { persisted: true, definition: draft.definition };
+      return { persisted: true, definition: undefined };
     default:
       return {};
   }
@@ -351,9 +352,11 @@ export function createGeneratorService(config: PipelineConfig): GeneratorService
       if (!draft) throw new Error(`Borrador no encontrado: ${draftId}`);
       
       const checkpoint = draft.stages[stage - 1];
-      checkpoint.status = 'pending';
-      checkpoint.retryCount = 0;
-      checkpoint.error = undefined;
+      if (checkpoint) {
+        checkpoint.status = 'pending';
+        checkpoint.retryCount = 0;
+        checkpoint.error = undefined;
+      }
       draft.currentStage = stage;
       draft.status = 'validating';
       draft.updatedAt = new Date().toISOString();
@@ -378,3 +381,22 @@ export interface ValidationError {
   message: string;
   path?: string;
 }
+
+// ============================================================================
+// Constantes
+// ============================================================================
+
+export const MAX_STAGE = 9;
+export const MAX_RETRIES_PER_STAGE = 3;
+
+export const STAGE_NAMES: Record<number, string> = {
+  1: 'fijar_delito_objetivos_verdad_motivaciones',
+  2: 'seleccionar_geografia_catalogo',
+  3: 'definir_npc_conocimiento_relaciones_cronologia',
+  4: 'construir_lugares_grafo_pistas',
+  5: 'fijar_pruebas_laboratorio_tiempos_eventos',
+  6: 'normalizar_json_validar_estructura_referencias',
+  7: 'coherencia_determinista_revision_semantica',
+  8: 'simular_rutas_errores_presupuestos',
+  9: 'persistir_version_hash_reporte_publicar',
+};

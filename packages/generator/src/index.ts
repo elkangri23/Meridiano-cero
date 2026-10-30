@@ -2,31 +2,51 @@
 // Pipeline por etapas con checkpoint y esquema de expediente
 
 export {
-  GenerationParams,
-  GenerationState,
-  CaseDraft,
-  GenerationStage,
-  GenerationResult,
-  StageCheckpoint,
-  PipelineConfig,
-  GeneratorService,
   runPipeline,
   createGeneratorService,
 } from './pipeline.js';
 
+export type {
+  GenerationParams,
+  CrimeType,
+  Region,
+  SurpriseMode,
+  DraftStatus,
+  CaseDraft,
+  StageCheckpoint,
+  ValidationReport,
+  StageValidation,
+  GenerationStage,
+  GenerationResult,
+  PipelineConfig,
+  GenerationValidator,
+  GeneratorService,
+} from './pipeline.js';
+
 export {
-  CheckpointStore,
+  createInMemoryCheckpointStore,
+  createLocalStorageCheckpointStore,
+  createCheckpointStoreFromStorage,
+  createLeasedCheckpointStore,
   createCheckpointStore,
-  saveCheckpoint,
-  loadCheckpoint,
-  listCheckpoints,
-  deleteCheckpoint,
+} from './checkpoint.js';
+
+export type {
+  CheckpointStore,
+  CheckpointStorage,
+  LeaseConfig,
+  LeasedCheckpoint,
 } from './checkpoint.js';
 
 export {
   validateGenerationParams,
   validateCaseDraft,
   validateStageOutput,
+  validateCatalogParams,
+  createGenerationValidator,
+} from './validator.js';
+
+export type {
   ValidationResult,
   ValidationError,
 } from './validator.js';
