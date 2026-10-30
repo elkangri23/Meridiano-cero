@@ -4,8 +4,8 @@ import { cookieToken, matches } from './session-security.ts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
-import { createSessionStore, tokenDigest } from './store.ts';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createSessionStore } from './store.ts';
+import { createHash, randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { profiles, sessions, runs } from '../database/schema.ts';
 
@@ -51,7 +51,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
       if (request.headers.origin !== config.origin) return deny(reply, request, 403, 'ORIGIN_REJECTED');
       const now = Date.now();
       for (const [key, entry] of registrationAttempts) if (entry.expires <= now) registrationAttempts.delete(key);
-      const current = registrationAttempts.get(request.ip) ?? { count: 0, expires: now + 300000 }; // 5 min window
+      const current = registrationAttempts.get(request.ip) ?? { count: 0, expires: now + 300000 };
       if (++current.count > 5 || registrationAttempts.size >= 10000) {
         reply.header('Retry-After', '300');
         return deny(reply, request, 429, 'RATE_LIMITED');
@@ -69,10 +69,10 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
       }
 
       // Hash de contraseña (usando bcrypt en producción, aquí simplificado)
-      const passwordHash = hashToken(password + email.toLowerCase()); // Placeholder: usar bcrypt real
+      hashToken(password + email.toLowerCase()); // Placeholder: usar bcrypt real
 
       // Crear perfil
-      const [profile] = await database.orm.insert(profiles).values({
+      const [createdProfile] = await database.orm.insert(profiles).values({
         localKey: email.toLowerCase(),
         displayName: displayName.trim(),
         role: 'player',
@@ -82,7 +82,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
       const result = await store.create(undefined);
       reply.header('Set-Cookie', 'meridiano_session=' + result.token + '; HttpOnly; SameSite=Lax; Path=/api/v1; Max-Age=28800');
 
-      return { profile: { id: profile.id, displayName: profile.displayName }, csrfToken: result.csrfToken };
+      return { profile: { id: createdProfile.id, displayName: createdProfile.displayName }, csrfToken: result.csrfToken };
     } catch (e) {
       return deny(reply, request, 503, 'DEPENDENCY_UNAVAILABLE');
     }
@@ -101,13 +101,13 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     onRequest: async (request, reply) => {
       if (request.headers.origin !== config.origin) return deny(reply, request, 403, 'ORIGIN_REJECTED');
     },
-  }, async (request, reply) => {
+  }, async (request, _reply) => {
     const { email } = request.body as { email: string };
 
     // Buscar perfil (pero siempre responder éxito para no enumerar)
-    const profile = await database.orm.select().from(profiles).where(eq(profiles.localKey, email.toLowerCase())).limit(1);
+    const profileRows = await database.orm.select().from(profiles).where(eq(profiles.localKey, email.toLowerCase())).limit(1);
 
-    if (profile.length > 0) {
+    if (profileRows.length > 0) {
       const token = generateToken();
       const tokenHash = hashToken(token);
       const expiresAt = new Date(Date.now() + 3600000); // 1 hora
@@ -116,7 +116,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
 
       // En producción: enviar email con token
       // await sendRecoveryEmail(email, token);
-      console.log('[RECOVERY] Token para', email.toLowerCase(), ':', token); // Solo para desarrollo
+      console.log('[RECOVERY] Token para', email.toLowerCase(), ':', token);
     }
 
     // Respuesta genérica siempre exitosa
@@ -140,7 +140,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
       if (request.headers.origin !== config.origin) return deny(reply, request, 403, 'ORIGIN_REJECTED');
     },
   }, async (request, reply) => {
-    const { token, newPassword } = request.body as { token: string; newPassword: string };
+    const { token } = request.body as { token: string; newPassword: string };
     const tokenHash = hashToken(token);
 
     const recovery = recoveryTokens.get(tokenHash);
@@ -154,14 +154,14 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
 
     // Buscar perfil asociado (en producción: el token incluiría el email/profileId)
     // Aquí simplificado: actualizamos el primer perfil como demo
-    const [profile] = await database.orm.select().from(profiles).limit(1);
-    if (!profile) return deny(reply, request, 404, 'PROFILE_NOT_FOUND');
+    const [foundProfile] = await database.orm.select().from(profiles).limit(1);
+    if (!foundProfile) return deny(reply, request, 404, 'PROFILE_NOT_FOUND');
 
     // Actualizar contraseña
     // En producción: await database.orm.update(profiles).set({ passwordHash: hashToken(newPassword + profile.localKey) }).where(eq(profiles.id, profile.id));
 
     // Revocar todas las sesiones existentes
-    await database.orm.delete(sessions).where(eq(sessions.profileId, profile.id));
+    await database.orm.delete(sessions).where(eq(sessions.profileId, foundProfile.id));
 
     return { message: 'Contraseña actualizada. Inicie sesión con la nueva contraseña.' };
   });
@@ -174,19 +174,20 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     const session = await store.find(sessionToken);
     if (!session) return deny(reply, request, 401, 'SESSION_REQUIRED');
 
-    const profile = await database.orm.select().from(profiles).where(eq(profiles.id, session.profile.id)).limit(1);
-    if (!profile.length) return deny(reply, request, 404, 'PROFILE_NOT_FOUND');
+    const profileRows = await database.orm.select().from(profiles).where(eq(profiles.id, session.profile.id)).limit(1);
+    if (profileRows.length === 0) return deny(reply, request, 404, 'PROFILE_NOT_FOUND');
+    const profile = profileRows[0];
 
-    const runs = await database.orm.select().from(runs).where(eq(runs.ownerId, session.profile.id));
+    const userRuns = await database.orm.select().from(runs).where(eq(runs.ownerId, session.profile.id));
 
     const exportData = {
-      profile: { id: profile[0].id, displayName: profile[0].displayName, role: profile[0].role },
-      runs: runs.map(r => ({ id: r.id, definitionId: r.definitionId, createdAt: r.createdAt, updatedAt: r.updatedAt })),
+      profile: { id: profile.id, displayName: profile.displayName, role: profile.role },
+      runs: userRuns.map(r => ({ id: r.id, definitionId: r.definitionId, createdAt: r.createdAt, updatedAt: r.updatedAt })),
       exportedAt: new Date().toISOString(),
     };
 
     reply.header('Content-Type', 'application/json');
-    reply.header('Content-Disposition', `attachment; filename="meridiano-export-${profile[0].id}.json"`);
+    reply.header('Content-Disposition', `attachment; filename="meridiano-export-${profile.id}.json"`);
     return exportData;
   });
 
@@ -218,10 +219,10 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     if (!session) return deny(reply, request, 401, 'SESSION_REQUIRED');
 
     // Verificar contraseña (placeholder)
-    const profile = await database.orm.select().from(profiles).where(eq(profiles.id, session.profile.id)).limit(1);
-    if (!profile.length) return deny(reply, request, 404, 'PROFILE_NOT_FOUND');
+    const profileRows = await database.orm.select().from(profiles).where(eq(profiles.id, session.profile.id)).limit(1);
+    if (profileRows.length === 0) return deny(reply, request, 404, 'PROFILE_NOT_FOUND');
 
-    const passwordHash = hashToken(password + profile[0].localKey);
+    hashToken(password + profileRows[0].localKey);
     // En producción: verificar con bcrypt
 
     // Borrado en cascada: sesiones, runs, etc.
@@ -235,6 +236,3 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     return reply.code(204).send();
   });
 }
-
-// Extender schema.ts con tabla runs importada
-import { runs } from '../database/schema.ts';

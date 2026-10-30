@@ -230,13 +230,15 @@ export async function getUsageStats(
   };
 
   for (const r of rows) {
-    stats.byProvider[r.providerId] = stats.byProvider[r.providerId] ?? { requests: 0, tokens: 0 };
-    stats.byProvider[r.providerId].requests++;
-    stats.byProvider[r.providerId].tokens += r.totalTokens;
+    const providerEntry = stats.byProvider[r.providerId] ?? { requests: 0, tokens: 0 };
+    providerEntry.requests++;
+    providerEntry.tokens += r.totalTokens;
+    stats.byProvider[r.providerId] = providerEntry;
 
-    stats.byFunction[r.function] = stats.byFunction[r.function] ?? { requests: 0, tokens: 0 };
-    stats.byFunction[r.function].requests++;
-    stats.byFunction[r.function].tokens += r.totalTokens;
+    const functionEntry = stats.byFunction[r.function] ?? { requests: 0, tokens: 0 };
+    functionEntry.requests++;
+    functionEntry.tokens += r.totalTokens;
+    stats.byFunction[r.function] = functionEntry;
   }
 
   return stats;
@@ -259,7 +261,10 @@ export async function disableGlobalCutoff(database: Database, adminId: string): 
 
 export async function getGlobalCutoff(database: Database): Promise<{ enabled: boolean; reason?: string } | null> {
   const [cutoff] = await database.orm.select().from(aiGlobalCutoff).where(eq(aiGlobalCutoff.id, 1)).limit(1);
-  return cutoff ? { enabled: !!cutoff.isEnabled, reason: cutoff.reason ?? undefined } : null;
+  if (!cutoff) return null;
+  const result: { enabled: boolean; reason?: string } = { enabled: !!cutoff.isEnabled };
+  if (cutoff.reason) result.reason = cutoff.reason;
+  return result;
 }
 
 // Inicializar cuotas por defecto
