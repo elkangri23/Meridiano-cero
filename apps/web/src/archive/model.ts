@@ -62,7 +62,9 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
     if (result.profileId !== identity.profile.id) throw new ArchiveError('invalid');
     session = identity;
     set({ phase: 'ready', profile: identity.profile, page: result, opened: null, openingRunId: null, cases: catalog.items, creation: creator.view(identity.profile.id), filter, cursor, previous,
-      notice: result.items.length ? 'Archivo actualizado.' : 'No hay partidas en este filtro.' });
+      notice: result.items.length ? 'Archivo actualizado.' : 'No hay partidas en este filtro.',
+      connectionStatus: 'online',
+      lastError: null });
   }
   async function open(local = false) {
     if (disposed) return;
@@ -79,7 +81,9 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
     if (disposed) return;
     if (!session) return open();
     const identity = session; const ticket = begin();
-    set({ ...state, phase: 'loading', profile: identity.profile, page: null, opened: null, openingRunId: null, filter, cursor, previous, notice: 'Consultando el archivo…' });
+    set({ ...state, phase: 'loading', profile: identity.profile, page: null, opened: null, openingRunId: null, filter, cursor, previous, notice: 'Consultando el archivo…',
+      connectionStatus: state.connectionStatus,
+      lastError: state.lastError });
     try { await page(ticket, identity, filter, cursor, previous); }
     catch { failed(ticket); }
   }
@@ -87,21 +91,29 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
     if (disposed || !session || state.phase !== 'ready') return;
     if (!state.page?.items.some(item => item.runId === runId)) return;
     const ticket = begin();
-    set({ ...state, phase: 'loading', opened: null, openingRunId: runId, notice: 'Consultando la ficha de la partida…' });
+    set({ ...state, phase: 'loading', opened: null, openingRunId: runId, notice: 'Consultando la ficha de la partida…',
+      connectionStatus: state.connectionStatus,
+      lastError: state.lastError });
     try {
       const view = await api.initial(runId, ticket.signal);
       if (!ticket.current()) return;
       if (view.runId !== runId) throw new ArchiveError('invalid');
-      set({ ...state, phase: 'ready', opened: view, openingRunId: null, notice: 'Ficha inicial consultada. El reloj no ha avanzado.' });
+      set({ ...state, phase: 'ready', opened: view, openingRunId: null, notice: 'Ficha inicial consultada. El reloj no ha avanzado.',
+        connectionStatus: state.connectionStatus,
+        lastError: state.lastError });
     } catch {
       if (ticket.current()) set({ ...state, phase: 'ready', opened: null, openingRunId: null,
-        notice: 'No se pudo abrir la ficha. Puede tener progreso aún no compatible, no estar disponible o haber cambiado la sesión. Actualiza el archivo para comprobarlo.' });
+        notice: 'No se pudo abrir la ficha. Puede tener progreso aún no compatible, no estar disponible o haber cambiado la sesión. Actualiza el archivo para comprobarlo.',
+        connectionStatus: state.connectionStatus,
+        lastError: state.lastError });
     }
   }
   function closeRun() {
     if (disposed || (!state.opened && !state.openingRunId)) return;
     begin();
-    set({ ...state, phase: 'ready', opened: null, openingRunId: null, notice: 'Ficha cerrada. El reloj no ha avanzado.' });
+    set({ ...state, phase: 'ready', opened: null, openingRunId: null, notice: 'Ficha cerrada. El reloj no ha avanzado.',
+      connectionStatus: state.connectionStatus,
+      lastError: state.lastError });
   }
   function clearCreationReference() {
     logoutProfile = session?.profile.id ?? logoutProfile;

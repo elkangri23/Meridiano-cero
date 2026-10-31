@@ -4,10 +4,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChangeEvent } from 'react';
 import { archiveApi } from './client';
 import { createArchiveModel } from './model';
-import type { ArchiveState, ConnectionStatus } from './model';
+import type { ConnectionStatus } from './model';
 import './archive.css';
-
-const date = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' });
 
 function connectionStatusLabel(status: ConnectionStatus): string {
   switch (status) {
@@ -24,6 +22,39 @@ function connectionStatusColor(status: ConnectionStatus): string {
     case 'reconnecting': return '#ffff55';
     default: return '#aaaaaa';
   }
+}
+
+function renderArchiveList(state: any, model: any, busy: boolean, filter: (e: any) => void, opener: any, closeRun: any) {
+  if (!state.profile) return null;
+  
+  return (
+    <section className="archive-list" aria-label="Partidas propias" aria-busy={busy}>
+      <label>Mostrar <select value={state.filter} disabled={busy} onChange={filter}><option value="all">Todas</option><option value="active">Activas</option><option value="closed">Cerradas</option></select></label>
+      <div className="connection-status" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '8px 12px', background: '#0000aa', border: '2px solid #ffff55', borderRadius: '4px' }}>
+        <span style={{ color: connectionStatusColor(state.connectionStatus), fontWeight: 'bold' }}>
+          {connectionStatusLabel(state.connectionStatus)}
+        </span>
+        {state.connectionStatus !== 'online' && (
+          <button type="button" className="text-button" onClick={() => { void model.reconnect(); }} disabled={state.connectionStatus === 'reconnecting'}>
+            Reintentar conexión
+          </button>
+        )}
+        {state.lastError && <span style={{ color: '#ff5555', fontSize: '0.8em' }}>{state.lastError}</span>}
+      </div>
+      <p role="status" aria-live="polite" className="archive-notice">{state.notice}</p>
+      {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
+      {state.opened && <InitialRun view={state.opened} close={closeRun} />}
+      {state.profile && <NewRun key={state.profile.id} state={state} model={model} />}
+      {state.page && state.page.items.length > 0 && (
+        <div className="archive-scroll" role="region" aria-label="Tabla de partidas, desplazable" tabIndex={0}>
+          <table><caption>Partidas de la cuenta actual</caption><thead><tr><th scope="col">Expediente</th><th scope="col">Referencia</th><th scope="col">Estado</th><th scope="col">Creación</th><th scope="col">Consulta</th></tr></thead>
+            <tbody>{state.page.items.map((item: any) => <tr key={item.runId}><td>{item.caseTitle ?? 'Expediente sin ficha disponible'}</td><td><code title={item.runId}>{item.runId.slice(0, 8)}</code></td><td>{item.status === 'active' ? 'Activa' : 'Cerrada'}</td><td><time dateTime={item.createdAt}>{item.createdAt.toLocaleString()}</time></td><td><button type="button" disabled={busy} aria-label={'Consultar partida ' + item.runId.slice(0, 8)} onClick={event => { opener.current = event.currentTarget; void model.openRun(item.runId); }}>Consultar</button></td></tr>)}</tbody>
+          </table>
+        </div>
+      )}
+      <nav className="archive-pages" aria-label="Páginas del archivo"><button type="button" disabled={busy || state.previous.length === 0} onClick={() => { void model.back(); }}>Anterior</button><span>Página {state.previous.length + 1}</span><button type="button" disabled={busy || !state.page?.nextCursor} onClick={() => { void model.next(); }}>Siguiente</button></nav>
+    </section>
+  );
 }
 
 function SessionBar({ state, model }: { state: any; model: any }) {
@@ -45,26 +76,7 @@ function SessionBar({ state, model }: { state: any; model: any }) {
   );
 }
 
-const date = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' });
-
-function connectionStatusLabel(status: ConnectionStatus): string {
-  switch (status) {
-    case 'online': return 'Conectado';
-    case 'offline': return 'Sin conexión';
-    case 'reconnecting': return 'Reconectando...';
-    default: return 'Desconocido';
-  }
-}
-function connectionStatusColor(status: ConnectionStatus): string {
-  switch (status) {
-    case 'online': return '#ffff55';
-    case 'offline': return '#ff5555';
-    case 'reconnecting': return '#ffff55';
-    default: return '#aaaaaa';
-  }
-}
-
-export function Archive() {
+function Archive() {
   const [model] = useState(() => createArchiveModel(archiveApi));
   const state = useSyncExternalStore(model.subscribe, model.getSnapshot);
   useEffect(() => { void model.refresh(); return model.dispose; }, [model]);
@@ -84,6 +96,7 @@ export function Archive() {
 
   return (
     <main className="archive">
+      <a className="skip-link" href="#command-input">Ir a la entrada de órdenes</a>
       <header className="archive-header"><span className="archive-mark" aria-hidden="true">M<span>0</span></span><div><p>MERIDIANO-CERO</p><h1>Archivo de partidas</h1></div></header>
       <p className="archive-banner">Consulta del archivo · La investigación aún no está disponible en esta pantalla.</p>
       <SessionBar state={state} model={model} />
@@ -91,41 +104,9 @@ export function Archive() {
       {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
       {state.opened && <InitialRun view={state.opened} close={closeRun} />}
       {state.profile && <NewRun key={state.profile.id} state={state} model={model} />}
-      {state.profile && (
-        <section className="archive-list" aria-label="Partidas propias" aria-busy={busy}>
-          <label>Mostrar <select value={state.filter} disabled={busy} onChange={filter}><option value="all">Todas</option><option value="active">Activas</option><option value="closed">Cerradas</option></select></label>
-          <div className="connection-status" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '8px 12px', background: '#0000aa', border: '2px solid #ffff55', borderRadius: '4px' }}>
-            <span style={{ color: connectionStatusColor(state.connectionStatus), fontWeight: 'bold' }}>
-              {connectionStatusLabel(state.connectionStatus)}
-            </span>
-            {state.connectionStatus !== 'online' && (
-              <button type="button" className="text-button" onClick={() => { void model.reconnect(); }} disabled={state.connectionStatus === 'reconnecting'}>
-                Reintentar conexión
-              </button>
-            )}
-            {state.lastError && <span style={{ color: '#ff5555', fontSize: '0.8em' }}>{state.lastError}</span>}
-          </div>
-          <p role="status" aria-live="polite" className="archive-notice">{state.notice}</p>
-          {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
-          {state.opened && <InitialRun view={state.opened} close={closeRun} />}
-          {state.profile && <NewRun key={state.profile.id} state={state} model={model} />}
-          {state.profile && (
-            <section className="archive-list" aria-label="Partidas propias" aria-busy={busy}>
-              <label>Mostrar <select value={state.filter} disabled={busy} onChange={filter}><option value="all">Todas</option><option value="active">Activas</option><option value="closed">Cerradas</option></select></label>
-              {state.page && state.page.items.length > 0 && (
-                <div className="archive-scroll" role="region" aria-label="Tabla de partidas, desplazable" tabIndex={0}>
-                  <table><caption>Partidas de la cuenta actual</caption><thead><tr><th scope="col">Expediente</th><th scope="col">Referencia</th><th scope="col">Estado</th><th scope="col">Creación</th><th scope="col">Consulta</th></tr></thead>
-                    <tbody>{state.page.items.map(item => <tr key={item.runId}><td>{item.caseTitle ?? 'Expediente sin ficha disponible'}</td><td><code title={item.runId}>{item.runId.slice(0, 8)}</code></td><td>{item.status === 'active' ? 'Activa' : 'Cerrada'}</td><td><time dateTime={item.createdAt}>{date.format(new Date(item.createdAt))}</time></td><td><button type="button" disabled={busy} aria-label={'Consultar partida ' + item.runId.slice(0, 8)} onClick={event => { opener.current = event.currentTarget; void model.openRun(item.runId); }}>Consultar</button></td></tr>)}</tbody>
-                  </table>
-                </div>
-              )}
-              <nav className="archive-pages" aria-label="Páginas del archivo"><button type="button" disabled={busy || state.previous.length === 0} onClick={() => { void model.back(); }}>Anterior</button><span>Página {state.previous.length + 1}</span><button type="button" disabled={busy || !state.page?.nextCursor} onClick={() => { void model.next(); }}>Siguiente</button></nav>
-            </section>
-          )}
-          <footer>Un detective por partida · Las consultas del archivo no avanzan el reloj del caso.</footer>
-        </main>
-      );
-    }
+      {state.profile && renderArchiveList(state, model, busy, filter, opener, closeRun)}
+      <footer>Un detective por partida · Las consultas del archivo no avanzan el reloj del caso.</footer>
+    </main>
   );
 }
 
