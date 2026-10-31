@@ -39,11 +39,10 @@ El artefacto heredado packages/web/RetroScreen fue conservado durante la integra
 
 ## Fases y próximos pasos
 
-T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. **T3-01/02/03/04/06/07 completados**; **T3-05 (E2E) preparada, requiere entorno dev completo**. Fases 4, 5 y 6 (T6-01/02/03, T7-01/02/03/05/06) completadas.
+T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. **T3-01/02/03/04/06/07/08 completados**; **T3-05 (E2E) preparada, requiere entorno dev completo**. Fases 4, 5 y 6 (T6-01/02/03, T7-01/02/03/05/06) completadas.
 
-1. **T3-08**: Presupuestos, cancelación, probes acotados, telemetría sanitizada
-2. **T3-05**: Ejecutar ambas rutas en navegador, reanudación y teclado (requiere entorno dev: API + Web + DB)
-3. Integrar generador (Fase 4) con API/UI para generación de casos de punta a punta.
+1. **T3-05**: Ejecutar ambas rutas en navegador, reanudación y teclado (requiere entorno dev: API + Web + DB)
+2. Integrar generador (Fase 4) con API/UI para generación de casos de punta a punta.
 
 ## Arranque vigente
 
