@@ -39,14 +39,12 @@ El artefacto heredado packages/web/RetroScreen fue conservado durante la integra
 
 ## Fases y próximos pasos
 
-T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. **T3-01/02/03/04 completados**; **T3-05 (E2E) preparada, requiere entorno dev completo**. Fases 4, 5 y 6 (T6-01/02/03, T7-01 a T7-06) completadas.
+T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. **T3-01/02/03/04/06 completados**; **T3-05 (E2E) preparada, requiere entorno dev completo**. Fases 4, 5 y 6 (T6-01/02/03, T7-01/02/03/05/06) completadas.
 
-1. Completar validación, lotes y extremos de retraso del motor; cerrar calidad global antes de habilitar acciones HTTP. Costes, ordinales y tiempos base de rutas ya están comprobados en v4.
-2. Ampliar el DTO inicial y API-juego: preview/commit, operaciones, transiciones y proyección de resultados; la creación inicial ya tiene ownership, rama e idempotencia.
-3. Conectar guardados/manuales, política NPC y UI, manteniendo el primer resultado oficial.
-4. Evaluar el proveedor real disponible cuando haya acceso, sin exigir Ollama en trabajo/VPS.
-5. **T3-05**: Ejecutar ambas rutas en navegador, reanudación y teclado conforme al catálogo detallado (requiere entorno dev: API + Web + DB).
-6. Integrar generador (Fase 4) con API/UI para generación de casos de punta a punta.
+1. **T3-07**: Estados UI ante fallo, logout, teclado, reconexión
+2. **T3-08**: Presupuestos, cancelación, probes acotados, telemetría sanitizada
+3. **T3-05**: Ejecutar ambas rutas en navegador, reanudación y teclado (requiere entorno dev: API + Web + DB)
+4. Integrar generador (Fase 4) con API/UI para generación de casos de punta a punta.
 
 ## Arranque vigente
 
