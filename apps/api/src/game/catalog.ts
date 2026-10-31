@@ -26,3 +26,8 @@ export function caseSummary(caseId: string): CaseSummary {
 export function listCases() {
   return [caseSummary(astrolabioDefinition.id)];
 }
+
+export function findDefinitionById(definitionId: string) {
+  if (definitionId !== astrolabioDefinition.id) throw new RunStoreError('NOT_FOUND');
+  return structuredClone(astrolabioDefinition);
+}

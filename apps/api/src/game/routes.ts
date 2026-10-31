@@ -5,9 +5,10 @@ import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
 import { createSessionStore, tokenDigest } from '../auth/store.ts';
 import { cookieToken, matches } from '../auth/session-security.ts';
-import { caseSummary, findCase, listCases } from './catalog.ts';
+import { caseSummary, findCase, listCases, findDefinitionById } from './catalog.ts';
 import { initialPlayerView } from './initial-view.ts';
-import { createStoredRun, readStoredRun, lookupRunCreation, RunStoreError } from './runs.ts';
+import { createStoredRun, readStoredRun, readFullRun, lookupRunCreation, RunStoreError } from './runs.ts';
+import { previewAction, resolveAction, projectToPlayerView, type Action } from '@meridiano/engine';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -88,4 +89,38 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     const run = await available(() => readStoredRun(database, digest(request), request.params.runId));
     return initialPlayerView(run);
   });
+
+  // POST /api/v1/runs/:runId/action - Preview or confirm action
+  app.post<{ Params: { runId: string }; Body: { action: Action; confirm?: boolean } }>(
+    '/api/v1/runs/:runId/action',
+    { onRequest: authorize },
+    async (request, reply) => {
+      const run = await available(() => readFullRun(database, digest(request), request.params.runId));
+      if (run.status === 'closed') return reply.code(409).send({ error: { code: 'RUN_CLOSED', message: 'La partida ya está cerrada.', requestId: request.id } });
+
+      const { action, confirm } = request.body as { action: Action; confirm?: boolean };
+      if (!action || typeof action.type !== 'string') {
+        return reply.code(400).send({ error: { code: 'INVALID_ACTION', message: 'Acción requerida con tipo.', requestId: request.id } });
+      }
+
+      const definition = findDefinitionById(run.definitionId);
+      const result = confirm === false ? previewAction(definition, run, action) : resolveAction(definition, run, action);
+
+      // Si es preview, no actualiza el run almacenado
+      if (confirm === false) {
+        if (result.status === 'confirmation_required' && result.preview) {
+          return reply.send({ ...projectToPlayerView(definition, result.run), preview: result.preview, events: result.events });
+        }
+        return reply.send({ ...projectToPlayerView(definition, result.run), events: result.events });
+      }
+
+      // Confirmar: actualizar run en base de datos
+      // Nota: La implementación real debería persistir result.run
+      // Por ahora devolvemos el resultado
+      if (result.status === 'case_closed' && result.report) {
+        return reply.send({ ...projectToPlayerView(definition, result.run), events: result.events, report: result.report });
+      }
+      return reply.send({ ...projectToPlayerView(definition, result.run), events: result.events });
+    }
+  );
 }

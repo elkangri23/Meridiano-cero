@@ -587,3 +587,4 @@ export function createInitialRun(
 }
 
 export { astrolabioDefinition } from './fixtures/case-astrolabio.js';
+export { previewAction };
