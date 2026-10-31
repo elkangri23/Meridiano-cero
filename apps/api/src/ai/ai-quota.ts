@@ -16,7 +16,7 @@ export const aiUsage = pgTable('ai_usage', {
   completionTokens: integer('completion_tokens').notNull().default(0),
   totalTokens: integer('total_tokens').notNull().default(0),
   latencyMs: integer('latency_ms').notNull(),
-  status: text('status').notNull(), // 'success', 'error', 'timeout', 'rate_limited', 'quota_exceeded'
+  status: text('status').notNull(), // 'success', 'error', 'timeout', 'rate_limited', 'quota_exceeded', 'cancelled'
   errorCode: text('error_code'),
   requestId: text('request_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -74,6 +74,16 @@ export interface UsageStats {
   errors: number;
   byProvider: Record<string, { requests: number; tokens: number }>;
   byFunction: Record<string, { requests: number; tokens: number }>;
+}
+
+export type AiUsageStatus = 'success' | 'error' | 'timeout' | 'rate_limited' | 'quota_exceeded' | 'cancelled';
+
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+export function estimateTokensFromContext(context: Record<string, unknown>): number {
+  return estimateTokens(JSON.stringify(context));
 }
 
 export async function checkQuota(
@@ -187,7 +197,7 @@ export async function recordUsage(
     completionTokens: number;
     totalTokens: number;
     latencyMs: number;
-    status: 'success' | 'error' | 'timeout' | 'rate_limited' | 'quota_exceeded';
+    status: AiUsageStatus;
     errorCode?: string;
     requestId: string;
   }
@@ -203,7 +213,7 @@ export async function recordUsage(
     totalTokens: params.totalTokens,
     latencyMs: params.latencyMs,
     status: params.status,
-    errorCode: params.errorCode,
+    errorCode: params.errorCode ?? '',
     requestId: params.requestId,
   });
 }

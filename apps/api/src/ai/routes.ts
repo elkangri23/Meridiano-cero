@@ -11,6 +11,7 @@ import type { AiRequest, AiProvider } from './provider.ts';
 import { RunStoreError } from '../game/runs.ts';
 import type { PublicFact, PublicScene, NpcContext, ConversationMemory, SpeechAct, ActionOffer } from './context.ts';
 import { speechActs } from './context.ts';
+import { checkQuota, recordUsage, estimateTokens } from './ai-quota.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -112,39 +113,187 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
   }
 
   // POST /api/v1/ai/interpret
-  app.post('/api/v1/ai/interpret', { onRequest: async (request) => { await authorize(request); } }, async (_request, reply) => {
-    await authorize(_request);
-    const aiRequest = toInterpretRequest(_request.body);
+  app.post('/api/v1/ai/interpret', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
+    const ownerId = await authorize(request);
+    const aiRequest = toInterpretRequest(request.body);
+
+    // Estimar tokens
+    const estimatedTokens = estimateTokens(JSON.stringify(aiRequest.context));
+
+    // Verificar cuota
+    const quotaCheck = await checkQuota(database, {
+      ownerId,
+      function: 'interpretAction',
+      providerId: aiProvider.providerId,
+      model: aiProvider.model,
+      estimatedTokens,
+    });
+    if (!quotaCheck.allowed) {
+      return reply.code(429).send({ error: { code: 'QUOTA_EXCEEDED', message: quotaCheck.reason, retryAfter: quotaCheck.retryAfter } });
+    }
+
     const callOptions: { requestId: string; signal?: AbortSignal } = { requestId: aiRequest.requestId };
     if (aiRequest.signal) callOptions.signal = aiRequest.signal;
-    const result = await director.interpretAction(aiRequest.context.text as string, aiRequest.context.scene as PublicScene, aiRequest.context.offers as ActionOffer[], callOptions);
-    return reply.send({ interpretation: result });
+
+    const startTime = performance.now();
+    try {
+      const result = await director.interpretAction(aiRequest.context.text as string, aiRequest.context.scene as PublicScene, aiRequest.context.offers as ActionOffer[], callOptions);
+
+      // Registrar uso exitoso
+      await recordUsage(database, {
+        ownerId,
+        function: 'interpretAction',
+        providerId: aiProvider.providerId,
+        model: aiProvider.model,
+        promptTokens: 0, // Se actualizaría con datos reales del provider
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: Math.round(performance.now() - startTime),
+        status: 'success',
+        requestId: aiRequest.requestId,
+      });
+
+      return reply.send({ interpretation: result });
+    } catch (error) {
+      // Registrar error
+      const errorCode = error instanceof AiError ? error.code : '';
+      await recordUsage(database, {
+        ownerId,
+        function: 'interpretAction',
+        providerId: aiProvider.providerId,
+        model: aiProvider.model,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: Math.round(performance.now() - startTime),
+        status: error instanceof AiError ? (error.code === 'timeout' ? 'timeout' : error.code === 'cancelled' ? 'cancelled' : 'error') : 'error',
+        errorCode,
+        requestId: aiRequest.requestId,
+      });
+      throw error;
+    }
   });
 
   // POST /api/v1/ai/narrate
-  app.post('/api/v1/ai/narrate', { onRequest: async (request) => { await authorize(request); } }, async (_request, reply) => {
-    await authorize(_request);
-    const aiRequest = toNarrateRequest(_request.body);
+  app.post('/api/v1/ai/narrate', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
+    const ownerId = await authorize(request);
+    const aiRequest = toNarrateRequest(request.body);
     const facts = aiRequest.context.facts as PublicFact[];
+
+    const estimatedTokens = estimateTokens(JSON.stringify(aiRequest.context));
+
+    const quotaCheck = await checkQuota(database, {
+      ownerId,
+      function: 'narrateResult',
+      providerId: aiProvider.providerId,
+      model: aiProvider.model,
+      estimatedTokens,
+    });
+    if (!quotaCheck.allowed) {
+      return reply.code(429).send({ error: { code: 'QUOTA_EXCEEDED', message: quotaCheck.reason, retryAfter: quotaCheck.retryAfter } });
+    }
+
     const callOptions: { requestId: string; signal?: AbortSignal } = { requestId: aiRequest.requestId };
     if (aiRequest.signal) callOptions.signal = aiRequest.signal;
-    const result = await director.narrateResult(facts, callOptions);
-    return reply.send({ narrative: result });
+
+    const startTime = performance.now();
+    try {
+      const result = await director.narrateResult(facts, callOptions);
+
+      await recordUsage(database, {
+        ownerId,
+        function: 'narrateResult',
+        providerId: aiProvider.providerId,
+        model: aiProvider.model,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: Math.round(performance.now() - startTime),
+        status: 'success',
+        requestId: aiRequest.requestId,
+      });
+
+      return reply.send({ narrative: result });
+    } catch (error) {
+      const errorCode = error instanceof AiError ? error.code : undefined;
+      await recordUsage(database, {
+        ownerId,
+        function: 'narrateResult',
+        providerId: aiProvider.providerId,
+        model: aiProvider.model,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: Math.round(performance.now() - startTime),
+        status: error instanceof AiError ? (error.code === 'timeout' ? 'timeout' : error.code === 'cancelled' ? 'cancelled' : 'error') : 'error',
+        ...(errorCode ? { errorCode } : {}),
+        requestId: aiRequest.requestId,
+      });
+      throw error;
+    }
   });
 
   // POST /api/v1/ai/converse
-  app.post('/api/v1/ai/converse', { onRequest: async (request) => { await authorize(request); } }, async (_request, reply) => {
-    await authorize(_request);
-    const aiRequest = toConverseRequest(_request.body);
+  app.post('/api/v1/ai/converse', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
+    const ownerId = await authorize(request);
+    const aiRequest = toConverseRequest(request.body);
     const facts = aiRequest.context.facts as PublicFact[];
     const memory = aiRequest.context.memory as ConversationMemory;
+
+    const estimatedTokens = estimateTokens(JSON.stringify(aiRequest.context));
+
+    const quotaCheck = await checkQuota(database, {
+      ownerId,
+      function: 'converse',
+      providerId: aiProvider.providerId,
+      model: aiProvider.model,
+      estimatedTokens,
+    });
+    if (!quotaCheck.allowed) {
+      return reply.code(429).send({ error: { code: 'QUOTA_EXCEEDED', message: quotaCheck.reason, retryAfter: quotaCheck.retryAfter } });
+    }
+
     const callOptions: { requestId: string; signal?: AbortSignal } = { requestId: aiRequest.requestId };
     if (aiRequest.signal) callOptions.signal = aiRequest.signal;
-    const result = await director.converse(
-      { runId: '', text: aiRequest.context.text as string, npc: aiRequest.context.npc as NpcContext, facts, memory, allowedActs: aiRequest.context.allowedActs as SpeechAct[] },
-      callOptions
-    );
-    return reply.send({ narrative: result.narrative, memory: result.memory });
+
+    const startTime = performance.now();
+    try {
+      const result = await director.converse(
+        { runId: '', text: aiRequest.context.text as string, npc: aiRequest.context.npc as NpcContext, facts, memory, allowedActs: aiRequest.context.allowedActs as SpeechAct[] },
+        callOptions
+      );
+
+      await recordUsage(database, {
+        ownerId,
+        function: 'converse',
+        providerId: aiProvider.providerId,
+        model: aiProvider.model,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: Math.round(performance.now() - startTime),
+        status: 'success',
+        requestId: aiRequest.requestId,
+      });
+
+      return reply.send({ narrative: result.narrative, memory: result.memory });
+    } catch (error) {
+      const errorCode = error instanceof AiError ? error.code : undefined;
+      await recordUsage(database, {
+        ownerId,
+        function: 'converse',
+        providerId: aiProvider.providerId,
+        model: aiProvider.model,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: Math.round(performance.now() - startTime),
+        status: error instanceof AiError ? (error.code === 'timeout' ? 'timeout' : error.code === 'cancelled' ? 'cancelled' : 'error') : 'error',
+        ...(errorCode ? { errorCode } : {}),
+        requestId: aiRequest.requestId,
+      });
+      throw error;
+    }
   });
 
   // GET /api/v1/ai/health - health check del proveedor IA
