@@ -1,6 +1,6 @@
 # Estado integrado del proyecto
 
-Estado vigente: motor v14 y validador 1.5; rutas A/B verificadas con tiempos base/máximos 455/545 y 485/575. T3 conecta archivo, catálogo, creación web recuperable y consulta de ficha inicial por cuenta/pestaña; conserva lectura inicial y recuperación por clave en API. Fase 4 (T4-01 a T4-07) completada: generador (pipeline 9 etapas, checkpoints, validadores), simulador de rutas, worker/cola PostgreSQL, import/export, E2E generador y fencing. Fase 5 (T5-01 a T5-07) completada: catálogo, geografía, NPCs, carrera, audio/TTS, auditoría GDD. Fase 6 (T6-01 a T6-03, T7-01 a T7-06) completada: setup/admin, migraciones/health, backup/restore, FreeLLMAPI, conexiones personales, cuotas/corte, staging/OWASP, SLO/capacidad, residencia/retención. 779 pruebas pasando globalmente (775 + 4), typecheck limpio en todos los paquetes (api, ai-adapters, api-utils, generator, case-schema, contracts, engine). Calidad de formato histórica, juego conectado y aceptación completa siguen pendientes.
+Estado vigente: motor v14 y validador 1.5; rutas A/B verificadas con tiempos base/máximos 455/545 y 485/575. T3 conecta archivo, catálogo, creación web recuperable y consulta de ficha inicial por cuenta/pestaña; conserva lectura inicial y recuperación por clave en API. **T3-04 completada**: adaptador Ollama, rutas HTTP IA (interpret/narrate/converse/health), integración prototype web, motor conectado (POST /api/v1/runs/:runId/action). Fase 4 (T4-01 a T4-07) completada: generador (pipeline 9 etapas, checkpoints, validadores), simulador de rutas, worker/cola PostgreSQL, import/export, E2E generador y fencing. Fase 5 (T5-01 a T5-07) completada: catálogo, geografía, NPCs, carrera, audio/TTS, auditoría GDD. Fase 6 (T6-01 a T6-03, T7-01 a T7-06) completada: setup/admin, migraciones/health, backup/restore, FreeLLMAPI, conexiones personales, cuotas/corte, staging/OWASP, SLO/capacidad, residencia/retención. 775 pruebas pasando globalmente, typecheck limpio en todos los paquetes. Calidad de formato histórica, juego conectado y aceptación completa siguen pendientes.
 
 Últimas evidencias: [cierre individual v14](../quality/T2-cierre-individual-v14.md), [formato cerrado 1.5](../quality/T2-formato-cerrado.md), [ficha inicial conectada](../quality/T3-ficha-inicial-conectada.md), [contenido reconocido 1.4](../quality/T2-contenido-ejecutable.md), [permisos del testimonio v13](../quality/T2-permisos-testimonio-v13.md) y [lista propia](../quality/T3-02-lista-partidas.md) y [archivo web](../quality/T3-03-archivo-conectado.md) y [creación recuperable](../quality/T3-creacion-web-recuperable.md). c4a86cd consolida v6, 8f9c288 registra v7/v8 y 42aaa42 el localizador de creación; los avances posteriores se consolidan para su integración en main por autorización expresa del usuario. Las cifras de integración inicial siguientes son históricas.
 
@@ -39,13 +39,13 @@ El artefacto heredado packages/web/RetroScreen fue conservado durante la integra
 
 ## Fases y próximos pasos
 
-T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. T3-01/02/03/04 están en curso; T3-05 espera E2E/modelo real. Fases 4 y 5 completadas (T4-01 a T4-07, T5-01 a T5-07). Fases 6–7 pendientes.
+T1 tiene entrega técnica local incorporada con evidencias históricas F1; no se infiere CI remota aprobada. T2 tiene implementación parcial y tareas reabiertas por defectos de reglas/tiempos y calidad. **T3-01/02/03/04 completados**; **T3-05 (E2E) preparada, requiere entorno dev completo**. Fases 4, 5 y 6 (T6-01/02/03, T7-01 a T7-06) completadas.
 
 1. Completar validación, lotes y extremos de retraso del motor; cerrar calidad global antes de habilitar acciones HTTP. Costes, ordinales y tiempos base de rutas ya están comprobados en v4.
 2. Ampliar el DTO inicial y API-juego: preview/commit, operaciones, transiciones y proyección de resultados; la creación inicial ya tiene ownership, rama e idempotencia.
 3. Conectar guardados/manuales, política NPC y UI, manteniendo el primer resultado oficial.
 4. Evaluar el proveedor real disponible cuando haya acceso, sin exigir Ollama en trabajo/VPS.
-5. Ejecutar ambas rutas en navegador, reanudación y teclado conforme al catálogo detallado.
+5. **T3-05**: Ejecutar ambas rutas en navegador, reanudación y teclado conforme al catálogo detallado (requiere entorno dev: API + Web + DB).
 6. Integrar generador (Fase 4) con API/UI para generación de casos de punta a punta.
 
 ## Arranque vigente
