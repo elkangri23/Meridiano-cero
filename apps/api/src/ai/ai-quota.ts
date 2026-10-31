@@ -141,7 +141,7 @@ export async function checkQuota(
     if (quota.limitType === 'requests') {
       const [count] = await database.orm.select({ count: sql`count(*)` }).from(aiUsage)
         .where(and(
-          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId!) : sql`1=1`,
+          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
           quota.scope === 'ip' ? sql`${aiUsage.ownerId} IS NULL` : sql`1=1`, // simplify
           gte(aiUsage.createdAt, windowStart),
           quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
@@ -152,7 +152,7 @@ export async function checkQuota(
     } else if (quota.limitType === 'tokens') {
       const [sumResult] = await database.orm.select({ sum: sum(aiUsage.totalTokens) }).from(aiUsage)
         .where(and(
-          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId!) : sql`1=1`,
+          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
           gte(aiUsage.createdAt, windowStart),
           quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
           quota.scope === 'model' ? eq(aiUsage.model, params.model) : sql`1=1`,
@@ -164,7 +164,7 @@ export async function checkQuota(
     } else if (quota.limitType === 'daily_tokens') {
       const [sumResult] = await database.orm.select({ sum: sum(aiUsage.totalTokens) }).from(aiUsage)
         .where(and(
-          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId!) : sql`1=1`,
+          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
           gte(aiUsage.createdAt, dayStart),
           quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
         ));
