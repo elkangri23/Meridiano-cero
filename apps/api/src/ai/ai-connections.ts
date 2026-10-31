@@ -317,7 +317,8 @@ export async function resolveAIConnection(database: Database, ownerId: string, a
     .limit(1);
 
   if (personal.length > 0) {
-    return { connection: personal[0]!, credential: decryptCredential(personal[0]!.encryptedCredential) };
+    const p = personal[0] as (typeof personal)[0];
+    return { connection: p, credential: decryptCredential(p.encryptedCredential) };
   }
 
   // 2. Fallback a configuración default del admin
@@ -326,7 +327,10 @@ export async function resolveAIConnection(database: Database, ownerId: string, a
       .where(and(eq(aiConnections.id, adminDefaultConnectionId), eq(aiConnections.status, 'active')))
       .limit(1);
     if (admin.length > 0) {
-      return { connection: admin[0]!, credential: decryptCredential(admin[0]!.encryptedCredential) };
+      const conn = admin[0];
+      if (conn) {
+        return { connection: conn, credential: decryptCredential(conn.encryptedCredential) };
+      }
     }
   }
 
