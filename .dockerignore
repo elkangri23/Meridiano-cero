@@ -1,0 +1,19 @@
+# Ignore local build outputs and dependencies
+node_modules
+dist
+*.log
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.tgz
+.cache
+coverage
+test-results
+*.tsbuildinfo
+
+# Ignore IDE and OS files
+.vscode
+.idea
+*.swp
+*.swo

@@ -11,7 +11,8 @@ import { createStoredRun, readStoredRun, readFullRun, lookupRunCreation, RunStor
 import { previewAction, resolveAction, projectToPlayerView, type Action } from '@meridiano/engine';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { manualSaves, operationRecords, runs } from '../database/schema.ts';
-import type { CaseDefinition, CaseRun, StoredRun } from '@meridiano/case-schema';
+import type { CaseRun } from '@meridiano/case-schema';
+import type { StoredRun } from './runs.ts';
 import { createHash, randomUUID } from 'node:crypto';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,19 +63,23 @@ function saveBody(value: unknown): { name: string; expectedVersion: number; idem
   const idempotencyKey = value.idempotencyKey;
   const replaceSaveId = value.replaceSaveId;
   if (typeof name !== 'string' || name.trim().length === 0 || name.length > 80) throw new RunStoreError('INVALID_REQUEST');
-  if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new RunStoreError('INVALID_REQUEST');
+  if (typeof expectedVersion !== 'number' || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new RunStoreError('INVALID_REQUEST');
   if (!isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
-  if (replaceSaveId !== undefined && (typeof replaceSaveId !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(replaceSaveId))) {
-    throw new RunStoreError('INVALID_REQUEST');
+  if (replaceSaveId !== undefined) {
+    if (typeof replaceSaveId !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(replaceSaveId)) {
+      throw new RunStoreError('INVALID_REQUEST');
+    }
   }
-  return { name: name.trim(), expectedVersion, idempotencyKey, replaceSaveId };
+  return replaceSaveId !== undefined
+    ? { name: name.trim(), expectedVersion, idempotencyKey, replaceSaveId }
+    : { name: name.trim(), expectedVersion, idempotencyKey };
 }
 
 function loadBody(value: unknown): { expectedVersion: number; idempotencyKey: string } {
   if (!isRecord(value)) throw new RunStoreError('INVALID_REQUEST');
   const expectedVersion = value.expectedVersion;
   const idempotencyKey = value.idempotencyKey;
-  if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new RunStoreError('INVALID_REQUEST');
+  if (typeof expectedVersion !== 'number' || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new RunStoreError('INVALID_REQUEST');
   if (!isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
   return { expectedVersion, idempotencyKey };
 }
@@ -85,7 +90,7 @@ function patchBody(value: unknown): { name: string; expectedSaveVersion: number;
   const expectedSaveVersion = value.expectedSaveVersion;
   const idempotencyKey = value.idempotencyKey;
   if (typeof name !== 'string' || name.trim().length === 0 || name.length > 80) throw new RunStoreError('INVALID_REQUEST');
-  if (!Number.isSafeInteger(expectedSaveVersion) || expectedSaveVersion < 1) throw new RunStoreError('INVALID_REQUEST');
+  if (typeof expectedSaveVersion !== 'number' || !Number.isSafeInteger(expectedSaveVersion) || expectedSaveVersion < 1) throw new RunStoreError('INVALID_REQUEST');
   if (!isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
   return { name: name.trim(), expectedSaveVersion, idempotencyKey };
 }
@@ -94,7 +99,7 @@ function deleteBody(value: unknown): { expectedSaveVersion: number; idempotencyK
   if (!isRecord(value)) throw new RunStoreError('INVALID_REQUEST');
   const expectedSaveVersion = value.expectedSaveVersion;
   const idempotencyKey = value.idempotencyKey;
-  if (!Number.isSafeInteger(expectedSaveVersion) || expectedSaveVersion < 1) throw new RunStoreError('INVALID_REQUEST');
+  if (typeof expectedSaveVersion !== 'number' || !Number.isSafeInteger(expectedSaveVersion) || expectedSaveVersion < 1) throw new RunStoreError('INVALID_REQUEST');
   if (!isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
   return { expectedSaveVersion, idempotencyKey };
 }
@@ -178,14 +183,14 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
   );
 
   // GET /api/v1/runs/:runId/saves - List manual saves
-  app.get<{ Params: { runId: string }; Querystring: { limit?: string; cursor?: string } }>(
+  app.get<{ Params: { runId: string }; Querystring: { limit?: string } }>(
     '/api/v1/runs/:runId/saves',
     { onRequest: authorize },
     async (request, reply) => {
       const run = await available(() => readStoredRun(database, digest(request), request.params.runId));
       if (run.status === 'closed') return reply.code(409).send({ error: { code: 'RUN_CLOSED', message: 'La partida ya está cerrada.', requestId: request.id } });
 
-      const { limit = '25', cursor } = request.query;
+      const { limit = '25' } = request.query;
       const limitNum = Number(limit);
       if (!Number.isSafeInteger(limitNum) || limitNum < 1 || limitNum > 100) throw new RunStoreError('INVALID_REQUEST');
 
@@ -215,7 +220,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         canLoad: s.status === 'active',
       }));
 
-      const nextCursor = saves.length > limitNum ? saves[limitNum].id : null;
+      const nextCursor = saves.length > limitNum ? saves[limitNum]!.id : null;
       return reply.send({ items, manualLimit: 10, manualCount: items.length, nextCursor });
     }
   );
@@ -330,15 +335,16 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       const save = await database.orm.select().from(manualSaves)
         .where(and(eq(manualSaves.id, request.params.saveId), eq(manualSaves.runId, request.params.runId))).limit(1);
       if (!save.length) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
-      const s = save[0];
+      const s = save[0]!;
       if (s.metadataVersion !== body.expectedSaveVersion) return reply.code(409).send({ error: { code: 'VERSION_CONFLICT', message: 'Versión de metadatos obsoleta.', requestId: request.id } });
       if (s.status !== 'active') return reply.code(400).send({ error: { code: 'SAVE_NOT_ACTIVE', message: 'El guardado no está activo.', requestId: request.id } });
 
       const ownerId = run.ownerId;
-      const [updated] = await database.orm.update(manualSaves)
+      const updatedResult = await database.orm.update(manualSaves)
         .set({ name: body.name, metadataVersion: s.metadataVersion + 1, updatedAt: new Date() })
         .where(and(eq(manualSaves.id, request.params.saveId), eq(manualSaves.runId, request.params.runId)))
         .returning({ id: manualSaves.id, name: manualSaves.name, metadataVersion: manualSaves.metadataVersion, updatedAt: manualSaves.updatedAt });
+      const updated = updatedResult[0]!;
 
       await database.orm.insert(operationRecords).values({
         runId: request.params.runId,
@@ -346,12 +352,12 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         idempotencyKey: body.idempotencyKey,
         kind: 'save',
         requestDigest: createHash('sha256').update(JSON.stringify({ patch: body.name })).digest('hex'),
-        resultPublic: { saveId: updated[0].id, action: 'patch' },
+        resultPublic: { saveId: updated.id, action: 'patch' },
         branchId: run.branchId,
         revision: run.revision,
       });
 
-      return reply.send({ saveId: updated[0].id, name: updated[0].name, metadataVersion: updated[0].metadataVersion });
+      return reply.send({ saveId: updated.id, name: updated.name, metadataVersion: updated.metadataVersion });
     }
   );
 
@@ -367,7 +373,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       const save = await database.orm.select().from(manualSaves)
         .where(and(eq(manualSaves.id, request.params.saveId), eq(manualSaves.runId, request.params.runId))).limit(1);
       if (!save.length) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
-      const s = save[0];
+      const s = save[0]!;
       if (s.metadataVersion !== body.expectedSaveVersion) return reply.code(409).send({ error: { code: 'VERSION_CONFLICT', message: 'Versión de metadatos obsoleta.', requestId: request.id } });
       if (s.status !== 'active') return reply.code(400).send({ error: { code: 'SAVE_NOT_ACTIVE', message: 'El guardado no está activo.', requestId: request.id } });
 
@@ -403,7 +409,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       const save = await database.orm.select().from(manualSaves)
         .where(and(eq(manualSaves.id, request.params.saveId), eq(manualSaves.runId, request.params.runId))).limit(1);
       if (!save.length) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
-      const s = save[0];
+      const s = save[0]!;
       if (s.metadataVersion !== body.expectedVersion) return reply.code(409).send({ error: { code: 'VERSION_CONFLICT', message: 'Versión de metadatos obsoleta.', requestId: request.id } });
       if (s.status !== 'active') return reply.code(400).send({ error: { code: 'SAVE_NOT_ACTIVE', message: 'El guardado no está activo.', requestId: request.id } });
 
@@ -413,7 +419,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       }
 
       const newBranchId = randomUUID();
-      const newRun = { ...savedSnapshot, branchId: newBranchId, revision: run.revision + 1 };
+      const newRun = { ...savedSnapshot, branchId: newBranchId, revision: (run as StoredRun & CaseRun).revision + 1 };
 
       const view = projectToPlayerView(run.definitionId ? { id: run.definitionId } as any : { id: '' }, newRun);
 
@@ -425,7 +431,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         requestDigest: createHash('sha256').update(JSON.stringify({ load: request.params.saveId })).digest('hex'),
         resultPublic: { newBranchId, sourceSaveId: s.id },
         branchId: newBranchId,
-        revision: run.revision + 1,
+        revision: (run as StoredRun & CaseRun).revision + 1,
       });
 
       return reply.send({ ...view, operationId: `load-${randomUUID()}`, newBranchId });

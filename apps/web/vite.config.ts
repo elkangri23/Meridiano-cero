@@ -7,5 +7,7 @@ export default defineConfig(({ mode }) => {
     server: { port: 5173, host: '127.0.0.1', strictPort: true,
       proxy: { '/api': { target: `http://127.0.0.1:${port}`, changeOrigin: false } } },
     preview: { host: '127.0.0.1', strictPort: true },
+    // SPA fallback for dev server
+    appType: 'spa'
   };
 });

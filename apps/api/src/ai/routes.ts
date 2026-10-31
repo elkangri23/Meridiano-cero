@@ -12,6 +12,7 @@ import { RunStoreError } from '../game/runs.ts';
 import type { PublicFact, PublicScene, NpcContext, ConversationMemory, SpeechAct, ActionOffer } from './context.ts';
 import { speechActs } from './context.ts';
 import { checkQuota, recordUsage, estimateTokens } from './ai-quota.ts';
+import { createDefaultMockProvider } from './mock.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -33,7 +34,7 @@ function getAiProvider(config: AppConfig): AiProvider {
     return createCompatibleOllamaProvider({ model, origin: baseUrl, timeoutMs });
   }
   // Default: mock provider for tests/development
-  return createCompatibleOllamaProvider({ model: 'deterministic-ci' });
+  return createDefaultMockProvider();
 }
 
 export function registerAiRoutes(app: FastifyInstance, config: AppConfig, database: Database): void {

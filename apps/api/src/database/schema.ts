@@ -25,6 +25,7 @@ export const runs = pgTable('runs', {
   engineVersion: integer('engine_version').notNull(),
   revision: integer('revision').notNull().default(1),
   branchId: uuid('branch_id').notNull().defaultRandom(),
+  status: text('status').notNull().default('active'), // active, closed
   engineState: jsonb('engine_state').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -35,6 +36,7 @@ export const runs = pgTable('runs', {
   check('runs_engine_positive', sql`${table.engineVersion} > 0`),
   check('runs_definition_digest', sql`${table.definitionHash} ~ '^[a-f0-9]{64}$'`),
   check('runs_state_object', sql`jsonb_typeof(${table.engineState}) = 'object'`),
+  check('runs_status', sql`${table.status} IN ('active', 'closed')`),
 ]);
 
 // Ámbito de creación: usuario + clave; aún no existe runId al recibir la intención.

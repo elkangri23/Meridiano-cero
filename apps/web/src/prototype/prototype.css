@@ -1,4 +1,6 @@
 .prototype { --paper:#ffffff; --muted:#aaaaaa; --gold:#ffff55; --edge:#aaaaaa; --panel:#0000aa; --ink:#000000; max-width:1440px; margin:24px auto; padding:0 32px; color:var(--paper); line-height:1.6; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+.prototype .skip-link { position:absolute; top:-100%; left:50%; transform:translateX(-50%); background:var(--gold); color:var(--ink); padding:8px 16px; border-radius:4px; z-index:100; font-weight:600; text-decoration:none; }
+.prototype .skip-link:focus { top:8px; }
 .prototype[data-contrast="high"] { --paper:#fff; --muted:#eee; --gold:#ffff55; --edge:#ccc; --panel:#000000; --ink:#000; }
 .prototype * { box-sizing:border-box; }
 .prototype h1,.prototype h2,.prototype h3,.prototype p { margin:0; }

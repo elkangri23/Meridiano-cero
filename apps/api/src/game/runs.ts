@@ -9,7 +9,7 @@ import type { Database } from '../database/connection.ts';
 import type { CaseRun } from '@meridiano/case-schema';
 
 export type RunStoreErrorCode = 'SESSION_REQUIRED' | 'SESSION_CHANGED' | 'NOT_FOUND' | 'IDEMPOTENCY_CONFLICT' | 'INVALID_REQUEST' |
-  'CASE_NOT_READY' | 'DEPENDENCY_UNAVAILABLE' | 'ORIGIN_REJECTED' | 'CSRF_REJECTED';
+  'CASE_NOT_READY' | 'DEPENDENCY_UNAVAILABLE' | 'ORIGIN_REJECTED' | 'CSRF_REJECTED' | 'SAVE_LIMIT_REACHED';
 
 export class RunStoreError extends Error {
   readonly code: RunStoreErrorCode;
@@ -28,6 +28,7 @@ export interface StoredRun {
   engineVersion: number;
   revision: number;
   branchId: string;
+  status: 'active' | 'closed';
   engineState: unknown;
 }
 const columns = `id, owner_id AS "ownerId", definition_id AS "definitionId",
@@ -126,14 +127,14 @@ export function readStoredRun(database: Database, sessionDigest: string, runId: 
   return inSession(database, sessionDigest, (client, ownerId) => ownedRun(client, ownerId, runId));
 }
 
-export async function readFullRun(database: Database, sessionDigest: string, runId: string): Promise<CaseRun> {
+export async function readFullRun(database: Database, sessionDigest: string, runId: string): Promise<StoredRun & CaseRun> {
   return inSession(database, sessionDigest, async (client, ownerId) => {
     const result = await client.query(
       `SELECT ${columns}, engine_state FROM runs WHERE id=$1 AND owner_id=$2`, [runId, ownerId]);
     const row = result.rows[0];
     if (!row) throw new RunStoreError('NOT_FOUND');
     const state = row.engine_state as CaseRun;
-    return { ...state, id: row.id, ownerId: row.ownerId, definitionId: row.definitionId, definitionHash: row.definitionHash, engineVersion: row.engineVersion, revision: row.revision, branchId: row.branchId };
+    return { ...state, id: row.id, ownerId: row.ownerId, definitionId: row.definitionId, definitionHash: row.definitionHash, engineVersion: row.engineVersion, revision: row.revision, branchId: row.branchId, status: row.status, engineState: row.engine_state };
   });
 }
 

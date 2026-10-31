@@ -1,5 +1,5 @@
 import { createOllamaProvider } from '@meridiano/ai-adapters';
-import { AiError, type AiProvider, type AiRequest, type AiResponse } from './provider.js';
+import { AiError, type AiProvider, type AiRequest, type AiResponse } from './provider.ts';
 
 /**
  * Adaptador de compatibilidad para el motor existente.

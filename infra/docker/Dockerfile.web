@@ -1,30 +1,40 @@
-# Dockerfile para Web (Vite + React + TypeScript)
-# Construir desde raíz del monorepo: docker build -f infra/docker/Dockerfile.web .
-
-FROM node:22-alpine AS base
-RUN corepack enable pnpm
+# Dockerfile para Web (Vite + React + TypeScript) - Build with tsconfig.base.json
+FROM node:24-alpine
+RUN corepack enable pnpm && apk add --no-cache python3 make g++
 WORKDIR /app
 
-FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tsconfig.base.json ./
 COPY apps/web/package.json ./apps/web/
-COPY packages/*/package.json ./packages/
-RUN pnpm install --frozen-lockfile --filter @meridiano/web...
+COPY packages/ai-adapters/package.json ./packages/ai-adapters/
+COPY packages/case-schema/package.json ./packages/case-schema/
+COPY packages/engine/package.json ./packages/engine/
+COPY packages/generator/package.json ./packages/generator/
+COPY packages/contracts/package.json ./packages/contracts/
 
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /app/packages/*/node_modules ./packages/
-COPY . .
+RUN pnpm install --frozen-lockfile
+
+COPY apps ./apps
+COPY packages ./packages
+
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @meridiano/case-schema build
+RUN pnpm --filter @meridiano/engine build
+RUN pnpm --filter @meridiano/ai-adapters build
+RUN pnpm --filter @meridiano/generator build
+RUN pnpm --filter @meridiano/contracts build
+
 RUN pnpm --filter @meridiano/web build
 
-FROM base AS runner
+RUN cp packages/case-schema/package.json packages/case-schema/dist/ && \
+    cp packages/engine/package.json packages/engine/dist/ && \
+    cp packages/ai-adapters/package.json packages/ai-adapters/dist/ && \
+    cp packages/generator/package.json packages/generator/dist/ && \
+    cp packages/contracts/package.json packages/contracts/dist/
+
+RUN ls -la /app/packages/case-schema/ && cat /app/packages/case-schema/package.json
+
 ENV NODE_ENV=production
-COPY --from=builder /app/apps/web/dist ./apps/web/dist
-COPY --from=builder /app/apps/web/package.json ./apps/web/
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/*/dist ./packages/
-COPY --from=builder /app/packages/*/package.json ./packages/
-WORKDIR /app/apps/web
+WORKDIR /app
 EXPOSE 5173
 CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--strictPort", "--port", "5173"]
