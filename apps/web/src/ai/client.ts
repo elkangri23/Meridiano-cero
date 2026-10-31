@@ -57,11 +57,55 @@ async function boundedJson(response: Response): Promise<unknown> {
   } finally { reader.releaseLock(); }
 }
 
+interface RequestOptions {
+  retries?: number;
+  baseDelayMs?: number;
+  shouldRetry?: (error: AiError) => boolean;
+}
+
+async function requestWithRetry(
+  path: string,
+  signal: AbortSignal,
+  init: RequestInit = {},
+  options: RequestOptions = {}
+): Promise<Response> {
+  const { retries = 2, baseDelayMs = 500, shouldRetry = () => false } = options;
+  let attempt = 0;
+  let lastError: AiError | undefined;
+
+  while (attempt <= retries) {
+    try {
+      const response = await fetch(path, {
+        ...init,
+        credentials: 'same-origin',
+        cache: 'no-store',
+        redirect: 'error',
+        signal: AbortSignal.any([signal, AbortSignal.timeout(8000)])
+      });
+      return response;
+    } catch (error) {
+      if (signal.aborted || error instanceof AiError && error.kind === 'cancelled') {
+        throw new AiError('cancelled');
+      }
+      lastError = error instanceof AiError ? error : new AiError('unavailable');
+      if (attempt < retries && shouldRetry(lastError)) {
+        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 100;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        attempt++;
+        continue;
+      }
+      throw lastError;
+    }
+  }
+  throw lastError ?? new AiError('unavailable');
+}
+
 async function request(path: string, signal: AbortSignal, init: RequestInit = {}): Promise<Response> {
-  try {
-    return await fetch(path, { ...init, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
-      signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]) });
-  } catch { throw new AiError('unavailable'); }
+  return requestWithRetry(path, signal, init, {
+    retries: 2,
+    baseDelayMs: 500,
+    shouldRetry: (error) => error.kind === 'unavailable' || error.kind === 'timeout'
+  });
 }
 
 function isValidBody(body: unknown): body is Record<string, unknown> {

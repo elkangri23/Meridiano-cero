@@ -4,14 +4,18 @@ import { ArchiveError } from './client';
 import { browserIntents, createRunCoordinator } from './creation';
 import type { CreationView, IntentStorage, CreationOutcome } from './creation';
 
+export type ConnectionStatus = 'online' | 'offline' | 'reconnecting' | 'unknown';
+
 type Phase = 'loading' | 'signed_out' | 'ready' | 'error' | 'logout_failed';
 export interface ArchiveState {
   phase: Phase; profile: SessionDto['profile'] | null; page: RunListDto | null;
   cases: CaseSummary[]; creation: CreationView;
   opened: InitialPlayerViewDto | null; openingRunId: string | null;
   filter: Filter; cursor: string | null; previous: readonly (string | null)[]; notice: string;
+  connectionStatus: ConnectionStatus;
+  lastError: string | null;
 }
-const blank = (): ArchiveState => ({ phase: 'loading', profile: null, page: null, opened: null, openingRunId: null, cases: [], creation: { phase: 'idle', caseId: null, runId: null }, filter: 'all', cursor: null, previous: [], notice: 'Consultando el archivo…' });
+const blank = (): ArchiveState => ({ phase: 'loading', profile: null, page: null, opened: null, openingRunId: null, cases: [], creation: { phase: 'idle', caseId: null, runId: null }, filter: 'all', cursor: null, previous: [], notice: 'Consultando el archivo…', connectionStatus: 'unknown', lastError: null });
 type Ticket = { signal: AbortSignal; current: () => boolean };
 
 export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = browserIntents) {
@@ -28,9 +32,30 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
   function failed(ticket: Ticket, closing = false) {
     if (!ticket.current()) return;
     session = null;
+    const wasOnline = state.connectionStatus === 'online';
     set({ ...blank(), phase: closing ? 'logout_failed' : 'error',
-      notice: closing ? 'No se pudo confirmar el cierre. Los datos se han ocultado; reintenta cerrar sesión.' : 'No se pudo consultar el archivo. Reintenta actualizar la sesión.' });
+      notice: closing ? 'No se pudo confirmar el cierre. Los datos se han ocultado; reintenta cerrar sesión.' : 'No se pudo consultar el archivo. Reintenta actualizar la sesión.',
+      connectionStatus: wasOnline ? 'reconnecting' : 'offline',
+      lastError: 'No se pudo completar la operación. Reintentando...' });
   }
+  
+  async function reconnect(): Promise<void> {
+    if (disposed) return;
+    const ticket = begin();
+    set({ ...state, phase: 'loading', connectionStatus: 'reconnecting', notice: 'Reconectando...' });
+    try {
+      const identity = await api.connect(ticket.signal);
+      if (!ticket.current()) return;
+      if (!identity) { set({ ...blank(), phase: 'signed_out', connectionStatus: 'offline', notice: 'La sesión no está iniciada.' }); return; }
+      await page(ticket, identity, 'all', null, []);
+      set({ ...state, connectionStatus: 'online', lastError: null });
+    } catch { 
+      if (ticket.current()) {
+        set({ ...state, connectionStatus: 'offline', notice: 'No se pudo reconectar. Verifica tu conexión e intenta de nuevo.' });
+      }
+    }
+  }
+  
   async function page(ticket: Ticket, identity: SessionDto, filter: Filter, cursor: string | null, previous: readonly (string | null)[]) {
     const [result, catalog] = await Promise.all([api.list(filter, cursor, ticket.signal), api.cases(ticket.signal)]);
     if (!ticket.current()) return;
@@ -121,6 +146,7 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     openRun, closeRun,
     refresh: () => open(), connect: () => open(true), logout,
+    reconnect,
     createCase: (caseId: string) => creation(caseId, false),
     recoverCreation: (resend = false) => creation(null, resend),
     prepareCreation() { if (state.phase === 'ready' && state.creation.phase === 'created') set({ ...state, creation: { phase: 'idle', caseId: null, runId: null } }); },
