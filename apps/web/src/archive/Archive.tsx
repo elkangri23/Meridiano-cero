@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { InitialRun } from './InitialRun';
 import { NewRun } from './NewRun';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -105,7 +106,7 @@ function Archive() {
       {state.opened && <InitialRun view={state.opened} close={closeRun} />}
       {state.profile && <NewRun key={state.profile.id} state={state} model={model} />}
       {state.profile && renderArchiveList(state, model, busy, filter, opener, closeRun)}
-      <footer>Un detective por partida · Las consultas del archivo no avanzan el reloj del caso.</footer>
+      <footer><Link to="/glosario">Glosario y reglas</Link> · Un detective por partida · Las consultas del archivo no avanzan el reloj del caso.</footer>
     </main>
   );
 }

@@ -1,0 +1,96 @@
+# Reglas del juego, glosario y FAQ de Meridiano-cero
+
+Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la app.
+
+## Glosario
+
+- **Caso:** misterio a investigar, con dos rutas posibles de investigación.
+- **Partida (run):** instancia de un caso para un usuario.
+- **Detective:** el jugador; único por partida.
+- **Reloj interno:** tiempo del caso, no el reloj de pared. Gobierna plazos y costes.
+- **Plazo:** límite de tiempo del caso. Al vencer, no se aplican efectos terminales ni el resto del lote.
+- **Evidencia:** prueba física o testimonial recogida durante la investigación.
+- **NPC / contacto:** personaje con el que se puede hablar; la revelación depende de conocimiento, tema y cooperación.
+- **Laboratorio:** servicio de análisis de evidencias con coste de tiempo.
+- **Mandamiento / orden:** autorización para una acción con admisibilidad y costes.
+- **Lote (secuencia):** agrupación de acciones con pausa, continuación confirmada y cancelación.
+- **Autoguardado:** guardado automático continuo.
+- **Guardado manual:** hasta 10 por partida; permite regresar a un punto anterior.
+- **Primer resultado oficial:** primer cierre de caso que cuenta para carrera y reputación.
+- **Carrera / reputación:** progreso del detective; idempotente, sin duplicación por repeticiones.
+- **Archivo:** listado de partidas propias con filtros y paginación.
+- **Localizador de creación:** mecanismo para recuperar una creación perdida por conexión sin duplicar partida.
+
+## Reglas fundamentales
+
+1. Una partida tiene un único usuario propietario y un detective jugador. Sin multijugador.
+2. El primer resultado oficial de un caso cuenta para carrera y reputación; las cargas y repeticiones posteriores son práctica y no reemplazan el resultado ni duplican recompensas.
+3. El reloj es interno del caso; nunca se usa el reloj de pared para decidir.
+4. El plazo gana en caso de empate con una acción.
+5. Las órdenes ambiguas piden aclaración antes de actuar; no se elige una interpretación ni se ejecuta parcialmente.
+6. La detención no cierra el caso por sí misma.
+7. No se filtra la verdad antes del informe final.
+8. Ningún compañero sugiere la siguiente pista.
+9. Las pruebas excluyentes de cada ruta se mantienen sin inyectar conocimiento.
+10. Hasta 10 guardados manuales por partida, además del autoguardado; no se borran automáticamente al alcanzar el límite.
+11. Cargar un guardado manual permite regresar a un punto anterior del mismo caso y probar otras decisiones.
+12. Los lotes admiten pausa, continuación confirmada y cancelación; el plazo interrumpe sin aplicar el resto ni efecto terminal.
+
+## Costes y tiempos
+
+- Viajar tiene coste de tiempo (seeded, determinista por semilla).
+- Consultas al laboratorio tienen coste de tiempo.
+- Comunicaciones al equipo: envío gratuito, acuse a +30 del reloj interno.
+- Laboratorio programado: +90 al reloj interno.
+- Consultas paralelas: +30 al reloj interno.
+
+## FAQ
+
+**¿Puedo jugar el mismo caso varias veces?**
+Sí. El primer resultado es el oficial; las repeticiones son práctica y no duplican recompensas.
+
+**¿Puedo volver atrás en una partida?**
+Sí, cargando un guardado manual anterior. No sustituye el primer resultado oficial.
+
+**¿Qué pasa si se me cae la conexión al crear una partida?**
+La creación es recuperable: reintenta con la misma clave. Un 404 puede ser provisional y nunca autoriza una nueva clave.
+
+**¿El sistema me da pistas?**
+No. Los errores operativos se muestran sin sugerir pistas ni valorar tu investigación.
+
+**¿Cómo se decide el culpable?**
+Tú analizas las evidencias. El motor no consulta la solución para conceder órdenes.
+
+**¿Qué son los lotes?**
+Agrupaciones de acciones con pausa, continuación confirmada y cancelación. El plazo interrumpe sin aplicar el resto.
+
+**¿Cuántos guardados manuales puedo tener?**
+10 por partida, además del autoguardado.
+
+**¿Funciona sin internet?**
+El motor es puro y no requiere red; la IA y la persistencia requieren conexión.
+
+**¿Qué proveedores de IA soporta?**
+Ollama (doméstico), FreeLLMAPI (trabajo/VPS) y endpoints configurables en instalaciones propias. El contrato es independiente del proveedor.
+
+**¿Hay multijugador?**
+No. Cada partida pertenece a un único usuario.
+
+## Funcionamiento de la web
+
+- **Archivo:** listado de partidas propias con filtro active/closed, paginación por cursor.
+- **Catálogo:** casos públicos para elegir.
+- **Creación recuperable:** POST + lookup por clave original; reintentos seguros.
+- **Ficha inicial:** reloj/plazo, ubicación y ciudades visibles (solo lectura).
+- **Estados UI:** offline/online con reconexión manual; respuestas tardías descartadas.
+- **Seguridad:** sesión validada en cada petición, CSRF en memoria, allowlist de DTO sin datos privados.
+
+## Apartado en la app: Glosario, reglas y ayuda
+
+La aplicación incluye (o incluirá) un apartado "Glosario" con:
+- Glosario de términos.
+- Reglas fundamentales.
+- FAQ.
+- Explicación de cómo se juega y cómo funciona la web y el programa.
+
+Este documento es la fuente de verdad para ese apartado. Actualizar ambos a la vez.

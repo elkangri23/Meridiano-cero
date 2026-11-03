@@ -1,6 +1,5 @@
 # Ignore local build outputs and dependencies
 node_modules
-dist
 *.log
 .env
 .env.local

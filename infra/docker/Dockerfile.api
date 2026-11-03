@@ -1,6 +1,6 @@
-# Dockerfile para API (Fastify + TypeScript + pnpm) - Multi-stage with tar archive
+# Dockerfile para API (Fastify + TypeScript + pnpm) - Multi-stage build
 FROM node:24-alpine AS base
-RUN corepack enable pnpm && apk add --no-cache python3 make g++ tar
+RUN corepack enable pnpm && apk add --no-cache python3 make g++
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -24,22 +24,18 @@ RUN pnpm --filter @meridiano/ai-adapters build
 RUN pnpm --filter @meridiano/generator build
 RUN pnpm --filter @meridiano/contracts build
 RUN pnpm --filter @meridiano/api build
-RUN cp packages/case-schema/package.json packages/case-schema/dist/ && \
-    cp packages/engine/package.json packages/engine/dist/ && \
-    cp packages/ai-adapters/package.json packages/ai-adapters/dist/ && \
-    cp packages/generator/package.json packages/generator/dist/ && \
-    cp packages/contracts/package.json packages/contracts/dist/
-# Create tar archive of packages for reliable copy
-RUN tar -cf /tmp/packages.tar -C /app packages && tar -tf /tmp/packages.tar | head -5 && ls -la /tmp/packages.tar
+RUN cp packages/case-schema/package.json packages/case-schema/dist/package.json && \
+    cp packages/engine/package.json packages/engine/dist/package.json && \
+    cp packages/ai-adapters/package.json packages/ai-adapters/dist/package.json && \
+    cp packages/generator/package.json packages/generator/dist/package.json && \
+    cp packages/contracts/package.json packages/contracts/dist/package.json
 
 FROM base AS runner
 ENV NODE_ENV=production
+WORKDIR /app
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/node_modules ./node_modules
-# Extract packages from tar archive (reliable copy)
-COPY --from=builder /tmp/packages.tar /tmp/packages.tar
-RUN tar -xf /tmp/packages.tar -C /app && ls -la /app/packages/ && cat /app/packages/case-schema/package.json && rm /tmp/packages.tar
-WORKDIR /app
+COPY --from=builder /app/packages ./packages
 EXPOSE 3000
 CMD ["node", "apps/api/dist/server.js"]
