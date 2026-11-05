@@ -43,7 +43,10 @@ async function resolveCreateBaseUrl(entry: ProviderCatalogEntry, raw: unknown, m
   if (!rawBaseUrl) throw new RunStoreError('INVALID_REQUEST');
   try {
     return await validateConnectionBaseUrl(entry.id, rawBaseUrl, mode);
-  } catch {
+  } catch (error) {
+    // El motivo real del rechazo (p. ej. destino no permitido) llega a la
+    // UI; el resto de validaciones sigue siendo INVALID_REQUEST genérico.
+    if (error instanceof Error) throw new RunStoreError('INVALID_DESTINATION', error.message);
     throw new RunStoreError('INVALID_REQUEST');
   }
 }
@@ -92,7 +95,8 @@ async function parseBaseUrlUpdate(body: Record<string, unknown>, entry: Provider
   if (!rawBaseUrl) throw new RunStoreError('INVALID_REQUEST');
   try {
     return await validateConnectionBaseUrl(adapterId, rawBaseUrl, mode);
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) throw new RunStoreError('INVALID_DESTINATION', error.message);
     throw new RunStoreError('INVALID_REQUEST');
   }
 }

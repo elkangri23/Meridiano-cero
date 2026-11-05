@@ -15,6 +15,14 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { HealthResponse } from '@meridiano/contracts';
 
+/** Solo INVALID_DESTINATION lleva mensaje propio (texto seguro del validador
+ * de destinos); el resto usa el mensaje genérico para no filtrar detalles. */
+function runStoreErrorMessage(error: RunStoreError): string {
+  return error.code === 'INVALID_DESTINATION' && error.detail
+    ? error.detail
+    : 'No se pudo completar la solicitud.';
+}
+
 export function createApp(options?: { config: AppConfig; database: Database; state?: RuntimeState; telemetry?: Telemetry; mailer?: Mailer | null }) {
   const app: FastifyInstance = Fastify({ logger: false, requestTimeout: 30_000, connectionTimeout: 30_000,
     // En producción la API solo escucha en 127.0.0.1 detrás de nginx: se
@@ -53,9 +61,10 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
       const statuses = {
         SESSION_REQUIRED: 401, SESSION_CHANGED: 409, NOT_FOUND: 404, IDEMPOTENCY_CONFLICT: 409, INVALID_REQUEST: 400,
         CASE_NOT_READY: 409, DEPENDENCY_UNAVAILABLE: 503, ORIGIN_REJECTED: 403, CSRF_REJECTED: 403, SAVE_LIMIT_REACHED: 409,
-        VERSION_CONFLICT: 409, RUN_CLOSED: 409, SAVE_NOT_ACTIVE: 400, SAVE_INCOMPATIBLE: 422,
+        VERSION_CONFLICT: 409, RUN_CLOSED: 409, SAVE_NOT_ACTIVE: 400, SAVE_INCOMPATIBLE: 422, INVALID_DESTINATION: 400,
       } as const;
-      return reply.code(statuses[error.code]).send({ error: { code: error.code, message: 'No se pudo completar la solicitud.', requestId: request.id } });
+      // Solo INVALID_DESTINATION lleva mensaje propio (ver runStoreErrorMessage).
+      return reply.code(statuses[error.code]).send({ error: { code: error.code, message: runStoreErrorMessage(error), requestId: request.id } });
     }
     const clientErrors = {
       400: { code: 'INVALID_REQUEST', message: 'Petición no válida.' },

@@ -10,13 +10,16 @@ import type { CaseRun } from '@meridiano/case-schema';
 
 export type RunStoreErrorCode = 'SESSION_REQUIRED' | 'SESSION_CHANGED' | 'NOT_FOUND' | 'IDEMPOTENCY_CONFLICT' | 'INVALID_REQUEST' |
   'CASE_NOT_READY' | 'DEPENDENCY_UNAVAILABLE' | 'ORIGIN_REJECTED' | 'CSRF_REJECTED' | 'SAVE_LIMIT_REACHED' | 'VERSION_CONFLICT' |
-  'RUN_CLOSED' | 'SAVE_NOT_ACTIVE' | 'SAVE_INCOMPATIBLE';
+  'RUN_CLOSED' | 'SAVE_NOT_ACTIVE' | 'SAVE_INCOMPATIBLE' | 'INVALID_DESTINATION';
 
 export class RunStoreError extends Error {
   readonly code: RunStoreErrorCode;
-  constructor(code: RunStoreErrorCode) {
+  /** Mensaje seguro para el usuario; solo se serializa para INVALID_DESTINATION. */
+  readonly detail?: string;
+  constructor(code: RunStoreErrorCode, detail?: string) {
     super(code);
     this.code = code;
+    if (detail !== undefined) this.detail = detail;
   }
 }
 
