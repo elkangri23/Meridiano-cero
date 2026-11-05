@@ -54,6 +54,13 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await playOffer(page, 'offer-recover:astrolabio-original', 455);
     await playOffer(page, 'offer-finish', 455);
     await expect(page.getByTestId('clock')).toContainText('Cerrada');
+    // Partida cerrada: Guardados explica por qué no se puede guardar ni cargar.
+    await page.click('button:has-text("Guardados")');
+    await expect(page.getByTestId('save-closed-notice')).toBeVisible();
+    await expect(page.getByTestId('save-closed-notice')).toContainText('No se pueden crear guardados nuevos ni cargar uno anterior');
+    await expect(page.getByTestId('save-create')).toBeDisabled();
+    await expect(page.locator('text=Manuales: 0 / 10')).toBeVisible();
+    await page.keyboard.press('Escape');
     // Informe final disponible en la ventana correspondiente.
     await page.click('button:has-text("Informe final")');
     await expect(page.locator('text=Resultado:')).toBeVisible();
@@ -70,6 +77,8 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await page.getByTestId('save-create').click();
     await expect(page.locator('text=Guardado confirmado por el servidor.')).toBeVisible();
     await expect(page.getByTestId('save-list')).toContainText('Punto E2E ruta B');
+    // El contador se actualiza al guardar (antes quedaba obsoleto en 0 / 10).
+    await expect(page.locator('text=Manuales: 1 / 10')).toBeVisible();
     await page.keyboard.press('Escape');
     // Avanzar y reanudar: el reloj vuelve a 30.
     await travelTo(page, 'paris', 210);
@@ -78,6 +87,10 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('load-confirm')).toBeVisible();
     await page.getByTestId('load-confirm-button').click();
     await expect(page.getByTestId('clock')).toContainText('30 min');
+    // Borrar el guardado: el contador vuelve a 0 / 10.
+    await page.getByRole('button', { name: 'Borrar' }).click();
+    await expect(page.locator('text=Manuales: 0 / 10')).toBeVisible();
+    await expect(page.locator('text=Sin guardados manuales.')).toBeVisible();
     await page.keyboard.press('Escape');
     // Continuar la ruta B desde el punto guardado.
     await travelTo(page, 'paris', 210);
