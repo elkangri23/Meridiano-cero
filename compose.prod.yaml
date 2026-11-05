@@ -15,8 +15,13 @@
 #                                    DATABASE_MIGRATION_URL (meridiano_owner)
 #                                    contra el servicio `db` de este compose.
 #                                    Ver .env.prod.example.
-# El proveedor de IA en producción es `mock` (jugable sin modelo real);
-# FreeLLMAPI y la configuración por usuario llegan en la Fase C.
+# El proveedor de IA en producción es `freellmapi` (Fase C): la API se une
+# a la red externa `freellmapi_default` del contenedor FreeLLMAPI del VPS
+# (mismo patrón que retaton) y lo alcanza como http://freellmapi:3001/v1
+# con modelo `auto`. La clave unificada vive en `.env.prod` como AI_API_KEY
+# (sin ella la API no arranca: fail-closed); las credenciales personales de
+# cada usuario se cifran con AI_CREDENTIAL_MASTER_KEY y mandan sobre este
+# defecto. Sin conexión personal, el juego usa este proveedor del servidor.
 version: "3.8"
 services:
   db:
@@ -58,13 +63,18 @@ services:
       PUBLIC_ORIGIN: https://meridianocero.laurafernandezenfermeria.com
       REGISTRATION_ENABLED: "true"
       LOCAL_DEV_AUTH_ENABLED: "false"
-      AI_PROVIDER: mock
+      AI_PROVIDER: freellmapi
+      AI_BASE_URL: http://freellmapi:3001/v1
+      AI_MODEL: auto
     env_file:
       - .env.prod
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
       - db
+    networks:
+      - default
+      - freellmapi_default
     restart: unless-stopped
 
 secrets:
@@ -75,3 +85,7 @@ secrets:
 
 volumes:
   meridiano_prod_data:
+
+networks:
+  freellmapi_default:
+    external: true

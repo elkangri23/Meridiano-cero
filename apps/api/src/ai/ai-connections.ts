@@ -308,6 +308,45 @@ export async function recordAIConnectionUsage(database: Database, ownerId: strin
   await database.orm.update(aiConnections).set(updates).where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.id, connectionId)));
 }
 
+export async function setAIConnectionStatus(database: Database, ownerId: string, connectionId: string, status: 'active' | 'disabled'): Promise<AIConnectionOutput | null> {
+  const [connection] = await database.orm.update(aiConnections)
+    .set({ status, updatedAt: new Date() })
+    .where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.id, connectionId)))
+    .returning({
+      id: aiConnections.id,
+      name: aiConnections.name,
+      adapterId: aiConnections.adapterId,
+      baseUrl: aiConnections.baseUrl,
+      model: aiConnections.model,
+      roles: aiConnections.roles,
+      limits: aiConnections.limits,
+      capabilities: aiConnections.capabilities,
+      isDefault: aiConnections.isDefault,
+      status: aiConnections.status,
+      createdAt: aiConnections.createdAt,
+      updatedAt: aiConnections.updatedAt,
+      lastUsedAt: aiConnections.lastUsedAt,
+      lastError: aiConnections.lastError,
+    });
+  return connection ? {
+    ...connection,
+    isDefault: !!connection.isDefault,
+    hasCredential: true,
+    createdAt: connection.createdAt.toISOString(),
+    updatedAt: connection.updatedAt.toISOString(),
+    lastUsedAt: connection.lastUsedAt?.toISOString() ?? null,
+  } : null;
+}
+
+// Desactiva todas las conexiones personales del usuario para volver a usar
+// el proveedor predeterminado del administrador. Las filas se conservan (con
+// su credencial cifrada) y se pueden reactivar después.
+export async function disableAllAIConnections(database: Database, ownerId: string): Promise<void> {
+  await database.orm.update(aiConnections)
+    .set({ isDefault: 0, status: 'disabled', updatedAt: new Date() })
+    .where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.status, 'active')));
+}
+
 // Resolver conexión para una petición: personal > default admin
 export async function resolveAIConnection(database: Database, ownerId: string, adminDefaultConnectionId?: string): Promise<{ connection: any; credential: string } | null> {
   // 1. Buscar conexión personal activa

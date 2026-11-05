@@ -127,4 +127,21 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('clock')).toContainText('10 min');
   });
+
+  test('Ajustes de IA: crear conexión Ollama, verla como efectiva y borrarla', async ({ page }) => {
+    await openGameScreen(page);
+    await page.click('button:has-text("Ajustes")');
+    await expect(page.getByTestId('settings-ai-effective')).toContainText('Mock determinista');
+    await page.getByTestId('ai-connection-adapter').selectOption('ollama');
+    await page.getByTestId('ai-connection-name').fill('Ollama E2E');
+    await page.getByTestId('ai-connection-model').fill('llama3.1:8b');
+    await page.getByTestId('ai-connection-save').click();
+    await expect(page.locator('text=Conexión guardada y activada.')).toBeVisible();
+    await expect(page.getByTestId('ai-connections-list')).toContainText('Ollama E2E');
+    await expect(page.getByTestId('settings-ai-effective')).toContainText('Ollama E2E');
+    await page.getByRole('button', { name: 'Borrar Ollama E2E' }).click();
+    await expect(page.getByTestId('ai-connections-list')).not.toContainText('Ollama E2E');
+    await expect(page.getByTestId('settings-ai-effective')).toContainText('Mock determinista');
+    await page.keyboard.press('Escape');
+  });
 });

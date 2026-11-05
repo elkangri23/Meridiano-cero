@@ -21,6 +21,8 @@ export interface AiProvider {
   readonly providerId: string;
   readonly model: string;
   request(input: AiRequest): Promise<AiResponse>;
+  /** Disponibilidad del transporte, cuando el adaptador la implementa. */
+  healthCheck?(): Promise<{ available: boolean; latencyMs?: number; error?: string }>;
 }
 export function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

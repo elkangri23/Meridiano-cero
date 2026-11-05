@@ -8,7 +8,7 @@ import type {
   AIFunction,
   ProviderId,
   AIContext as AIContextType,
-} from '../index.ts';
+} from '../types.js';
 
 interface OllamaChatRequest {
   model: string;

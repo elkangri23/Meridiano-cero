@@ -3,7 +3,7 @@ import { createProvider } from './index.js';
 import { DeterministicMockProvider } from './mock.js';
 import { createOllamaProvider } from './ollama.js';
 import { parseOllamaConfig } from './ollama-config.js';
-import type { AIContext, AIFunction, InterpretActionOutput } from '../index.js';
+import type { AIContext, AIFunction, InterpretActionOutput } from '../types.js';
 
 function context(functionName: AIFunction, input: unknown): AIContext {
   return { providerId: 'synthetic', model: 'synthetic:local', function: functionName, schemaVersion: 1,
