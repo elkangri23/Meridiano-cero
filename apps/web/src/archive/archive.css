@@ -11,13 +11,16 @@ body:has(.archive) { background:#000000; color:#ffffff; }
 .archive-session { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; border:4px double #ffffff; padding:16px; background:#0000aa; }
 .archive-actions { display:flex; flex-wrap:wrap; gap:12px; }
 .archive button,.archive select { font:inherit; border-radius:0; border:2px outset #ffffff; background:#aaaaaa; color:#000000; padding:8px 12px; min-height:44px; }
+.archive a { color:#ffff55; }
+.archive a:focus-visible { outline:3px solid #ffff55; outline-offset:4px; }
 .archive button:disabled { opacity:1; color:#555555; cursor:default; }
 .archive button:focus-visible,.archive select:focus-visible,.archive-scroll:focus-visible { outline:3px solid #ffff55; outline-offset:4px; }
 .archive .archive-notice { padding:20px 0; min-height:72px; color:#ffff55; }
 .archive-list { border-top:1px solid #aaaaaa; padding-top:16px; }
+.archive-list h2 { margin:0 0 8px; color:#ffff55; font-size:1.15rem; font-weight:400; }
 .archive-list label { display:flex; gap:12px; align-items:center; margin-bottom:16px; }
 .archive-scroll { overflow-x:auto; border:1px solid #aaaaaa; }
-.archive table { border-collapse:collapse; width:100%; text-align:left; min-width:640px; }
+.archive table { border-collapse:collapse; width:100%; text-align:left; min-width:760px; }
 .archive caption { text-align:left; padding:12px; background:#0000aa; }
 .archive th,.archive td { padding:12px; border-bottom:1px solid #555555; }
 .archive th { color:#ffff55; font-weight:400; }

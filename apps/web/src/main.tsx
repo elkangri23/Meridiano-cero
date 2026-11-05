@@ -4,6 +4,7 @@ import { Archive } from './archive/Archive';
 import { Glosario } from './glosario/GlosarioPage';
 import { Prototype } from './prototype/Prototype';
 import { GameScreen } from './game/GameScreen';
+import { LoginPage, RecoveryPage, RegisterPage, VerifyPage } from './auth/AuthPages';
 import './style.css';
 
 const root = document.getElementById('root');
@@ -16,6 +17,10 @@ application.render(
       <Route path="/glosario" element={<Glosario />} />
       <Route path="/prototype" element={<Prototype />} />
       <Route path="/runs/:runId" element={<GameScreen />} />
+      <Route path="/registro" element={<RegisterPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/verificar" element={<VerifyPage />} />
+      <Route path="/recuperar" element={<RecoveryPage />} />
     </Routes>
   </BrowserRouter>
 );

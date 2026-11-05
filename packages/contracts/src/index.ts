@@ -94,12 +94,13 @@ export interface RunSummaryDto {
   caseId: string;
   status: 'active' | 'closed';
   version: number;
+  minute: number;
   createdAt: string;
 }
 export interface RunListDto { profileId: string; items: RunSummaryDto[]; nextCursor: string | null }
 
 export interface SessionDto {
-  profile: { id: string; displayName: string; role: 'player' };
+  profile: { id: string; displayName: string; role: 'player'; emailVerified: boolean };
   csrfToken: string;
 }
 
@@ -114,7 +115,7 @@ function shortText(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 160;
 }
 function profile(value: unknown): value is SessionDto['profile'] {
-  return dtoRecord(value, 'displayName,id,role') && uuid(value.id) && shortText(value.displayName) && value.role === 'player';
+  return dtoRecord(value, 'displayName,emailVerified,id,role') && uuid(value.id) && shortText(value.displayName) && value.role === 'player' && typeof value.emailVerified === 'boolean';
 }
 export function isSessionDto(value: unknown): value is SessionDto {
   return dtoRecord(value, 'csrfToken,profile') && profile(value.profile) &&
@@ -130,9 +131,10 @@ function summaryState(value: Record<string, unknown>): boolean {
     typeof value.version === 'number' && Number.isSafeInteger(value.version) && value.version > 0 && isoDate(value.createdAt);
 }
 function runSummary(value: unknown): value is RunSummaryDto {
-  if (!dtoRecord(value, 'caseId,caseTitle,createdAt,runId,status,version')) return false;
+  if (!dtoRecord(value, 'caseId,caseTitle,createdAt,minute,runId,status,version')) return false;
   if (!uuid(value.runId) || typeof value.caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.caseId)) return false;
   if (value.caseTitle !== null && !shortText(value.caseTitle)) return false;
+  if (typeof value.minute !== 'number' || !Number.isSafeInteger(value.minute) || value.minute < 0) return false;
   return summaryState(value);
 }
 function pageCursor(value: unknown): boolean {

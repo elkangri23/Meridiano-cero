@@ -84,7 +84,9 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
       console.log('EMAIL_NOT_CONFIGURED');
       return;
     }
-    const url = `${config.origin}/api/v1/auth/recovery?token=${token}`;
+    // El enlace lleva a la página web de recuperación, no a la API: la API no
+    // tiene ruta GET para este token y el enlace antiguo devolvía 404.
+    const url = `${config.origin}/recuperar?token=${token}`;
     try {
       await mailer.sendMail(email, 'Recuperación de contraseña de Meridiano-cero',
         `Para elegir una contraseña nueva abre este enlace (válido 1 hora):\n${url}\n\nSi no pediste este cambio, ignora este mensaje.`);
@@ -136,7 +138,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
       });
       await sendVerificationEmail(normalizedEmail, token);
 
-      const result = await store.createForProfile(createdProfile);
+      const result = await store.createForProfile({ ...createdProfile, emailVerifiedAt: null });
       reply.header('Set-Cookie', sessionCookie(config, result.token));
       return { profile: { id: createdProfile.id, displayName: createdProfile.displayName, emailVerified: false }, csrfToken: result.csrfToken };
     } catch {

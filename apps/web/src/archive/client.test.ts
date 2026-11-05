@@ -4,8 +4,8 @@ import { archiveApi, ArchiveError } from './client';
 import type { RunListDto, SessionDto } from '@meridiano/contracts';
 
 const id = '11111111-1111-4111-8111-111111111111';
-const session: SessionDto = { profile: { id, displayName: 'Detective sintético', role: 'player' }, csrfToken: 's'.repeat(43) };
-const page: RunListDto = { profileId: id, items: [{ runId: id, caseId: 'synthetic', caseTitle: 'Caso sintético', status: 'active', version: 1, createdAt: '2026-01-01T00:00:00.000Z' }], nextCursor: null };
+const session: SessionDto = { profile: { id, displayName: 'Detective sintético', role: 'player', emailVerified: false }, csrfToken: 's'.repeat(43) };
+const page: RunListDto = { profileId: id, items: [{ runId: id, caseId: 'synthetic', caseTitle: 'Caso sintético', status: 'active', version: 1, minute: 0, createdAt: '2026-01-01T00:00:00.000Z' }], nextCursor: null };
 const signal = () => new AbortController().signal;
 function respond(body: unknown, status = 200) {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));

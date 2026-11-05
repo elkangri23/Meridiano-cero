@@ -18,6 +18,15 @@ function validateOrigin(value: string | undefined, mode: 'development' | 'produc
     return value;
   } catch { throw new Error('CONFIG_PUBLIC_ORIGIN'); }
 }
+function readDevelopmentRegistration(env: NodeJS.ProcessEnv): boolean {
+  // En desarrollo el registro también puede activarse (REGISTRATION_ENABLED=true)
+  // para probar la UI de autenticación contra la API local: el desarrollo solo
+  // escucha en loopback y ya ofrece sesión local sin contraseña, así que no se
+  // amplía la superficie de confianza. El .env de desarrollo lo deja en false
+  // por defecto, así que el comportamiento habitual no cambia.
+  if (env.REGISTRATION_ENABLED !== 'false' && env.REGISTRATION_ENABLED !== 'true') throw new Error('CONFIG_REGISTRATION_ENABLED');
+  return env.REGISTRATION_ENABLED === 'true';
+}
 function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig & { mode: 'development' | 'production'; origin: string; registrationEnabled: boolean } {
   const mode = env.APP_MODE;
   if (mode !== 'development' && mode !== 'production') throw new Error('CONFIG_APP_MODE');
@@ -37,8 +46,7 @@ function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig & { mode: 'developmen
     if (env.REGISTRATION_ENABLED !== 'true') throw new Error('CONFIG_REGISTRATION_ENABLED');
     return { host, port, mode, origin, registrationEnabled: true };
   }
-  if (env.REGISTRATION_ENABLED !== 'false') throw new Error('CONFIG_REGISTRATION_ENABLED');
-  return { host, port, mode, origin, registrationEnabled: false };
+  return { host, port, mode, origin, registrationEnabled: readDevelopmentRegistration(env) };
 }
 export function readDatabaseUrl(value: string | undefined): string {
   try {

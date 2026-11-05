@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent, RefObject } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { archiveApi } from '../archive/client';
 import { aiApi, AiError } from '../ai/client';
 import { gameApi, GameError } from './client';
@@ -70,7 +70,7 @@ function previewOutcome(response: ActionResponseDto, offer: PublicActionOffer, k
 
 // ── Secciones presentacionales ──────────────────────────────────────────────────
 
-function HeaderSection({ view, caseTitle, detective }: { view: PlayerViewDto; caseTitle: string | null; detective: string }) {
+function HeaderSection({ view, caseTitle, detective, onLogout }: { view: PlayerViewDto; caseTitle: string | null; detective: string; onLogout: (() => void) | null }) {
   return <header className="game-header">
     <div>
       <p className="game-eyebrow">A.C.M.E. · {caseTitle ?? view.caseId}</p>
@@ -82,6 +82,7 @@ function HeaderSection({ view, caseTitle, detective }: { view: PlayerViewDto; ca
       <span className="game-clock-state">{view.status === 'closed' ? 'Cerrada' : 'Activa'}</span>
     </div>
     <Link to="/">Archivo</Link>
+    {onLogout && <button type="button" onClick={onLogout}>Cerrar sesión</button>}
   </header>;
 }
 
@@ -349,6 +350,7 @@ function UnavailableScreen({ phase, notice }: { phase: ScreenPhase; notice: stri
  * herramientas. La UI no calcula resultados: recibe PlayerView y eventos. */
 export function GameScreen() {
   const { runId } = useParams();
+  const navigate = useNavigate();
   const windows = useWindows();
   const generation = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -642,7 +644,9 @@ export function GameScreen() {
   };
 
   return <main className={`game${highContrast ? ' game-high-contrast' : ''}`} data-testid="game-screen" style={{ fontSize: `${16 * textScale / 100}px` }}>
-    <HeaderSection view={view} caseTitle={caseTitle} detective={identity?.profile.displayName ?? '—'} />
+    <HeaderSection view={view} caseTitle={caseTitle} detective={identity?.profile.displayName ?? '—'} onLogout={identity ? () => {
+      void archiveApi.logout(identity.csrfToken, new AbortController().signal).finally(() => navigate('/'));
+    } : null} />
 
     <p className="game-notice" role="status">{notice}</p>
 

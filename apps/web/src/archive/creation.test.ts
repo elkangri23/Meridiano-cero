@@ -6,7 +6,7 @@ import type { ArchiveApi } from './client';
 
 const profileId = '11111111-1111-4111-8111-111111111111';
 const runId = '22222222-2222-4222-8222-222222222222';
-const identity: SessionDto = { profile: { id: profileId, displayName: 'Persona sintética', role: 'player' }, csrfToken: 's'.repeat(43) };
+const identity: SessionDto = { profile: { id: profileId, displayName: 'Persona sintética', role: 'player', emailVerified: false }, csrfToken: 's'.repeat(43) };
 const signal = () => new AbortController().signal;
 const found = { schemaVersion: 1 as const, kind: 'create_run' as const, status: 'committed' as const, runId };
 function storage() {

@@ -8,6 +8,13 @@ describe('configuración DB/sesión', () => {
   expect(readAppConfig(valid).localAuth).toBe(true);
   expect(readAppConfig({ ...valid, LOCAL_DEV_AUTH_ENABLED: 'false' }).localAuth).toBe(false);
  });
+ it('en desarrollo el registro puede activarse para probar la UI de autenticación en local', () => {
+  const cfg = readAppConfig({ ...valid, REGISTRATION_ENABLED: 'true' });
+  expect(cfg.mode).toBe('development');
+  expect(cfg.registrationEnabled).toBe(true);
+  expect(cfg.origin).toBe('http://127.0.0.1:5173');
+  expect(() => readAppConfig({ ...valid, REGISTRATION_ENABLED: 'sí' })).toThrow(/^CONFIG_/);
+ });
  it('admite modo producción con origen público y registro activado', () => {
   const prod = { ...valid, APP_MODE: 'production', PUBLIC_ORIGIN: 'https://meridianocero.laurafernandezenfermeria.com',
     REGISTRATION_ENABLED: 'true', LOCAL_DEV_AUTH_ENABLED: 'false' };

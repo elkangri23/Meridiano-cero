@@ -7,14 +7,14 @@ export function tokenDigest(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 export function createSessionStore(database: Database) {
-  async function createForProfile(profile: { id: string; displayName: string; role: string }, previous?: string) {
+  async function createForProfile(profile: { id: string; displayName: string; role: string; emailVerifiedAt: Date | null }, previous?: string) {
     return database.orm.transaction(async tx => {
       if (previous) await tx.update(sessions).set({ revokedAt: new Date() }).where(and(eq(sessions.tokenHash, tokenDigest(previous)), eq(sessions.profileId, profile.id)));
       const token = randomBytes(32).toString('base64url');
       const csrfToken = randomBytes(32).toString('base64url');
       const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
       await tx.insert(sessions).values({ tokenHash: tokenDigest(token), profileId: profile.id, csrfToken, expiresAt });
-      return { token, csrfToken, profile: { id: profile.id, displayName: profile.displayName, role: profile.role } };
+      return { token, csrfToken, profile: { id: profile.id, displayName: profile.displayName, role: profile.role, emailVerified: profile.emailVerifiedAt !== null } };
     });
   }
   return {
@@ -31,7 +31,7 @@ export function createSessionStore(database: Database) {
         const csrfToken = randomBytes(32).toString('base64url');
         const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
         await tx.insert(sessions).values({ tokenHash: tokenDigest(token), profileId: profile.id, csrfToken, expiresAt });
-        return { token, csrfToken, profile: { id: profile.id, displayName: profile.displayName, role: profile.role } };
+        return { token, csrfToken, profile: { id: profile.id, displayName: profile.displayName, role: profile.role, emailVerified: profile.emailVerifiedAt !== null } };
       });
     },
     async find(token: string | undefined) {
