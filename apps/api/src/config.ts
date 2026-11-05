@@ -1,27 +1,36 @@
 export interface BootstrapConfig { host: '127.0.0.1'; port: number }
 export interface AppConfig extends BootstrapConfig {
-  origin: string; localAuth: boolean; databaseUrl: string;
+  mode: 'development' | 'production';
+  origin: string; localAuth: boolean; registrationEnabled: boolean; databaseUrl: string;
   aiProvider: 'ollama' | 'mock' | 'none';
   aiBaseUrl?: string;
   aiModel?: string;
   aiTimeoutMs?: number;
 }
-function validateOrigin(value: string | undefined): string {
+const PRODUCTION_ORIGIN = 'https://meridianocero.laurafernandezenfermeria.com';
+function validateOrigin(value: string | undefined, mode: 'development' | 'production'): string {
   if (!value) throw new Error('CONFIG_PUBLIC_ORIGIN');
   try {
     const url = new URL(value);
-    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== value) throw new Error();
+    if (mode === 'production') {
+      if (url.protocol !== 'https:' || url.origin !== PRODUCTION_ORIGIN || url.origin !== value) throw new Error();
+    } else if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== value) throw new Error();
     return value;
   } catch { throw new Error('CONFIG_PUBLIC_ORIGIN'); }
 }
-function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig {
-  if (env.APP_MODE !== 'development') throw new Error('CONFIG_APP_MODE');
+function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig & { mode: 'development' | 'production'; origin: string; registrationEnabled: boolean } {
+  const mode = env.APP_MODE;
+  if (mode !== 'development' && mode !== 'production') throw new Error('CONFIG_APP_MODE');
   if (env.API_HOST !== '127.0.0.1') throw new Error('CONFIG_API_HOST');
   const port = Number(env.API_PORT);
   if (!env.API_PORT || !/^[1-9]\d*$/.test(env.API_PORT) || !Number.isSafeInteger(port) || port > 65535) throw new Error('CONFIG_API_PORT');
-  validateOrigin(env.PUBLIC_ORIGIN);
+  const origin = validateOrigin(env.PUBLIC_ORIGIN, mode);
+  if (mode === 'production') {
+    if (env.REGISTRATION_ENABLED !== 'true') throw new Error('CONFIG_REGISTRATION_ENABLED');
+    return { host: '127.0.0.1', port, mode, origin, registrationEnabled: true };
+  }
   if (env.REGISTRATION_ENABLED !== 'false') throw new Error('CONFIG_REGISTRATION_ENABLED');
-  return { host: '127.0.0.1', port };
+  return { host: '127.0.0.1', port, mode, origin, registrationEnabled: false };
 }
 export function readDatabaseUrl(value: string | undefined): string {
   try {
@@ -35,15 +44,17 @@ export function readDatabaseUrl(value: string | undefined): string {
 export function readBootstrapConfig(env: NodeJS.ProcessEnv): BootstrapConfig {
   const http = readHttp(env);
   if (env.LOCAL_DEV_AUTH_ENABLED !== 'false') throw new Error('CONFIG_LOCAL_DEV_AUTH_ENABLED');
-  return http;
+  return { host: http.host, port: http.port };
 }
 export function readAppConfig(env: NodeJS.ProcessEnv): AppConfig {
   const http = readHttp(env);
   if (!['true', 'false'].includes(env.LOCAL_DEV_AUTH_ENABLED ?? '')) throw new Error('CONFIG_LOCAL_DEV_AUTH_ENABLED');
+  // Fail-closed: en producción no existe sesión local de desarrollo.
+  if (http.mode === 'production' && env.LOCAL_DEV_AUTH_ENABLED !== 'false') throw new Error('CONFIG_LOCAL_DEV_AUTH_ENABLED');
   const aiProvider = env.AI_PROVIDER ?? 'mock';
   if (!['ollama', 'mock', 'none'].includes(aiProvider)) throw new Error('CONFIG_AI_PROVIDER');
 const cfg: AppConfig = {
-    ...http, origin: validateOrigin(env.PUBLIC_ORIGIN), localAuth: env.LOCAL_DEV_AUTH_ENABLED === 'true',
+    ...http, localAuth: env.LOCAL_DEV_AUTH_ENABLED === 'true',
     databaseUrl: readDatabaseUrl(env.DATABASE_URL),
     aiProvider: aiProvider as AppConfig['aiProvider'],
   };

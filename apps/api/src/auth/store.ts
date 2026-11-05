@@ -7,7 +7,18 @@ export function tokenDigest(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 export function createSessionStore(database: Database) {
+  async function createForProfile(profile: { id: string; displayName: string; role: string }, previous?: string) {
+    return database.orm.transaction(async tx => {
+      if (previous) await tx.update(sessions).set({ revokedAt: new Date() }).where(and(eq(sessions.tokenHash, tokenDigest(previous)), eq(sessions.profileId, profile.id)));
+      const token = randomBytes(32).toString('base64url');
+      const csrfToken = randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+      await tx.insert(sessions).values({ tokenHash: tokenDigest(token), profileId: profile.id, csrfToken, expiresAt });
+      return { token, csrfToken, profile: { id: profile.id, displayName: profile.displayName, role: profile.role } };
+    });
+  }
   return {
+    createForProfile,
     async create(previous: string | undefined) {
       return database.orm.transaction(async tx => {
         // Serialize the single local profile's rotations, including concurrent tabs.
@@ -27,10 +38,12 @@ export function createSessionStore(database: Database) {
       if (!token) return undefined;
       const found = await database.orm.select({
         csrfToken: sessions.csrfToken,
-        profile: { id: profiles.id, displayName: profiles.displayName, role: profiles.role },
+        profile: { id: profiles.id, displayName: profiles.displayName, role: profiles.role, emailVerified: profiles.emailVerifiedAt },
       }).from(sessions).innerJoin(profiles, eq(sessions.profileId, profiles.id))
         .where(and(eq(sessions.tokenHash, tokenDigest(token)), isNull(sessions.revokedAt), gt(sessions.expiresAt, new Date())));
-      return found[0];
+      const row = found[0];
+      if (!row) return undefined;
+      return { csrfToken: row.csrfToken, profile: { ...row.profile, emailVerified: row.profile.emailVerified !== null } };
     },
     async revoke(token: string) {
       await database.orm.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.tokenHash, tokenDigest(token)));

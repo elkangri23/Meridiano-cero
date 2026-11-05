@@ -35,7 +35,12 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
+# Las migraciones las lee migrate-cli en tiempo de ejecución (Fase B).
+COPY --from=builder /app/apps/api/migrations ./apps/api/migrations
+COPY --from=builder /app/infra/docker/entrypoint-api.sh ./infra/docker/entrypoint-api.sh
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
+RUN chmod +x ./infra/docker/entrypoint-api.sh
 EXPOSE 3000
-CMD ["node", "apps/api/dist/server.js"]
+# Espera a PostgreSQL, aplica migraciones y arranca el servidor.
+ENTRYPOINT ["/app/infra/docker/entrypoint-api.sh"]

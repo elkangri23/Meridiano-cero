@@ -8,12 +8,20 @@ import type { AppConfig } from './config.ts';
 import type { Database } from './database/connection.ts';
 import { createReadiness } from './database/readiness.ts';
 import { registerLocalAuth } from './auth/routes.ts';
-import Fastify from 'fastify';
+import { registerPublicAuth } from './auth/public-auth.ts';
+import type { Mailer } from './auth/mailer.ts';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { HealthResponse } from '@meridiano/contracts';
 
-export function createApp(options?: { config: AppConfig; database: Database; state?: RuntimeState; telemetry?: Telemetry }) {
-  const app = Fastify({ logger: false, requestTimeout: 30_000, connectionTimeout: 30_000, trustProxy: false, bodyLimit: 65536, requestIdHeader: false, genReqId: () => randomUUID() });
+export function createApp(options?: { config: AppConfig; database: Database; state?: RuntimeState; telemetry?: Telemetry; mailer?: Mailer | null }) {
+  const app: FastifyInstance = Fastify({ logger: false, requestTimeout: 30_000, connectionTimeout: 30_000,
+    // En producción la API solo escucha en 127.0.0.1 detrás de nginx: se
+    // confía solo en el primer salto (nginx) para que request.ip sea la IP
+    // real del cliente (los límites por IP del registro usan ese valor).
+    // En desarrollo, sin proxy.
+    trustProxy: options?.config.mode === 'production' ? (_address: string, hop: number) => hop === 0 : false,
+    bodyLimit: 65536, requestIdHeader: false, genReqId: () => randomUUID() });
   app.addHook('onRequest', async (request, reply) => {
     reply.header('X-Request-Id', request.id);
     reply.header('Cache-Control', 'no-store');
@@ -28,6 +36,10 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
       return reply.code(available ? 200 : 503).send({ status: available ? 'ready' : 'not_ready' });
     });
     registerLocalAuth(app, options.config, options.database);
+    // Registro público solo cuando la configuración lo activa (producción).
+    // La sesión local de desarrollo no se registra en producción porque
+    // config.localAuth es false allí (fail-closed en config.ts).
+    if (options.config.registrationEnabled) registerPublicAuth(app, options.config, options.database, options.mailer ?? null);
     registerGameRoutes(app, options.config, options.database, ready);
     registerAiRoutes(app, options.config, options.database);
   }
