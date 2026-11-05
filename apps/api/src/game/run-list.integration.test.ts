@@ -59,7 +59,7 @@ describe('T3-02: lista paginada propia PostgreSQL/HTTP', () => {
     expect(body.profileId).toBe(player.id);
     expect(body.items.every(item => item.caseTitle === 'El astrolabio de las tres ciudades')).toBe(true);
     expect(body.items.map(item => item.runId)).toEqual([...ids].reverse()); expect(body.nextCursor).toBeNull();
-    for (const item of body.items) expect(Object.keys(item).sort()).toEqual(['caseId', 'caseTitle', 'createdAt', 'minute', 'runId', 'status', 'version']);
+    for (const item of body.items) expect(Object.keys(item).sort()).toEqual(['caseId', 'caseTitle', 'createdAt', 'difficulty', 'minute', 'runId', 'status', 'version']);
     // El reloj del resumen refleja el minuto del motor (0 en partidas nuevas).
     expect(body.items.every(item => Number.isSafeInteger(item.minute) && item.minute >= 0)).toBe(true);
     for (const marker of [otherRun, 'SYNTHETIC_LIST_PRIVATE', 'definitionHash', 'engineState', 'finalReport', 'ines-valera']) expect(response.body).not.toContain(marker);

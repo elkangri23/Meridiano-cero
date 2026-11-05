@@ -11,7 +11,7 @@ import type { CaseRun } from '@meridiano/case-schema';
 import { isIdempotencyKey, type ActionResponseDto, type SaveLoadResponseDto } from '@meridiano/contracts';
 import type { Database } from '../database/connection.ts';
 import { assertRunShape, inSession, pureRun, runColumns, RunStoreError, type StoredRun } from './runs.ts';
-import { findDefinitionById } from './catalog.ts';
+import { findDefinitionById, definitionForRun } from './catalog.ts';
 import { playerViewDto, projectEvents } from './player-view.ts';
 
 type FullRun = StoredRun & CaseRun;
@@ -30,6 +30,7 @@ async function lockedRun(client: PoolClient, ownerId: string, runId: string): Pr
     ...state,
     id: row.id, ownerId: row.ownerId, definitionId: row.definitionId, definitionHash: row.definitionHash,
     engineVersion: row.engineVersion, revision: row.revision, branchId: row.branchId, status: row.status,
+    difficulty: row.difficulty, deadlineMinutes: row.deadlineMinutes,
     engineState: row.engine_state,
   };
 }
@@ -106,7 +107,8 @@ async function persistAction(
     ...result.run,
     id: run.id, ownerId, definitionId: run.definitionId, definitionHash: run.definitionHash,
     engineVersion: result.run.engineVersion, revision: newRevision, branchId: run.branchId,
-    status: result.run.status, engineState: result.run,
+    status: result.run.status, difficulty: run.difficulty, deadlineMinutes: run.deadlineMinutes,
+    engineState: result.run,
   };
   return { operationId, events, newRun, stored };
 }
@@ -155,7 +157,7 @@ export async function commitAction(
   return inSession(database, digest, async (client, ownerId) => {
     const run = await lockedRun(client, ownerId, runId);
     if (run.status === 'closed') throw new RunStoreError('RUN_CLOSED');
-    const definition = findDefinitionById(run.definitionId);
+    const definition = definitionForRun(run.definitionId, run.difficulty, run.deadlineMinutes);
     const manualCount = await manualSaveCount(client, runId);
 
     // Preview explícito: solo lectura, sin persistencia ni registro.
@@ -243,7 +245,8 @@ async function persistLoad(
     ...restored,
     id: run.id, ownerId, definitionId: run.definitionId, definitionHash: run.definitionHash,
     engineVersion: restored.engineVersion, revision: newRevision, branchId: newBranchId,
-    status: restored.status, engineState: restored,
+    status: restored.status, difficulty: run.difficulty, deadlineMinutes: run.deadlineMinutes,
+    engineState: restored,
   };
   return { operationId, newBranchId, newRun };
 }
@@ -259,7 +262,7 @@ export async function commitLoad(
   return inSession(database, digest, async (client, ownerId) => {
     const run = await lockedRun(client, ownerId, runId);
     if (run.status === 'closed') throw new RunStoreError('RUN_CLOSED');
-    const definition = findDefinitionById(run.definitionId);
+    const definition = definitionForRun(run.definitionId, run.difficulty, run.deadlineMinutes);
     const loadDigest = createHash('sha256').update(JSON.stringify(['load', saveId])).digest('hex');
 
     // Replay por idempotencia ANTES de rechazar una revisión vieja.

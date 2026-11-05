@@ -5,6 +5,7 @@ import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schem
 import { isPublicBatchStep, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
 import { availableOffers, ENGINE_VERSION, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
+import { caseBriefing } from './catalog.ts';
 
 type FullRun = StoredRun & CaseRun;
 
@@ -100,6 +101,7 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     finalReport: publicFinalReport(run),
     officialResult: null,
     offers: availableOffers(definition, run),
+    briefing: caseBriefing(definition.id),
     saveCapabilities: {
       manualLimit: 10,
       manualCount,

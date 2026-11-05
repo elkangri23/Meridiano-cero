@@ -47,6 +47,30 @@ export const DIFFICULTY_BUDGET: Record<Difficulty, number> = {
   hard: 600,
 };
 
+// Plazo interno de una partida sobre un expediente ya construido, según la
+// dificultad elegida al crearla. Es un factor sobre el plazo base del
+// expediente, NO el DIFFICULTY_BUDGET: ese presupuesto es de generación de
+// casos nuevos (el generador construye el contenido para que quepa en él) y
+// no se puede aplicar literalmente al caso fijo del astrolabio, cuyas rutas
+// mínimas verificadas son 455/485 minutos (545/575 con retrasos máximos,
+// SPEC-003 v8): con 300 minutos en fácil el caso sería incompletable, y con
+// 480 en normal la ruta B (485) tampoco cabría. El factor se mide sobre la
+// dificultad normal del expediente —el astrolabio se diseñó y verificó en
+// normal con 2880 minutos (SPEC-003)—, así que normal conserva el plazo
+// base (factor 1), fácil lo duplica (factor 2) y difícil lo reduce a la
+// mitad (factor 0.5, todavía 2,5 veces la ruta peor, 575), de modo que las
+// tres dificultades se pueden completar y la creación sin dificultad elegida
+// se comporta exactamente como antes.
+export const DIFFICULTY_DEADLINE_FACTOR: Record<Difficulty, number> = {
+  easy: 2,
+  normal: 1,
+  hard: 0.5,
+};
+
+export function deadlineMinutesForDifficulty(baseDeadlineMinutes: number, difficulty: Difficulty): number {
+  return Math.max(60, Math.round(baseDeadlineMinutes * DIFFICULTY_DEADLINE_FACTOR[difficulty]));
+}
+
 // Duración por defecto por dificultad
 export const DIFFICULTY_DURATION: Record<Difficulty, Duration> = {
   easy: 'short',

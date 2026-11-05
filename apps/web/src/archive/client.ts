@@ -6,8 +6,9 @@ export type Filter = 'all' | 'active' | 'closed';
 export interface ArchiveApi {
   initial(runId: string, signal: AbortSignal): Promise<PlayerViewDto>;
   cases(signal: AbortSignal): Promise<CaseListDto>;
-  create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal): Promise<void>;
+  create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal, difficulty?: 'easy' | 'normal' | 'hard'): Promise<void>;
   lookup(key: string, identity: SessionDto, signal: AbortSignal): Promise<RunCreationLookupDto | null>;
+  deleteRun(runId: string, identity: SessionDto, signal: AbortSignal): Promise<void>;
   me(signal: AbortSignal): Promise<SessionDto | null>;
   connect(signal: AbortSignal): Promise<SessionDto | null>;
   list(filter: Filter, cursor: string | null, signal: AbortSignal): Promise<RunListDto>;
@@ -15,7 +16,7 @@ export interface ArchiveApi {
 }
 
 export class ArchiveError extends Error {
-  constructor(readonly kind: 'unavailable' | 'invalid') { super(kind); }
+  constructor(readonly kind: 'unavailable' | 'invalid', readonly detail?: string) { super(kind); }
 }
 
 async function boundedJson(response: Response): Promise<unknown> {
@@ -109,10 +110,33 @@ export const archiveApi: ArchiveApi = {
     return readCaseListDto(response);
   },
 
-  async create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal): Promise<void> {
-    const response = await request('/api/v1/runs', signal, { method: 'POST', headers: mutationHeaders(identity), body: JSON.stringify({ caseId, idempotencyKey: key }) });
+  async create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal,
+    difficulty?: 'easy' | 'normal' | 'hard'): Promise<void> {
+    const body: Record<string, string> = { caseId, idempotencyKey: key };
+    if (difficulty) body.difficulty = difficulty;
+    const response = await request('/api/v1/runs', signal, { method: 'POST', headers: mutationHeaders(identity), body: JSON.stringify(body) });
+    if (response.status === 200 || response.status === 201) { await response.body?.cancel(); return; }
+    // El mensaje de error real llega a la UI: antes se tragaba con el
+    // «unavailable» genérico y la creación quedaba como «pendiente de
+    // confirmar» sin explicación.
+    let detail: string | undefined;
+    try {
+      const parsed = await boundedJson(response);
+      if (isValidBody(parsed) && isValidBody(parsed.error)) {
+        if (parsed.error.code === 'IDEMPOTENCY_CONFLICT') detail = 'Ya existe una partida creada con esa clave y otra dificultad.';
+        else if (typeof parsed.error.message === 'string') detail = parsed.error.message;
+      }
+    } catch { /* el detalle es opcional; sin él queda el mensaje genérico */ }
+    throw new ArchiveError('unavailable', detail);
+  },
+
+  async deleteRun(runId: string, identity: SessionDto, signal: AbortSignal): Promise<void> {
+    const response = await request('/api/v1/runs/' + encodeURIComponent(runId), signal,
+      { method: 'DELETE', headers: mutationHeaders(identity), body: JSON.stringify({ confirm: true }) });
     await response.body?.cancel();
-    if (response.status !== 200 && response.status !== 201) throw new ArchiveError('unavailable');
+    // 404 significa que la partida ya no existe o no es del usuario: el
+    // resultado para el archivo es el mismo (no está en la lista).
+    if (response.status !== 204 && response.status !== 404) throw new ArchiveError('unavailable');
   },
 
   async lookup(key: string, identity: SessionDto, signal: AbortSignal): Promise<RunCreationLookupDto | null> {

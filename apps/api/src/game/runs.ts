@@ -33,11 +33,15 @@ export interface StoredRun {
   revision: number;
   branchId: string;
   status: 'active' | 'closed';
+  /** Dificultad elegida al crear (migración 0007) y su plazo en minutos. */
+  difficulty: 'easy' | 'normal' | 'hard';
+  deadlineMinutes: number;
   engineState: unknown;
 }
 export const runColumns = `id, owner_id AS "ownerId", definition_id AS "definitionId",
   definition_hash AS "definitionHash", engine_version AS "engineVersion",
   revision, branch_id AS "branchId", engine_state AS "engineState",
+  difficulty, deadline_minutes AS "deadlineMinutes",
   engine_state->>'status' AS status`;
 // El estado autoritativo vive en engine_state (así lo lee run-list.ts); runs no
 // tiene columna status. Sin este alias, StoredRun.status era undefined y los
@@ -96,7 +100,10 @@ export async function createStoredRun(database: Database, sessionDigest: string,
   const candidate = structuredClone(definition);
   const structureValid = validateCaseDefinition(candidate).valid;
   const definitionHash = structureValid ? preparedHash(candidate) : undefined;
-  const requestDigest = createHash('sha256').update(JSON.stringify(['create_run', candidate.id])).digest('hex');
+  // El resumen cubre los parámetros efectivos (expediente, dificultad y
+  // plazo): reintentar la misma clave con otra dificultad es conflicto, no
+  // un replay silencioso de la primera creación.
+  const requestDigest = createHash('sha256').update(JSON.stringify(['create_run', candidate.id, candidate.difficulty, candidate.deadlineMinutes])).digest('hex');
   return inSession(database, sessionDigest, async (client, ownerId) => {
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [JSON.stringify([ownerId, idempotencyKey])]);
     const previous = await client.query<{ request_digest: string; run_id: string }>(
@@ -113,15 +120,32 @@ export async function createStoredRun(database: Database, sessionDigest: string,
     const id = randomUUID();
     const state = createInitialRun(candidate, ownerId, id, definitionHash);
     const result = await client.query<StoredRun>(
-      `INSERT INTO runs(id, owner_id, definition_id, definition_hash, engine_version, branch_id, engine_state)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb) RETURNING ${columns}`,
-      [id, ownerId, candidate.id, definitionHash, state.engineVersion, randomUUID(), JSON.stringify(state)]);
+      `INSERT INTO runs(id, owner_id, definition_id, definition_hash, engine_version, branch_id, difficulty, deadline_minutes, engine_state)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING ${columns}`,
+      [id, ownerId, candidate.id, definitionHash, state.engineVersion, randomUUID(), candidate.difficulty, candidate.deadlineMinutes, JSON.stringify(state)]);
     await client.query('INSERT INTO run_creations(owner_id, idempotency_key, request_digest, run_id) VALUES ($1,$2,$3,$4)',
       [ownerId, idempotencyKey, requestDigest, id]);
     const run = result.rows[0];
     if (!run) throw new Error('RUN_INSERT_FAILED');
     return { run, replayed: false };
   }, expectedOwnerId);
+}
+
+/**
+ * Borrado de una partida propia (migración 0007): la app no tiene DELETE
+ * sobre operation_records/runs/run_creations, así que el borrado ordenado lo
+ * hace la función SECURITY DEFINER delete_run (propiedad de
+ * meridiano_owner), que solo borra filas del propietario indicado. Devuelve
+ * false si la partida no existe o no es del propietario (el llamador responde
+ * 404 en ambos casos, sin distinguirlos).
+ */
+export async function deleteStoredRun(database: Database, sessionDigest: string, runId: string): Promise<boolean> {
+  if (!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(runId)) throw new RunStoreError('NOT_FOUND');
+  return inSession(database, sessionDigest, async (client, ownerId) => {
+    const result = await client.query<{ delete_run: boolean }>(
+      'SELECT delete_run($1, $2) AS delete_run', [runId, ownerId]);
+    return result.rows[0]?.delete_run ?? false;
+  });
 }
 
 async function ownedRun(client: PoolClient, ownerId: string, id: string): Promise<StoredRun> {
@@ -209,7 +233,7 @@ export async function readFullRun(database: Database, sessionDigest: string, run
     const stored = await ownedRun(client, ownerId, runId);
     const state = stored.engineState as CaseRun;
     if (stored.engineVersion === ENGINE_VERSION) assertRunShape(state);
-    return { ...state, id: stored.id, ownerId: stored.ownerId, definitionId: stored.definitionId, definitionHash: stored.definitionHash, engineVersion: stored.engineVersion, revision: stored.revision, branchId: stored.branchId, status: stored.status, engineState: stored.engineState };
+    return { ...state, id: stored.id, ownerId: stored.ownerId, definitionId: stored.definitionId, definitionHash: stored.definitionHash, engineVersion: stored.engineVersion, revision: stored.revision, branchId: stored.branchId, status: stored.status, difficulty: stored.difficulty, deadlineMinutes: stored.deadlineMinutes, engineState: stored.engineState };
   });
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateCatalogParams, getBudgetForParams, getSuggestedDuration, ALLOWED_REGIONS, ALLOWED_CRIME_TYPES } from './catalog.js';
+import { validateCatalogParams, getBudgetForParams, getSuggestedDuration, deadlineMinutesForDifficulty, ALLOWED_REGIONS, ALLOWED_CRIME_TYPES } from './catalog.js';
 
 describe('catalog', () => {
   it('acepta parámetros válidos', () => {
@@ -89,6 +89,17 @@ describe('catalog', () => {
   it('getBudgetForParams devuelve presupuesto correcto', () => {
     const params = { crimeType: 'fraude', difficulty: 'easy' as const, explorationMode: 'guided' as const, duration: 'short' as const, region: 'madrid', contentMode: 'generated' as const };
     expect(getBudgetForParams(params)).toBe(300);
+  });
+
+  it('deadlineMinutesForDifficulty escala el plazo base del expediente', () => {
+    // Caso fijo del astrolabio (plazo base 2880, diseñado en normal): normal
+    // conserva el plazo del expediente, fácil lo duplica y difícil lo reduce
+    // a la mitad, siempre por encima de las rutas mínimas verificadas
+    // (455/485, 545/575 con retrasos máximos).
+    expect(deadlineMinutesForDifficulty(2880, 'easy')).toBe(5760);
+    expect(deadlineMinutesForDifficulty(2880, 'normal')).toBe(2880);
+    expect(deadlineMinutesForDifficulty(2880, 'hard')).toBe(1440);
+    expect(deadlineMinutesForDifficulty(100, 'hard')).toBe(60);
   });
 
   it('getSuggestedDuration devuelve duración sugerida', () => {

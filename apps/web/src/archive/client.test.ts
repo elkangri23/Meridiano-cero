@@ -5,7 +5,7 @@ import type { RunListDto, SessionDto } from '@meridiano/contracts';
 
 const id = '11111111-1111-4111-8111-111111111111';
 const session: SessionDto = { profile: { id, displayName: 'Detective sintético', role: 'player', emailVerified: false }, csrfToken: 's'.repeat(43) };
-const page: RunListDto = { profileId: id, items: [{ runId: id, caseId: 'synthetic', caseTitle: 'Caso sintético', status: 'active', version: 1, minute: 0, createdAt: '2026-01-01T00:00:00.000Z' }], nextCursor: null };
+const page: RunListDto = { profileId: id, items: [{ runId: id, caseId: 'synthetic', caseTitle: 'Caso sintético', status: 'active', difficulty: 'normal', version: 1, minute: 0, createdAt: '2026-01-01T00:00:00.000Z' }], nextCursor: null };
 const signal = () => new AbortController().signal;
 function respond(body: unknown, status = 200) {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
@@ -61,6 +61,26 @@ describe('T3: frontera HTTP del archivo', () => {
     await archiveApi.create('synthetic', 'synthetic-original-key', session, signal());
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/runs');
     expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken }, body: JSON.stringify({ caseId: 'synthetic', idempotencyKey: 'synthetic-original-key' }) });
+  });
+  it('creación con dificultad la envía en el cuerpo; sin ella no se inventa ninguna', async () => {
+    const fetcher = respond({ syntheticIgnored: true }, 201);
+    await archiveApi.create('synthetic', 'synthetic-key-easy', session, signal(), 'easy');
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ body: JSON.stringify({ caseId: 'synthetic', idempotencyKey: 'synthetic-key-easy', difficulty: 'easy' }) });
+  });
+  it('error de creación conserva el motivo del servidor en lugar del genérico', async () => {
+    respond({ error: { code: 'VALIDATION_ERROR', message: 'dificultad no admitida' } }, 400);
+    await expect(archiveApi.create('synthetic', 'synthetic-key-bad', session, signal(), 'easy'))
+      .rejects.toEqual(new ArchiveError('unavailable', 'dificultad no admitida'));
+  });
+  it('borrado de partida exige confirmación; 204 y 404 la dan por borrada', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 })); vi.stubGlobal('fetch', fetcher);
+    await archiveApi.deleteRun(id, session, signal());
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/runs/' + id);
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'DELETE', headers: { 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken }, body: JSON.stringify({ confirm: true }) });
+    respond(null, 404);
+    await expect(archiveApi.deleteRun(id, session, signal())).resolves.toBeUndefined();
+    respond({}, 503);
+    await expect(archiveApi.deleteRun(id, session, signal())).rejects.toEqual(new ArchiveError('unavailable'));
   });
   it('lookup con 404 es ausencia provisional; clave nunca se coloca en URL', async () => {
     const fetcher = respond({}, 404);

@@ -282,8 +282,37 @@ function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolea
   </div>;
 }
 
+function BriefingText({ briefing }: { briefing: NonNullable<PlayerViewDto['briefing']> }) {
+  return <div><p><em>{briefing.speaker} te pone en situación:</em></p>{briefing.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
+}
+
+/** Introducción del caso: qué ha ocurrido y qué tienes que resolver. Se
+ * muestra al entrar en una partida nueva (versión 1, minuto 0) y queda
+ * guardada por partida en esta pestaña; se puede volver a abrir desde la
+ * barra de herramientas y siempre está en el dossier. */
+function BriefingSection({ view, onDismiss }: { view: PlayerViewDto; onDismiss: () => void }) {
+  if (!view.briefing) return null;
+  return <section className="game-briefing" aria-label="Introducción del caso">
+    <p className="game-overline">Introducción del caso</p>
+    <h2>{view.briefing.title}</h2>
+    <BriefingText briefing={view.briefing} />
+    <button type="button" onClick={onDismiss}>Entendido, a investigar</button>
+  </section>;
+}
+
+function IntroPanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boolean; onDismiss: () => void }) {
+  if (!open || !view.briefing) return null;
+  return <BriefingSection view={view} onDismiss={onDismiss} />;
+}
+
+function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void }) {
+  if (!view.briefing) return null;
+  return <button type="button" onClick={onOpen}>Introducción</button>;
+}
+
 function DossierContent({ view }: { view: PlayerViewDto }) {
   return <div>
+    {view.briefing && <div><h4>Introducción del caso</h4><BriefingText briefing={view.briefing} /></div>}
     <h4>Evidencias en tu poder</h4>
     {view.objects.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin evidencias recogidas.</p></div>
@@ -726,6 +755,20 @@ export function GameScreen() {
   const [commRecipient, setCommRecipient] = useState('');
   const [commChannel, setCommChannel] = useState('call');
   const [commText, setCommText] = useState('');
+  const [introOpen, setIntroOpen] = useState(false);
+
+  // La intro se abre sola al entrar en una partida nueva (versión 1, minuto
+  // 0, activa) salvo que ya se haya descartado en esta pestaña. Queda
+  // recuperable desde la barra de herramientas y desde el dossier.
+  useEffect(() => {
+    if (view && view.status === 'active' && view.version === 1 && view.clock.minute === 0 && view.briefing && runId &&
+      !sessionStorage.getItem('meridiano:intro-seen:' + runId)) setIntroOpen(true);
+  }, [view, runId]);
+
+  function dismissIntro() {
+    if (runId) sessionStorage.setItem('meridiano:intro-seen:' + runId, '1');
+    setIntroOpen(false);
+  }
 
   const contacts = useMemo(() => (view ? contactsFromView(view) : []), [view]);
 
@@ -1009,7 +1052,10 @@ export function GameScreen() {
 
     <p className="game-notice" role="status">{notice}</p>
 
+    <IntroPanel view={view} open={introOpen} onDismiss={dismissIntro} />
+
     <div className="game-toolbar" role="toolbar" aria-label="Herramientas">
+      <IntroButton view={view} onOpen={() => setIntroOpen(true)} />
       {(Object.keys(windowLabels) as WindowId[]).map(id => (
         <button key={id} type="button" aria-pressed={windows.windows[id].open}
           onClick={event => windows.open(id, event.currentTarget)}>{windowLabels[id]}</button>
