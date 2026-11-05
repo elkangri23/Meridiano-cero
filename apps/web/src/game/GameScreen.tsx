@@ -250,8 +250,8 @@ function LabContent({ view, contacts, recipient, channel, text, busy, onRecipien
   </div>;
 }
 
-function SaveList({ saves, atLimit, onLoad, onDelete, onReplace }: {
-  saves: SaveListDto | null; atLimit: boolean;
+function SaveList({ saves, atLimit, closed, onLoad, onDelete, onReplace }: {
+  saves: SaveListDto | null; atLimit: boolean; closed: boolean;
   onLoad: (save: SaveListItem) => void; onDelete: (save: SaveListItem) => void; onReplace: (save: SaveListItem) => void;
 }) {
   if (!saves) return <p>Cargando guardados…</p>;
@@ -259,11 +259,26 @@ function SaveList({ saves, atLimit, onLoad, onDelete, onReplace }: {
   return <ul data-testid="save-list">
     {saves.items.map(save => <li key={save.saveId}>
       <strong>{save.name}</strong> · {save.cityName} · min {save.minute} · {new Date(save.createdAt).toLocaleString('es-ES')}
-      <span> <button type="button" data-testid={`load-${save.saveId}`} onClick={() => onLoad(save)}>Cargar</button></span>
-      <span> <button type="button" onClick={() => onDelete(save)}>Borrar</button></span>
-      {atLimit && <span> <button type="button" onClick={() => onReplace(save)}>Reemplazar con el nuevo</button></span>}
+      <span> <button type="button" data-testid={`load-${save.saveId}`} disabled={closed} onClick={() => onLoad(save)}>Cargar</button></span>
+      <span> <button type="button" disabled={closed} onClick={() => onDelete(save)}>Borrar</button></span>
+      {atLimit && !closed && <span> <button type="button" onClick={() => onReplace(save)}>Reemplazar con el nuevo</button></span>}
     </li>)}
   </ul>;
+}
+
+function SaveCreateForm({ savePhase, saveName, closed, canSave, replaceTarget, onSaveName, onCreate }: {
+  savePhase: SavePhase; saveName: string; closed: boolean; canSave: boolean; replaceTarget: SaveListItem | null;
+  onSaveName: (value: string) => void; onCreate: () => void;
+}) {
+  return <form onSubmit={event => { event.preventDefault(); onCreate(); }}>
+    <label>Nombre del guardado <input type="text" data-testid="save-name-input" value={saveName}
+      onChange={event => onSaveName(event.target.value)} maxLength={128} /></label>
+    {replaceTarget && <p>Al guardar se reemplazará «{replaceTarget.name}».</p>}
+    <button type="submit" data-testid="save-create"
+      disabled={closed || !saveName.trim() || savePhase === 'saving' || (!canSave && !replaceTarget)}>
+      {savePhase === 'saving' ? 'Guardando…' : 'Guardar partida'}
+    </button>
+  </form>;
 }
 
 function SavesContent({ view, saves, savePhase, saveName, replaceTarget, loadTarget, onSaveName, onCreate, onLoad, onDelete, onReplace, onConfirmLoad, onCancelLoad }: {
@@ -272,21 +287,19 @@ function SavesContent({ view, saves, savePhase, saveName, replaceTarget, loadTar
   onLoad: (save: SaveListItem) => void; onDelete: (save: SaveListItem) => void; onReplace: (save: SaveListItem) => void;
   onConfirmLoad: () => void; onCancelLoad: () => void;
 }) {
+  const closed = view.status === 'closed';
   const atLimit = view.saveCapabilities.manualCount >= view.saveCapabilities.manualLimit;
   return <div>
     <p>Manuales: {view.saveCapabilities.manualCount} / {view.saveCapabilities.manualLimit}. Guardar no avanza el reloj.</p>
-    <form onSubmit={event => { event.preventDefault(); onCreate(); }}>
-      <label>Nombre del guardado <input type="text" data-testid="save-name-input" value={saveName}
-        onChange={event => onSaveName(event.target.value)} maxLength={128} /></label>
-      {replaceTarget && <p>Al guardar se reemplazará «{replaceTarget.name}».</p>}
-      <button type="submit" data-testid="save-create" disabled={!saveName.trim() || savePhase === 'saving' || (!view.saveCapabilities.canSave && !replaceTarget)}>
-        {savePhase === 'saving' ? 'Guardando…' : 'Guardar partida'}
-      </button>
-    </form>
+    {closed && <p role="status" data-testid="save-closed-notice">Esta partida está cerrada porque el caso ya está
+      resuelto. No se pueden crear guardados nuevos ni cargar uno anterior. Puedes consultar el informe final
+      o empezar una partida nueva desde el archivo.</p>}
+    <SaveCreateForm savePhase={savePhase} saveName={saveName} closed={closed} canSave={view.saveCapabilities.canSave}
+      replaceTarget={replaceTarget} onSaveName={onSaveName} onCreate={onCreate} />
     {savePhase === 'saved' && <p role="status">Guardado confirmado por el servidor.</p>}
     {savePhase === 'failed' && <p role="alert">No se pudo guardar. Reinténtalo.</p>}
     <h4>Guardados manuales</h4>
-    <SaveList saves={saves} atLimit={atLimit} onLoad={onLoad} onDelete={onDelete} onReplace={onReplace} />
+    <SaveList saves={saves} atLimit={atLimit} closed={closed} onLoad={onLoad} onDelete={onDelete} onReplace={onReplace} />
     {loadTarget && <div className="game-load-confirm" role="dialog" aria-label="Confirmar carga" data-testid="load-confirm">
       <p>Volverás a «{loadTarget.name}» (min {loadTarget.minute}). Perderás el progreso posterior de la rama actual; el primer resultado oficial se mantiene.</p>
       <button type="button" data-testid="load-confirm-button" onClick={onConfirmLoad}>Cargar este punto</button>
@@ -578,6 +591,16 @@ export function GameScreen() {
     try { setSaves(await gameApi.saves(runId, new AbortController().signal)); } catch { setSaves(null); }
   }
 
+  // Recarga silenciosa de la vista: actualiza saveCapabilities.manualCount
+  // tras crear o borrar un guardado. No se usa refresh() aquí: si la vista
+  // fallara de forma transitoria tras un guardado correcto, refresh() mostraría
+  // la pantalla de error; con un fallo silencioso el contador se actualiza en
+  // la próxima recarga y el guardado confirmado no se pierde de vista.
+  async function reloadView() {
+    if (!runId) return;
+    try { setView(await gameApi.view(runId, new AbortController().signal)); } catch { /* conserva la vista anterior */ }
+  }
+
   async function createSave() {
     if (!runId || !identity || !view || !saveName.trim()) return;
     setSavePhase('saving');
@@ -589,6 +612,7 @@ export function GameScreen() {
       setSaveName('');
       setReplaceTarget(null);
       await reloadSaves();
+      await reloadView();
     } catch (error) {
       setSavePhase('failed');
       handleActionError(error);
@@ -617,6 +641,7 @@ export function GameScreen() {
       await gameApi.deleteSave(runId, save.saveId, save.metadataVersion, crypto.randomUUID(), identity, new AbortController().signal);
       setNotice(`Guardado «${save.name}» borrado.`);
       await reloadSaves();
+      await reloadView();
     } catch (error) {
       handleActionError(error);
     }
