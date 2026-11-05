@@ -9,7 +9,7 @@ function context(functionName: AIFunction, input: unknown): AIContext {
   return { providerId: 'synthetic', model: 'synthetic:local', function: functionName, schemaVersion: 1,
     authorizedContext: input, limits: { timeoutMs: 1000, maxRetries: 0 }, requestId: 'synthetic' };
 }
-const actions = [{ type: 'inspect', params: { targetId: 'MAD-SALA' }, description: 'sintético' }];
+const offers = [{ id: 'inspect:MAD-SALA', label: 'Inspeccionar la sala' }];
 afterEach(() => vi.restoreAllMocks());
 
 describe('configuración del adaptador alternativo', () => {
@@ -36,26 +36,26 @@ describe('doble determinista y limitado a propuestas autorizadas', () => {
     vi.spyOn(Date, 'now').mockImplementation(() => { throw new Error('Unexpected clock'); });
     const send = vi.spyOn(globalThis, 'fetch');
     const provider = new DeterministicMockProvider();
-    const input = context('interpretAction', { text: 'inspecciona MAD-SALA', availableActions: actions });
+    const input = context('interpretAction', { text: 'inspecciona MAD-SALA', offers });
     const first = await provider.execute(input);
     expect(await provider.execute(input)).toEqual(first);
-    expect(first).toMatchObject({ finishReason: 'stop', latencyMs: 0, payload: { actionType: 'inspect', params: { targetId: 'MAD-SALA' } } });
+    expect(first).toMatchObject({ finishReason: 'stop', latencyMs: 0, payload: { kind: 'actions', actionIds: ['inspect:MAD-SALA'] } });
     expect(first.usage).toBeUndefined();
     expect(send).not.toHaveBeenCalled();
   });
   it.each(['inspecciona', 'inspecciona otro', 'inspecciona MAD-SALA y viaja a paris', 'espera', 'mensaje desconocido'])('pide aclaración sin inventar acción/objetivo: %s', text => {
     const provider = new DeterministicMockProvider();
-    return expect(provider.execute<InterpretActionOutput>(context('interpretAction', { text, availableActions: actions })))
-      .resolves.toMatchObject({ payload: { actionType: '', params: {}, confidence: 0, clarificationQuestion: expect.any(String) } });
+    return expect(provider.execute<InterpretActionOutput>(context('interpretAction', { text, offers })))
+      .resolves.toMatchObject({ payload: { kind: 'clarification', actionIds: [] } });
   });
-  it('no elige entre dos acciones coincidentes y no comparte referencias de params', async () => {
+  it('no elige entre dos acciones coincidentes y no comparte referencias de ids', async () => {
     const provider = new DeterministicMockProvider();
-    const duplicate = { text: 'inspecciona MAD-SALA', availableActions: [actions[0], actions[0]] };
-    expect(await provider.execute(context('interpretAction', duplicate))).toMatchObject({ payload: { confidence: 0 } });
-    const result = await provider.execute<InterpretActionOutput>(context('interpretAction', { text: 'inspecciona MAD-SALA', availableActions: actions }));
+    const duplicate = { text: 'inspecciona MAD-SALA', offers: [offers[0], offers[0]] };
+    expect(await provider.execute(context('interpretAction', duplicate))).toMatchObject({ payload: { kind: 'clarification' } });
+    const result = await provider.execute<InterpretActionOutput>(context('interpretAction', { text: 'inspecciona MAD-SALA', offers }));
     if (!result.payload) throw new Error('Missing synthetic payload');
-    result.payload.params.targetId = 'changed';
-    expect(actions[0]?.params.targetId).toBe('MAD-SALA');
+    result.payload.actionIds.push('inspect:OTRO');
+    expect(offers[0]?.id).toBe('inspect:MAD-SALA');
   });
   it('no concede aprobaciones de casos inválidos ni inventa expedientes jugables', async () => {
     const provider = new DeterministicMockProvider();
@@ -67,9 +67,9 @@ describe('doble determinista y limitado a propuestas autorizadas', () => {
   });
   it('no inventa IDs de hechos, conocimiento o cambios de cooperación', async () => {
     const provider = new DeterministicMockProvider();
-    expect(await provider.execute(context('narrateResult', { publicEvents: [{ type: 'synthetic' }] })))
-      .toMatchObject({ payload: { factReferences: [] } });
-    expect(await provider.execute(context('converse', {}))).toMatchObject({ payload: { factIds: [], cooperationChange: 0 } });
+    expect(await provider.execute(context('narrateResult', { facts: [{ id: 'f1', text: 'Hecho sintético.' }] })))
+      .toMatchObject({ payload: { act: 'state', factIds: ['f1'] } });
+    expect(await provider.execute(context('converse', {}))).toMatchObject({ payload: { act: 'acknowledge', factIds: [] } });
   });
   it('cancelación previa no produce respuesta sintética', async () => {
     const controller = new AbortController(); controller.abort();
@@ -84,7 +84,7 @@ function envelope(content: unknown, usage: Record<string, unknown> = {}) {
 
 describe('salida del transporte alternativo con fetch sintético', () => {
   it('entrega payload interpretado en vez del sobre del fabricante; uso ausente permanece desconocido', async () => {
-    const output = { actionType: 'inspect', params: { targetId: 'MAD-SALA' }, confidence: 1 };
+    const output = { kind: 'actions', actionIds: ['inspect:MAD-SALA'] };
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(envelope(output));
     const result = await createOllamaProvider({ maxRetries: 0 }).execute(context('interpretAction', {}));
     expect(result.payload).toEqual(output);
@@ -96,12 +96,12 @@ describe('salida del transporte alternativo con fetch sintético', () => {
       .toMatchObject({ usage: { promptTokens: 12, completionTokens: 3, totalTokens: 15 } });
   });
   it.each([
-    { actionType: 'inspect', params: { targetId: 'MAD' }, confidence: 1, thought: 'Creo que es aquí' },
-    { actionType: 'inspect', params: { targetId: 'MAD' }, confidence: 1, extra: 123 },
-    { text: 'Hola', actOfSpeech: 'inform', extra: 'meta' }
+    { kind: 'actions', actionIds: ['inspect:MAD'], thought: 'Creo que es aquí' },
+    { kind: 'actions', actionIds: ['inspect:MAD'], extra: 123 },
+    { act: 'state', factIds: [], extra: 'meta' }
   ])('rechaza salida con campos adicionales: %j', async output => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(envelope(output));
-    const fn = output.actionType ? 'interpretAction' : 'converse';
+    const fn = 'kind' in output ? 'interpretAction' : 'converse';
     await expect(createOllamaProvider({ maxRetries: 0 }).execute(context(fn, {})))
       .rejects.toThrow('INVALID_OUTPUT');
   });

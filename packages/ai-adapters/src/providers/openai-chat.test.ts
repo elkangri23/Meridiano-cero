@@ -31,11 +31,11 @@ function chatResponse(content: string): Response {
 describe('adaptadores OpenAI-compatibles', () => {
   it('FreeLLMAPI interpreta con modelo auto y registra uso', async () => {
     const send = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      chatResponse('{"actionType":"inspect","params":{"targetId":"MAD-SALA"},"confidence":0.9}'),
+      chatResponse('{"kind":"actions","actionIds":["inspect:MAD-SALA"]}'),
     );
     const provider = createFreeLLMAPIProvider({ apiKey: 'test-key', baseUrl: 'http://freellmapi:3001/v1', defaultModel: 'auto', maxRetries: 0 });
     const result = await provider.execute(context('auto'));
-    expect(result.payload).toEqual({ actionType: 'inspect', params: { targetId: 'MAD-SALA' }, confidence: 0.9 });
+    expect(result.payload).toEqual({ kind: 'actions', actionIds: ['inspect:MAD-SALA'] });
     expect(result.usage).toEqual({ promptTokens: 10, completionTokens: 5, totalTokens: 15 });
     expect(result.finishReason).toBe('stop');
     expect(send).toHaveBeenCalledWith('http://freellmapi:3001/v1/chat/completions', expect.objectContaining({
@@ -46,7 +46,7 @@ describe('adaptadores OpenAI-compatibles', () => {
 
   it('OpenAI directo usa api.openai.com por defecto', async () => {
     const send = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      chatResponse('{"actionType":"inspect","params":{},"confidence":0.5}'),
+      chatResponse('{"kind":"actions","actionIds":["inspect:MAD-SALA"]}'),
     );
     const provider = createOpenAIProvider({ apiKey: 'sk-test', maxRetries: 0 });
     expect(provider.id).toBe('openai');
@@ -57,7 +57,7 @@ describe('adaptadores OpenAI-compatibles', () => {
 
   it('openai-compatible apunta a LM Studio y exige baseUrl y modelo', async () => {
     const send = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      chatResponse('{"actionType":"inspect","params":{},"confidence":0.5}'),
+      chatResponse('{"kind":"actions","actionIds":["inspect:MAD-SALA"]}'),
     );
     const provider = createOpenAICompatibleProvider({
       apiKey: '',

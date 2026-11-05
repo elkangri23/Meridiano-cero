@@ -28,34 +28,33 @@ Responde SOLO con JSON válido.`;
 
 export function buildGameFunctionPrompt(functionName: AIFunction): string {
   const functionInstructions: Record<AIFunction, string> = {
+    // El esquema de salida es el contrato del director de la API
+    // (apps/api/src/ai/schemas.ts): la interpretación elige ofertas por id
+    // y la narración/conversación elige acto de habla y hechos por id.
+    // Cualquier otro esquema lo rechaza el director como invalid_response.
     interpretAction: `
 INTERPRETAR ACCIÓN DEL JUGADOR
-Entrada: texto libre del jugador, vista del jugador (PlayerView), acciones disponibles.
-Salida: JSON con { actionType, params, confidence, clarificationQuestion? }
-- actionType debe ser uno de: inspect, collect, talk, travel, analyze, communicate, query, wait, request_warrant, detain, recover, finish, batch
-- params: parámetros específicos según actionType
-- confidence: 0-1
-- clarificationQuestion: solo si el texto es ambiguo
+Entrada: texto libre del jugador, vista del jugador (PlayerView), acciones disponibles (cada una con su id).
+Salida: JSON con { kind, actionIds }
+- kind debe ser 'actions' si el texto corresponde a una o varias de las acciones disponibles, o 'clarification' si es ambiguo o no corresponde a ninguna.
+- actionIds: lista con los ids EXACTOS de las acciones elegidas, copiados tal cual de la entrada (1 a 8). Si kind es 'clarification', actionIds debe ser [].
+- No inventes ids ni acciones que no estén en la entrada.
 NO ejecutes la acción, solo interpreta.`,
 
     narrateResult: `
 NARRAR RESULTADO DE ACCIÓN
-Entrada: eventos públicos confirmados, escenas autorizadas, estilo.
-Salida: JSON con { narrative, factReferences[], style }
-- narrative: texto narrativo sin revelar solución
-- factReferences: IDs de hechos referenciados
-- style: 'brief' | 'detailed' | 'ambient'
-NO inventes hechos ni reveles culpabilidad.`,
+Entrada: hechos públicos confirmados (cada uno con su id), actos de habla permitidos (allowedActs).
+Salida: JSON con { act, factIds }
+- act: un acto de habla de allowedActs (para narrar un resultado confirmado usa 'state').
+- factIds: lista con los ids EXACTOS de los hechos referenciados, copiados tal cual de la entrada. Al narrar un resultado confirmado hay que incluir TODOS los hechos de la entrada, sin suprimir consecuencias.
+- No inventes hechos ni reveles culpabilidad.`,
 
     converse: `
 CONVERSAR CON NPC
-Entrada: persona del NPC, hechos conocidos, fragmento de conversación, trato recibido.
-Salida: JSON con { text, factIds[], actOfSpeech, cooperationChange?, newKnowledge? }
-- text: respuesta del NPC
-- factIds: IDs de hechos revelados (debe ser subset de knownFacts)
-- actOfSpeech: 'inform' | 'question' | 'refusal' | 'evasion' | 'silence'
-- cooperationChange: -10 a +10 (opcional)
-- newKnowledge: nuevos hechos que el NPC puede revelar en futuras conversaciones
+Entrada: persona del NPC, hechos conocidos (cada uno con su id), fragmento de conversación, trato recibido, actos de habla permitidos (allowedActs).
+Salida: JSON con { act, factIds }
+- act: un acto de habla de allowedActs ('inform' | 'question' | 'refusal' | 'evasion' | 'silence' | 'state' | 'acknowledge' | 'decline', según lo permitido).
+- factIds: lista con los ids EXACTOS de los hechos revelados, copiados tal cual de la entrada (debe ser subset de los hechos conocidos; [] si no se revela nada).
 El NPC NO sabe la solución. Puede mentir, evadir, o guardar silencio según su personalidad.`,
 
     generateCase: `
@@ -95,7 +94,35 @@ function requireField(obj: Record<string, unknown>, key: string, kind: FieldKind
   if (!ok) throw new Error('INVALID_OUTPUT');
 }
 
-/** Valida la forma mínima de la salida del modelo según la función. */
+function exactKeys(value: Record<string, unknown>, allowed: string[]): void {
+  const keys = Object.keys(value);
+  if (keys.length !== allowed.length || keys.some(key => !allowed.includes(key))) throw new Error('INVALID_OUTPUT');
+}
+
+function validateInterpretation(value: Record<string, unknown>): void {
+  exactKeys(value, ['kind', 'actionIds']);
+  requireField(value, 'kind', 'string');
+  requireField(value, 'actionIds', 'array');
+  const ids = value.actionIds as unknown[];
+  if (ids.length > 8 || ids.some(id => typeof id !== 'string')) throw new Error('INVALID_OUTPUT');
+  if (value.kind === 'actions' && ids.length === 0) throw new Error('INVALID_OUTPUT');
+  if (value.kind === 'clarification' && ids.length !== 0) throw new Error('INVALID_OUTPUT');
+  if (value.kind !== 'actions' && value.kind !== 'clarification') throw new Error('INVALID_OUTPUT');
+}
+
+function validateFactual(value: Record<string, unknown>): void {
+  exactKeys(value, ['act', 'factIds']);
+  requireField(value, 'act', 'string');
+  requireField(value, 'factIds', 'array');
+  const ids = value.factIds as unknown[];
+  if (ids.length > 16 || ids.some(id => typeof id !== 'string')) throw new Error('INVALID_OUTPUT');
+}
+
+/** Valida la forma mínima de la salida del modelo según la función.
+ * interpretAction/narrateResult/converse usan el esquema del director de la
+ * API (schemas.ts): {kind, actionIds} y {act, factIds}. Las claves deben ser
+ * exactamente las del esquema: el modelo no puede inyectar pensamientos,
+ * razonamientos ni metadatos no solicitados. */
 export function validateGameOutput(functionName: AIFunction, value: unknown): void {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('INVALID_OUTPUT');
@@ -103,18 +130,11 @@ export function validateGameOutput(functionName: AIFunction, value: unknown): vo
   const obj = value as Record<string, unknown>;
   switch (functionName) {
     case 'interpretAction':
-      requireField(obj, 'actionType', 'string');
-      requireField(obj, 'params', 'object');
-      requireField(obj, 'confidence', 'number');
+      validateInterpretation(obj);
       break;
     case 'narrateResult':
-      requireField(obj, 'narrative', 'string');
-      requireField(obj, 'factReferences', 'array');
-      break;
     case 'converse':
-      requireField(obj, 'text', 'string');
-      requireField(obj, 'factIds', 'array');
-      requireField(obj, 'actOfSpeech', 'string');
+      validateFactual(obj);
       break;
     case 'generateCase':
       requireField(obj, 'truth', 'string');

@@ -15,46 +15,58 @@ const verbs = [
 ];
 
 function clarification() {
-  return { actionType: '', params: {}, confidence: 0, clarificationQuestion: '¿Qué acción y objetivo quieres indicar?' };
+  return { kind: 'clarification', actionIds: [] };
 }
 
-function mentionsTarget(params: Record<string, unknown>, words: string[]): boolean {
-  return Object.values(params).some(value => {
-    if (typeof value === 'string') return words.includes(value.toLowerCase());
-    return typeof value === 'number' && Number.isFinite(value) && words.includes(String(value));
-  });
+type Offer = { id: string; label: string };
+
+function mentionsTarget(offer: Offer, words: string[]): boolean {
+  const suffix = offer.id.split(':').slice(1).join(':').toLowerCase();
+  if (!suffix) return false;
+  if (words.includes(suffix)) return true;
+  const parts = suffix.split(/[^a-z0-9]+/u).filter(part => part.length > 0);
+  return parts.length > 0 && parts.every(part => words.includes(part));
 }
 
-function matchingAction(value: unknown, type: string, words: string[]): value is { type: string; params: Record<string, unknown> } {
-  if (!record(value) || value.type !== type || !record(value.params)) return false;
-  return mentionsTarget(value.params, words);
+function matchingOffer(value: unknown, type: string, words: string[]): value is Offer {
+  if (!record(value) || typeof value.id !== 'string' || typeof value.label !== 'string') return false;
+  const offer: Offer = { id: value.id, label: value.label };
+  return offer.id.startsWith(`${type}:`) && mentionsTarget(offer, words);
 }
 
-function interpretationInput(input: unknown): input is { text: string; availableActions: unknown[] } {
-  return record(input) && typeof input.text === 'string' && Array.isArray(input.availableActions);
+function interpretationInput(input: unknown): input is { text: string; offers: unknown[] } {
+  return record(input) && typeof input.text === 'string' && Array.isArray(input.offers);
 }
 
 function interpret(input: unknown) {
   if (!interpretationInput(input)) return clarification();
-  if (input.text.length > 4096 || input.availableActions.length > 64) return clarification();
+  if (input.text.length > 4096 || input.offers.length > 64) return clarification();
   const text = input.text.toLowerCase();
   const kinds = verbs.filter(verb => verb.terms.some(term => text.includes(term)));
   const kind = kinds[0];
   if (kinds.length !== 1 || !kind) return clarification();
   const words = text.match(/[\p{L}\p{N}._:-]+/gu) ?? [];
-  const matches = input.availableActions.filter(value => matchingAction(value, kind.type, words));
-  const action = matches[0];
-  if (matches.length !== 1 || !action) return clarification();
-  return { actionType: action.type, params: structuredClone(action.params), confidence: 1 };
+  const matches = input.offers.filter(value => matchingOffer(value, kind.type, words));
+  const offer = matches[0];
+  if (matches.length !== 1 || !offer) return clarification();
+  return { kind: 'actions', actionIds: [offer.id] };
+}
+
+function factIds(input: unknown): string[] {
+  if (!record(input) || !Array.isArray(input.facts)) return [];
+  return input.facts
+    .filter(fact => record(fact) && typeof fact.id === 'string')
+    .map(fact => (fact as { id: string }).id);
 }
 
 function narrate(input: unknown) {
-  const events = record(input) && Array.isArray(input.publicEvents) ? input.publicEvents : [];
-  return { narrative: `Acción registrada. Eventos públicos: ${events.length}.`, factReferences: [], style: 'brief' };
+  const ids = factIds(input);
+  return ids.length > 0 ? { act: 'state', factIds: ids } : { act: 'acknowledge', factIds: [] };
 }
 
-function converse() {
-  return { text: 'Te escucho, detective.', factIds: [], actOfSpeech: 'inform', cooperationChange: 0 };
+function converse(input: unknown) {
+  const ids = factIds(input);
+  return ids.length > 0 ? { act: 'state', factIds: ids } : { act: 'acknowledge', factIds: [] };
 }
 
 function generationUnavailable() {

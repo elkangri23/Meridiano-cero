@@ -22,7 +22,7 @@ function context(model: string): AIContext {
 describe('AnthropicProvider', () => {
   it('interpreta desde el bloque de texto de Messages', async () => {
     const send = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      content: [{ type: 'text', text: '{"actionType":"inspect","params":{"targetId":"MAD-SALA"},"confidence":0.8}' }],
+      content: [{ type: 'text', text: '{"kind":"actions","actionIds":["inspect-room"]}' }],
       usage: { input_tokens: 12, output_tokens: 6 },
       stop_reason: 'end_turn',
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -30,7 +30,7 @@ describe('AnthropicProvider', () => {
     expect(provider.id).toBe('anthropic');
     expect(provider.defaultModel).toBe('claude-sonnet-4-5');
     const result = await provider.execute(context('claude-sonnet-4-5'));
-    expect(result.payload).toEqual({ actionType: 'inspect', params: { targetId: 'MAD-SALA' }, confidence: 0.8 });
+    expect(result.payload).toEqual({ kind: 'actions', actionIds: ['inspect-room'] });
     expect(result.usage).toEqual({ promptTokens: 12, completionTokens: 6, totalTokens: 18 });
     expect(send).toHaveBeenCalledWith('https://api.anthropic.com/v1/messages', expect.objectContaining({
       method: 'POST',
@@ -66,14 +66,14 @@ describe('AnthropicProvider', () => {
 describe('GoogleProvider', () => {
   it('interpreta desde el candidato de generateContent', async () => {
     const send = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: '{"actionType":"inspect","params":{},"confidence":0.7}' }] } }],
+      candidates: [{ content: { parts: [{ text: '{"kind":"actions","actionIds":["inspect-room"]}' }] } }],
       usageMetadata: { promptTokenCount: 11, candidatesTokenCount: 4, totalTokenCount: 15 },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const provider = createGoogleProvider({ apiKey: 'AIza-test', maxRetries: 0 });
     expect(provider.id).toBe('google');
     expect(provider.defaultModel).toBe('gemini-2.5-flash');
     const result = await provider.execute(context('gemini-2.5-flash'));
-    expect(result.payload).toEqual({ actionType: 'inspect', params: {}, confidence: 0.7 });
+    expect(result.payload).toEqual({ kind: 'actions', actionIds: ['inspect-room'] });
     expect(result.usage).toEqual({ promptTokens: 11, completionTokens: 4, totalTokens: 15 });
     expect(send).toHaveBeenCalledWith(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',

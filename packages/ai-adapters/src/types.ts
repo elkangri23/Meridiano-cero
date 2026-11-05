@@ -2,8 +2,6 @@
 // La raíz del paquete (index.ts) solo re-exporta estos tipos y los proveedores,
 // así los proveedores pueden importar tipos sin crear un ciclo.
 
-import type { PlayerView } from '@meridiano/case-schema';
-
 // AI Adapters - Contratos y tipos para integración de IA
 // SPEC-005: Integración de IA y fidelidad narrativa
 
@@ -125,33 +123,23 @@ export interface NPCPersona {
 
 export interface InterpretActionInput {
   text: string;
-  playerView: Omit<PlayerView, 'finalReport'>;
-  availableActions: ReadonlyArray<{
-    type: string;
-    params: Record<string, unknown>;
-    description: string;
-  }>;
+  scene: { location: string; description: string };
+  offers: ReadonlyArray<{ id: string; label: string }>;
 }
 
 export interface InterpretActionOutput {
-  actionType: string;
-  params: Record<string, unknown>;
-  confidence: number;
-  clarificationQuestion?: string;
+  kind: 'actions' | 'clarification';
+  actionIds: string[];
 }
 
 export interface ConverseOutput {
-  text: string;
-  factIds?: string[];
-  actOfSpeech: 'inform' | 'question' | 'refusal' | 'evasion' | 'silence';
-  cooperationChange?: number;
-  newKnowledge?: string[];
+  act: string;
+  factIds: string[];
 }
 
 export interface NarrateResultOutput {
-  narrative: string;
-  factReferences: ReadonlyArray<string>;
-  style: 'brief' | 'detailed' | 'ambient';
+  act: string;
+  factIds: string[];
 }
 
 export interface GenerateCaseInput {

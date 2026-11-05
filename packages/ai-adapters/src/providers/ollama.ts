@@ -1,4 +1,5 @@
-import { validateOllamaOutput } from './ollama-output.js';
+import { buildGameFunctionPrompt, buildGameSystemPrompt } from './game-prompts.js';
+import { parseGamePayload } from './provider-transport.js';
 import { parseOllamaConfig, type OllamaConfig } from './ollama-config.js';
 export type { OllamaConfig } from './ollama-config.js';
 import type {
@@ -7,7 +8,6 @@ import type {
   AIResponse,
   AIFunction,
   ProviderId,
-  AIContext as AIContextType,
 } from '../types.js';
 
 interface OllamaChatRequest {
@@ -39,83 +39,6 @@ function decodeEnvelope(value: unknown): OllamaChatResponse {
   if (typeof value.message.content !== 'string') throw new Error('INVALID_OUTPUT');
   return { done: true, message: { content: value.message.content },
     prompt_eval_count: value.prompt_eval_count, eval_count: value.eval_count };
-}
-
-function buildSystemPrompt(functionName: AIFunction, context: AIContextType): string {
-  const basePrompt = `Eres un asistente de IA para el videojuego Meridiano-cero. Tu función es: ${functionName}.
-
-REGLAS FUNDAMENTALES:
-1. NUNCA reveles la solución del caso, hechos ocultos, ni la culpabilidad de sospechosos.
-2. Solo usa hechos autorizados que se te proporcionen en el contexto.
-3. Si no tienes información suficiente, responde con plantilla factual breve.
-4. No inventes hechos, testimonios, ni pruebas.
-5. Mantén el tono: profesional, objetivo, ambientado en investigación.
-6. Responde SOLO con JSON válido según el esquema solicitado.
-
-Contexto autorizado:
-${JSON.stringify(context.authorizedContext, null, 2)}
-
-Límites:
-- Timeout: ${context.limits.timeoutMs}ms
-- Max tokens: ${context.limits.maxTokens ?? 'default'}
-- Max reintentos: ${context.limits.maxRetries}
-
-Responde SOLO con JSON válido.`;
-
-  return basePrompt;
-}
-
-function buildPrompt(functionName: AIFunction, input: unknown): string {
-  const functionInstructions: Record<AIFunction, string> = {
-    interpretAction: `
-INTERPRETAR ACCIÓN DEL JUGADOR
-Entrada: texto libre del jugador, vista del jugador (PlayerView), acciones disponibles.
-Salida: JSON con { actionType, params, confidence, clarificationQuestion? }
-- actionType debe ser uno de: inspect, collect, talk, travel, analyze, communicate, query, wait, request_warrant, detain, recover, finish, batch
-- params: parámetros específicos según actionType
-- confidence: 0-1
-- clarificationQuestion: solo si el texto es ambiguo
-NO ejecutes la acción, solo interpreta.`,
-
-    narrateResult: `
-NARRAR RESULTADO DE ACCIÓN
-Entrada: eventos públicos confirmados, escenas autorizadas, estilo.
-Salida: JSON con { narrative, factReferences[], style }
-- narrative: texto narrativo sin revelar solución
-- factReferences: IDs de hechos referenciados
-- style: 'brief' | 'detailed' | 'ambient'
-NO inventes hechos ni reveles culpabilidad.`,
-
-    converse: `
-CONVERSAR CON NPC
-Entrada: persona del NPC, hechos conocidos, fragmento de conversación, trato recibido.
-Salida: JSON con { text, factIds[], actOfSpeech, cooperationChange?, newKnowledge? }
-- text: respuesta del NPC
-- factIds: IDs de hechos revelados (debe ser subset de knownFacts)
-- actOfSpeech: 'inform' | 'question' | 'refusal' | 'evasion' | 'silence'
-- cooperationChange: -10 a +10 (opcional)
-- newKnowledge: nuevos hechos que el NPC puede revelar en futuras conversaciones
-El NPC NO sabe la solución. Puede mentir, evadir, o guardar silencio según su personalidad.`,
-
-    generateCase: `
-GENERAR CASO NUEVO
-Entrada: parámetros de generación (seed, dificultad, modo, región, duración).
-Salida: CaseDefinition completo con todos los campos requeridos.
-DEBE ser consistente, jugable, con dos rutas independientes.`,
-
-    validateCase: `
-VALIDAR CASO
-Entrada: CaseDefinition completa.
-Salida: { valid: boolean, errors: string[] }
-Verifica: estructura, referencias, dos rutas independientes, costes, plazo.`,
-  };
-
-  return `${functionInstructions[functionName]}\n\nInput:\n${JSON.stringify(input, null, 2)}`;
-}
-
-function parseJSONResponse(text: string): unknown {
-  try { return JSON.parse(text); }
-  catch { throw new Error('INVALID_OUTPUT'); }
 }
 
 type ChatResult = { data: OllamaChatResponse; payload: unknown };
@@ -176,8 +99,8 @@ export class OllamaProvider implements AIProvider {
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
       try {
         context.cancellationSignal?.throwIfAborted();
-        const prompt = buildPrompt(context.function, context.authorizedContext);
-        const systemPrompt = buildSystemPrompt(context.function, context);
+        const prompt = buildGameFunctionPrompt(context.function);
+        const systemPrompt = buildGameSystemPrompt(context.function, context);
         const response = await this.callOllamaChat(context.function, systemPrompt, prompt, context);
         return successfulResponse<T>(response, startTime);
       } catch (error) {
@@ -227,10 +150,7 @@ export class OllamaProvider implements AIProvider {
 
       // Parsear el contenido JSON de la respuesta del modelo
       const content = data.message.content;
-      const parsed = parseJSONResponse(content);
-
-      // Validar según la función
-      validateOllamaOutput(context.function, parsed);
+      const parsed = parseGamePayload(content, context.function);
 
       return { data, payload: parsed };
     } finally {
