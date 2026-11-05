@@ -1,4 +1,4 @@
-export interface BootstrapConfig { host: '127.0.0.1'; port: number }
+export interface BootstrapConfig { host: '127.0.0.1' | '0.0.0.0'; port: number }
 export interface AppConfig extends BootstrapConfig {
   mode: 'development' | 'production';
   origin: string; localAuth: boolean; registrationEnabled: boolean; databaseUrl: string;
@@ -21,16 +21,24 @@ function validateOrigin(value: string | undefined, mode: 'development' | 'produc
 function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig & { mode: 'development' | 'production'; origin: string; registrationEnabled: boolean } {
   const mode = env.APP_MODE;
   if (mode !== 'development' && mode !== 'production') throw new Error('CONFIG_APP_MODE');
-  if (env.API_HOST !== '127.0.0.1') throw new Error('CONFIG_API_HOST');
+  // En desarrollo la API solo escucha en el loopback del host. En producción
+  // corre en contenedor: el loopback del contenedor no es el del host, y el
+  // puerto publicado (127.0.0.1:3000) es lo que la mantiene solo-local; por
+  // eso ahí se admite 0.0.0.0 dentro de la red aislada del compose. Cualquier
+  // otra IP se rechaza en ambos modos.
+  if (mode === 'development') {
+    if (env.API_HOST !== '127.0.0.1') throw new Error('CONFIG_API_HOST');
+  } else if (env.API_HOST !== '127.0.0.1' && env.API_HOST !== '0.0.0.0') throw new Error('CONFIG_API_HOST');
+  const host = env.API_HOST as '127.0.0.1' | '0.0.0.0';
   const port = Number(env.API_PORT);
   if (!env.API_PORT || !/^[1-9]\d*$/.test(env.API_PORT) || !Number.isSafeInteger(port) || port > 65535) throw new Error('CONFIG_API_PORT');
   const origin = validateOrigin(env.PUBLIC_ORIGIN, mode);
   if (mode === 'production') {
     if (env.REGISTRATION_ENABLED !== 'true') throw new Error('CONFIG_REGISTRATION_ENABLED');
-    return { host: '127.0.0.1', port, mode, origin, registrationEnabled: true };
+    return { host, port, mode, origin, registrationEnabled: true };
   }
   if (env.REGISTRATION_ENABLED !== 'false') throw new Error('CONFIG_REGISTRATION_ENABLED');
-  return { host: '127.0.0.1', port, mode, origin, registrationEnabled: false };
+  return { host, port, mode, origin, registrationEnabled: false };
 }
 export function readDatabaseUrl(value: string | undefined): string {
   try {

@@ -49,7 +49,11 @@ services:
     container_name: meridiano-api
     environment:
       APP_MODE: production
-      API_HOST: "127.0.0.1"
+      # Dentro del contenedor el loopback es el del contenedor, no el del
+      # host: con 127.0.0.1 el puerto publicado no llegaría a la API. El
+      # acceso sigue siendo solo-local porque el puerto se publica como
+      # 127.0.0.1:3000 en el host y nginx es el único que lo usa.
+      API_HOST: "0.0.0.0"
       API_PORT: "3000"
       PUBLIC_ORIGIN: https://meridianocero.laurafernandezenfermeria.com
       REGISTRATION_ENABLED: "true"

@@ -21,7 +21,7 @@ async function start(): Promise<void> {
   }
   try { await app.listen({ host: config.host, port: config.port }); }
   catch (error) { await shutdown(); throw error; }
-  console.log('API local iniciada; consultar /api/v1/ready para DB y esquema.');
+  console.log(`API iniciada en modo ${config.mode}; consultar /api/v1/ready para DB y esquema.`);
 }
 start().catch((error: unknown) => {
   const code = error instanceof Error && /^CONFIG_[A-Z_]+$/.test(error.message) ? error.message : 'API_START_FAILED';

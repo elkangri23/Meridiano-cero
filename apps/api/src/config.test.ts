@@ -17,13 +17,19 @@ describe('configuración DB/sesión', () => {
   expect(cfg.registrationEnabled).toBe(true);
   expect(cfg.localAuth).toBe(false);
  });
+ it('en producción admite 0.0.0.0 dentro del contenedor, pero no una IP pública', () => {
+  const prod = { ...valid, APP_MODE: 'production', PUBLIC_ORIGIN: 'https://meridianocero.laurafernandezenfermeria.com',
+    REGISTRATION_ENABLED: 'true', LOCAL_DEV_AUTH_ENABLED: 'false' };
+  expect(readAppConfig({ ...prod, API_HOST: '0.0.0.0' }).host).toBe('0.0.0.0');
+  expect(() => readAppConfig({ ...prod, API_HOST: '192.168.1.10' })).toThrow(/^CONFIG_/);
+ });
  it.each([
   { REGISTRATION_ENABLED: 'false' },
   { LOCAL_DEV_AUTH_ENABLED: 'true' },
   { PUBLIC_ORIGIN: 'http://meridianocero.laurafernandezenfermeria.com' },
   { PUBLIC_ORIGIN: 'https://meridianocero.laurafernandezenfermeria.com/' },
   { PUBLIC_ORIGIN: 'https://otro.laurafernandezenfermeria.com' },
-  { API_HOST: '0.0.0.0' },
+  { API_HOST: '192.168.1.10' },
  ])('rechaza producción insegura o incompleta: %j', patch => {
   const prod = { ...valid, APP_MODE: 'production', PUBLIC_ORIGIN: 'https://meridianocero.laurafernandezenfermeria.com',
     REGISTRATION_ENABLED: 'true', LOCAL_DEV_AUTH_ENABLED: 'false', ...patch };
