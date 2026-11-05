@@ -1,0 +1,77 @@
+# Meridiano-cero — Compose de producción (Fase B)
+#
+# Uso en el VPS (desde /opt/meridiano-cero):
+#   docker-compose -f compose.prod.yaml up -d --build
+#
+# Compatible con docker-compose v1 del VPS: sin `name:`, sin `depends_on`
+# con `condition:` y sin claves del Compose Spec v2. La API espera a la base
+# de datos con wait-db.js y aplica las migraciones al arrancar.
+# La web NO va en este compose: nginx la sirve desde apps/web/dist.
+#
+# Secretos y entorno (nunca en git):
+#   .secrets/prod-admin-password  -> contraseña de meridiano_owner
+#   .secrets/prod-app-password    -> contraseña de meridiano_app
+#   .env.prod                     -> DATABASE_URL (meridiano_app) y
+#                                    DATABASE_MIGRATION_URL (meridiano_owner)
+#                                    contra el servicio `db` de este compose.
+#                                    Ver .env.prod.example.
+# El proveedor de IA en producción es `mock` (jugable sin modelo real);
+# FreeLLMAPI y la configuración por usuario llegan en la Fase C.
+version: "3.8"
+services:
+  db:
+    image: postgres:18.6@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
+    container_name: meridiano-db
+    environment:
+      POSTGRES_USER: meridiano_owner
+      POSTGRES_DB: meridiano
+      POSTGRES_PASSWORD_FILE: /run/secrets/admin_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=trust
+    volumes:
+      - meridiano_prod_data:/var/lib/postgresql
+      - ./infra/docker/init-role.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    secrets:
+      - admin_password
+      - app_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridiano_owner -d meridiano"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: meridiano-api
+    environment:
+      APP_MODE: production
+      # Dentro del contenedor el loopback es el del contenedor, no el del
+      # host: con 127.0.0.1 el puerto publicado no llegaría a la API. El
+      # acceso sigue siendo solo-local porque el puerto se publica como
+      # 127.0.0.1:3000 en el host y nginx es el único que lo usa.
+      API_HOST: "0.0.0.0"
+      API_PORT: "3000"
+      PUBLIC_ORIGIN: https://meridianocero.laurafernandezenfermeria.com
+      REGISTRATION_ENABLED: "true"
+      LOCAL_DEV_AUTH_ENABLED: "false"
+      AI_PROVIDER: mock
+    env_file:
+      - .env.prod
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+secrets:
+  admin_password:
+    file: ${DB_ADMIN_SECRET_FILE:-./.secrets/prod-admin-password}
+  app_password:
+    file: ${DB_APP_SECRET_FILE:-./.secrets/prod-app-password}
+
+volumes:
+  meridiano_prod_data:

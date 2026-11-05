@@ -6,6 +6,22 @@ export const profiles = pgTable('profiles', {
   localKey: text('local_key').notNull().unique(),
   displayName: text('display_name').notNull(),
   role: text('role').notNull().default('player'),
+  passwordHash: text('password_hash'),
+  emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+});
+export const emailVerifications = pgTable('email_verifications', {
+  tokenHash: text('token_hash').primaryKey(),
+  profileId: uuid('profile_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+export const recoveryTokens = pgTable('recovery_tokens', {
+  tokenHash: text('token_hash').primaryKey(),
+  profileId: uuid('profile_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 export const sessions = pgTable('sessions', {
   tokenHash: text('token_hash').primaryKey(),
