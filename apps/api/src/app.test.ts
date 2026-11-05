@@ -47,13 +47,16 @@ describe('base HTTP sin datos del juego', () => {
 describe('arranque cerrado', () => {
   it('admite únicamente configuración local explícita', () => {
     expect(readBootstrapConfig(local)).toEqual({ host: '127.0.0.1', port: 3000 });
+    // El registro puede activarse en desarrollo para probar la UI de
+    // autenticación en local; el arranque aislado sigue sin exponer auth.
+    expect(readBootstrapConfig({ ...local, REGISTRATION_ENABLED: 'true' })).toEqual({ host: '127.0.0.1', port: 3000 });
   });
   it.each([
     { APP_MODE: 'public' }, { APP_MODE: undefined }, { API_HOST: '0.0.0.0' },
     { API_PORT: '0' }, { API_PORT: '65536' }, { API_PORT: '3000x' },
     { PUBLIC_ORIGIN: 'http://localhost:5173' }, { PUBLIC_ORIGIN: 'http://127.0.0.1:5173/path' },
     { PUBLIC_ORIGIN: 'http://usuario:secreto@127.0.0.1:5173' },
-    { LOCAL_DEV_AUTH_ENABLED: 'true' }, { REGISTRATION_ENABLED: 'true' },
+    { LOCAL_DEV_AUTH_ENABLED: 'true' },
   ])('rechaza configuración insegura o capacidad ausente: %j', patch => {
     expect(() => readBootstrapConfig({ ...local, ...patch })).toThrow();
   });

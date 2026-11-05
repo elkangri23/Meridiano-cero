@@ -6,7 +6,7 @@ import type { ActionResponseDto, SaveLoadResponseDto, SessionDto } from '@meridi
 const id = '11111111-1111-4111-8111-111111111111';
 const saveId = '44444444-4444-4444-8444-444444444444';
 const key = '55555555-5555-4555-8555-555555555555';
-const session: SessionDto = { profile: { id, displayName: 'Detective sintético', role: 'player' }, csrfToken: 's'.repeat(43) };
+const session: SessionDto = { profile: { id, displayName: 'Detective sintético', role: 'player', emailVerified: false }, csrfToken: 's'.repeat(43) };
 const action = { type: 'inspect', params: { targetId: 'synthetic-room' } } as const;
 const actionResponse: ActionResponseDto = { ...initialView, outcome: 'applied',
   events: [{ id: 'e1', sequence: 1, minute: 10, type: 'inspect', summary: 'La sala queda inspeccionada.' }] };

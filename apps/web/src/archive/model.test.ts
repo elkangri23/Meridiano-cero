@@ -6,7 +6,7 @@ import type { ArchiveApi } from './client';
 
 const id = '11111111-1111-4111-8111-111111111111';
 const runId = '22222222-2222-4222-8222-222222222222';
-const identity: SessionDto = { profile: { id, displayName: 'Detective sintético', role: 'player' }, csrfToken: 's'.repeat(43) };
+const identity: SessionDto = { profile: { id, displayName: 'Detective sintético', role: 'player', emailVerified: false }, csrfToken: 's'.repeat(43) };
 const page: RunListDto = { profileId: id, items: [], nextCursor: null };
 function api() {
   return { initial: vi.fn<ArchiveApi['initial']>(), cases: vi.fn<ArchiveApi['cases']>().mockResolvedValue({ items: [], nextCursor: null }),
@@ -109,7 +109,7 @@ describe('T3: archivo, cuenta y respuestas tardías', () => {
 describe('T3: abrir ficha propia y descartar lecturas tardías', () => {
   async function ready() {
     const transport = api(); transport.initial.mockResolvedValue(initialView);
-    transport.list.mockResolvedValue({ ...page, items: [{ runId, caseId: 'synthetic', caseTitle: 'Caso sintético', status: 'active', version: 1, createdAt: '2026-01-01T00:00:00.000Z' }] });
+    transport.list.mockResolvedValue({ ...page, items: [{ runId, caseId: 'synthetic', caseTitle: 'Caso sintético', status: 'active', version: 1, minute: 0, createdAt: '2026-01-01T00:00:00.000Z' }] });
     const model = createArchiveModel(transport); await model.refresh(); return { transport, model };
   }
   it('abre solo un ID de la página propia, sin crear partida ni avanzar el reloj', async () => {

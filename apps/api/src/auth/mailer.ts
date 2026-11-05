@@ -5,8 +5,8 @@
 // cuenta se crea igual, la verificación queda pendiente y se registra
 // EMAIL_NOT_CONFIGURED (sin el token y sin la dirección). Cuando Antonio
 // configure esas dos variables en el .env del VPS, el flujo completo
-// funciona sin tocar código. No se reutiliza la clave de Resend de retaton:
-// pertenece a otro proyecto.
+// funciona sin tocar código. Desde el 2026-11-05 se reutiliza la clave de
+// Resend de retaton por decisión de Antonio, con el remitente de retaton.
 
 export interface Mailer {
   sendMail(to: string, subject: string, text: string): Promise<void>;

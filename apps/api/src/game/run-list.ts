@@ -31,12 +31,18 @@ function runListOptions(query: Record<string, unknown>): Options {
   return { limit: pageLimit(query.limit), status, anchor: pageAnchor(query.cursor, status) };
 }
 
-type Row = { cursorValid: boolean; runId: string | null; caseId: string; status: unknown; version: number; createdAt: Date };
+type Row = { cursorValid: boolean; runId: string | null; caseId: string; status: unknown; version: number; minute: number; createdAt: Date };
+function validMinute(minute: number): boolean {
+  return Number.isSafeInteger(minute) && minute >= 0;
+}
+function validInstant(value: unknown): value is Date {
+  return value instanceof Date && Number.isFinite(value.getTime());
+}
 function summary(row: Row, titles: Map<string, string>): RunSummaryDto {
   if (!row.runId || !/^[A-Za-z0-9._:-]{1,128}$/.test(row.caseId) ||
       (row.status !== 'active' && row.status !== 'closed') || !Number.isSafeInteger(row.version) || row.version < 1 ||
-      !(row.createdAt instanceof Date) || !Number.isFinite(row.createdAt.getTime())) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-  return { runId: row.runId, caseId: row.caseId, caseTitle: titles.get(row.caseId) ?? null, status: row.status, version: row.version, createdAt: row.createdAt.toISOString() };
+      !validMinute(row.minute) || !validInstant(row.createdAt)) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  return { runId: row.runId, caseId: row.caseId, caseTitle: titles.get(row.caseId) ?? null, status: row.status, version: row.version, minute: row.minute, createdAt: row.createdAt.toISOString() };
 }
 
 export function listStoredRuns(database: Database, digest: string, query: Record<string, unknown>): Promise<RunListDto> {
@@ -50,7 +56,7 @@ export function listStoredRuns(database: Database, digest: string, query: Record
           AND ($2::text IS NULL OR engine_state->>'status'=$2)
       ), page AS (
         SELECT id AS "runId",definition_id AS "caseId",engine_state->>'status' AS status,
-          revision AS version,created_at AS "createdAt" FROM runs
+          revision AS version,COALESCE((engine_state->>'minute')::int, 0) AS minute,created_at AS "createdAt" FROM runs
         WHERE owner_id=$1 AND ($2::text IS NULL OR engine_state->>'status'=$2)
           AND ($3::uuid IS NULL OR (created_at,id)<(SELECT created_at,id FROM anchor))
         ORDER BY created_at DESC,id DESC LIMIT $4

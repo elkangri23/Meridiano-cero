@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-/** Crea una partida desde la UI del archivo y abre su pantalla de juego. */
+/** Crea una partida desde la UI del archivo; la creación confirmada navega sola a su pantalla de juego. */
 async function openGameScreen(page: Page) {
   await page.goto('/');
   await page.waitForSelector('#root > *', { timeout: 10000 });
@@ -9,12 +9,7 @@ async function openGameScreen(page: Page) {
   const creation = page.locator('.archive-create').first();
   await expect(creation.getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
   await creation.locator('select').selectOption('astrolabio-tres-ciudades');
-  await creation.getByRole('button', { name: 'Crear partida' }).click();
-  await expect(page.locator('text=Partida creada').first()).toBeVisible();
-  await page.click('button[aria-label^="Consultar partida"]');
-  const href = await page.getAttribute('a:has-text("pantalla de juego")', 'href');
-  expect(href).toMatch(/^\/runs\/[0-9a-f-]+$/);
-  await page.goto(href!);
+  await creation.getByRole('button', { name: 'Empezar partida' }).click();
   await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
   await expect(page.getByTestId('clock')).toContainText('0 min');
 }
