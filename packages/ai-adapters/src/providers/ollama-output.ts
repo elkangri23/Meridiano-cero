@@ -1,4 +1,4 @@
-import type { AIFunction } from '../index.js';
+import type { AIFunction } from '../types.js';
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

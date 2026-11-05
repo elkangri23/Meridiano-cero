@@ -2,9 +2,10 @@ export interface BootstrapConfig { host: '127.0.0.1' | '0.0.0.0'; port: number }
 export interface AppConfig extends BootstrapConfig {
   mode: 'development' | 'production';
   origin: string; localAuth: boolean; registrationEnabled: boolean; databaseUrl: string;
-  aiProvider: 'ollama' | 'mock' | 'none';
+  aiProvider: 'ollama' | 'mock' | 'none' | 'freellmapi' | 'openai' | 'anthropic' | 'google' | 'openai-compatible';
   aiBaseUrl?: string;
   aiModel?: string;
+  aiApiKey?: string;
   aiTimeoutMs?: number;
 }
 const PRODUCTION_ORIGIN = 'https://meridianocero.laurafernandezenfermeria.com';
@@ -68,14 +69,27 @@ export function readAppConfig(env: NodeJS.ProcessEnv): AppConfig {
   // Fail-closed: en producción no existe sesión local de desarrollo.
   if (http.mode === 'production' && env.LOCAL_DEV_AUTH_ENABLED !== 'false') throw new Error('CONFIG_LOCAL_DEV_AUTH_ENABLED');
   const aiProvider = env.AI_PROVIDER ?? 'mock';
-  if (!['ollama', 'mock', 'none'].includes(aiProvider)) throw new Error('CONFIG_AI_PROVIDER');
-const cfg: AppConfig = {
+  if (!['ollama', 'mock', 'none', 'freellmapi', 'openai', 'anthropic', 'google', 'openai-compatible'].includes(aiProvider)) throw new Error('CONFIG_AI_PROVIDER');
+  const cfg: AppConfig = {
     ...http, localAuth: env.LOCAL_DEV_AUTH_ENABLED === 'true',
     databaseUrl: readDatabaseUrl(env.DATABASE_URL),
     aiProvider: aiProvider as AppConfig['aiProvider'],
   };
-  if (env.AI_BASE_URL) cfg.aiBaseUrl = env.AI_BASE_URL;
-  if (env.AI_MODEL) cfg.aiModel = env.AI_MODEL;
-  if (env.AI_TIMEOUT_MS) cfg.aiTimeoutMs = Number(env.AI_TIMEOUT_MS);
-  return cfg;
+  return { ...cfg, ...readAiSettings(env, cfg.aiProvider) };
+}
+
+function readAiSettings(env: NodeJS.ProcessEnv, aiProvider: AppConfig['aiProvider']): Pick<AppConfig, 'aiBaseUrl' | 'aiModel' | 'aiApiKey' | 'aiTimeoutMs'> {
+  const settings: Pick<AppConfig, 'aiBaseUrl' | 'aiModel' | 'aiApiKey' | 'aiTimeoutMs'> = {};
+  if (env.AI_BASE_URL) settings.aiBaseUrl = env.AI_BASE_URL;
+  if (env.AI_MODEL) settings.aiModel = env.AI_MODEL;
+  // Fail-closed: los proveedores con clave no arrancan sin ella; sin clave
+  // no se cae silenciosamente al mock (en producción el defecto es real).
+  if (['freellmapi', 'openai', 'anthropic', 'google'].includes(aiProvider)) {
+    if (!env.AI_API_KEY) throw new Error('CONFIG_AI_API_KEY');
+    settings.aiApiKey = env.AI_API_KEY;
+  } else if (env.AI_API_KEY) {
+    settings.aiApiKey = env.AI_API_KEY;
+  }
+  if (env.AI_TIMEOUT_MS) settings.aiTimeoutMs = Number(env.AI_TIMEOUT_MS);
+  return settings;
 }

@@ -1,18 +1,16 @@
 import { AiError, record } from './provider.ts';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
-import { createSessionStore } from '../auth/store.ts';
-import { cookieToken, matches } from '../auth/session-security.ts';
-import { createCompatibleOllamaProvider } from './ollama-adapter.ts';
+import { createAuthorizer } from './authorize.ts';
 import { createDirector } from './director.ts';
 import { interpretationSchema, factualSchema } from './schemas.ts';
-import type { AiRequest, AiProvider } from './provider.ts';
+import type { AiRequest } from './provider.ts';
 import { RunStoreError } from '../game/runs.ts';
 import type { PublicFact, PublicScene, NpcContext, ConversationMemory, SpeechAct, ActionOffer } from './context.ts';
 import { speechActs } from './context.ts';
 import { checkQuota, recordUsage, estimateTokens } from './ai-quota.ts';
-import { createDefaultMockProvider } from './mock.ts';
+import { resolveRequestProvider, type ResolvedProvider } from './provider-factory.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -26,30 +24,14 @@ function restoreMemory(value: unknown, runId: string, npcId: string): Conversati
   return value as unknown as ConversationMemory;
 }
 
-function getAiProvider(config: AppConfig): AiProvider {
-  if (config.aiProvider === 'ollama') {
-    const baseUrl = config.aiBaseUrl ?? 'http://127.0.0.1:11434';
-    const model = config.aiModel ?? 'llama3.1:8b';
-    const timeoutMs = config.aiTimeoutMs ?? 60000;
-    return createCompatibleOllamaProvider({ model, origin: baseUrl, timeoutMs });
-  }
-  // Default: mock provider for tests/development
-  return createDefaultMockProvider();
-}
-
 export function registerAiRoutes(app: FastifyInstance, config: AppConfig, database: Database): void {
-  const store = createSessionStore(database);
-  const aiProvider = getAiProvider(config);
-  const director = createDirector(aiProvider);
+  const authorize = createAuthorizer(config, database);
 
-  async function authorize(request: FastifyRequest): Promise<string> {
-    const session = await store.find(cookieToken(request.headers.cookie));
-    if (!session) throw new RunStoreError('SESSION_REQUIRED');
-    if (request.method === 'POST') {
-      if (request.headers.origin !== config.origin) throw new RunStoreError('ORIGIN_REJECTED');
-      if (!matches(request.headers['x-csrf-token'], session.csrfToken)) throw new RunStoreError('CSRF_REJECTED');
-    }
-    return session.profile.id;
+  // Resolución por petición: conexión personal del usuario > defecto del
+  // administrador > mock. El director se crea por petición con ese proveedor.
+  async function resolveFor(ownerId: string): Promise<ResolvedProvider & { director: ReturnType<typeof createDirector> }> {
+    const resolved = await resolveRequestProvider(database, ownerId, config);
+    return { ...resolved, director: createDirector(resolved.provider) };
   }
 
   function toInterpretRequest(body: unknown): AiRequest {
@@ -116,6 +98,7 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
   // POST /api/v1/ai/interpret
   app.post('/api/v1/ai/interpret', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
     const ownerId = await authorize(request);
+    const { provider: aiProvider, director } = await resolveFor(ownerId);
     const aiRequest = toInterpretRequest(request.body);
 
     // Estimar tokens
@@ -178,6 +161,7 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
   // POST /api/v1/ai/narrate
   app.post('/api/v1/ai/narrate', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
     const ownerId = await authorize(request);
+    const { provider: aiProvider, director } = await resolveFor(ownerId);
     const aiRequest = toNarrateRequest(request.body);
     const facts = aiRequest.context.facts as PublicFact[];
 
@@ -237,6 +221,7 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
   // POST /api/v1/ai/converse
   app.post('/api/v1/ai/converse', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
     const ownerId = await authorize(request);
+    const { provider: aiProvider, director } = await resolveFor(ownerId);
     const aiRequest = toConverseRequest(request.body);
     const facts = aiRequest.context.facts as PublicFact[];
     const memory = aiRequest.context.memory as ConversationMemory;
@@ -298,8 +283,10 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
   });
 
   // GET /api/v1/ai/health - health check del proveedor IA
-  app.get('/api/v1/ai/health', { onRequest: async (request) => { await authorize(request); } }, async (_request, reply) => {
-    const health = await (aiProvider as any).healthCheck?.();
+  app.get('/api/v1/ai/health', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
+    const ownerId = await authorize(request);
+    const { provider: aiProvider } = await resolveFor(ownerId);
+    const health = await aiProvider.healthCheck?.();
     return reply.send({ ai: health ?? { available: false, error: 'healthCheck no implementado' } });
   });
 }

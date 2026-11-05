@@ -3,6 +3,8 @@ import type { FormEvent, KeyboardEvent, RefObject } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { archiveApi } from '../archive/client';
 import { aiApi, AiError } from '../ai/client';
+import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
+import type { AiConnection, ConnectionsResponse, ConnectionTestResult, ProviderCatalogEntry } from '../ai/connections';
 import { gameApi, GameError } from './client';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
@@ -383,21 +385,240 @@ function SavesContent({ view, saves, savePhase, saveName, replaceTarget, loadTar
   </div>;
 }
 
-function SettingsContent({ textScale, highContrast, onScale, onContrast }: {
-  textScale: number; highContrast: boolean; onScale: (value: number) => void; onContrast: (value: boolean) => void;
+function describeEffectiveProvider(data: ConnectionsResponse | null, catalogLabel: (providerId: string) => string): string {
+  if (!data) return 'Cargando proveedor…';
+  if (data.effective.source === 'mock') return 'Mock determinista (se puede jugar sin modelo real).';
+  if (data.effective.source === 'admin') {
+    return `${catalogLabel(data.effective.providerId)} (${data.effective.model}) — proveedor del servidor.`;
+  }
+  return `Tu conexión «${data.effective.connectionName ?? ''}» (${catalogLabel(data.effective.providerId)}, ${data.effective.model}).`;
+}
+
+function testSummary(result: ConnectionTestResult): string {
+  if (!result.available) return `no disponible${result.error ? `: ${result.error}` : ''}`;
+  return `disponible (${result.latencyMs ?? '?'} ms)`;
+}
+
+function ConnectionsList({ connections, effectiveId, catalogLabel, testingId, testResults, onUse, onTest, onRemove }: {
+  connections: AiConnection[];
+  effectiveId: string | null;
+  catalogLabel: (providerId: string) => string;
+  testingId: string | null;
+  testResults: Record<string, ConnectionTestResult>;
+  onUse: (id: string) => void;
+  onTest: (id: string) => void;
+  onRemove: (id: string) => void;
 }) {
-  return <div>
-    <h4>Proveedor de IA</h4>
-    <p>Actual: <strong>Mock determinista</strong> (incluido en la Fase A: se puede jugar sin modelo real).</p>
+  return <ul>{connections.map(connection => {
+    const result = testResults[connection.id];
+    const inUse = effectiveId === connection.id;
+    return <li key={connection.id}>
+      <strong>{connection.name}</strong> · {catalogLabel(connection.adapterId)} · {connection.model}
+      {connection.status !== 'active' ? ` · ${connection.status}` : ''}{inUse ? ' · en uso' : ''}
+      {result && <span> · {testSummary(result)}</span>}
+      <div>
+        {!inUse && <button type="button" onClick={() => onUse(connection.id)}>Usar</button>}
+        <button type="button" disabled={testingId === connection.id} onClick={() => onTest(connection.id)}>
+          {testingId === connection.id ? 'Probando…' : 'Probar'}
+        </button>
+        <button type="button" aria-label={`Borrar ${connection.name}`} onClick={() => onRemove(connection.id)}>Borrar</button>
+      </div>
+    </li>;
+  })}</ul>;
+}
+
+function validateConnectionForm(selected: ProviderCatalogEntry, connName: string, apiKey: string): string | null {
+  if (!connName.trim()) return 'Ponle un nombre a la conexión.';
+  if (selected.needsKey && !apiKey) return 'Este proveedor necesita tu clave.';
+  return null;
+}
+
+function ConnectionProviderFields({ selected, baseUrl, onBaseUrl, model, onModel, apiKey, onApiKey }: {
+  selected: ProviderCatalogEntry | undefined;
+  baseUrl: string; onBaseUrl: (value: string) => void;
+  model: string; onModel: (value: string) => void;
+  apiKey: string; onApiKey: (value: string) => void;
+}) {
+  return <>
+    {selected?.needsBaseUrl && <label className="game-setting"><span>URL del endpoint</span>
+      <input data-testid="ai-connection-base-url" value={baseUrl} onChange={event => onBaseUrl(event.target.value)} maxLength={512} placeholder={selected.defaultBaseUrl} />
+    </label>}
+    <label className="game-setting"><span>Modelo</span>
+      <input data-testid="ai-connection-model" value={model} onChange={event => onModel(event.target.value)} maxLength={128} placeholder={selected?.defaultModel ?? ''} />
+    </label>
+    {selected?.needsKey && <label className="game-setting"><span>Clave</span>
+      <input data-testid="ai-connection-key" type="password" value={apiKey} onChange={event => onApiKey(event.target.value)} maxLength={512} autoComplete="off" placeholder="Tu clave, solo se guarda cifrada" />
+    </label>}
+  </>;
+}
+
+function AddConnectionForm({ catalog, csrfToken, onSaved }: {
+  catalog: ProviderCatalogEntry[];
+  csrfToken: string;
+  onSaved: () => Promise<void>;
+}) {
+  const [adapterId, setAdapterId] = useState('ollama');
+  const [connName, setConnName] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
+  const [model, setModel] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [formMessage, setFormMessage] = useState('');
+  const [formError, setFormError] = useState('');
+  const selected = catalog.find(entry => entry.id === adapterId);
+
+  function onAdapterChange(value: string) {
+    setAdapterId(value);
+    const entry = catalog.find(item => item.id === value);
+    if (entry) {
+      setModel(entry.defaultModel);
+      setBaseUrl(entry.needsBaseUrl ? entry.defaultBaseUrl : '');
+    }
+    setApiKey('');
+    setFormError('');
+    setFormMessage('');
+  }
+
+  async function saveConnection(event: FormEvent) {
+    event.preventDefault();
+    if (!selected || saving) return;
+    const validationError = validateConnectionForm(selected, connName, apiKey);
+    if (validationError) { setFormError(validationError); return; }
+    setSaving(true);
+    setFormError('');
+    setFormMessage('');
+    try {
+      const input: { name: string; adapterId: string; baseUrl?: string; model: string; credential?: string; isDefault: boolean } = {
+        name: connName.trim(), adapterId: selected.id,
+        model: model.trim() || selected.defaultModel, isDefault: true,
+      };
+      if (selected.needsBaseUrl) input.baseUrl = baseUrl.trim();
+      if (apiKey) input.credential = apiKey;
+      await aiConnectionsApi.create(input, new AbortController().signal, { csrfToken });
+      setConnName('');
+      setApiKey('');
+      setFormMessage('Conexión guardada y activada.');
+      await onSaved();
+    } catch (error) {
+      setFormError(error instanceof ConnectionsError && error.kind === 'session'
+        ? 'La sesión caducó. Vuelve a entrar.'
+        : 'No se pudo guardar la conexión. Revisa los datos (el nombre no puede repetirse).');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <form onSubmit={saveConnection}>
     <label className="game-setting"><span>Proveedor</span>
-      <select disabled aria-describedby="provider-note">
-        <option>Mock determinista (actual)</option>
-        <option>Ollama local</option>
-        <option>LM Studio (OpenAI-compatible)</option>
-        <option>FreeLLMAPI</option>
+      <select data-testid="ai-connection-adapter" value={adapterId} onChange={event => onAdapterChange(event.target.value)}>
+        {catalog.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
       </select>
     </label>
-    <p className="game-panel-note" id="provider-note">La configuración del proveedor por usuario llega en la Fase C: cada persona elegirá su LLM y su clave. En esta fase el selector está desactivado a propósito.</p>
+    {selected && <p className="game-panel-note">{selected.hint}</p>}
+    <label className="game-setting"><span>Nombre</span>
+      <input data-testid="ai-connection-name" value={connName} onChange={event => setConnName(event.target.value)} maxLength={100} placeholder="Mi Ollama" />
+    </label>
+    <ConnectionProviderFields
+      selected={selected}
+      baseUrl={baseUrl} onBaseUrl={setBaseUrl}
+      model={model} onModel={setModel}
+      apiKey={apiKey} onApiKey={setApiKey}
+    />
+    <p><button data-testid="ai-connection-save" type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar conexión'}</button></p>
+    {formMessage && <p role="status">{formMessage}</p>}
+    {formError && <p role="alert">{formError}</p>}
+  </form>;
+}
+
+function SettingsContent({ identity, textScale, highContrast, onScale, onContrast }: {
+  identity: SessionDto | null; textScale: number; highContrast: boolean; onScale: (value: number) => void; onContrast: (value: boolean) => void;
+}) {
+  const [data, setData] = useState<ConnectionsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, ConnectionTestResult>>({});
+
+  const csrfToken = identity?.csrfToken ?? null;
+  const auth = csrfToken ? { csrfToken } : undefined;
+  const catalogLabel = (providerId: string): string =>
+    data?.catalog.find(entry => entry.id === providerId)?.label ?? providerId;
+
+  const reload = useCallback(async (signal: AbortSignal) => {
+    if (!csrfToken) return;
+    setLoading(true);
+    setLoadError('');
+    try {
+      setData(await aiConnectionsApi.list(signal, { csrfToken }));
+    } catch {
+      setLoadError('No se pudo cargar la configuración de IA.');
+    } finally {
+      setLoading(false);
+    }
+  }, [csrfToken]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void reload(controller.signal);
+    return () => controller.abort();
+  }, [reload]);
+
+  async function useConnection(id: string) {
+    if (!auth) return;
+    await aiConnectionsApi.update(id, { isDefault: true, status: 'active' }, new AbortController().signal, auth);
+    await reload(new AbortController().signal);
+  }
+
+  async function testConnection(id: string) {
+    if (!auth) return;
+    setTestingId(id);
+    try {
+      const result = await aiConnectionsApi.test(id, new AbortController().signal, auth);
+      setTestResults(prev => ({ ...prev, [id]: result }));
+      await reload(new AbortController().signal);
+    } finally {
+      setTestingId(null);
+    }
+  }
+
+  async function removeConnection(id: string) {
+    if (!auth) return;
+    await aiConnectionsApi.remove(id, new AbortController().signal, auth);
+    await reload(new AbortController().signal);
+  }
+
+  async function useServerDefault() {
+    if (!auth) return;
+    await aiConnectionsApi.useDefault(new AbortController().signal, auth);
+    await reload(new AbortController().signal);
+  }
+
+  return <div>
+    <h4>Proveedor de IA</h4>
+    <p data-testid="settings-ai-effective">Actual: <strong>{describeEffectiveProvider(data, catalogLabel)}</strong></p>
+    {loading && <p role="status">Cargando conexiones…</p>}
+    {loadError && <p role="alert">{loadError}</p>}
+    {data && <>
+      <p className="game-panel-note">Tu conexión personal manda sobre el proveedor del servidor. Cada persona paga sus propios tokens; sin conexión personal, juega con el proveedor del servidor.</p>
+      <h4>Mis conexiones</h4>
+      <div data-testid="ai-connections-list">
+        {data.connections.length === 0
+          ? <p className="game-panel-note">Todavía no tienes conexiones propias.</p>
+          : <ConnectionsList
+              connections={data.connections}
+              effectiveId={data.effective.connectionId}
+              catalogLabel={catalogLabel}
+              testingId={testingId}
+              testResults={testResults}
+              onUse={id => void useConnection(id)}
+              onTest={id => void testConnection(id)}
+              onRemove={id => void removeConnection(id)}
+            />}
+      </div>
+      {data.effective.source === 'personal' && <p><button type="button" onClick={() => void useServerDefault()}>Usar el proveedor del servidor</button></p>}
+      <h4>Añadir conexión</h4>
+      {csrfToken && <AddConnectionForm catalog={data.catalog} csrfToken={csrfToken} onSaved={() => reload(new AbortController().signal)} />}
+    </>}
     <h4>Presentación</h4>
     <label className="game-setting"><span>Tamaño de texto</span>
       <select value={textScale} onChange={event => onScale(Number(event.target.value))}>
@@ -788,7 +1009,7 @@ export function GameScreen() {
         onReplace={setReplaceTarget} onConfirmLoad={() => void confirmLoad()} onCancelLoad={() => setLoadTarget(null)} />
     </GameWindow>
     <GameWindow id="settings" title="Ajustes" state={windows.windows.settings} {...windowProps}>
-      <SettingsContent textScale={textScale} highContrast={highContrast} onScale={setTextScale} onContrast={setHighContrast} />
+      <SettingsContent identity={identity} textScale={textScale} highContrast={highContrast} onScale={setTextScale} onContrast={setHighContrast} />
     </GameWindow>
     <GameWindow id="report" title="Informe final" state={windows.windows.report} {...windowProps}>
       <ReportContent view={view} />

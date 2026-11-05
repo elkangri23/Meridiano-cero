@@ -1,4 +1,4 @@
-import type { AIProvider, AIContext, AIResponse, AIFunction, ProviderId } from '../index.js';
+import type { AIProvider, AIContext, AIResponse, AIFunction, ProviderId } from '../types.js';
 import { validateCaseDefinition } from '@meridiano/case-schema';
 
 function record(value: unknown): value is Record<string, unknown> {

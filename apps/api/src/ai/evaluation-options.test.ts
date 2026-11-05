@@ -6,6 +6,8 @@ describe('Modo explícito de evaluación', () => {
     { args: ['--mock'], expected: { kind: 'mock' } },
     { args: ['--probe'], expected: { kind: 'probe' } },
     { args: ['--model', 'synthetic:local'], expected: { kind: 'model', model: 'synthetic:local' } },
+    { args: ['--freellmapi'], expected: { kind: 'freellmapi' } },
+    { args: ['--openai-compatible'], expected: { kind: 'openai-compatible' } },
   ])('admite un único modo: $args', ({ args, expected }) => {
     expect(parseEvaluationArgs(args)).toEqual(expected);
   });
