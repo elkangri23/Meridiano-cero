@@ -35,7 +35,7 @@ export function canIssueWarrant(def: CaseDefinition, run: CaseRun, suspectId: st
     : has(['EV-09', 'EV-10']);
 }
 
-function knownSuspect(run: CaseRun, id: string): boolean {
+export function knownSuspect(run: CaseRun, id: string): boolean {
   if (run.discoveries.includes('identity:' + id)) return true;
   const references = id === 'ines' ? ['EV-04', 'EV-05', 'EV-07', 'EV-08'] : ['EV-09', 'EV-10'];
   return references.some(evidence => knowsEvidence(run, evidence));

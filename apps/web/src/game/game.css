@@ -1,0 +1,64 @@
+body:has(.game) { background:#000000; color:#ffffff; }
+.game { max-width:72rem; margin:0 auto; padding:16px; font-family:ui-monospace, monospace; line-height:1.6; }
+.game-high-contrast { background:#000000; color:#ffffff; }
+.game-high-contrast .game-window, .game-high-contrast .game-scene, .game-high-contrast .game-offers,
+.game-high-contrast .game-console, .game-high-contrast .game-order { border-color:#ffff55; }
+.game h1 { font-size:1.4rem; line-height:1.3; color:#ffff55; margin:0 0 8px; }
+.game h2 { font-size:1.1rem; color:#ffff55; font-weight:400; margin:0 0 8px; }
+.game h3 { font-size:1rem; color:#ffff55; font-weight:400; }
+.game h4 { font-size:1rem; color:#ffff55; font-weight:400; margin:16px 0 8px; }
+.game button, .game select, .game input, .game textarea { font:inherit; border-radius:0; border:2px outset #ffffff; background:#aaaaaa; color:#000000; padding:8px 12px; min-height:44px; }
+.game button:disabled { opacity:1; color:#555555; cursor:default; }
+.game button:focus-visible, .game select:focus-visible, .game input:focus-visible, .game textarea:focus-visible, .game a:focus-visible { outline:3px solid #ffff55; outline-offset:2px; }
+.game a { color:#ffff55; }
+.game code { background:#0000aa; padding:0 4px; }
+
+.game-header { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:16px; border:4px double #ffffff; padding:16px; background:#0000aa; }
+.game-eyebrow { color:#9ed7b3; font-size:.85rem; margin:0 0 4px; }
+.game-header p { margin:4px 0; }
+.game-clock { text-align:right; }
+.game-clock strong { font-size:1.4rem; color:#ffff55; }
+.game-clock-state { display:block; color:#9ed7b3; }
+
+.game-notice { padding:12px 0; min-height:48px; color:#ffff55; }
+.game-error { color:#ff5555; }
+.game-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 16px; }
+
+.game-scene, .game-offers, .game-console, .game-order { border:4px double #ffffff; background:#0000aa; padding:16px; margin-bottom:16px; }
+.game-offers ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px; }
+.game-console ol { margin:0; padding-left:20px; max-height:12rem; overflow:auto; }
+.game-console details { margin-top:12px; }
+.game-order label { display:block; margin-bottom:8px; }
+.game-order textarea { width:100%; box-sizing:border-box; background:#ffffff; color:#000000; }
+.game-order form button { margin-top:8px; }
+.game-clarification, .game-recovering { border:2px solid #ffff55; padding:12px; margin-top:12px; background:#000000; }
+.game-clarification button, .game-recovering button, .game-error button { margin-right:8px; }
+
+.game-preview-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.8); display:grid; place-items:center; z-index:40; padding:16px; }
+.game-preview { border:4px double #ffff55; background:#0000aa; padding:24px; max-width:32rem; width:100%; }
+.game-preview-actions { display:flex; gap:12px; margin-top:16px; }
+
+.game-window { position:absolute; z-index:20; width:min(28rem, calc(100vw - 32px)); border:4px double #ffffff; background:#0000aa; box-shadow:8px 8px 0 #222222; }
+.game-window-titlebar { display:flex; align-items:center; justify-content:space-between; gap:8px; background:#ffffff; color:#000000; padding:4px 8px; cursor:move; }
+.game-window-titlebar h3 { color:#000000; margin:0; cursor:move; }
+.game-window-titlebar h3:focus-visible { outline:3px solid #0000aa; }
+.game-window-controls { display:flex; align-items:center; gap:4px; }
+.game-window-controls button { min-height:32px; padding:2px 8px; }
+.game-window-moving { font-size:.8rem; }
+.game-window-body { padding:16px; max-height:60vh; overflow:auto; }
+.game-window-body table { border-collapse:collapse; width:100%; }
+.game-window-body th, .game-window-body td { border:1px solid #aaaaaa; padding:4px 8px; text-align:left; }
+.game-window-body th { color:#ffff55; font-weight:400; }
+.game-window-body label { display:block; margin:8px 0; }
+.game-window-body input, .game-window-body select { width:100%; box-sizing:border-box; background:#ffffff; color:#000000; }
+.game-minimized-bar { position:fixed; left:16px; bottom:16px; z-index:30; display:flex; flex-wrap:wrap; gap:8px; }
+.game-load-confirm { border:2px solid #ffff55; padding:12px; margin-top:12px; background:#000000; }
+.game-load-confirm button { margin-right:8px; }
+
+@media (max-width: 720px) {
+  .game { padding:8px; }
+  .game-window { position:static; width:auto; box-shadow:none; margin-bottom:16px; }
+  .game-window-body { max-height:none; }
+  .game-header { flex-direction:column; }
+  .game-clock { text-align:left; }
+}

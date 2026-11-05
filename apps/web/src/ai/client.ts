@@ -26,10 +26,15 @@ export interface AiHealth {
   error?: string;
 }
 
+export interface AiAuth {
+  /** CSRF de la sesión en memoria (nunca en storage). Sin él, los POST de IA devuelven 403. */
+  csrfToken: string;
+}
+
 export interface AiApi {
-  interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal): Promise<AiInterpretation>;
-  narrate(facts: Array<{ id: string; text: string }>, signal: AbortSignal): Promise<AiNarrative>;
-  converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal): Promise<AiConverseResult>;
+  interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiInterpretation>;
+  narrate(facts: Array<{ id: string; text: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiNarrative>;
+  converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult>;
   health(signal: AbortSignal): Promise<AiHealth>;
 }
 
@@ -120,24 +125,30 @@ async function read(response: Response): Promise<Record<string, unknown>> {
 }
 
 export const aiApi: AiApi = {
-  async interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal): Promise<AiInterpretation> {
-    const response = await request('/api/v1/ai/interpret', signal, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, scene, offers, requestId: crypto.randomUUID() }) });
+  async interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiInterpretation> {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (auth) headers['x-csrf-token'] = auth.csrfToken;
+    const response = await request('/api/v1/ai/interpret', signal, { method: 'POST', headers, body: JSON.stringify({ text, scene, offers, requestId: crypto.randomUUID() }) });
     const body = await read(response);
     const interpretation = body.interpretation;
     if (!interpretation || typeof interpretation !== 'object' || !('kind' in interpretation)) throw new AiError('invalid');
     return interpretation as AiInterpretation;
   },
 
-  async narrate(facts: Array<{ id: string; text: string }>, signal: AbortSignal): Promise<AiNarrative> {
-    const response = await request('/api/v1/ai/narrate', signal, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ facts, requestId: crypto.randomUUID() }) });
+  async narrate(facts: Array<{ id: string; text: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiNarrative> {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (auth) headers['x-csrf-token'] = auth.csrfToken;
+    const response = await request('/api/v1/ai/narrate', signal, { method: 'POST', headers, body: JSON.stringify({ facts, requestId: crypto.randomUUID() }) });
     const body = await read(response);
     const narrative = body.narrative;
     if (!narrative || typeof narrative !== 'object' || !('text' in narrative)) throw new AiError('invalid');
     return narrative as AiNarrative;
   },
 
-  async converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal): Promise<AiConverseResult> {
-    const response = await request('/api/v1/ai/converse', signal, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...input, requestId: crypto.randomUUID() }) });
+  async converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult> {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (auth) headers['x-csrf-token'] = auth.csrfToken;
+    const response = await request('/api/v1/ai/converse', signal, { method: 'POST', headers, body: JSON.stringify({ ...input, requestId: crypto.randomUUID() }) });
     const body = await read(response);
     if (!body.narrative || !body.memory) throw new AiError('invalid');
     return { narrative: body.narrative as AiNarrative, memory: body.memory };

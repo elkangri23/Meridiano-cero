@@ -1,4 +1,4 @@
-import { isInitialPlayerViewDto } from '@meridiano/contracts';
+import { isPlayerViewDto } from '@meridiano/contracts';
 import { Writable } from 'node:stream';
 import { createTelemetry } from '../telemetry.ts';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -107,7 +107,7 @@ describe('catálogo e inicio por HTTP con PostgreSQL real', () => {
     expect(view.position.city.name).toBe('Madrid');
     expect(view.cities.map((city: { id: string }) => city.id)).toEqual(['madrid', 'paris', 'lisboa']);
     expect(view.locations).toHaveLength(1);
-    expect(view.saveCapabilities).toEqual({ manualLimit: 10, manualCount: 0, canSave: false, canLoad: false });
+    expect(view.saveCapabilities).toEqual({ manualLimit: 10, manualCount: 0, canSave: true, canLoad: false });
     for (const marker of ['ines-valera', 'solution', 'definitionHash', 'ownerId', 'engineState', 'knowledge', 'cooperation']) expect(response.body).not.toContain(marker);
     expect(view.finalReport).toBeNull();
   });
@@ -125,7 +125,7 @@ describe('catálogo e inicio por HTTP con PostgreSQL real', () => {
   it('otra instancia HTTP reanuda y otro usuario no accede', async () => {
     const expected = await app.inject({ url: '/api/v1/runs/' + runId, headers });
     expect(expected.statusCode).toBe(200);
-    expect(isInitialPlayerViewDto(expected.json())).toBe(true);
+    expect(isPlayerViewDto(expected.json())).toBe(true);
     expect(expected.headers['cache-control']).toBe('no-store');
     const secondDatabase = createDatabase(config.databaseUrl);
     const second = createApp({ config, database: secondDatabase });

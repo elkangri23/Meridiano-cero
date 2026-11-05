@@ -8,11 +8,12 @@ import { cookieToken, matches } from '../auth/session-security.ts';
 import { caseSummary, findCase, listCases, findDefinitionById } from './catalog.ts';
 import { initialPlayerView } from './initial-view.ts';
 import { createStoredRun, readStoredRun, readFullRun, lookupRunCreation, RunStoreError } from './runs.ts';
-import { previewAction, resolveAction, projectToPlayerView, type Action } from '@meridiano/engine';
+import { ENGINE_VERSION, type Action } from '@meridiano/engine';
+import { commitAction, commitLoad } from './transitions.ts';
+import { playerViewDto } from './player-view.ts';
 import { eq, and, desc, sql } from 'drizzle-orm';
-import { manualSaves, operationRecords, runs } from '../database/schema.ts';
+import { manualSaves, operationRecords } from '../database/schema.ts';
 import type { CaseRun } from '@meridiano/case-schema';
-import type { StoredRun } from './runs.ts';
 import { createHash, randomUUID } from 'node:crypto';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -104,6 +105,72 @@ function deleteBody(value: unknown): { expectedSaveVersion: number; idempotencyK
   return { expectedSaveVersion, idempotencyKey };
 }
 
+function actionShape(value: Record<string, unknown>): Action {
+  const { action } = value;
+  if (!isRecord(action) || typeof action.type !== 'string' || action.type.length === 0 ||
+      !isRecord(action.params)) throw new RunStoreError('INVALID_REQUEST');
+  return action as unknown as Action;
+}
+
+function validExpectedVersion(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
+}
+
+function actionOptions(value: Record<string, unknown>): { confirm?: boolean; expectedVersion?: number; idempotencyKey?: string } {
+  const { confirm, expectedVersion, idempotencyKey } = value;
+  if (confirm !== undefined && typeof confirm !== 'boolean') throw new RunStoreError('INVALID_REQUEST');
+  if (expectedVersion !== undefined && !validExpectedVersion(expectedVersion)) throw new RunStoreError('INVALID_REQUEST');
+  if (idempotencyKey !== undefined && !isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
+  const options: { confirm?: boolean; expectedVersion?: number; idempotencyKey?: string } = {};
+  if (confirm !== undefined) options.confirm = confirm;
+  if (expectedVersion !== undefined) options.expectedVersion = expectedVersion;
+  if (idempotencyKey !== undefined) options.idempotencyKey = idempotencyKey;
+  return options;
+}
+
+function actionBody(value: unknown): { action: Action; confirm?: boolean; expectedVersion?: number; idempotencyKey?: string } {
+  if (!isRecord(value)) throw new RunStoreError('INVALID_REQUEST');
+  const keys = Object.keys(value);
+  const allowed = ['action', 'confirm', 'expectedVersion', 'idempotencyKey'];
+  if (!keys.includes('action') || keys.some(key => !allowed.includes(key))) {
+    throw new RunStoreError('INVALID_REQUEST');
+  }
+  return { action: actionShape(value), ...actionOptions(value) };
+}
+
+/** Guardados manuales activos de una partida (para saveCapabilities). */
+async function saveCount(database: Database, runId: string): Promise<number> {
+  const result = await database.pool.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM manual_saves WHERE run_id=$1 AND status='active'`, [runId]);
+  return Number(result.rows[0]?.n ?? 0);
+}
+
+/** Reintento de crear/reemplazar un guardado: devuelve el resumen guardado o null. */
+async function findSaveReplay(database: Database, runId: string, idempotencyKey: string, requestDigest: string): Promise<Record<string, unknown> | null> {
+  const replay = await database.orm.select({
+    requestDigest: operationRecords.requestDigest,
+    resultPublic: operationRecords.resultPublic,
+  }).from(operationRecords)
+    .where(and(
+      eq(operationRecords.runId, runId),
+      eq(operationRecords.idempotencyKey, idempotencyKey),
+      eq(operationRecords.kind, 'save'),
+    )).limit(1);
+  const found = replay[0];
+  if (!found) return null;
+  if (found.requestDigest !== requestDigest) throw new RunStoreError('IDEMPOTENCY_CONFLICT');
+  return found.resultPublic as Record<string, unknown>;
+}
+
+/** Ciudad del snapshot de un guardado (posición guardada; 'Madrid' si se desconoce). */
+function snapshotCityId(snapshot: unknown): string | undefined {
+  if (!snapshot || typeof snapshot !== 'object') return undefined;
+  const root = snapshot as Record<string, unknown>;
+  const inner = root.engineState as Record<string, unknown> | undefined;
+  const position = (root.position ?? inner?.position) as Record<string, unknown> | undefined;
+  return typeof position?.cityId === 'string' ? position.cityId : undefined;
+}
+
 export function registerGameRoutes(app: FastifyInstance, config: AppConfig, database: Database, ready: () => Promise<boolean>): void {
   const store = createSessionStore(database);
   async function authorize(request: FastifyRequest): Promise<void> {
@@ -135,8 +202,12 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
   app.post('/api/v1/runs', { onRequest: authorize }, async (request, reply) => {
     const body = createBody(request.body);
     const definition = findCase(body.caseId);
-    const result = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey, expectedProfile(request)));
-    return reply.code(result.replayed ? 200 : 201).send({ ...initialPlayerView(result.run), replayed: result.replayed });
+    const created = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey, expectedProfile(request)));
+    // La vista es la actual (en un replay puede haber progreso posterior).
+    const run = await available(() => readFullRun(database, digest(request), created.run.id));
+    const manualCount = await available(() => saveCount(database, run.id));
+    const view = playerViewDto(definition, run, manualCount);
+    return reply.code(created.replayed ? 200 : 201).send({ ...view, replayed: created.replayed });
   });
   app.post<{ Querystring: Record<string, unknown> }>('/api/v1/run-creations/lookup', { onRequest: authorize }, async request => {
     if (Object.keys(request.query).length) throw new RunStoreError('INVALID_REQUEST');
@@ -144,41 +215,25 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     return available(() => lookupRunCreation(database, digest(request), key, expectedProfile(request)));
   });
   app.get<{ Params: { runId: string } }>('/api/v1/runs/:runId', { onRequest: authorize }, async request => {
-    const run = await available(() => readStoredRun(database, digest(request), request.params.runId));
-    return initialPlayerView(run);
+    const run = await available(() => readFullRun(database, digest(request), request.params.runId));
+    // Motores antiguos: se conserva la vista inicial (503 si no es inicial virgen).
+    if (run.engineVersion !== ENGINE_VERSION) return initialPlayerView(run);
+    const definition = findDefinitionById(run.definitionId);
+    const manualCount = await available(() => saveCount(database, run.id));
+    return playerViewDto(definition, run, manualCount);
   });
 
-  // POST /api/v1/runs/:runId/action - Preview or confirm action
-  app.post<{ Params: { runId: string }; Body: { action: Action; confirm?: boolean } }>(
+  // POST /api/v1/runs/:runId/action - Preview (confirm=false) o confirmación.
+  // confirm=true aplica con confirmAction y persiste en la misma transacción
+  // que el registro de operación; un resultado sin transición (impossible,
+  // clarification_required, confirmation_required) no persiste ni avanza revisión.
+  app.post<{ Params: { runId: string }; Body: { action: Action; confirm?: boolean; expectedVersion?: number; idempotencyKey?: string } }>(
     '/api/v1/runs/:runId/action',
     { onRequest: authorize },
     async (request, reply) => {
-      const run = await available(() => readFullRun(database, digest(request), request.params.runId));
-      if (run.status === 'closed') return reply.code(409).send({ error: { code: 'RUN_CLOSED', message: 'La partida ya está cerrada.', requestId: request.id } });
-
-      const { action, confirm } = request.body as { action: Action; confirm?: boolean };
-      if (!action || typeof action.type !== 'string') {
-        return reply.code(400).send({ error: { code: 'INVALID_ACTION', message: 'Acción requerida con tipo.', requestId: request.id } });
-      }
-
-      const definition = findDefinitionById(run.definitionId);
-      const result = confirm === false ? previewAction(definition, run, action) : resolveAction(definition, run, action);
-
-      // Si es preview, no actualiza el run almacenado
-      if (confirm === false) {
-        if (result.status === 'confirmation_required' && result.preview) {
-          return reply.send({ ...projectToPlayerView(definition, result.run), preview: result.preview, events: result.events });
-        }
-        return reply.send({ ...projectToPlayerView(definition, result.run), events: result.events });
-      }
-
-      // Confirmar: actualizar run en base de datos
-      // Nota: La implementación real debería persistir result.run
-      // Por ahora devolvemos el resultado
-      if (result.status === 'case_closed' && result.report) {
-        return reply.send({ ...projectToPlayerView(definition, result.run), events: result.events, report: result.report });
-      }
-      return reply.send({ ...projectToPlayerView(definition, result.run), events: result.events });
+      const body = actionBody(request.body);
+      const result = await available(() => commitAction(database, digest(request), request.params.runId, body));
+      return reply.send(result);
     }
   );
 
@@ -202,18 +257,20 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         minute: manualSaves.minute,
         status: manualSaves.status,
         metadataVersion: manualSaves.metadataVersion,
+        snapshot: manualSaves.snapshot,
       }).from(manualSaves)
         .where(and(eq(manualSaves.runId, request.params.runId), eq(manualSaves.status, 'active')))
         .orderBy(desc(manualSaves.createdAt))
         .limit(limitNum + 1);
 
+      const definition = findDefinitionById(run.definitionId);
       const items = saves.slice(0, limitNum).map(s => ({
         saveId: s.id,
         runId: request.params.runId,
         name: s.name,
         createdAt: s.createdAt.toISOString(),
         sourceRevision: s.sourceRevision,
-        cityName: 'Madrid',
+        cityName: definition.cities.find(city => city.id === snapshotCityId(s.snapshot))?.name ?? 'Madrid',
         minute: s.minute,
         status: s.status,
         metadataVersion: s.metadataVersion,
@@ -234,9 +291,15 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       if (run.status === 'closed') return reply.code(409).send({ error: { code: 'RUN_CLOSED', message: 'La partida ya está cerrada.', requestId: request.id } });
 
       const body = saveBody(request.body);
-      const ownerIdResult = await database.orm.select({ ownerId: runs.ownerId }).from(runs).where(eq(runs.id, request.params.runId)).limit(1);
-      const ownerId = ownerIdResult[0]?.ownerId;
-      if (!ownerId) throw new RunStoreError('NOT_FOUND');
+      const ownerId = run.ownerId;
+      const requestDigest = createHash('sha256')
+        .update(JSON.stringify(body.replaceSaveId ? { replace: body.replaceSaveId } : { create: body.name }))
+        .digest('hex');
+
+      // Replay por idempotencia ANTES de rechazar una revisión vieja (GUARDADOS.md).
+      const replayedSummary = await findSaveReplay(database, request.params.runId, body.idempotencyKey, requestDigest);
+      if (replayedSummary) return reply.code(200).send({ ...replayedSummary, replayed: true });
+      if (body.expectedVersion !== run.revision) throw new RunStoreError('VERSION_CONFLICT');
 
       const existingByName = await database.orm.select({ id: manualSaves.id }).from(manualSaves)
         .where(and(eq(manualSaves.runId, request.params.runId), eq(manualSaves.name, body.name), eq(manualSaves.status, 'active'))).limit(1);
@@ -245,44 +308,62 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         .where(and(eq(manualSaves.runId, request.params.runId), eq(manualSaves.status, 'active')));
       const activeCountNum = Number(activeCount[0]?.count ?? 0);
 
-      const runFull = await available(() => readFullRun(database, digest(request), request.params.runId));
-      const snapshot = runFull;
-      const snapshotHash = computeSnapshotHash(snapshot);
+      const target = body.replaceSaveId
+        ? (await database.orm.select({
+            id: manualSaves.id, createdAt: manualSaves.createdAt, metadataVersion: manualSaves.metadataVersion,
+          }).from(manualSaves)
+            .where(and(eq(manualSaves.id, body.replaceSaveId), eq(manualSaves.runId, request.params.runId))).limit(1))[0]
+        : undefined;
+      if (body.replaceSaveId && !target) throw new RunStoreError('NOT_FOUND');
 
-      return database.orm.transaction(async (tx) => {
-        if (body.replaceSaveId) {
+      // El snapshot guarda el CaseRun puro, no el agregado (la carga lo restaura tal cual).
+      const snapshot = run.engineState as CaseRun;
+      const snapshotHash = computeSnapshotHash(snapshot);
+      const now = new Date();
+
+      // La respuesta se envía DESPUÉS del commit: responder dentro de la
+      // transacción permitiría que el 201 llegase antes de que el guardado
+      // fuese visible para otras conexiones.
+      const created = await database.orm.transaction(async (tx) => {
+        if (body.replaceSaveId && target) {
           const replaced = await tx.update(manualSaves)
             .set({
               name: body.name,
-              sourceRevision: runFull.revision,
-              sourceBranchId: runFull.branchId,
-              minute: runFull.minute,
-              snapshot: runFull,
+              sourceRevision: run.revision,
+              sourceBranchId: run.branchId,
+              minute: run.minute,
+              snapshot,
               snapshotHash,
-              engineVersion: runFull.engineVersion,
+              engineVersion: run.engineVersion,
               metadataVersion: sql`${manualSaves.metadataVersion} + 1`,
-              updatedAt: new Date(),
+              updatedAt: now,
               status: 'active',
             })
             .where(and(eq(manualSaves.id, body.replaceSaveId), eq(manualSaves.runId, request.params.runId)))
-            .returning({ id: manualSaves.id });
+            .returning({ metadataVersion: manualSaves.metadataVersion });
           if (!replaced.length) throw new RunStoreError('NOT_FOUND');
+          const replacedRow = replaced[0];
+          if (!replacedRow) throw new RunStoreError('NOT_FOUND');
+          const summary = {
+            saveId: body.replaceSaveId, name: body.name, createdAt: target.createdAt.toISOString(),
+            sourceRevision: run.revision, metadataVersion: replacedRow.metadataVersion,
+          };
 
           await tx.insert(operationRecords).values({
             runId: request.params.runId,
-            ownerId: ownerId!,
+            ownerId,
             idempotencyKey: body.idempotencyKey,
             kind: 'save',
-            requestDigest: createHash('sha256').update(JSON.stringify({ replace: body.replaceSaveId })).digest('hex'),
-            resultPublic: { saveId: body.replaceSaveId, action: 'replace' },
-            branchId: runFull.branchId,
-            revision: runFull.revision,
+            requestDigest,
+            resultPublic: summary,
+            branchId: run.branchId,
+            revision: run.revision,
           });
 
-          return reply.code(200).send({ ...replaced[0], replayed: true });
+          return { status: 200, summary };
         }
 
-        if (activeCountNum >= 10 && !body.replaceSaveId) {
+        if (activeCountNum >= 10) {
           throw new RunStoreError('SAVE_LIMIT_REACHED');
         }
 
@@ -294,32 +375,37 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         await tx.insert(manualSaves).values({
           id,
           runId: request.params.runId,
-          ownerId: ownerId!,
+          ownerId,
           schemaVersion: 1,
           name: body.name,
-          sourceRevision: runFull.revision,
-          sourceBranchId: runFull.branchId,
-          minute: runFull.minute,
+          sourceRevision: run.revision,
+          sourceBranchId: run.branchId,
+          minute: run.minute,
           status: 'active',
-          snapshot: runFull,
+          snapshot,
           snapshotHash,
-          engineVersion: runFull.engineVersion,
+          engineVersion: run.engineVersion,
           metadataVersion: 1,
         });
+        const summary = {
+          saveId: id, name: body.name, createdAt: now.toISOString(),
+          sourceRevision: run.revision, metadataVersion: 1,
+        };
 
         await tx.insert(operationRecords).values({
           runId: request.params.runId,
-          ownerId: ownerId!,
+          ownerId,
           idempotencyKey: body.idempotencyKey,
           kind: 'save',
-          requestDigest: createHash('sha256').update(JSON.stringify({ create: body.name })).digest('hex'),
-          resultPublic: { saveId: id },
-          branchId: runFull.branchId,
-          revision: runFull.revision,
+          requestDigest,
+          resultPublic: summary,
+          branchId: run.branchId,
+          revision: run.revision,
         });
 
-        return reply.code(201).send({ saveId: id, name: body.name, createdAt: new Date().toISOString(), sourceRevision: runFull.revision, metadataVersion: 1 });
+        return { status: 201, summary };
       });
+      return reply.code(created.status).send(created.summary);
     }
   );
 
@@ -397,44 +483,15 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     }
   );
 
-  // POST /api/v1/runs/:runId/saves/:saveId/load - Load save
+  // POST /api/v1/runs/:runId/saves/:saveId/load - Load save (nueva rama, revisión+1)
   app.post<{ Params: { runId: string; saveId: string }; Body: { expectedVersion: number; idempotencyKey: string } }>(
     '/api/v1/runs/:runId/saves/:saveId/load',
     { onRequest: authorize },
     async (request, reply) => {
       const body = loadBody(request.body);
-      const run = await available(() => readFullRun(database, digest(request), request.params.runId));
-      if (run.status === 'closed') return reply.code(409).send({ error: { code: 'RUN_CLOSED', message: 'La partida ya está cerrada.', requestId: request.id } });
-
-      const save = await database.orm.select().from(manualSaves)
-        .where(and(eq(manualSaves.id, request.params.saveId), eq(manualSaves.runId, request.params.runId))).limit(1);
-      if (!save.length) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
-      const s = save[0]!;
-      if (s.metadataVersion !== body.expectedVersion) return reply.code(409).send({ error: { code: 'VERSION_CONFLICT', message: 'Versión de metadatos obsoleta.', requestId: request.id } });
-      if (s.status !== 'active') return reply.code(400).send({ error: { code: 'SAVE_NOT_ACTIVE', message: 'El guardado no está activo.', requestId: request.id } });
-
-      const savedSnapshot = s.snapshot as CaseRun;
-      if (savedSnapshot.engineVersion !== run.engineVersion || savedSnapshot.definitionHash !== run.definitionHash) {
-        return reply.code(422).send({ error: { code: 'SAVE_INCOMPATIBLE', message: 'El guardado no es compatible con la partida actual.', requestId: request.id } });
-      }
-
-      const newBranchId = randomUUID();
-      const newRun = { ...savedSnapshot, branchId: newBranchId, revision: (run as StoredRun & CaseRun).revision + 1 };
-
-      const view = projectToPlayerView(run.definitionId ? { id: run.definitionId } as any : { id: '' }, newRun);
-
-      await database.orm.insert(operationRecords).values({
-        runId: request.params.runId,
-        ownerId: run.ownerId,
-        idempotencyKey: body.idempotencyKey,
-        kind: 'load',
-        requestDigest: createHash('sha256').update(JSON.stringify({ load: request.params.saveId })).digest('hex'),
-        resultPublic: { newBranchId, sourceSaveId: s.id },
-        branchId: newBranchId,
-        revision: (run as StoredRun & CaseRun).revision + 1,
-      });
-
-      return reply.send({ ...view, operationId: `load-${randomUUID()}`, newBranchId });
+      const result = await available(() =>
+        commitLoad(database, digest(request), request.params.runId, request.params.saveId, body));
+      return reply.send(result);
     }
   );
 }

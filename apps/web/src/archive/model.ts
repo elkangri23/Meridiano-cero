@@ -1,4 +1,4 @@
-import type { InitialPlayerViewDto, RunListDto, SessionDto, CaseSummary } from '@meridiano/contracts';
+import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary } from '@meridiano/contracts';
 import type { ArchiveApi, Filter } from './client';
 import { ArchiveError } from './client';
 import { browserIntents, createRunCoordinator } from './creation';
@@ -10,7 +10,7 @@ type Phase = 'loading' | 'signed_out' | 'ready' | 'error' | 'logout_failed';
 export interface ArchiveState {
   phase: Phase; profile: SessionDto['profile'] | null; page: RunListDto | null;
   cases: CaseSummary[]; creation: CreationView;
-  opened: InitialPlayerViewDto | null; openingRunId: string | null;
+  opened: PlayerViewDto | null; openingRunId: string | null;
   filter: Filter; cursor: string | null; previous: readonly (string | null)[]; notice: string;
   connectionStatus: ConnectionStatus;
   lastError: string | null;

@@ -4,12 +4,13 @@ import { migrationFiles, matchesMigrationLedger } from '../database/migrations.t
 import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { validateCaseDefinition, type CaseDefinition } from '@meridiano/case-schema';
-import { createInitialRun } from '@meridiano/engine';
+import { createInitialRun, ENGINE_VERSION } from '@meridiano/engine';
 import type { Database } from '../database/connection.ts';
 import type { CaseRun } from '@meridiano/case-schema';
 
 export type RunStoreErrorCode = 'SESSION_REQUIRED' | 'SESSION_CHANGED' | 'NOT_FOUND' | 'IDEMPOTENCY_CONFLICT' | 'INVALID_REQUEST' |
-  'CASE_NOT_READY' | 'DEPENDENCY_UNAVAILABLE' | 'ORIGIN_REJECTED' | 'CSRF_REJECTED' | 'SAVE_LIMIT_REACHED';
+  'CASE_NOT_READY' | 'DEPENDENCY_UNAVAILABLE' | 'ORIGIN_REJECTED' | 'CSRF_REJECTED' | 'SAVE_LIMIT_REACHED' | 'VERSION_CONFLICT' |
+  'RUN_CLOSED' | 'SAVE_NOT_ACTIVE' | 'SAVE_INCOMPATIBLE';
 
 export class RunStoreError extends Error {
   readonly code: RunStoreErrorCode;
@@ -31,9 +32,14 @@ export interface StoredRun {
   status: 'active' | 'closed';
   engineState: unknown;
 }
-const columns = `id, owner_id AS "ownerId", definition_id AS "definitionId",
+export const runColumns = `id, owner_id AS "ownerId", definition_id AS "definitionId",
   definition_hash AS "definitionHash", engine_version AS "engineVersion",
-  revision, branch_id AS "branchId", engine_state AS "engineState"`;
+  revision, branch_id AS "branchId", engine_state AS "engineState",
+  engine_state->>'status' AS status`;
+// El estado autoritativo vive en engine_state (así lo lee run-list.ts); runs no
+// tiene columna status. Sin este alias, StoredRun.status era undefined y los
+// controles RUN_CLOSED de las rutas nunca se disparaban.
+const columns = runColumns;
 
 async function sessionOwner(client: PoolClient, digest: string): Promise<string> {
   if (!/^[a-f0-9]{64}$/.test(digest)) throw new RunStoreError('SESSION_REQUIRED');
@@ -127,14 +133,80 @@ export function readStoredRun(database: Database, sessionDigest: string, runId: 
   return inSession(database, sessionDigest, (client, ownerId) => ownedRun(client, ownerId, runId));
 }
 
+// ── Forma del estado v14 ────────────────────────────────────────────────────────
+// Fail-closed: un engine_state con claves desconocidas o tipos inválidos no se
+// proyecta ni se ejecuta (no se reconstruye progreso ficticio ni se filtra el
+// contenido). Solo se aplica a motores v14; los estados antiguos (v1–v13) los
+// valida initialPlayerView con su igualdad estricta propia.
+const runStateKeys = new Set([
+  'id', 'ownerId', 'definitionId', 'definitionHash', 'engineVersion', 'eventOrdinal', 'tripCount',
+  'version', 'minute', 'status', 'position', 'discoveries', 'evidenceRecords', 'inventory',
+  'admissibility', 'npcRelations', 'conversationRecords', 'pendingRequests', 'warrants',
+  'detentions', 'recoveredObjects', 'pendingBatch', 'finalReport',
+]);
+function isRecordValue(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(item => typeof item === 'string');
+}
+function isCounter(value: unknown, min: number): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= min;
+}
+const stateFields: Array<{ key: string; check: (value: unknown) => boolean }> = [
+  { key: 'id', check: value => typeof value === 'string' && value.length > 0 },
+  { key: 'ownerId', check: value => typeof value === 'string' && value.length > 0 },
+  { key: 'definitionId', check: value => typeof value === 'string' && value.length > 0 },
+  { key: 'definitionHash', check: value => typeof value === 'string' && value.length > 0 },
+  { key: 'engineVersion', check: value => isCounter(value, 1) },
+  { key: 'eventOrdinal', check: value => isCounter(value, 0) },
+  { key: 'tripCount', check: value => isCounter(value, 0) },
+  { key: 'version', check: value => isCounter(value, 1) },
+  { key: 'minute', check: value => isCounter(value, 0) },
+  { key: 'status', check: value => value === 'active' || value === 'closed' },
+  { key: 'position', check: value => isRecordValue(value) && typeof value.cityId === 'string' && typeof value.locationId === 'string' },
+  { key: 'discoveries', check: isStringList },
+  { key: 'inventory', check: isStringList },
+  { key: 'admissibility', check: isRecordValue },
+  { key: 'npcRelations', check: isRecordValue },
+  { key: 'conversationRecords', check: isStringList },
+  { key: 'pendingRequests', check: value => Array.isArray(value) },
+  { key: 'warrants', check: isStringList },
+  { key: 'detentions', check: isStringList },
+  { key: 'recoveredObjects', check: isStringList },
+  { key: 'pendingBatch', check: value => value === null || isStringList(value) },
+  { key: 'finalReport', check: value => value === null || isRecordValue(value) },
+  { key: 'evidenceRecords', check: value => value === undefined || isRecordValue(value) },
+];
+export function assertRunShape(state: unknown): void {
+  if (!isRecordValue(state)) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  if (Object.keys(state).some(key => !runStateKeys.has(key))) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  for (const field of stateFields) if (!field.check(state[field.key])) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+}
+
+/**
+ * CaseRun puro: solo las claves del motor. El motor hace spread del run que
+ * recibe, así que pasarle el agregado (con revision/branchId/engineState)
+ * contaminaría el engine_state persistido con campos del agregado.
+ */
+export function pureRun(run: CaseRun): CaseRun {
+  const { id, ownerId, definitionId, definitionHash, engineVersion, eventOrdinal, tripCount, version, minute,
+    status, position, discoveries, evidenceRecords, inventory, admissibility, npcRelations,
+    conversationRecords, pendingRequests, warrants, detentions, recoveredObjects, pendingBatch, finalReport } = run;
+  return { id, ownerId, definitionId, definitionHash, engineVersion, eventOrdinal, tripCount, version, minute,
+    status, position, discoveries, ...(evidenceRecords !== undefined ? { evidenceRecords } : {}),
+    inventory, admissibility, npcRelations, conversationRecords, pendingRequests, warrants, detentions,
+    recoveredObjects, pendingBatch, finalReport };
+}
+
 export async function readFullRun(database: Database, sessionDigest: string, runId: string): Promise<StoredRun & CaseRun> {
   return inSession(database, sessionDigest, async (client, ownerId) => {
-    const result = await client.query(
-      `SELECT ${columns}, engine_state FROM runs WHERE id=$1 AND owner_id=$2`, [runId, ownerId]);
-    const row = result.rows[0];
-    if (!row) throw new RunStoreError('NOT_FOUND');
-    const state = row.engine_state as CaseRun;
-    return { ...state, id: row.id, ownerId: row.ownerId, definitionId: row.definitionId, definitionHash: row.definitionHash, engineVersion: row.engineVersion, revision: row.revision, branchId: row.branchId, status: row.status, engineState: row.engine_state };
+    // ownedRun valida el formato UUID: sin él, Postgres rechaza el literal y
+    // la ruta devolvería 503 en vez de 404 para un id mal formado.
+    const stored = await ownedRun(client, ownerId, runId);
+    const state = stored.engineState as CaseRun;
+    if (stored.engineVersion === ENGINE_VERSION) assertRunShape(state);
+    return { ...state, id: stored.id, ownerId: stored.ownerId, definitionId: stored.definitionId, definitionHash: stored.definitionHash, engineVersion: stored.engineVersion, revision: stored.revision, branchId: stored.branchId, status: stored.status, engineState: stored.engineState };
   });
 }
 

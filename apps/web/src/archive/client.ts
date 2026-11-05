@@ -1,10 +1,10 @@
-import { isInitialPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto } from '@meridiano/contracts';
-import type { InitialPlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto } from '@meridiano/contracts';
+import { isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto } from '@meridiano/contracts';
+import type { PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto } from '@meridiano/contracts';
 
 export type Filter = 'all' | 'active' | 'closed';
 
 export interface ArchiveApi {
-  initial(runId: string, signal: AbortSignal): Promise<InitialPlayerViewDto>;
+  initial(runId: string, signal: AbortSignal): Promise<PlayerViewDto>;
   cases(signal: AbortSignal): Promise<CaseListDto>;
   create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal): Promise<void>;
   lookup(key: string, identity: SessionDto, signal: AbortSignal): Promise<RunCreationLookupDto | null>;
@@ -57,9 +57,9 @@ async function read(response: Response): Promise<Record<string, unknown>> {
   return body;
 }
 
-async function readInitialPlayerViewDto(response: Response): Promise<InitialPlayerViewDto> {
+async function readPlayerViewDto(response: Response): Promise<PlayerViewDto> {
   const body = await read(response);
-  if (!isInitialPlayerViewDto(body)) throw new ArchiveError('invalid');
+  if (!isPlayerViewDto(body)) throw new ArchiveError('invalid');
   return body;
 }
 
@@ -96,10 +96,10 @@ function mutationHeaders(identity: SessionDto) {
 }
 
 export const archiveApi: ArchiveApi = {
-  async initial(runId: string, signal: AbortSignal): Promise<InitialPlayerViewDto> {
+  async initial(runId: string, signal: AbortSignal): Promise<PlayerViewDto> {
     if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(runId)) throw new ArchiveError('invalid');
     const response = await request('/api/v1/runs/' + encodeURIComponent(runId), signal);
-    const view = await readInitialPlayerViewDto(response);
+    const view = await readPlayerViewDto(response);
     if (view.runId !== runId) throw new ArchiveError('invalid');
     return view;
   },
