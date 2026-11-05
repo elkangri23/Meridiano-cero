@@ -1,64 +1,202 @@
+/* Pantalla de juego: lenguaje visual del prototipo pixel-art (/prototype).
+ * Paleta y motivos tomados de apps/web/src/prototype/prototype.css:
+ * negro de fondo, panel azul #0000aa, dorado #ffff55, gris #aaaaaa,
+ * teal #00aaaa y cielo #55ffff. Solo presentación: clases, testids y textos
+ * de lógica intactos. El prototipo no se toca. */
 body:has(.game) { background:#000000; color:#ffffff; }
-.game { max-width:72rem; margin:0 auto; padding:16px; font-family:ui-monospace, monospace; line-height:1.6; }
-.game-high-contrast { background:#000000; color:#ffffff; }
-.game-high-contrast .game-window, .game-high-contrast .game-scene, .game-high-contrast .game-offers,
-.game-high-contrast .game-console, .game-high-contrast .game-order { border-color:#ffff55; }
-.game h1 { font-size:1.4rem; line-height:1.3; color:#ffff55; margin:0 0 8px; }
-.game h2 { font-size:1.1rem; color:#ffff55; font-weight:400; margin:0 0 8px; }
-.game h3 { font-size:1rem; color:#ffff55; font-weight:400; }
-.game h4 { font-size:1rem; color:#ffff55; font-weight:400; margin:16px 0 8px; }
-.game button, .game select, .game input, .game textarea { font:inherit; border-radius:0; border:2px outset #ffffff; background:#aaaaaa; color:#000000; padding:8px 12px; min-height:44px; }
+.game {
+  --paper:#ffffff; --muted:#aaaaaa; --gold:#ffff55; --edge:#aaaaaa;
+  --panel:#0000aa; --ink:#000000; --teal:#00aaaa; --sky:#55ffff;
+  --rust:#aa5500; --grey:#555555; --error:#ff5555;
+  max-width:1440px; margin:16px auto; padding:0 32px;
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace; line-height:1.5; color:var(--paper);
+}
+.game * { box-sizing:border-box; }
+.game-high-contrast { --panel:#000000; --ink:#000000; --edge:#ffffff; --muted:#ffffff; }
+.game h1,.game h2,.game h3,.game p { margin:0; }
+.game button,.game select,.game input,.game textarea { font:inherit; }
+.game button { border-radius:0; cursor:pointer; }
+.game button:focus-visible,.game select:focus-visible,.game input:focus-visible,.game textarea:focus-visible,.game a:focus-visible { outline:3px solid var(--gold); outline-offset:4px; }
+.game a { color:var(--gold); text-underline-offset:4px; }
+.game code { background:var(--panel); padding:0 4px; }
+
+/* Botón base: gris con relieve blanco, como el prototipo (DOS). */
+.game button,.game select { border:2px outset #ffffff; background:#aaaaaa; color:#000000; padding:8px 12px; min-height:44px; }
 .game button:disabled { opacity:1; color:#555555; cursor:default; }
-.game button:focus-visible, .game select:focus-visible, .game input:focus-visible, .game textarea:focus-visible, .game a:focus-visible { outline:3px solid #ffff55; outline-offset:2px; }
-.game a { color:#ffff55; }
-.game code { background:#0000aa; padding:0 4px; }
+.game .game-primary-button { background:var(--gold); color:#000000; border:2px outset #ffffff; }
+.game .game-primary-button:disabled { opacity:.55; color:#555555; }
 
-.game-header { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:16px; border:4px double #ffffff; padding:16px; background:#0000aa; }
-.game-eyebrow { color:#9ed7b3; font-size:.85rem; margin:0 0 4px; }
-.game-header p { margin:4px 0; }
+/* Sobre-título del prototipo: pequeño, espaciado, apagado, en mayúsculas. */
+.game-overline { font-size:.67em; letter-spacing:.13em; color:var(--muted); font-weight:600; text-transform:uppercase; }
+.game h1 { font-size:clamp(1.5rem,3vw,2.5rem); font-weight:500; letter-spacing:.05em; line-height:1.25; }
+.game h2 { font-size:1.15em; font-weight:700; line-height:1.25; }
+.game h3 { font-size:.9em; }
+
+/* Cabecera de agencia + tira del expediente (como el prototipo). */
+.game-header { margin-bottom:16px; }
+.game-agency { display:flex; justify-content:space-between; align-items:center; gap:18px; padding:16px 0; }
+.game-brand { display:flex; align-items:center; gap:18px; }
+.game-mark { font-size:2.4em; line-height:1; border:2px solid var(--gold); color:var(--gold); background:var(--panel); width:62px; height:62px; display:grid; place-items:center; position:relative; font-weight:700; flex-shrink:0; }
+.game-mark > span { position:absolute; font-size:.35em; right:3px; bottom:1px; background:var(--ink); padding:1px; }
+.game-detective { display:flex; align-items:center; gap:12px; font-size:.8em; }
+.game-detective strong,.game-detective small { display:block; }
+.game-detective small { color:var(--muted); font-size:.8em; }
+.game-avatar { display:grid; place-items:center; width:42px; height:42px; background:#000000; color:var(--paper); border:1px solid var(--edge); flex-shrink:0; }
+.game-header-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.game-header-actions a { white-space:nowrap; }
+.game-case-strip { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:20px; background:var(--panel); border:2px solid var(--edge); padding:12px; }
+.game-case-strip strong { font-size:.9em; font-weight:500; }
+.game-case-strip p { margin-bottom:2px; }
 .game-clock { text-align:right; }
-.game-clock strong { font-size:1.4rem; color:#ffff55; }
-.game-clock-state { display:block; color:#9ed7b3; }
+.game-clock strong { font-size:1.25em; color:var(--gold); }
+.game-clock strong span { color:var(--muted); font-size:.7em; }
+.game-clock small { display:block; font-size:.6em; color:var(--muted); }
 
-.game-notice { padding:12px 0; min-height:48px; color:#ffff55; }
-.game-error { color:#ff5555; }
-.game-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 16px; }
+.game-notice { padding:12px 0; min-height:48px; color:var(--gold); }
+.game-error { color:var(--error); }
 
-.game-scene, .game-offers, .game-console, .game-order { border:4px double #ffffff; background:#0000aa; padding:16px; margin-bottom:16px; }
+/* Barra de herramientas: navegación del prototipo (fondo negro, activa teal). */
+.game-toolbar { display:flex; flex-wrap:wrap; gap:0; margin:8px 0 16px; background:#000000; border:2px solid var(--edge); padding:0; }
+.game-toolbar button { text-align:left; color:var(--muted); background:transparent; border:0; border-left:2px solid transparent; font-size:.8em; padding:12px 14px; line-height:1.5; min-height:44px; }
+.game-toolbar button:hover { background:var(--panel); color:var(--paper); }
+.game-toolbar button[aria-pressed="true"] { background:var(--teal); border-left-color:var(--gold); color:var(--paper); }
+
+/* Escena: panel azul con barra superior, arte pixel y pie de escena. */
+.game-scene { border:2px solid var(--edge); background:var(--panel); margin-bottom:16px; }
+.game-scene-top { display:flex; justify-content:space-between; gap:10px; background:var(--edge); color:#000000; padding:4px 8px; font-size:.75em; }
+.game-scene-art { background:#000; overflow:hidden; }
+.game-scene-art svg { display:block; width:100%; height:auto; image-rendering:pixelated; }
+.game-scene-caption { padding:12px; display:flex; align-items:center; justify-content:space-between; gap:15px; }
+.game-scene-description { padding:0 12px 12px; font-size:.9em; line-height:1.7; }
+.game-scene-meta { padding:0 12px 12px; font-size:.85em; color:var(--muted); }
+.game-scene-meta p { margin-top:4px; }
+
+/* Ofertas. */
+.game-offers { border:2px solid var(--edge); background:var(--panel); padding:16px; margin-bottom:16px; }
+.game-offers h2 { margin:8px 0 12px; }
 .game-offers ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px; }
-.game-console ol { margin:0; padding-left:20px; max-height:12rem; overflow:auto; }
+.game-offers > p { color:var(--muted); font-size:.9em; }
+
+/* Consola narrativa: cuaderno de campo del prototipo. */
+.game-console { border:2px solid var(--edge); border-left:4px solid var(--gold); background:var(--panel); padding:12px 16px; margin-bottom:16px; }
+.game-console h2 { margin:8px 0 12px; }
+.game-console ol { margin:0; padding:0; list-style:none; max-height:12rem; overflow:auto; font-size:.84em; }
+.game-console ol li { margin-top:8px; }
+.game-console ol li:first-child { margin-top:0; }
+.game-console .game-log-minute { color:var(--gold); }
+.game-narrative-cursor { color:var(--gold); }
 .game-console details { margin-top:12px; }
-.game-order label { display:block; margin-bottom:8px; }
-.game-order textarea { width:100%; box-sizing:border-box; background:#ffffff; color:#000000; }
-.game-order form button { margin-top:8px; }
-.game-clarification, .game-recovering { border:2px solid #ffff55; padding:12px; margin-top:12px; background:#000000; }
-.game-clarification button, .game-recovering button, .game-error button { margin-right:8px; }
+.game-console details summary { cursor:pointer; color:var(--muted); font-size:.85em; }
+.game-console details ol { max-height:none; }
 
+/* Orden: sección de comando del prototipo (fondo negro, símbolo > dorado). */
+.game-order { border:2px solid var(--edge); background:#000000; padding:18px 20px 10px; margin-bottom:16px; }
+.game-order-label { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:13px; font-size:.85em; text-transform:uppercase; }
+.game-order-label > span { color:var(--muted); font-size:.6em; letter-spacing:.1em; }
+.game-order form { display:flex; align-items:stretch; border:1px solid var(--edge); background:#000000; }
+.game-prompt-symbol { color:var(--gold); padding:0 14px; align-self:center; }
+.game-order textarea { min-width:0; width:100%; border:0; background:transparent; color:var(--paper); padding:15px 0; font-size:.9em; resize:vertical; }
+.game-order textarea::placeholder { color:var(--muted); }
+.game-order form button { white-space:nowrap; margin:0; border-left:1px solid var(--edge); }
+.game-order-bottom { display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:32px; }
+.game-order-bottom p { font-size:.65em; color:var(--muted); }
+.game-clarification,.game-recovering { border:2px solid var(--gold); padding:12px; margin-top:12px; background:#000000; }
+.game-clarification button,.game-recovering button,.game-error button { margin-right:8px; }
+
+/* Diálogo de confirmación: diálogo del prototipo. */
 .game-preview-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.8); display:grid; place-items:center; z-index:40; padding:16px; }
-.game-preview { border:4px double #ffff55; background:#0000aa; padding:24px; max-width:32rem; width:100%; }
-.game-preview-actions { display:flex; gap:12px; margin-top:16px; }
+.game-preview { border:4px double #ffffff; box-shadow:8px 8px #000000; background:var(--panel); padding:30px; max-width:520px; width:100%; }
+.game-preview h2 { margin:8px 0 20px; }
+.game-preview > p { font-size:.9em; margin-top:8px; }
+.game-preview-facts { margin:20px 0; border-block:1px solid var(--edge); padding:12px 0; font-size:.75em; display:flex; justify-content:space-between; gap:15px; }
+.game-preview-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:25px; }
 
-.game-window { position:absolute; z-index:20; width:min(28rem, calc(100vw - 32px)); border:4px double #ffffff; background:#0000aa; box-shadow:8px 8px 0 #222222; }
-.game-window-titlebar { display:flex; align-items:center; justify-content:space-between; gap:8px; background:#ffffff; color:#000000; padding:4px 8px; cursor:move; }
-.game-window-titlebar h3 { color:#000000; margin:0; cursor:move; }
-.game-window-titlebar h3:focus-visible { outline:3px solid #0000aa; }
+/* Ventanas de herramienta: diálogo del prototipo con barra negra. */
+.game-window { position:absolute; z-index:20; width:min(28rem, calc(100vw - 32px)); border:2px solid var(--edge); background:var(--panel); box-shadow:8px 8px 0 #000000; }
+.game-window-titlebar { display:flex; align-items:center; justify-content:space-between; gap:8px; background:#000000; color:var(--paper); padding:4px 8px; border-bottom:1px solid var(--edge); cursor:move; }
+.game-window-titlebar h3 { color:var(--paper); margin:0; cursor:move; font-weight:400; }
+.game-window-titlebar h3:focus-visible { outline:3px solid var(--gold); }
 .game-window-controls { display:flex; align-items:center; gap:4px; }
 .game-window-controls button { min-height:32px; padding:2px 8px; }
-.game-window-moving { font-size:.8rem; }
+.game-window-moving { font-size:.8rem; color:var(--gold); }
 .game-window-body { padding:16px; max-height:60vh; overflow:auto; }
 .game-window-body table { border-collapse:collapse; width:100%; }
-.game-window-body th, .game-window-body td { border:1px solid #aaaaaa; padding:4px 8px; text-align:left; }
-.game-window-body th { color:#ffff55; font-weight:400; }
+.game-window-body th,.game-window-body td { border:1px solid var(--edge); padding:4px 8px; text-align:left; }
+.game-window-body th { color:var(--gold); font-weight:400; }
+.game-window-body h4 { font-size:.75em; letter-spacing:.13em; color:var(--muted); font-weight:600; text-transform:uppercase; margin:16px 0 8px; }
+.game-window-body h4:first-child { margin-top:0; }
 .game-window-body label { display:block; margin:8px 0; }
-.game-window-body input, .game-window-body select { width:100%; box-sizing:border-box; background:#ffffff; color:#000000; }
+.game-window-body input,.game-window-body select { width:100%; box-sizing:border-box; background:#ffffff; color:#000000; }
+.game-window-body input[type="checkbox"] { width:20px; height:20px; accent-color:var(--gold); }
+.game-window-body form button[type="submit"] { background:var(--gold); color:#000000; }
 .game-minimized-bar { position:fixed; left:16px; bottom:16px; z-index:30; display:flex; flex-wrap:wrap; gap:8px; }
-.game-load-confirm { border:2px solid #ffff55; padding:12px; margin-top:12px; background:#000000; }
+.game-load-confirm { border:2px solid var(--gold); padding:12px; margin-top:12px; background:#000000; }
 .game-load-confirm button { margin-right:8px; }
 
-@media (max-width: 720px) {
+/* Atlas del prototipo: tierra teal y ciudades con ▪ dorado. */
+.game-atlas { height:140px; position:relative; background:var(--panel); border:1px solid var(--edge); margin:0 0 18px; }
+.game-atlas-land { position:absolute; inset:10px 15%; background:var(--teal); clip-path:polygon(30% 0,80% 0,80% 20%,100% 20%,100% 40%,80% 40%,80% 60%,60% 60%,60% 80%,50% 80%,50% 100%,20% 100%,20% 80%,10% 80%,10% 60%,20% 60%,20% 40%,10% 40%,10% 20%,30% 20%); }
+.game-atlas-city { position:absolute; font-size:.7em; color:#ffffff; text-shadow:1px 1px #000; }
+.game-atlas-city::before { content:"▪ "; color:var(--gold); }
+.game-destination-list { list-style:none; padding:0; margin:0; }
+.game-destination-list li { display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid var(--edge); padding:11px 0; }
+.game-destination-list small { display:block; font-size:.7em; color:var(--muted); }
+.game-destination-list button { padding:6px; font-size:.65em; min-height:32px; }
+
+/* Tarjeta de evidencia del prototipo: gris, texto negro, sombra dura. */
+.game-evidence-card { padding:18px 14px; border:1px solid #ffffff; background:#aaaaaa; color:#000000; box-shadow:4px 4px #000000; margin:12px 0; }
+.game-evidence-kind { color:#000000; letter-spacing:.14em; font-size:.58em; }
+.game-evidence-card p { font-size:.83em; line-height:1.7; margin-top:9px; }
+
+/* Estados vacíos y notas del prototipo. */
+.game-empty-state { padding:25px 0; text-align:center; border-block:1px dashed var(--edge); margin-top:25px; }
+.game-empty-state .game-empty-glyph { display:block; font-size:3em; color:var(--gold); }
+.game-empty-state p { font-size:.85em; color:var(--muted); margin-top:15px; }
+.game-panel-note { margin-top:20px; font-size:.7em; color:var(--muted); }
+
+/* Guardados: contador con número dorado y aviso de partida cerrada. */
+.game-save-count strong { color:var(--gold); font-size:1.1em; }
+.game-closed-note { border:2px solid var(--gold); background:#000000; padding:12px; margin:12px 0; }
+.game-save-list { list-style:none; padding:0; margin:0; }
+.game-save-list li { display:flex; flex-wrap:wrap; align-items:center; gap:8px; border-bottom:1px solid var(--edge); padding:11px 0; }
+.game-save-list small { display:block; font-size:.7em; color:var(--muted); }
+.game-save-list button { padding:6px; font-size:.65em; min-height:32px; }
+
+/* Ajustes: filas del prototipo. */
+.game-setting { display:flex; justify-content:space-between; align-items:center; gap:16px; border-bottom:1px solid var(--edge); padding:18px 0; font-size:.9em; min-height:48px; }
+.game-setting select { width:auto; }
+
+/* Informe final. */
+.game-report-result strong { color:var(--gold); }
+.game-report-objectives { list-style:none; padding:0; margin:8px 0; }
+.game-report-objectives li::before { content:"▪ "; color:var(--gold); }
+
+@media (max-width:1100px) { .game { padding:0 20px; } }
+@media (max-width:850px) {
+  .game-agency { flex-wrap:wrap; }
+  .game-detective { display:none; }
+  .game-case-strip { grid-template-columns:1fr 1fr; }
+  .game-clock { text-align:left; }
+  .game-toolbar { flex-wrap:nowrap; overflow-x:auto; }
+  .game-toolbar button { flex-shrink:0; }
+}
+@media (max-width:720px) {
   .game { padding:8px; }
   .game-window { position:static; width:auto; box-shadow:none; margin-bottom:16px; }
   .game-window-body { max-height:none; }
-  .game-header { flex-direction:column; }
-  .game-clock { text-align:left; }
+  .game-case-strip { grid-template-columns:1fr; }
 }
+@media (max-width:520px) {
+  .game { margin:10px auto; padding:0 14px; }
+  .game-agency { padding:22px 0 12px; }
+  .game-brand { gap:12px; }
+  .game-mark { width:48px; height:48px; font-size:1.8em; }
+  .game-order { padding:14px; }
+  .game-order form { flex-wrap:wrap; }
+  .game-order textarea { width:calc(100% - 45px); }
+  .game-order form button { width:100%; border-left:0; border-top:1px solid var(--edge); }
+  .game-order-label > span { display:none; }
+  .game-order-bottom { flex-wrap:wrap; }
+  .game-scene-top { font-size:.65em; }
+}
+@media (prefers-reduced-motion:reduce) { .game *, .game *::before, .game *::after { scroll-behavior:auto; animation:none; transition:none; } }

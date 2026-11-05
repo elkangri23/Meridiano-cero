@@ -30,9 +30,10 @@ function renderArchiveList(state: any, model: any, busy: boolean, filter: (e: an
   
   return (
     <section className="archive-list" aria-label="Partidas propias" aria-busy={busy}>
+      <p className="archive-overline">Partidas propias</p>
       <h2>Mis partidas</h2>
       <label>Mostrar <select value={state.filter} disabled={busy} onChange={filter}><option value="all">Todas</option><option value="active">Activas</option><option value="closed">Cerradas</option></select></label>
-      <div className="connection-status" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '8px 12px', background: '#0000aa', border: '2px solid #ffff55', borderRadius: '4px' }}>
+      <div className="archive-connection">
         <span style={{ color: connectionStatusColor(state.connectionStatus), fontWeight: 'bold' }}>
           {connectionStatusLabel(state.connectionStatus)}
         </span>
@@ -41,7 +42,7 @@ function renderArchiveList(state: any, model: any, busy: boolean, filter: (e: an
             Reintentar conexión
           </button>
         )}
-        {state.lastError && <span style={{ color: '#ff5555', fontSize: '0.8em' }}>{state.lastError}</span>}
+        {state.lastError && <span className="archive-connection-error">{state.lastError}</span>}
       </div>
       <p role="status" aria-live="polite" className="archive-notice">{state.notice}</p>
       {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
@@ -108,7 +109,7 @@ function Archive() {
   return (
     <main className="archive">
       <a className="skip-link" href="#command-input">Ir a la entrada de órdenes</a>
-      <header className="archive-header"><span className="archive-mark" aria-hidden="true">M<span>0</span></span><div><p>MERIDIANO-CERO</p><h1>Archivo de partidas</h1></div></header>
+      <header className="archive-header"><span className="archive-mark" aria-hidden="true">M<span>0</span></span><div><p>Meridiano-cero · Agencia de investigación internacional</p><h1>Archivo de partidas</h1></div></header>
       <p className="archive-banner">Consulta del archivo · Aquí empiezas tus investigaciones y retomas las que tienes a medias.</p>
       <SessionBar state={state} model={model} />
       {verified && <p role="status" className="archive-notice">Correo verificado. Ya puedes jugar.</p>}
