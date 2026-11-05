@@ -6,6 +6,7 @@ export function InitialRun({ view, close }: { view: PlayerViewDto; close: () => 
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, [view.runId]);
   return <section className="archive-initial" aria-labelledby="initial-heading">
+    <p className="archive-overline">Ficha de lectura</p>
     <h2 id="initial-heading" tabIndex={-1} ref={heading}>Ficha de la partida</h2>
     <p>Referencia: <code>{view.runId.slice(0, 8)}</code> · Revisión {view.version}</p>
     <p>Reloj del caso: {view.clock.minute} min · Plazo: {view.clock.deadlineMinutes} min</p>

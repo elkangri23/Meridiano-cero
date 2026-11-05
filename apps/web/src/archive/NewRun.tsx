@@ -5,7 +5,7 @@ import type { ArchiveState, createArchiveModel } from './model';
 
 type Props = { state: ArchiveState; model: ReturnType<typeof createArchiveModel> };
 export function NewRun({ state, model }: Props) {
-  return <section className="archive-create" aria-labelledby="new-run-title"><h2 id="new-run-title">Nueva partida</h2><p>Elige un expediente para empezar a investigar.</p><CreationContent state={state} model={model} /></section>;
+  return <section className="archive-create" aria-labelledby="new-run-title"><p className="archive-overline">Nueva investigación</p><h2 id="new-run-title">Nueva partida</h2><p>Elige un expediente para empezar a investigar.</p><CreationContent state={state} model={model} /></section>;
 }
 function CreationContent({ state, model }: Props) {
   const [selected, setSelected] = useState('');

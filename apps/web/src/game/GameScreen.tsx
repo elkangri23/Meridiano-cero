@@ -72,29 +72,79 @@ function previewOutcome(response: ActionResponseDto, offer: PublicActionOffer, k
 
 function HeaderSection({ view, caseTitle, detective, onLogout }: { view: PlayerViewDto; caseTitle: string | null; detective: string; onLogout: (() => void) | null }) {
   return <header className="game-header">
-    <div>
-      <p className="game-eyebrow">A.C.M.E. · {caseTitle ?? view.caseId}</p>
-      <h1>{view.position.city.name} — {view.position.location.name}</h1>
-      <p>Detective: {detective} · Referencia: <code>{view.runId.slice(0, 8)}</code> · Revisión {view.version}</p>
+    <div className="game-agency">
+      <div className="game-brand">
+        <span className="game-mark" aria-hidden="true">M<span>0</span></span>
+        <div><p className="game-overline">Agencia de investigación internacional</p><h1>Meridiano cero</h1></div>
+      </div>
+      <div className="game-detective">
+        <span className="game-avatar" aria-hidden="true">{detective.slice(0, 1).toUpperCase()}</span>
+        <div><strong>Detective: {detective}</strong><small>Referencia: {view.runId.slice(0, 8)} · Revisión {view.version}</small></div>
+      </div>
+      <div className="game-header-actions">
+        <Link to="/">Archivo</Link>
+        {onLogout && <button type="button" onClick={onLogout}>Cerrar sesión</button>}
+      </div>
     </div>
-    <div className="game-clock" data-testid="clock" aria-label={`Reloj del caso: ${view.clock.minute} minutos de ${view.clock.deadlineMinutes}`}>
-      <strong>{view.clock.minute} min</strong><span> / {view.clock.deadlineMinutes} min</span>
-      <span className="game-clock-state">{view.status === 'closed' ? 'Cerrada' : 'Activa'}</span>
+    <div className="game-case-strip">
+      <div><p className="game-overline">Expediente</p><strong>{caseTitle ?? view.caseId}</strong></div>
+      <div><p className="game-overline">Destino actual</p><strong>{view.position.city.name}, {view.position.city.country}</strong></div>
+      <div className="game-clock" data-testid="clock" aria-label={`Reloj del caso: ${view.clock.minute} minutos de ${view.clock.deadlineMinutes}`}>
+        <p className="game-overline">Tiempo transcurrido / plazo</p>
+        <strong>{view.clock.minute} min<span> / {view.clock.deadlineMinutes} min</span></strong>
+        <small>{view.status === 'closed' ? 'Cerrada' : 'Activa'} · El reloj avanza solo al actuar</small>
+      </div>
     </div>
-    <Link to="/">Archivo</Link>
-    {onLogout && <button type="button" onClick={onLogout}>Cerrar sesión</button>}
   </header>;
 }
 
+/** Arte de escena genérico (decorativo): mismo motivo pixel de la maqueta
+ * (ventana con skyline, mesa y caja) sin pretender ser la localización
+ * concreta, porque el juego no tiene ilustración por localización. */
+function SceneArt() {
+  return <div className="game-scene-art" aria-hidden="true">
+    <svg viewBox="0 0 320 160" shapeRendering="crispEdges" focusable="false">
+      <rect width="320" height="160" fill="#555555" />
+      <path d="M0 0H8V120H0ZM312 0H320V120H312Z" fill="#aaaaaa" />
+      <rect y="116" width="320" height="44" fill="#aa5500" />
+      <path d="M0 116H320V120H0ZM0 136H320V140H0ZM0 156H320V160H0ZM64 120H68V136H64ZM192 120H196V136H192ZM128 140H132V156H128ZM256 140H260V156H256Z" fill="#000000" />
+      <rect x="28" y="16" width="104" height="84" fill="#000000" />
+      <rect x="32" y="20" width="96" height="76" fill="#aaaaaa" />
+      <rect x="36" y="24" width="88" height="68" fill="#55ffff" />
+      <path d="M36 72H48V60H60V68H76V52H88V64H104V56H116V72H124V92H36Z" fill="#00aaaa" />
+      <path d="M76 24H80V92H76ZM36 48H124V52H36Z" fill="#000000" />
+      <rect x="224" y="24" width="64" height="48" fill="#000000" />
+      <rect x="228" y="28" width="56" height="40" fill="#aa5500" />
+      <rect x="232" y="32" width="48" height="32" fill="#0000aa" />
+      <path d="M232 56H240V48H248V40H256V48H264V56H280V64H232Z" fill="#00aaaa" />
+      <path d="M176 0H180V24H176ZM168 24H188V28H168ZM164 28H192V32H164Z" fill="#000000" />
+      <rect x="164" y="32" width="28" height="4" fill="#ffff55" />
+      <rect x="56" y="112" width="212" height="8" fill="#ffff55" />
+      <rect x="56" y="120" width="212" height="8" fill="#000000" />
+      <path d="M64 128H72V152H64ZM252 128H260V152H252Z" fill="#aaaaaa" />
+      <rect x="100" y="76" width="80" height="36" fill="#aa5500" />
+      <path d="M100 76H180V80H100ZM100 92H180V96H100ZM100 108H180V112H100Z" fill="#000000" />
+      <path d="M108 76H116V112H108ZM164 76H172V112H164Z" fill="#aaaaaa" />
+      <rect x="204" y="104" width="32" height="8" fill="#ffffff" />
+      <rect x="208" y="100" width="12" height="4" fill="#ffffff" />
+      <rect x="208" y="108" width="24" height="4" fill="#aaaaaa" />
+    </svg>
+  </div>;
+}
+
 function SceneSection({ view }: { view: PlayerViewDto }) {
+  const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   return <section className="game-scene" aria-labelledby="scene-heading">
-    <h2 id="scene-heading">Escena</h2>
-    <p>{view.position.location.description}</p>
-    <p>Ciudad: {view.position.city.name}, {view.position.city.country} · Lugar: {view.position.location.name}</p>
-    {view.objects.length > 0 && <p>En tu poder: {view.objects.map(item => item.id).join(', ')}</p>}
-    {view.pendingRequests.length > 0 && <p>Solicitudes pendientes: {view.pendingRequests.map(item => `${requestTypeLabels[item.type] ?? item.type} (min ${item.dueMinute})`).join(', ')}</p>}
-    {view.warrants.length > 0 && <p>Órdenes: {view.warrants.join(', ')}</p>}
-    {view.detentions.length > 0 && <p>Detenciones: {view.detentions.join(', ')}</p>}
+    <div className="game-scene-top"><span>Localización {String(locationIndex).padStart(2, '0')}</span><span>{view.position.city.name.toUpperCase()} · {view.position.city.country}</span></div>
+    <SceneArt />
+    <div className="game-scene-caption"><div><p className="game-overline">{view.position.city.name}</p><h2 id="scene-heading">{view.position.location.name}</h2></div></div>
+    <p className="game-scene-description">{view.position.location.description}</p>
+    <div className="game-scene-meta">
+      {view.objects.length > 0 && <p>En tu poder: {view.objects.map(item => item.id).join(', ')}</p>}
+      {view.pendingRequests.length > 0 && <p>Solicitudes pendientes: {view.pendingRequests.map(item => `${requestTypeLabels[item.type] ?? item.type} (min ${item.dueMinute})`).join(', ')}</p>}
+      {view.warrants.length > 0 && <p>Órdenes: {view.warrants.join(', ')}</p>}
+      {view.detentions.length > 0 && <p>Detenciones: {view.detentions.join(', ')}</p>}
+    </div>
   </section>;
 }
 
@@ -103,6 +153,7 @@ function OffersSection({ view, disabled, onOffer }: { view: PlayerViewDto; disab
   const offers = view.offers.filter(offer => offer.action.type !== 'travel' && offer.action.type !== 'finish');
   const finishOffer = view.offers.find(offer => offer.action.type === 'finish');
   return <section className="game-offers" aria-labelledby="offers-heading">
+    <p className="game-overline">Acciones del motor</p>
     <h2 id="offers-heading">Acciones disponibles</h2>
     {closed
       ? <p>La partida está cerrada. Consulta el informe final.</p>
@@ -115,18 +166,20 @@ function OffersSection({ view, disabled, onOffer }: { view: PlayerViewDto; disab
               {offer.label}{offer.detail ? ` · ${offer.detail}` : ''}
             </button>
           </li>))}</ul>}
-    {finishOffer && !closed && <p><button type="button" data-testid="offer-finish" disabled={disabled}
+    {finishOffer && !closed && <p><button type="button" className="game-primary-button" data-testid="offer-finish" disabled={disabled}
       onClick={event => onOffer(finishOffer, event.currentTarget)}>{finishOffer.label}</button></p>}
   </section>;
 }
 
 function ConsoleSection({ log, orderHistory }: { log: Array<{ minute: number; summary: string }>; orderHistory: string[] }) {
   return <section className="game-console" aria-labelledby="console-heading">
+    <p className="game-overline">Cuaderno de campo</p>
     <h2 id="console-heading">Consola narrativa</h2>
     <ol aria-live="polite">
       {log.length === 0 && <li>La investigación comienza. Inspecciona la escena o elige una acción.</li>}
-      {log.map((entry, index) => <li key={index}>[min {entry.minute}] {entry.summary}</li>)}
+      {log.map((entry, index) => <li key={index}><span className="game-log-minute">[min {entry.minute}]</span> {entry.summary}</li>)}
     </ol>
+    <span className="game-narrative-cursor" aria-hidden="true">_</span>
     {orderHistory.length > 0 && <details><summary>Historial de órdenes</summary><ol>{orderHistory.map((item, index) => <li key={index}>{item}</li>)}</ol></details>}
   </section>;
 }
@@ -137,16 +190,20 @@ function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSu
   onCancel: () => void; onRecover: () => void;
 }) {
   return <section className="game-order" aria-labelledby="order-heading">
-    <h2 id="order-heading">Orden en texto libre</h2>
+    <div className="game-order-label">
+      <label id="order-heading" htmlFor="order-input">Tu siguiente acción</label>
+      <span>Escribe con tus palabras</span>
+    </div>
     <form onSubmit={onSubmit}>
-      <label htmlFor="order-input">Escribe lo que quieres hacer (Ctrl+Enter para enviar)</label>
+      <span className="game-prompt-symbol" aria-hidden="true">&gt;</span>
       <textarea id="order-input" data-testid="order-input" ref={inputRef} rows={3} value={draft}
         onChange={event => onDraft(event.target.value)} onKeyDown={onKeyDown}
         disabled={closed || busy} placeholder="p. ej. inspeccionar la sala, hablar con Lucía…" />
-      <button type="submit" data-testid="order-submit" disabled={closed || !draft.trim() || busy}>
+      <button type="submit" className="game-primary-button" data-testid="order-submit" disabled={closed || !draft.trim() || busy}>
         {orderPhase.kind === 'interpreting' ? 'Interpretando…' : 'Interpretar orden'}
       </button>
     </form>
+    <div className="game-order-bottom"><p>Ctrl+Enter para enviar · Las herramientas no consumen tiempo.</p></div>
     {orderPhase.kind === 'clarification' && <div className="game-clarification" role="dialog" aria-label="Aclaración">
       <p><strong>Antes de actuar:</strong> {orderPhase.question}</p>
       <p>Orden original: «{orderPhase.original}»</p>
@@ -172,9 +229,9 @@ function PreviewDialog({ phase, confirmRef, onConfirm, onCancel }: {
       {phase.response.preview
         ? <p>{phase.response.preview.description}</p>
         : <p>Esta acción se ejecutará al confirmar.</p>}
-      {phase.response.preview && <p>Duración estimada: {phase.response.preview.estimatedMinutes} min · Hora prevista: min {phase.response.preview.estimatedEndTime}</p>}
+      {phase.response.preview && <p className="game-preview-facts"><span>Duración estimada: {phase.response.preview.estimatedMinutes} min</span><span>Hora prevista: min {phase.response.preview.estimatedEndTime}</span></p>}
       <div className="game-preview-actions">
-        <button type="button" ref={confirmRef} data-testid="preview-confirm" onClick={onConfirm}>Confirmar</button>
+        <button type="button" className="game-primary-button" ref={confirmRef} data-testid="preview-confirm" onClick={onConfirm}>Confirmar</button>
         <button type="button" data-testid="preview-cancel" onClick={onCancel}>Cancelar</button>
       </div>
     </div>
@@ -183,9 +240,22 @@ function PreviewDialog({ phase, confirmRef, onConfirm, onCancel }: {
 
 // ── Contenidos de ventanas ──────────────────────────────────────────────────────
 
+// Coordenadas de presentación del atlas, tomadas de la maqueta
+// (apps/web/src/prototype/sample.ts): las tres ciudades del caso.
+const atlasPositions: Record<string, { x: number; y: number }> = {
+  madrid: { x: 43, y: 67 }, paris: { x: 59, y: 29 }, lisboa: { x: 23, y: 75 },
+};
+
 function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const travelOffers = view.offers.filter(offer => offer.action.type === 'travel');
   return <div>
+    <p className="game-overline">Atlas A.C.M.E.</p>
+    <h4>Tres ciudades, un expediente</h4>
+    <div className="game-atlas" aria-hidden="true"><div className="game-atlas-land" />{view.cities.map(city => {
+      const position = atlasPositions[city.id];
+      if (!position) return null;
+      return <span key={city.id} className="game-atlas-city" style={{ left: position.x + '%', top: position.y + '%' }}>{city.name}</span>;
+    })}</div>
     <label>Buscar ciudad <input type="search" data-testid="map-search" placeholder="Madrid, París, Lisboa…"
       onChange={event => {
         const query = event.target.value.toLowerCase();
@@ -193,20 +263,20 @@ function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolea
           el.hidden = query !== '' && !el.textContent?.toLowerCase().includes(query);
         });
       }} /></label>
-    <ul>
+    <ul className="game-destination-list">
       {view.cities.map(city => {
         const travel = travelOffers.find(offer => offer.action.params.toCityId === city.id);
         const current = city.id === view.position.city.id;
         return <li key={city.id} data-city={city.id}>
-          <strong>{city.name}, {city.country}</strong>{current ? ' (aquí)' : ''}
-          {travel && !current && <span> — <button type="button" data-testid={`travel-${city.id}`}
+          <span><strong>{city.name}, {city.country}</strong><small>{current ? 'Estás aquí' : 'Destino conocido'}</small></span>
+          {travel && !current && <button type="button" data-testid={`travel-${city.id}`}
             disabled={busy}
-            onClick={event => onOffer(travel, event.currentTarget)}>Viajar · {travel.detail ?? ''}</button></span>}
+            onClick={event => onOffer(travel, event.currentTarget)}>Viajar · {travel.detail ?? ''}</button>}
         </li>;
       })}
     </ul>
     <h4>Lugares conocidos</h4>
-    <ul>{view.locations.map(location => <li key={location.id}>{location.name}{location.id === view.position.location.id ? ' (aquí)' : ''} — {location.description}</li>)}</ul>
+    <ul className="game-destination-list">{view.locations.map(location => <li key={location.id}><span><strong>{location.name}</strong>{location.id === view.position.location.id ? ' (aquí)' : ''}<small>{location.description}</small></span></li>)}</ul>
   </div>;
 }
 
@@ -214,13 +284,17 @@ function DossierContent({ view }: { view: PlayerViewDto }) {
   return <div>
     <h4>Evidencias en tu poder</h4>
     {view.objects.length === 0
-      ? <p>Sin evidencias recogidas.</p>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin evidencias recogidas.</p></div>
       : <table><thead><tr><th>ID</th><th>Tipo</th><th>Procedencia</th><th>Minuto</th><th>Admisible</th></tr></thead>
         <tbody>{view.objects.map(item => <tr key={item.id}><td>{item.id}</td><td>{evidenceTypeLabels[item.type] ?? item.type}</td><td>{item.origin}</td><td>{item.minute}</td><td>{item.admissible ? 'Sí' : 'No'}</td></tr>)}</tbody></table>}
     <h4>Hallazgos</h4>
-    {view.dossier.length === 0 ? <p>Sin hallazgos todavía.</p> : <ul>{view.dossier.map((entry, index) => <li key={index}>{entry}</li>)}</ul>}
+    {view.dossier.length === 0
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin hallazgos todavía.</p></div>
+      : view.dossier.map((entry, index) => <article key={index} className="game-evidence-card"><span className="game-evidence-kind">Hallazgo</span><p>{entry}</p></article>)}
     <h4>Conversación registrada</h4>
-    {view.conversation.length === 0 ? <p>Sin conversaciones registradas.</p> : <ul>{view.conversation.map((entry, index) => <li key={index}>{entry}</li>)}</ul>}
+    {view.conversation.length === 0
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin conversaciones registradas.</p></div>
+      : <ul className="game-destination-list">{view.conversation.map((entry, index) => <li key={index}><span>{entry}</span></li>)}</ul>}
   </div>;
 }
 
@@ -231,11 +305,11 @@ function LabContent({ view, contacts, recipient, channel, text, busy, onRecipien
   return <div>
     <h4>Solicitudes pendientes</h4>
     {view.pendingRequests.length === 0
-      ? <p>Sin solicitudes pendientes. Los análisis tardan 90 min y las consultas 30 min de juego.</p>
-      : <ul>{view.pendingRequests.map(item => <li key={item.id}>{requestTypeLabels[item.type] ?? item.type} · responde en el minuto {item.dueMinute} (ahora {view.clock.minute})</li>)}</ul>}
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin solicitudes pendientes. Los análisis tardan 90 min y las consultas 30 min de juego.</p></div>
+      : <ul className="game-destination-list">{view.pendingRequests.map(item => <li key={item.id}><span><strong>{requestTypeLabels[item.type] ?? item.type}</strong><small>Responde en el minuto {item.dueMinute} (ahora {view.clock.minute})</small></span></li>)}</ul>}
     <h4>Contactar</h4>
     {contacts.length === 0
-      ? <p>Habla primero con alguien en persona para poder contactarlo después.</p>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Habla primero con alguien en persona para poder contactarlo después.</p></div>
       : <form onSubmit={onSend}>
         <label>Destinatario <select value={recipient} onChange={event => onRecipient(event.target.value)}>
           <option value="">Elige…</option>
@@ -247,6 +321,7 @@ function LabContent({ view, contacts, recipient, channel, text, busy, onRecipien
         <label>Mensaje <input type="text" value={text} onChange={event => onText(event.target.value)} maxLength={4000} /></label>
         <button type="submit" disabled={!recipient || !text.trim() || busy}>Enviar mensaje</button>
       </form>}
+    <p className="game-panel-note">Consultar este panel no consume tiempo.</p>
   </div>;
 }
 
@@ -255,10 +330,10 @@ function SaveList({ saves, atLimit, closed, onLoad, onDelete, onReplace }: {
   onLoad: (save: SaveListItem) => void; onDelete: (save: SaveListItem) => void; onReplace: (save: SaveListItem) => void;
 }) {
   if (!saves) return <p>Cargando guardados…</p>;
-  if (saves.items.length === 0) return <p>Sin guardados manuales.</p>;
-  return <ul data-testid="save-list">
+  if (saves.items.length === 0) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin guardados manuales.</p></div>;
+  return <ul className="game-save-list" data-testid="save-list">
     {saves.items.map(save => <li key={save.saveId}>
-      <strong>{save.name}</strong> · {save.cityName} · min {save.minute} · {new Date(save.createdAt).toLocaleString('es-ES')}
+      <span><strong>{save.name}</strong><small>{save.cityName} · min {save.minute} · {new Date(save.createdAt).toLocaleString('es-ES')}</small></span>
       <span> <button type="button" data-testid={`load-${save.saveId}`} disabled={closed} onClick={() => onLoad(save)}>Cargar</button></span>
       <span> <button type="button" disabled={closed} onClick={() => onDelete(save)}>Borrar</button></span>
       {atLimit && !closed && <span> <button type="button" onClick={() => onReplace(save)}>Reemplazar con el nuevo</button></span>}
@@ -290,8 +365,8 @@ function SavesContent({ view, saves, savePhase, saveName, replaceTarget, loadTar
   const closed = view.status === 'closed';
   const atLimit = view.saveCapabilities.manualCount >= view.saveCapabilities.manualLimit;
   return <div>
-    <p>Manuales: {view.saveCapabilities.manualCount} / {view.saveCapabilities.manualLimit}. Guardar no avanza el reloj.</p>
-    {closed && <p role="status" data-testid="save-closed-notice">Esta partida está cerrada porque el caso ya está
+    <p className="game-save-count">Manuales: <strong>{view.saveCapabilities.manualCount}</strong> / {view.saveCapabilities.manualLimit}. Guardar no avanza el reloj.</p>
+    {closed && <p className="game-closed-note" role="status" data-testid="save-closed-notice">Esta partida está cerrada porque el caso ya está
       resuelto. No se pueden crear guardados nuevos ni cargar uno anterior. Puedes consultar el informe final
       o empezar una partida nueva desde el archivo.</p>}
     <SaveCreateForm savePhase={savePhase} saveName={saveName} closed={closed} canSave={view.saveCapabilities.canSave}
@@ -314,7 +389,7 @@ function SettingsContent({ textScale, highContrast, onScale, onContrast }: {
   return <div>
     <h4>Proveedor de IA</h4>
     <p>Actual: <strong>Mock determinista</strong> (incluido en la Fase A: se puede jugar sin modelo real).</p>
-    <label>Proveedor
+    <label className="game-setting"><span>Proveedor</span>
       <select disabled aria-describedby="provider-note">
         <option>Mock determinista (actual)</option>
         <option>Ollama local</option>
@@ -322,26 +397,27 @@ function SettingsContent({ textScale, highContrast, onScale, onContrast }: {
         <option>FreeLLMAPI</option>
       </select>
     </label>
-    <p id="provider-note">La configuración del proveedor por usuario llega en la Fase C: cada persona elegirá su LLM y su clave. En esta fase el selector está desactivado a propósito.</p>
+    <p className="game-panel-note" id="provider-note">La configuración del proveedor por usuario llega en la Fase C: cada persona elegirá su LLM y su clave. En esta fase el selector está desactivado a propósito.</p>
     <h4>Presentación</h4>
-    <label>Tamaño de texto
+    <label className="game-setting"><span>Tamaño de texto</span>
       <select value={textScale} onChange={event => onScale(Number(event.target.value))}>
         {[100, 125, 150, 175, 200].map(scale => <option key={scale} value={scale}>{scale}%</option>)}
       </select>
     </label>
-    <label><input type="checkbox" checked={highContrast} onChange={event => onContrast(event.target.checked)} /> Alto contraste</label>
+    <label className="game-setting"><span>Alto contraste</span><input type="checkbox" checked={highContrast} onChange={event => onContrast(event.target.checked)} /></label>
+    <p className="game-panel-note">Estos ajustes afectan solo a la presentación. También puedes usar el zoom de tu navegador.</p>
   </div>;
 }
 
 function ReportContent({ view }: { view: PlayerViewDto }) {
-  if (!view.finalReport) return <p>El informe final estará disponible al cerrar el caso.</p>;
+  if (!view.finalReport) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>El informe final estará disponible al cerrar el caso.</p></div>;
   return <div>
-    <p>Resultado: <strong>{view.finalReport.result}</strong> · Motivo: {view.finalReport.reason} · Minuto: {view.finalReport.minute}</p>
+    <p className="game-report-result">Resultado: <strong>{view.finalReport.result}</strong> · Motivo: {view.finalReport.reason} · Minuto: {view.finalReport.minute}</p>
     <h4>Objetivos logrados</h4>
     {view.finalReport.objectivesAchieved.length === 0
-      ? <p>Ningún objetivo registrado.</p>
-      : <ul>{view.finalReport.objectivesAchieved.map((item, index) => <li key={index}>{item}</li>)}</ul>}
-    <p>El informe completo (verdad y omisiones) solo se muestra tras el cierre, y ya está cerrado.</p>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Ningún objetivo registrado.</p></div>
+      : <ul className="game-report-objectives">{view.finalReport.objectivesAchieved.map((item, index) => <li key={index}>{item}</li>)}</ul>}
+    <p className="game-panel-note">El informe completo (verdad y omisiones) solo se muestra tras el cierre, y ya está cerrado.</p>
   </div>;
 }
 

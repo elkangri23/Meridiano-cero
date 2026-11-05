@@ -1,9 +1,15 @@
-.auth-form { border: 2px solid #aaaaaa; padding: 16px; margin-bottom: 24px; max-width: 560px; }
-.auth-form h1 { margin: 0 0 8px; }
-.auth-form p { margin-bottom: 12px; }
-.auth-form label { display: grid; gap: 8px; margin-bottom: 16px; }
-.auth-form input { font: inherit; background: #000000; color: #ffffff; border: 2px solid #ffffff; padding: 8px 12px; min-height: 44px; }
-.auth-form input:focus-visible { outline: 3px solid #ffff55; outline-offset: 2px; }
-.auth-form .auth-error { color: #ff5555; }
-.auth-form .auth-ok { color: #ffff55; }
-.auth-links { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+/* Páginas de acceso: diálogo del prototipo pixel-art (/prototype).
+ * La cabecera y el pie vienen de .archive (AuthShell usa esas clases).
+ * Solo presentación: textos y flujos intactos. */
+.auth-form { border:2px solid #aaaaaa; box-shadow:8px 8px #000000; background:#0000aa; padding:30px; margin-bottom:24px; max-width:560px; }
+.auth-form h1 { margin:0 0 8px; }
+.auth-form p { margin-bottom:12px; }
+.auth-form label { display:grid; gap:8px; margin-bottom:16px; }
+.auth-form input { font:inherit; background:#000000; color:#ffffff; border:2px solid #ffffff; border-radius:0; padding:8px 12px; min-height:44px; }
+.auth-form input:focus-visible { outline:3px solid #ffff55; outline-offset:2px; }
+.auth-form button[type="submit"] { background:#ffff55; color:#000000; border:2px outset #ffffff; }
+.auth-form button[type="submit"]:disabled { opacity:.55; color:#555555; }
+.auth-form .auth-error { color:#ff5555; }
+.auth-form .auth-ok { color:#ffff55; }
+.auth-links { display:flex; flex-wrap:wrap; gap:16px; margin-top:16px; }
+@media (max-width:520px) { .auth-form { padding:20px; } }
