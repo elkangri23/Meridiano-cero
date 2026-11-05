@@ -2,7 +2,7 @@ import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary } from '@meridi
 import type { ArchiveApi, Filter } from './client';
 import { ArchiveError } from './client';
 import { browserIntents, createRunCoordinator } from './creation';
-import type { CreationView, IntentStorage, CreationOutcome } from './creation';
+import type { CreationView, IntentStorage, CreationOutcome, Difficulty } from './creation';
 
 export type ConnectionStatus = 'online' | 'offline' | 'reconnecting' | 'unknown';
 
@@ -138,19 +138,37 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
   }
   function showCreation(result: CreationOutcome) {
     set({ ...state, phase: 'ready', creation: { phase: result.phase, caseId: state.creation.caseId, runId: result.phase === 'created' ? result.runId : null },
-      notice: result.phase === 'created' ? 'Creación confirmada. Actualiza el archivo para verla.' : 'Creación sin confirmar. Se conserva la misma referencia; comprobar no crea otra partida.' });
+      notice: result.phase === 'created' ? 'Creación confirmada. Actualiza el archivo para verla.'
+        : result.reason ? `Creación sin confirmar: ${result.reason}` : 'Creación sin confirmar. Se conserva la misma referencia; comprobar no crea otra partida.' });
   }
-  async function creation(caseId: string | null, resend: boolean) {
+  async function attemptCreation(caseId: string | null, resend: boolean, difficulty: Difficulty, identity: SessionDto, ticket: Ticket): Promise<CreationOutcome | null> {
+    try {
+      const result = caseId === null ? await creator.recover(identity, resend, ticket.signal) : await creator.start(caseId, identity, ticket.signal, difficulty);
+      return ticket.current() ? result : null;
+    } catch {
+      if (ticket.current()) set({ ...state, phase: 'ready', creation: { phase: 'blocked', caseId: state.creation.caseId, runId: null }, notice: 'No se pudo acceder a la referencia local. No se ha enviado una intención nueva.' });
+      return null;
+    }
+  }
+  async function creation(caseId: string | null, resend: boolean, difficulty: Difficulty = 'normal') {
     if (disposed || !session || state.phase !== 'ready') return;
     if (!creationAllowed(caseId)) return;
     const identity = session; const ticket = begin();
     set({ ...state, phase: 'loading', creation: { phase: 'sending', caseId: caseId ?? state.creation.caseId, runId: null }, notice: 'Comprobando la creación…' });
+    const result = await attemptCreation(caseId, resend, difficulty, identity, ticket);
+    if (result) showCreation(result);
+  }
+  async function deleteRun(runId: string) {
+    if (disposed || !session || state.phase !== 'ready') return;
+    const identity = session; const ticket = begin();
+    set({ ...state, notice: 'Borrando la partida…' });
     try {
-      const result = caseId === null ? await creator.recover(identity, resend, ticket.signal) : await creator.start(caseId, identity, ticket.signal);
+      await api.deleteRun(runId, identity, ticket.signal);
       if (!ticket.current()) return;
-      showCreation(result);
+      await open();
+      if (state.phase === 'ready') set({ ...state, notice: 'Partida borrada.' });
     } catch {
-      if (ticket.current()) set({ ...state, phase: 'ready', creation: { phase: 'blocked', caseId: state.creation.caseId, runId: null }, notice: 'No se pudo acceder a la referencia local. No se ha enviado una intención nueva.' });
+      if (ticket.current()) set({ ...state, notice: 'No se pudo borrar la partida. Actualiza el archivo para comprobarlo.' });
     }
   }
   return {
@@ -159,9 +177,19 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
     openRun, closeRun,
     refresh: () => open(), connect: () => open(true), logout,
     reconnect,
-    createCase: (caseId: string) => creation(caseId, false),
+    createCase: (caseId: string, difficulty: Difficulty = 'normal') => creation(caseId, false, difficulty),
     recoverCreation: (resend = false) => creation(null, resend),
     prepareCreation() { if (state.phase === 'ready' && state.creation.phase === 'created') set({ ...state, creation: { phase: 'idle', caseId: null, runId: null } }); },
+    // Descarta la referencia local de una creación pendiente o bloqueada y
+    // devuelve el formulario de «Nueva partida». La partida, si llegó a
+    // crearse en el servidor, sigue en el archivo.
+    discardCreation() {
+      if (disposed || !session || state.phase !== 'ready') return;
+      if (state.creation.phase !== 'uncertain' && state.creation.phase !== 'blocked') return;
+      if (!creator.discard(session.profile.id)) return;
+      set({ ...state, creation: { phase: 'idle', caseId: null, runId: null }, notice: 'Referencia de creación descartada. Puedes crear una partida nueva.' });
+    },
+    deleteRun,
     filter: (value: Filter) => navigate(value, null, []),
     next: () => state.page?.nextCursor ? navigate(state.filter, state.page.nextCursor, [...state.previous, state.cursor]) : Promise.resolve(),
     back: () => state.previous.length ? navigate(state.filter, state.previous.at(-1) ?? null, state.previous.slice(0, -1)) : Promise.resolve(),

@@ -24,7 +24,7 @@ export function initialPlayerView(run: StoredRun): InitialPlayerViewDto {
   const cities = definition.explorationMode === 'guided' ? definition.cities : [city];
   return {
     schemaVersion: 1, runId: run.id, branchId: run.branchId, version: run.revision,
-    status: 'active', clock: { minute: 0, deadlineMinutes: definition.deadlineMinutes },
+    status: 'active', clock: { minute: 0, deadlineMinutes: run.deadlineMinutes },
     position: { city: { id: city.id, name: city.name, country: city.country }, location: { ...publicLocation } },
     cities: cities.map(item => ({ id: item.id, name: item.name, country: item.country })),
     locations: [publicLocation], objects: [], dossier: [], conversation: [], pendingRequests: [],

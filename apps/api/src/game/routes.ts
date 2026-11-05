@@ -5,10 +5,11 @@ import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
 import { createSessionStore, tokenDigest } from '../auth/store.ts';
 import { cookieToken, matches } from '../auth/session-security.ts';
-import { caseSummary, findCase, listCases, findDefinitionById } from './catalog.ts';
+import { caseSummary, findCase, listCases, findDefinitionById, applyDifficulty, definitionForRun } from './catalog.ts';
 import { initialPlayerView } from './initial-view.ts';
-import { createStoredRun, readStoredRun, readFullRun, lookupRunCreation, RunStoreError } from './runs.ts';
+import { createStoredRun, deleteStoredRun, readStoredRun, readFullRun, lookupRunCreation, RunStoreError } from './runs.ts';
 import { ENGINE_VERSION, type Action } from '@meridiano/engine';
+import type { Difficulty } from '@meridiano/case-schema';
 import { commitAction, commitLoad } from './transitions.ts';
 import { playerViewDto } from './player-view.ts';
 import { eq, and, desc, sql } from 'drizzle-orm';
@@ -20,14 +21,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function createBody(value: unknown): { caseId: string; idempotencyKey: string } {
+function parseDifficulty(value: unknown): Difficulty {
+  if (value === undefined) return 'normal';
+  if (typeof value !== 'string' || !['easy', 'normal', 'hard'].includes(value)) throw new RunStoreError('INVALID_REQUEST');
+  return value as Difficulty;
+}
+
+function createBody(value: unknown): { caseId: string; idempotencyKey: string; difficulty: Difficulty } {
   if (!isRecord(value)) throw new RunStoreError('INVALID_REQUEST');
   const keys = Object.keys(value).sort().join(',');
-  if (keys !== 'caseId,idempotencyKey') throw new RunStoreError('INVALID_REQUEST');
-  const { caseId, idempotencyKey } = value;
+  if (keys !== 'caseId,idempotencyKey' && keys !== 'caseId,difficulty,idempotencyKey') throw new RunStoreError('INVALID_REQUEST');
+  const { caseId, idempotencyKey, difficulty } = value;
   if (typeof caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(caseId) ||
       !isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
-  return { caseId, idempotencyKey };
+  return { caseId, idempotencyKey, difficulty: parseDifficulty(difficulty) };
+}
+
+function deleteRunBody(value: unknown): { confirm: boolean } {
+  if (!isRecord(value) || Object.keys(value).join(',') !== 'confirm' || value.confirm !== true) {
+    throw new RunStoreError('INVALID_REQUEST');
+  }
+  return { confirm: true };
 }
 
 function lookupBody(value: unknown): string {
@@ -201,7 +215,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     available(() => listStoredRuns(database, digest(request), request.query)));
   app.post('/api/v1/runs', { onRequest: authorize }, async (request, reply) => {
     const body = createBody(request.body);
-    const definition = findCase(body.caseId);
+    const definition = applyDifficulty(findCase(body.caseId), body.difficulty);
     const created = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey, expectedProfile(request)));
     // La vista es la actual (en un replay puede haber progreso posterior).
     const run = await available(() => readFullRun(database, digest(request), created.run.id));
@@ -209,6 +223,20 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     const view = playerViewDto(definition, run, manualCount);
     return reply.code(created.replayed ? 200 : 201).send({ ...view, replayed: created.replayed });
   });
+  // DELETE /api/v1/runs/:runId - Borrar una partida propia (activa o
+  // cerrada) con todos sus guardados y su registro de operaciones. Solo el
+  // propietario; para cualquier otro es 404 sin distinguir. El borrado lo
+  // ejecuta la función SECURITY DEFINER delete_run (migración 0007).
+  app.delete<{ Params: { runId: string }; Body: { confirm: boolean } }>(
+    '/api/v1/runs/:runId',
+    { onRequest: authorize },
+    async (request, reply) => {
+      deleteRunBody(request.body);
+      const deleted = await available(() => deleteStoredRun(database, digest(request), request.params.runId));
+      if (!deleted) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Partida no encontrada.', requestId: request.id } });
+      return reply.code(204).send();
+    }
+  );
   app.post<{ Querystring: Record<string, unknown> }>('/api/v1/run-creations/lookup', { onRequest: authorize }, async request => {
     if (Object.keys(request.query).length) throw new RunStoreError('INVALID_REQUEST');
     const key = lookupBody(request.body);
@@ -218,7 +246,9 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     const run = await available(() => readFullRun(database, digest(request), request.params.runId));
     // Motores antiguos: se conserva la vista inicial (503 si no es inicial virgen).
     if (run.engineVersion !== ENGINE_VERSION) return initialPlayerView(run);
-    const definition = findDefinitionById(run.definitionId);
+    // La definición gobierna con los parámetros persistidos de esta partida
+    // (dificultad y plazo elegidos al crearla), no con los del catálogo.
+    const definition = definitionForRun(run.definitionId, run.difficulty, run.deadlineMinutes);
     const manualCount = await available(() => saveCount(database, run.id));
     return playerViewDto(definition, run, manualCount);
   });

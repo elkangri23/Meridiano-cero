@@ -42,6 +42,11 @@ export const runs = pgTable('runs', {
   revision: integer('revision').notNull().default(1),
   branchId: uuid('branch_id').notNull().defaultRandom(),
   status: text('status').notNull().default('active'), // active, closed
+  // Parámetros elegidos al crear la partida (migración 0007): la dificultad
+  // y el plazo se persisten aquí porque la definición se recarga del
+  // catálogo en cada petición; sin columnas propias se perderían.
+  difficulty: text('difficulty').notNull().default('normal'), // easy, normal, hard
+  deadlineMinutes: integer('deadline_minutes').notNull().default(2880),
   engineState: jsonb('engine_state').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -53,6 +58,8 @@ export const runs = pgTable('runs', {
   check('runs_definition_digest', sql`${table.definitionHash} ~ '^[a-f0-9]{64}$'`),
   check('runs_state_object', sql`jsonb_typeof(${table.engineState}) = 'object'`),
   check('runs_status', sql`${table.status} IN ('active', 'closed')`),
+  check('runs_difficulty', sql`${table.difficulty} IN ('easy', 'normal', 'hard')`),
+  check('runs_deadline_positive', sql`${table.deadlineMinutes} > 0`),
 ]);
 
 // Ámbito de creación: usuario + clave; aún no existe runId al recibir la intención.

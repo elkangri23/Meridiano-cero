@@ -93,6 +93,8 @@ export interface RunSummaryDto {
   caseTitle: string | null;
   caseId: string;
   status: 'active' | 'closed';
+  /** Dificultad elegida al crear la partida (determina su plazo interno). */
+  difficulty: 'easy' | 'normal' | 'hard';
   version: number;
   minute: number;
   createdAt: string;
@@ -131,9 +133,10 @@ function summaryState(value: Record<string, unknown>): boolean {
     typeof value.version === 'number' && Number.isSafeInteger(value.version) && value.version > 0 && isoDate(value.createdAt);
 }
 function runSummary(value: unknown): value is RunSummaryDto {
-  if (!dtoRecord(value, 'caseId,caseTitle,createdAt,minute,runId,status,version')) return false;
+  if (!dtoRecord(value, 'caseId,caseTitle,createdAt,difficulty,minute,runId,status,version')) return false;
   if (!uuid(value.runId) || typeof value.caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.caseId)) return false;
   if (value.caseTitle !== null && !shortText(value.caseTitle)) return false;
+  if (typeof value.difficulty !== 'string' || !['easy', 'normal', 'hard'].includes(value.difficulty)) return false;
   if (typeof value.minute !== 'number' || !Number.isSafeInteger(value.minute) || value.minute < 0) return false;
   return summaryState(value);
 }
@@ -254,6 +257,10 @@ export interface PlayerViewDto {
   /** Acciones intentables desde el estado actual (motor). La UI las ofrece como
    * botones y las envía a interpret; el motor valida cada una al confirmarla. */
   offers: PublicActionOffer[];
+  /** Introducción del caso (GDD §3): quién te pone en situación antes de
+   * empezar. La presenta Margaret Sullivan; es breve, omisible y siempre
+   * recuperable en el dossier. Null si el expediente no trae introducción. */
+  briefing: { speaker: string; title: string; paragraphs: string[] } | null;
   saveCapabilities: { manualLimit: 10; manualCount: number; canSave: boolean; canLoad: boolean };
   recovery: { retryCreationWithSameKey: true; creationLookup: true; operationLookup: false };
 }
@@ -434,11 +441,24 @@ function playerViewIdentity(value: Record<string, unknown>): boolean {
   if (typeof value.caseId !== 'string' || value.caseId.length === 0 || value.caseId.length > 128) return false;
   return value.status === 'active' || value.status === 'closed';
 }
-const playerViewKeys = 'batch,branchId,caseId,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+function validBriefingParagraphs(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length >= 1 && value.length <= 8 &&
+    value.every(item => typeof item === 'string' && item.trim().length > 0 && item.length <= 2000);
+}
+function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
+  if (value === null) return true;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).sort().join(',') !== 'paragraphs,speaker,title') return false;
+  if (!shortText(record.speaker) || !shortText(record.title)) return false;
+  return validBriefingParagraphs(record.paragraphs);
+}
+const playerViewKeys = 'batch,branchId,briefing,caseId,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;
   if (!playerViewIdentity(value)) return false;
+  if (!publicBriefing(value.briefing)) return false;
   if (!generalClock(value.clock) || !generalCapabilities(value) || !initialGeography(value)) return false;
   return generalCollections(value) && generalReports(value);
 }

@@ -11,6 +11,7 @@ const page: RunListDto = { profileId: id, items: [], nextCursor: null };
 function api() {
   return { initial: vi.fn<ArchiveApi['initial']>(), cases: vi.fn<ArchiveApi['cases']>().mockResolvedValue({ items: [], nextCursor: null }),
     create: vi.fn<ArchiveApi['create']>().mockResolvedValue(), lookup: vi.fn<ArchiveApi['lookup']>().mockResolvedValue(null),
+    deleteRun: vi.fn<ArchiveApi['deleteRun']>().mockResolvedValue(),
     me: vi.fn<ArchiveApi['me']>().mockResolvedValue(identity), connect: vi.fn<ArchiveApi['connect']>().mockResolvedValue(identity),
     list: vi.fn<ArchiveApi['list']>().mockResolvedValue(page), logout: vi.fn<ArchiveApi['logout']>().mockResolvedValue() };
 }
@@ -103,13 +104,30 @@ describe('T3: archivo, cuenta y respuestas tardías', () => {
     const transport = api(); const model = createArchiveModel(transport); await model.refresh();
     await model.createCase('hidden'); expect(transport.create).not.toHaveBeenCalled();
   });
+  it('borrar una partida llama al borrado y recarga el archivo', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    await model.deleteRun(runId);
+    expect(transport.deleteRun).toHaveBeenCalledTimes(1);
+    expect(transport.deleteRun.mock.calls[0]?.[0]).toBe(runId);
+    expect(model.getSnapshot().notice).toBe('Partida borrada.');
+  });
+  it('descartar una creación pendiente devuelve el formulario sin enviar nada', async () => {
+    const transport = api(); const data = new Map<string, string>();
+    const memory = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); }, removeItem: (key: string) => { data.delete(key); } };
+    data.set('meridiano:create-run:v1:' + id, JSON.stringify({ schemaVersion: 1, profileId: id, caseId: 'synthetic', difficulty: 'easy', idempotencyKey: '12345678-1234-4123-8123-123456789012' }));
+    const model = createArchiveModel(transport, memory); await model.refresh();
+    expect(model.getSnapshot().creation.phase).toBe('uncertain');
+    model.discardCreation();
+    expect(model.getSnapshot().creation).toEqual({ phase: 'idle', caseId: null, runId: null });
+    expect(transport.create).not.toHaveBeenCalled();
+  });
 
 });
 
 describe('T3: abrir ficha propia y descartar lecturas tardías', () => {
   async function ready() {
     const transport = api(); transport.initial.mockResolvedValue(initialView);
-    transport.list.mockResolvedValue({ ...page, items: [{ runId, caseId: 'synthetic', caseTitle: 'Caso sintético', status: 'active', version: 1, minute: 0, createdAt: '2026-01-01T00:00:00.000Z' }] });
+    transport.list.mockResolvedValue({ ...page, items: [{ runId, caseId: 'synthetic', caseTitle: 'Caso sintético', status: 'active', difficulty: 'normal', version: 1, minute: 0, createdAt: '2026-01-01T00:00:00.000Z' }] });
     const model = createArchiveModel(transport); await model.refresh(); return { transport, model };
   }
   it('abre solo un ID de la página propia, sin crear partida ni avanzar el reloj', async () => {

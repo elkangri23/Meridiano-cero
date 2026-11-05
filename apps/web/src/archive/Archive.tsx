@@ -25,9 +25,11 @@ function connectionStatusColor(status: ConnectionStatus): string {
   }
 }
 
-function renderArchiveList(state: any, model: any, busy: boolean, filter: (e: any) => void, opener: any, closeRun: any) {
+const difficultyLabels: Record<string, string> = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' };
+
+function renderArchiveList(state: any, model: any, busy: boolean, filter: (e: any) => void, opener: any, closeRun: any, deleteTarget: string | null, setDeleteTarget: (runId: string | null) => void) {
   if (!state.profile) return null;
-  
+
   return (
     <section className="archive-list" aria-label="Partidas propias" aria-busy={busy}>
       <p className="archive-overline">Partidas propias</p>
@@ -46,12 +48,10 @@ function renderArchiveList(state: any, model: any, busy: boolean, filter: (e: an
       </div>
       <p role="status" aria-live="polite" className="archive-notice">{state.notice}</p>
       {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
-      {state.opened && <InitialRun view={state.opened} close={closeRun} />}
-      {state.profile && <NewRun key={state.profile.id} state={state} model={model} />}
       {state.page && state.page.items.length > 0 && (
         <div className="archive-scroll" role="region" aria-label="Tabla de partidas, desplazable" tabIndex={0}>
-          <table><caption>Partidas de la cuenta actual</caption><thead><tr><th scope="col">Expediente</th><th scope="col">Referencia</th><th scope="col">Estado</th><th scope="col">Reloj</th><th scope="col">Creación</th><th scope="col">Consulta</th><th scope="col">Jugar</th></tr></thead>
-            <tbody>{state.page.items.map((item: any) => <tr key={item.runId}><td>{item.caseTitle ?? 'Expediente sin ficha disponible'}</td><td><code title={item.runId}>{item.runId.slice(0, 8)}</code></td><td>{item.status === 'active' ? 'Activa' : 'Cerrada'}</td><td>{item.minute} min</td><td><time dateTime={item.createdAt}>{item.createdAt.toLocaleString()}</time></td><td><button type="button" disabled={busy} aria-label={'Consultar partida ' + item.runId.slice(0, 8)} onClick={event => { opener.current = event.currentTarget; void model.openRun(item.runId); }}>Consultar</button></td><td><Link to={'/runs/' + item.runId}>{item.status === 'active' ? 'Jugar' : 'Revisar'}</Link></td></tr>)}</tbody>
+          <table><caption>Partidas de la cuenta actual</caption><thead><tr><th scope="col">Expediente</th><th scope="col">Referencia</th><th scope="col">Estado</th><th scope="col">Dificultad</th><th scope="col">Reloj</th><th scope="col">Creación</th><th scope="col">Consulta</th><th scope="col">Jugar</th><th scope="col">Borrar</th></tr></thead>
+            <tbody>{state.page.items.map((item: any) => <tr key={item.runId}><td>{item.caseTitle ?? 'Expediente sin ficha disponible'}</td><td><code title={item.runId}>{item.runId.slice(0, 8)}</code></td><td>{item.status === 'active' ? 'Activa' : 'Cerrada'}</td><td>{difficultyLabels[item.difficulty] ?? item.difficulty}</td><td>{item.minute} min</td><td><time dateTime={item.createdAt}>{item.createdAt.toLocaleString()}</time></td><td><button type="button" disabled={busy} aria-label={'Consultar partida ' + item.runId.slice(0, 8)} onClick={event => { opener.current = event.currentTarget; void model.openRun(item.runId); }}>Consultar</button></td><td><Link to={'/runs/' + item.runId}>{item.status === 'active' ? 'Jugar' : 'Revisar'}</Link></td><td>{deleteTarget === item.runId ? <span><button type="button" disabled={busy} onClick={() => { setDeleteTarget(null); void model.deleteRun(item.runId); }}>Sí, borrar</button>{' '}<button type="button" disabled={busy} onClick={() => setDeleteTarget(null)}>Cancelar</button></span> : <button type="button" disabled={busy} aria-label={'Borrar partida ' + item.runId.slice(0, 8)} onClick={() => setDeleteTarget(item.runId)}>Borrar</button>}</td></tr>)}</tbody>
           </table>
         </div>
       )}
@@ -94,6 +94,7 @@ function Archive() {
   useEffect(() => { void model.refresh(); return model.dispose; }, [model]);
   const opener = useRef<HTMLButtonElement | null>(null);
   const restoreFocus = useRef(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   useEffect(() => {
     if (restoreFocus.current && state.phase === 'ready') {
       restoreFocus.current = false; opener.current?.focus();
@@ -117,7 +118,7 @@ function Archive() {
       {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
       {state.opened && <InitialRun view={state.opened} close={closeRun} />}
       {state.profile && <NewRun key={state.profile.id} state={state} model={model} />}
-      {state.profile && renderArchiveList(state, model, busy, filter, opener, closeRun)}
+      {state.profile && renderArchiveList(state, model, busy, filter, opener, closeRun, deleteTarget, setDeleteTarget)}
       <footer><Link to="/glosario">Glosario y reglas</Link> · Un detective por partida · Las consultas del archivo no avanzan el reloj del caso.</footer>
     </main>
   );

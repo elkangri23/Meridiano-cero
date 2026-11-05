@@ -3,6 +3,7 @@ import type { SessionDto } from '@meridiano/contracts';
 import { createRunCoordinator, CreationBlocked } from './creation';
 import type { IntentStorage } from './creation';
 import type { ArchiveApi } from './client';
+import { ArchiveError } from './client';
 
 const profileId = '11111111-1111-4111-8111-111111111111';
 const runId = '22222222-2222-4222-8222-222222222222';
@@ -15,7 +16,8 @@ function storage() {
 }
 function api() {
   return { initial: vi.fn<ArchiveApi['initial']>(), me: vi.fn<ArchiveApi['me']>(), connect: vi.fn<ArchiveApi['connect']>(), list: vi.fn<ArchiveApi['list']>(), cases: vi.fn<ArchiveApi['cases']>(), logout: vi.fn<ArchiveApi['logout']>(),
-    create: vi.fn<ArchiveApi['create']>().mockResolvedValue(), lookup: vi.fn<ArchiveApi['lookup']>().mockResolvedValue(null) };
+    create: vi.fn<ArchiveApi['create']>().mockResolvedValue(), lookup: vi.fn<ArchiveApi['lookup']>().mockResolvedValue(null),
+    deleteRun: vi.fn<ArchiveApi['deleteRun']>().mockResolvedValue() };
 }
 
 describe('T3: creación durable en pestaña sin otra intención', () => {
@@ -90,5 +92,40 @@ describe('T3: creación durable en pestaña sin otra intención', () => {
     const coordinator = createRunCoordinator(transport, blocked);
     expect(await coordinator.start('synthetic-case', identity, signal())).toEqual({ phase: 'uncertain' });
     expect(coordinator.view(profileId).phase).toBe('uncertain'); expect(transport.create).toHaveBeenCalledTimes(1);
+  });
+  it('la dificultad elegida se guarda en la intención y se envía al crear', async () => {
+    const memory = storage(); const transport = api(); transport.lookup.mockResolvedValue(found);
+    let stored = '';
+    transport.create.mockImplementation(async () => { stored = [...memory.data.values()][0] ?? ''; });
+    const coordinator = createRunCoordinator(transport, memory);
+    expect(await coordinator.start('synthetic-case', identity, signal(), 'hard')).toEqual({ phase: 'created', runId });
+    expect(transport.create.mock.calls[0]?.[4]).toBe('hard');
+    expect(JSON.parse(stored)).toMatchObject({ caseId: 'synthetic-case', difficulty: 'hard' });
+    expect(memory.data.size).toBe(0);
+  });
+  it('intención antigua sin dificultad se acepta como normal y se reutiliza', async () => {
+    const memory = storage(); const transport = api();
+    memory.setItem('meridiano:create-run:v1:' + profileId, JSON.stringify({ schemaVersion: 1, profileId, caseId: 'synthetic-case', idempotencyKey: '12345678-1234-4123-8123-123456789012' }));
+    const coordinator = createRunCoordinator(transport, memory);
+    expect(coordinator.view(profileId)).toEqual({ phase: 'uncertain', caseId: 'synthetic-case', runId: null });
+    await coordinator.start('synthetic-case', identity, signal());
+    expect(transport.create.mock.calls[0]?.[4]).toBeUndefined();
+  });
+  it('otra dificultad con intención incierta no la sobrescribe; descartarla permite empezar de nuevo', async () => {
+    const memory = storage(); const transport = api(); const coordinator = createRunCoordinator(transport, memory);
+    await coordinator.start('synthetic-case', identity, signal(), 'easy');
+    await expect(coordinator.start('synthetic-case', identity, signal(), 'hard')).rejects.toBeInstanceOf(CreationBlocked);
+    expect(transport.create).toHaveBeenCalledTimes(1);
+    expect(coordinator.discard(profileId)).toBe(true);
+    expect(coordinator.view(profileId).phase).toBe('idle');
+    transport.lookup.mockResolvedValue(found);
+    expect(await coordinator.start('synthetic-case', identity, signal(), 'hard')).toEqual({ phase: 'created', runId });
+    expect(transport.create.mock.calls[1]?.[4]).toBe('hard');
+  });
+  it('error de creación con motivo llega como incierta con motivo, no como genérica', async () => {
+    const memory = storage(); const transport = api();
+    transport.create.mockRejectedValue(new ArchiveError('unavailable', 'dificultad no admitida'));
+    const coordinator = createRunCoordinator(transport, memory);
+    expect(await coordinator.start('synthetic-case', identity, signal(), 'easy')).toEqual({ phase: 'uncertain', reason: 'dificultad no admitida' });
   });
 });
