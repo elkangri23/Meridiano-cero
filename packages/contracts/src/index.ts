@@ -212,3 +212,291 @@ export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerVi
   if (value.schemaVersion !== 1 || !uuid(value.runId) || !uuid(value.branchId) || value.version !== 1 || value.status !== 'active') return false;
   return initialClock(value.clock) && initialCapabilities(value) && initialEmptyCollections(value) && initialGeography(value);
 }
+
+/** Vista general del jugador (Fase A): proyección completa de una partida en
+ * cualquier revisión. La vista inicial es un caso particular de esta forma
+ * (minute 0, colecciones vacías). Difiere de PlayerView (motor) en que incluye
+ * nombres públicos, revisión/rama, capacidades de guardado y recuperación, y
+ * nunca expone payloads internos (p. ej. pendingRequests.payload). */
+export interface PlayerViewDto {
+  schemaVersion: 1;
+  runId: string;
+  branchId: string;
+  version: number;
+  status: 'active' | 'closed';
+  caseId: string;
+  clock: { minute: number; deadlineMinutes: number };
+  position: {
+    city: { id: string; name: string; country: string };
+    location: { id: string; name: string; description: string };
+  };
+  cities: Array<{ id: string; name: string; country: string }>;
+  locations: Array<{ id: string; name: string; description: string }>;
+  objects: Array<{ id: string; type: string; origin: string; minute: number; admissible: boolean }>;
+  dossier: string[];
+  conversation: string[];
+  pendingRequests: Array<{ id: string; type: 'analysis' | 'query' | 'request'; dueMinute: number }>;
+  warrants: string[];
+  detentions: string[];
+  batch: null | {
+    steps: Array<{
+      ordinal: number;
+      dependsOn: number[];
+      action: { type: string; params: Record<string, unknown> };
+      status: 'pending' | 'applied' | 'impossible' | 'skipped';
+      reason?: string;
+    }>;
+  };
+  finalReport: FinalReport | null;
+  officialResult: null;
+  /** Acciones intentables desde el estado actual (motor). La UI las ofrece como
+   * botones y las envía a interpret; el motor valida cada una al confirmarla. */
+  offers: PublicActionOffer[];
+  saveCapabilities: { manualLimit: 10; manualCount: number; canSave: boolean; canLoad: boolean };
+  recovery: { retryCreationWithSameKey: true; creationLookup: true; operationLookup: false };
+}
+
+/** Oferta de acción pública: id estable, etiqueta legible y acción completa. */
+export interface PublicActionOffer {
+  id: string;
+  label: string;
+  detail?: string;
+  action: { type: string; params: Record<string, unknown> };
+}
+
+/** Evento público de una acción: solo id opaco, secuencia estable, minuto,
+ * tipo y resumen factual autorizado. Nunca se serializa EngineEvent.payload. */
+export interface PublicEvent {
+  id: string;
+  sequence: number;
+  minute: number;
+  type: string;
+  summary: string;
+}
+
+export interface PublicActionPreview {
+  actionType: string;
+  estimatedMinutes: number;
+  estimatedEndTime: number;
+  description: string;
+}
+
+/** Respuesta de POST /runs/:runId/action: vista completa + resultado. */
+export interface ActionResponseDto extends PlayerViewDto {
+  outcome: 'applied' | 'impossible' | 'clarification_required' | 'confirmation_required' | 'batch_paused' | 'case_closed';
+  events: PublicEvent[];
+  preview?: PublicActionPreview;
+  report?: FinalReport;
+  operationId?: string;
+  replayed?: boolean;
+  /** Solo en preview (confirm=false): true si la acción exige confirmación. */
+  requiresConfirmation?: boolean;
+  question?: string;
+  reason?: string;
+  pausedAt?: number;
+}
+
+/** Respuesta de POST /runs/:runId/saves/:saveId/load: vista restaurada. */
+export interface SaveLoadResponseDto extends PlayerViewDto {
+  operationId: string;
+  newBranchId: string;
+}
+
+function nonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+function publicObject(value: unknown): value is PlayerViewDto['objects'][number] {
+  if (!dtoRecord(value, 'admissible,id,minute,origin,type')) return false;
+  return publicId(value.id) && typeof value.type === 'string' &&
+    ['observation', 'analysis', 'record', 'testimony', 'object'].includes(value.type) &&
+    publicId(value.origin) && nonNegativeInteger(value.minute) && typeof value.admissible === 'boolean';
+}
+function publicObjects(value: unknown): value is PlayerViewDto['objects'] {
+  return Array.isArray(value) && value.length <= 1000 && value.every(publicObject) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
+function publicRequest(value: unknown): value is PlayerViewDto['pendingRequests'][number] {
+  if (!dtoRecord(value, 'dueMinute,id,type')) return false;
+  return publicId(value.id) && typeof value.type === 'string' &&
+    ['analysis', 'query', 'request'].includes(value.type) &&
+    nonNegativeInteger(value.dueMinute);
+}
+function publicRequests(value: unknown): value is PlayerViewDto['pendingRequests'] {
+  return Array.isArray(value) && value.length <= 100 && value.every(publicRequest) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
+function stringList(value: unknown, maxItems: number, maxLength: number): value is string[] {
+  return Array.isArray(value) && value.length <= maxItems &&
+    value.every(item => typeof item === 'string' && item.length <= maxLength);
+}
+function isBatchStepStatus(value: unknown): boolean {
+  return value === 'pending' || value === 'applied' || value === 'impossible' || value === 'skipped';
+}
+function batchStepShape(record: Record<string, unknown>): boolean {
+  const keys = Object.keys(record).sort().join(',');
+  if (keys !== 'action,dependsOn,ordinal,status' && keys !== 'action,dependsOn,ordinal,reason,status') return false;
+  if (!nonNegativeInteger(record.ordinal)) return false;
+  if (!Array.isArray(record.dependsOn) || !record.dependsOn.every(nonNegativeInteger)) return false;
+  if (!isBatchStepStatus(record.status)) return false;
+  return record.reason === undefined || typeof record.reason === 'string';
+}
+function batchStepAction(record: Record<string, unknown>): boolean {
+  const action = record.action;
+  if (typeof action !== 'object' || action === null || Array.isArray(action)) return false;
+  const actionRecord = action as Record<string, unknown>;
+  if (Object.keys(actionRecord).sort().join(',') !== 'params,type') return false;
+  return typeof actionRecord.type === 'string' && actionRecord.type.length > 0 &&
+    typeof actionRecord.params === 'object' && actionRecord.params !== null && !Array.isArray(actionRecord.params);
+}
+export function isPublicBatchStep(value: unknown): value is NonNullable<PlayerViewDto['batch']>['steps'][number] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return batchStepShape(record) && batchStepAction(record);
+}
+function publicBatch(value: unknown): value is PlayerViewDto['batch'] {
+  if (value === null) return true;
+  if (!dtoRecord(value, 'steps') || !Array.isArray(value.steps) || value.steps.length > 8) return false;
+  return value.steps.every(isPublicBatchStep);
+}
+function publicFinalReport(value: unknown): value is FinalReport {
+  if (!dtoRecord(value, 'minute,objectivesAchieved,reason,result')) return false;
+  return ['complete', 'partial', 'incorrect', 'unresolved'].includes(value.result as string) &&
+    ['finished', 'deadline'].includes(value.reason as string) && nonNegativeInteger(value.minute) &&
+    stringList(value.objectivesAchieved, 100, 128);
+}
+function generalClock(value: unknown): boolean {
+  return dtoRecord(value, 'deadlineMinutes,minute') && nonNegativeInteger(value.minute) &&
+    positiveInteger(value.deadlineMinutes);
+}
+function generalCapabilities(value: Record<string, unknown>): boolean {
+  const saves = value.saveCapabilities; const recovery = value.recovery;
+  return dtoRecord(saves, 'canLoad,canSave,manualCount,manualLimit') &&
+    typeof saves.canLoad === 'boolean' && typeof saves.canSave === 'boolean' &&
+    nonNegativeInteger(saves.manualCount) && (saves.manualCount as number) <= 10 && saves.manualLimit === 10 &&
+    dtoRecord(recovery, 'creationLookup,operationLookup,retryCreationWithSameKey') &&
+    recovery.creationLookup === true && recovery.operationLookup === false && recovery.retryCreationWithSameKey === true;
+}
+function publicActionParam(value: unknown): boolean {
+  if (typeof value === 'string') return value.length <= 4000;
+  if (typeof value === 'number') return Number.isSafeInteger(value);
+  if (typeof value === 'boolean') return true;
+  return Array.isArray(value) && value.length <= 16 && value.every(item => typeof item === 'string' && item.length <= 128);
+}
+function boundedString(value: unknown, max: number): boolean {
+  return typeof value === 'string' && value.length > 0 && value.length <= max;
+}
+function optionalBoundedString(value: unknown, max: number): boolean {
+  return value === undefined || (typeof value === 'string' && value.length <= max);
+}
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function offerIdentity(record: Record<string, unknown>): boolean {
+  const keys = Object.keys(record).sort().join(',');
+  if (keys !== 'action,id,label' && keys !== 'action,detail,id,label') return false;
+  if (!boundedString(record.id, 128)) return false;
+  if (!boundedString(record.label, 200)) return false;
+  return optionalBoundedString(record.detail, 200);
+}
+function offerAction(record: Record<string, unknown>): boolean {
+  if (!isPlainRecord(record.action)) return false;
+  const actionRecord = record.action;
+  if (Object.keys(actionRecord).sort().join(',') !== 'params,type') return false;
+  if (!boundedString(actionRecord.type, 64)) return false;
+  if (!isPlainRecord(actionRecord.params)) return false;
+  return Object.values(actionRecord.params).every(publicActionParam);
+}
+export function isPublicActionOffer(value: unknown): value is PublicActionOffer {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return offerIdentity(record) && offerAction(record);
+}
+function publicOffers(value: unknown): value is PublicActionOffer[] {
+  return Array.isArray(value) && value.length <= 64 && value.every(isPublicActionOffer) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
+function generalCollections(value: Record<string, unknown>): boolean {
+  if (!publicObjects(value.objects) || !publicRequests(value.pendingRequests)) return false;
+  if (!stringList(value.dossier, 1000, 128) || !stringList(value.conversation, 1000, 16000)) return false;
+  if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
+  return publicOffers(value.offers);
+}
+function generalReports(value: Record<string, unknown>): boolean {
+  if (!publicBatch(value.batch)) return false;
+  if (value.finalReport !== null && !publicFinalReport(value.finalReport)) return false;
+  return value.officialResult === null;
+}
+function playerViewIdentity(value: Record<string, unknown>): boolean {
+  if (value.schemaVersion !== 1 || !uuid(value.runId) || !uuid(value.branchId)) return false;
+  if (!positiveInteger(value.version)) return false;
+  if (typeof value.caseId !== 'string' || value.caseId.length === 0 || value.caseId.length > 128) return false;
+  return value.status === 'active' || value.status === 'closed';
+}
+const playerViewKeys = 'batch,branchId,caseId,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+/** Vista general: acepta también la forma inicial (es un caso particular). */
+export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
+  if (!dtoRecord(value, playerViewKeys)) return false;
+  if (!playerViewIdentity(value)) return false;
+  if (!generalClock(value.clock) || !generalCapabilities(value) || !initialGeography(value)) return false;
+  return generalCollections(value) && generalReports(value);
+}
+
+function publicEventId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
+}
+function publicEvent(value: unknown): value is PublicEvent {
+  if (!dtoRecord(value, 'id,minute,sequence,summary,type')) return false;
+  if (!publicEventId(value.id) || !nonNegativeInteger(value.sequence) || !nonNegativeInteger(value.minute)) return false;
+  if (typeof value.type !== 'string' || value.type.length === 0 || value.type.length > 128) return false;
+  return typeof value.summary === 'string' && value.summary.length > 0 && value.summary.length <= 2000;
+}
+function publicPreview(value: unknown): value is PublicActionPreview {
+  if (!dtoRecord(value, 'actionType,description,estimatedEndTime,estimatedMinutes')) return false;
+  return typeof value.actionType === 'string' && value.actionType.length > 0 &&
+    nonNegativeInteger(value.estimatedMinutes) && nonNegativeInteger(value.estimatedEndTime) &&
+    typeof value.description === 'string' && value.description.length > 0 && value.description.length <= 2000;
+}
+function actionOutcome(record: Record<string, unknown>): boolean {
+  return ['applied', 'impossible', 'clarification_required', 'confirmation_required', 'batch_paused', 'case_closed']
+    .includes(record.outcome as string);
+}
+function actionOptionalScalars(record: Record<string, unknown>): boolean {
+  if (record.preview !== undefined && !publicPreview(record.preview)) return false;
+  if (record.report !== undefined && !publicFinalReport(record.report)) return false;
+  if (record.operationId !== undefined && !uuid(record.operationId)) return false;
+  if (record.replayed !== undefined && typeof record.replayed !== 'boolean') return false;
+  return record.requiresConfirmation === undefined || typeof record.requiresConfirmation === 'boolean';
+}
+function actionOptionalTexts(record: Record<string, unknown>): boolean {
+  if (record.question !== undefined && (typeof record.question !== 'string' || record.question.length === 0)) return false;
+  if (record.reason !== undefined && (typeof record.reason !== 'string' || record.reason.length === 0)) return false;
+  return record.pausedAt === undefined || nonNegativeInteger(record.pausedAt);
+}
+function actionExtras(record: Record<string, unknown>): boolean {
+  return actionOptionalScalars(record) && actionOptionalTexts(record);
+}
+function actionResponseBase(record: Record<string, unknown>): boolean {
+  const base: Record<string, unknown> = {};
+  for (const key of playerViewKeys.split(',')) base[key] = record[key];
+  if (!isPlayerViewDto(base)) return false;
+  const allowed = new Set([...playerViewKeys.split(','), 'outcome', 'events', 'preview', 'report', 'operationId', 'replayed', 'requiresConfirmation', 'question', 'reason', 'pausedAt']);
+  return Object.keys(record).every(key => allowed.has(key));
+}
+export function isActionResponseDto(value: unknown): value is ActionResponseDto {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (!actionResponseBase(record)) return false;
+  if (!actionOutcome(record)) return false;
+  if (!Array.isArray(record.events) || record.events.length > 100 || !record.events.every(publicEvent)) return false;
+  return actionExtras(record);
+}
+export function isSaveLoadResponseDto(value: unknown): value is SaveLoadResponseDto {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const base: Record<string, unknown> = {};
+  for (const key of playerViewKeys.split(',')) base[key] = record[key];
+  if (!isPlayerViewDto(base)) return false;
+  const allowed = new Set([...playerViewKeys.split(','), 'operationId', 'newBranchId']);
+  if (!Object.keys(record).every(key => allowed.has(key))) return false;
+  return uuid(record.operationId) && uuid(record.newBranchId);
+}

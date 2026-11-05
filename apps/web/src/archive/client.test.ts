@@ -77,7 +77,7 @@ describe('T3: frontera HTTP del archivo', () => {
 
 });
 
-describe('T3: lectura inicial sin aceptar replay o progreso', () => {
+describe('T3: lectura de partida sin aceptar replay ni contrato ajeno', () => {
   it('consulta GET del ID elegido y conserva las garantías del transporte', async () => {
     const fetcher = respond(initialView);
     expect(await archiveApi.initial(initialView.runId, signal())).toEqual(initialView);
@@ -88,15 +88,12 @@ describe('T3: lectura inicial sin aceptar replay o progreso', () => {
   it.each([
     { ...initialView, engineState: 'SYNTHETIC_PRIVATE' },
     { ...initialView, replayed: true },
-    { ...initialView, version: 2 },
-    { ...initialView, clock: { minute: 1, deadlineMinutes: 100 } },
     { ...initialView, pendingRequests: [{ payload: 'SYNTHETIC_PRIVATE' }] },
     { ...initialView, finalReport: { result: 'complete' } },
-    { ...initialView, saveCapabilities: { ...initialView.saveCapabilities, canSave: true } },
-    { ...initialView, cities: [initialView.position.city, initialView.position.city] },
+    { ...initialView, cities: [] },
     { ...initialView, locations: [] },
     { ...initialView, position: { ...initialView.position, city: { ...initialView.position.city, secret: true } } },
-  ])('rechaza contrato ajeno al inicio antes de exponerlo', async body => {
+  ])('rechaza contrato ajeno a la partida antes de exponerlo', async body => {
     respond(body); await expect(archiveApi.initial(initialView.runId, signal())).rejects.toEqual(new ArchiveError('invalid'));
   });
   it('no acepta respuesta de otra partida ni fabrica inicio cuando falla la API', async () => {

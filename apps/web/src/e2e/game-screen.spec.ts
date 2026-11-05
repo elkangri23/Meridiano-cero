@@ -1,0 +1,122 @@
+import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+/** Crea una partida desde la UI del archivo y abre su pantalla de juego. */
+async function openGameScreen(page: Page) {
+  await page.goto('/');
+  await page.waitForSelector('#root > *', { timeout: 10000 });
+  await page.click('button:has-text("Entrar en desarrollo local")');
+  const creation = page.locator('.archive-create').first();
+  await expect(creation.getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
+  await creation.locator('select').selectOption('astrolabio-tres-ciudades');
+  await creation.getByRole('button', { name: 'Crear partida' }).click();
+  await expect(page.locator('text=Partida creada').first()).toBeVisible();
+  await page.click('button[aria-label^="Consultar partida"]');
+  const href = await page.getAttribute('a:has-text("pantalla de juego")', 'href');
+  expect(href).toMatch(/^\/runs\/[0-9a-f-]+$/);
+  await page.goto(href!);
+  await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
+  await expect(page.getByTestId('clock')).toContainText('0 min');
+}
+
+/** Pulsa una oferta, confirma el diálogo de preview y espera el reloj en `minute`. */
+async function playOffer(page: Page, testId: string, minute: number) {
+  await page.getByTestId(testId).click();
+  await expect(page.getByTestId('preview-dialog')).toBeVisible();
+  await page.getByTestId('preview-confirm').click();
+  await expect(page.getByTestId('preview-dialog')).toBeHidden();
+  await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
+}
+
+/** Viaja desde la ventana del mapa: abre Mapa, pulsa Viajar, confirma y cierra la ventana. */
+async function travelTo(page: Page, cityId: string, minute: number) {
+  await page.click('button:has-text("Mapa")');
+  await page.getByTestId(`travel-${cityId}`).click();
+  await expect(page.getByTestId('preview-dialog')).toBeVisible();
+  await page.getByTestId('preview-confirm').click();
+  await expect(page.getByTestId('preview-dialog')).toBeHidden();
+  await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId(`travel-${cityId}`)).toBeHidden();
+}
+
+test.describe('E2E T3-05 - Pantalla de juego', () => {
+  test('Ruta A completa (455 min): inspeccionar, recoger, analizar, viajar, consultar, orden, detener, recuperar y cerrar', async ({ page }) => {
+    await openGameScreen(page);
+    await playOffer(page, 'offer-inspect:MAD-SALA', 10);
+    await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);
+    await playOffer(page, 'offer-collect:EV-02', 30);
+    await playOffer(page, 'offer-analyze:EV-02', 30);
+    await travelTo(page, 'paris', 210);
+    await playOffer(page, 'offer-query:herramienta-hv17', 210);
+    await playOffer(page, 'offer-query:traslado-ines', 210);
+    await playOffer(page, 'offer-wait:30', 240);
+    await playOffer(page, 'offer-request_warrant:ines', 240);
+    await playOffer(page, 'offer-wait:30', 270);
+    await travelTo(page, 'lisboa', 420);
+    await playOffer(page, 'offer-talk:ines:identidad', 420);
+    await playOffer(page, 'offer-detain:ines', 435);
+    await playOffer(page, 'offer-recover:astrolabio-original', 455);
+    await playOffer(page, 'offer-finish', 455);
+    await expect(page.getByTestId('clock')).toContainText('Cerrada');
+    // Informe final disponible en la ventana correspondiente.
+    await page.click('button:has-text("Informe final")');
+    await expect(page.locator('text=Resultado:')).toBeVisible();
+  });
+
+  test('Ruta B completa (485 min) con guardar y reanudar a mitad de ruta', async ({ page }) => {
+    await openGameScreen(page);
+    await playOffer(page, 'offer-inspect:MAD-SALA', 10);
+    await playOffer(page, 'offer-inspect:MAD-SALA:caja', 30);
+    await playOffer(page, 'offer-collect:EV-06', 30);
+    // Guardar en el minuto 30.
+    await page.click('button:has-text("Guardados")');
+    await page.getByTestId('save-name-input').fill('Punto E2E ruta B');
+    await page.getByTestId('save-create').click();
+    await expect(page.locator('text=Guardado confirmado por el servidor.')).toBeVisible();
+    await expect(page.getByTestId('save-list')).toContainText('Punto E2E ruta B');
+    await page.keyboard.press('Escape');
+    // Avanzar y reanudar: el reloj vuelve a 30.
+    await travelTo(page, 'paris', 210);
+    await page.click('button:has-text("Guardados")');
+    await page.locator('[data-testid^="load-"]').first().click();
+    await expect(page.getByTestId('load-confirm')).toBeVisible();
+    await page.getByTestId('load-confirm-button').click();
+    await expect(page.getByTestId('clock')).toContainText('30 min');
+    await page.keyboard.press('Escape');
+    // Continuar la ruta B desde el punto guardado.
+    await travelTo(page, 'paris', 210);
+    await playOffer(page, 'offer-query:firma-sello', 210);
+    await playOffer(page, 'offer-wait:30', 240);
+    await travelTo(page, 'lisboa', 390);
+    await playOffer(page, 'offer-query:custodia-envio', 390);
+    await playOffer(page, 'offer-wait:30', 420);
+    await playOffer(page, 'offer-request_warrant:ines', 420);
+    await playOffer(page, 'offer-wait:30', 450);
+    await playOffer(page, 'offer-talk:ines:identidad', 450);
+    await playOffer(page, 'offer-detain:ines', 465);
+    await playOffer(page, 'offer-recover:astrolabio-original', 485);
+    await playOffer(page, 'offer-finish', 485);
+    await expect(page.getByTestId('clock')).toContainText('Cerrada');
+  });
+
+  test('Teclado: Enter en una oferta, Escape cierra el diálogo y Ctrl+Enter envía la orden en texto libre', async ({ page }) => {
+    await openGameScreen(page);
+    // Tab/Enter: enfocar la primera oferta y confirmar con Enter.
+    await page.getByTestId('offer-inspect:MAD-SALA').focus();
+    await expect(page.getByTestId('offer-inspect:MAD-SALA')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('preview-dialog')).toBeVisible();
+    // Escape cancela el diálogo y devuelve el foco a la oferta.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('offer-inspect:MAD-SALA')).toBeFocused();
+    // Ctrl+Enter en la orden en texto libre: el mock interpreta la primera oferta.
+    await page.getByTestId('order-input').fill('inspecciona la sala con cuidado');
+    await page.keyboard.press('Control+Enter');
+    await expect(page.getByTestId('preview-dialog')).toBeVisible();
+    await expect(page.getByTestId('preview-dialog')).toContainText('Inspeccionar');
+    await page.getByTestId('preview-confirm').click();
+    await expect(page.getByTestId('clock')).toContainText('10 min');
+  });
+});

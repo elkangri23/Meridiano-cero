@@ -11,6 +11,15 @@ const queries: Readonly<Record<string, QueryRule>> = {
   'accesos-tomas': { city: 'madrid', location: 'MAD-SALA', evidenceId: 'EV-10', requires: [] },
 };
 
+export function listQueryIds(): string[] {
+  return Object.keys(queries);
+}
+
+/** Elementos inspeccionables de una localización en el caso fijo. */
+export function listInspectableElements(target: string): string[] {
+  return target === 'MAD-SALA' ? ['cerradura', 'caja'] : [];
+}
+
 export function knowsEvidence(run: CaseRun, id: string): boolean {
   return run.discoveries.includes(id) || run.inventory.includes(id);
 }

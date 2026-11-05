@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Archive } from './archive/Archive';
 import { Glosario } from './glosario/GlosarioPage';
 import { Prototype } from './prototype/Prototype';
+import { GameScreen } from './game/GameScreen';
 import './style.css';
 
 const root = document.getElementById('root');
@@ -14,6 +15,7 @@ application.render(
       <Route path="/" element={<Archive />} />
       <Route path="/glosario" element={<Glosario />} />
       <Route path="/prototype" element={<Prototype />} />
+      <Route path="/runs/:runId" element={<GameScreen />} />
     </Routes>
   </BrowserRouter>
 );
