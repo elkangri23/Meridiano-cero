@@ -54,7 +54,8 @@ export interface ConnectionTestResult {
 }
 
 export class ConnectionsError extends Error {
-  constructor(readonly kind: 'unavailable' | 'invalid' | 'not_found' | 'session') { super(kind); }
+  /** Motivo real del servidor, solo para errores de destino (INVALID_DESTINATION). */
+  constructor(readonly kind: 'unavailable' | 'invalid' | 'not_found' | 'session', readonly detail?: string) { super(kind); }
 }
 
 async function readJson(response: Response): Promise<Record<string, unknown>> {
@@ -67,6 +68,15 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
   } catch {
     throw new ConnectionsError('invalid');
   }
+}
+
+async function readErrorDetail(response: Response): Promise<string | undefined> {
+  const body = await readJson(response).catch(() => ({} as Record<string, unknown>));
+  const errorBody = body.error;
+  if (typeof errorBody !== 'object' || errorBody === null) return undefined;
+  const record = errorBody as Record<string, unknown>;
+  if (record.code !== 'INVALID_DESTINATION' || typeof record.message !== 'string') return undefined;
+  return record.message;
 }
 
 async function request(
@@ -89,7 +99,11 @@ async function request(
   }
   if (response.status === 401) throw new ConnectionsError('session');
   if (response.status === 404) throw new ConnectionsError('not_found');
-  if (!response.ok) throw new ConnectionsError('invalid');
+  if (!response.ok) {
+    // El servidor solo adjunta mensaje propio a INVALID_DESTINATION; ese
+    // motivo real se muestra en el formulario en vez del mensaje genérico.
+    throw new ConnectionsError('invalid', await readErrorDetail(response));
+  }
   return readJson(response);
 }
 

@@ -128,7 +128,14 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('clock')).toContainText('10 min');
   });
 
-  test('Ajustes de IA: crear conexión Ollama, verla como efectiva y borrarla', async ({ page }) => {
+  // Los dos tests de Ajustes comparten el perfil local de desarrollo y el
+  // proveedor efectivo: en serie para que uno no vea activa la conexión del
+  // otro (ni deje una conexión activa que cambie la interpretación en el
+  // resto de tests).
+  test.describe('Ajustes de IA', () => {
+    test.describe.configure({ mode: 'serial' });
+
+    test('Ajustes de IA: crear conexión Ollama, verla como efectiva y borrarla', async ({ page }) => {
     await openGameScreen(page);
     await page.click('button:has-text("Ajustes")');
     await expect(page.getByTestId('settings-ai-effective')).toContainText('Mock determinista');
@@ -143,5 +150,26 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('ai-connections-list')).not.toContainText('Ollama E2E');
     await expect(page.getByTestId('settings-ai-effective')).toContainText('Mock determinista');
     await page.keyboard.press('Escape');
+  });
+
+  test('Ajustes de IA: el formulario trae valores prerrellenados y borrar limpia el mensaje', async ({ page }) => {
+    await openGameScreen(page);
+    await page.click('button:has-text("Ajustes")');
+    await expect(page.getByTestId('settings-ai-effective')).toContainText('Mock determinista');
+    // Sin teclear nada: nombre, URL y modelo ya están en el formulario.
+    await expect(page.getByTestId('ai-connection-name')).toHaveValue('Mi Ollama');
+    await expect(page.getByTestId('ai-connection-base-url')).toHaveValue('http://127.0.0.1:11434');
+    await expect(page.getByTestId('ai-connection-model')).toHaveValue('llama3.1:8b');
+    await page.getByTestId('ai-connection-save').click();
+    await expect(page.locator('text=Conexión guardada y activada.')).toBeVisible();
+    await expect(page.getByTestId('ai-connections-list')).toContainText('Mi Ollama');
+    await expect(page.getByTestId('settings-ai-effective')).toContainText('Mi Ollama');
+    await page.getByRole('button', { name: 'Borrar Mi Ollama' }).click();
+    await expect(page.getByTestId('ai-connections-list')).not.toContainText('Mi Ollama');
+    await expect(page.getByTestId('settings-ai-effective')).toContainText('Mock determinista');
+    // El mensaje de éxito no queda obsoleto tras borrar.
+    await expect(page.locator('text=Conexión guardada y activada.')).toBeHidden();
+    await page.keyboard.press('Escape');
+  });
   });
 });

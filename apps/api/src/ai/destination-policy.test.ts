@@ -5,32 +5,38 @@ import { describe, expect, it } from 'vitest';
 import { validateConnectionBaseUrl } from './destination-policy.ts';
 
 describe('política de destinos de conexiones personales', () => {
-  it('Ollama exige loopback literal sin ruta', async () => {
+  it('Ollama exige loopback literal sin ruta; localhost y ::1 se normalizan a 127.0.0.1', async () => {
     await expect(validateConnectionBaseUrl('ollama', 'http://127.0.0.1:11434', 'development'))
       .resolves.toBe('http://127.0.0.1:11434');
     await expect(validateConnectionBaseUrl('ollama', 'http://localhost:11434', 'development'))
-      .rejects.toThrow('Ollama requiere');
+      .resolves.toBe('http://127.0.0.1:11434');
+    await expect(validateConnectionBaseUrl('ollama', 'http://localhost:11434', 'production'))
+      .resolves.toBe('http://127.0.0.1:11434');
+    await expect(validateConnectionBaseUrl('ollama', 'http://[::1]:11434', 'development'))
+      .resolves.toBe('http://127.0.0.1:11434');
     await expect(validateConnectionBaseUrl('ollama', 'https://127.0.0.1:11434', 'development'))
       .rejects.toThrow('Ollama requiere');
     await expect(validateConnectionBaseUrl('ollama', 'http://127.0.0.1:11434/api', 'development'))
       .rejects.toThrow('Ollama requiere');
   });
 
-  it('en desarrollo admite loopback y LAN local para OpenAI-compatible', async () => {
+  it('en desarrollo admite loopback y LAN local para OpenAI-compatible; localhost se normaliza', async () => {
     await expect(validateConnectionBaseUrl('openai-compatible', 'http://localhost:1234/v1', 'development'))
-      .resolves.toBe('http://localhost:1234/v1');
+      .resolves.toBe('http://127.0.0.1:1234/v1');
     await expect(validateConnectionBaseUrl('openai-compatible', 'http://192.168.1.50:1234/v1/', 'development'))
       .resolves.toBe('http://192.168.1.50:1234/v1');
   });
 
   it('en producción exige HTTPS y rechaza loopback, privada y metadata', async () => {
     await expect(validateConnectionBaseUrl('openai-compatible', 'http://localhost:1234/v1', 'production'))
-      .rejects.toThrow('HTTPS');
+      .rejects.toThrow('versión alojada');
+    await expect(validateConnectionBaseUrl('openai-compatible', 'https://localhost:1234/v1', 'production'))
+      .rejects.toThrow('versión alojada');
+    await expect(validateConnectionBaseUrl('openai-compatible', 'http://127.0.0.1:1234/v1', 'production'))
+      .rejects.toThrow('versión alojada');
     await expect(validateConnectionBaseUrl('openai-compatible', 'https://127.0.0.1:1234/v1', 'production'))
       .rejects.toThrow('no está permitido');
     await expect(validateConnectionBaseUrl('openai-compatible', 'https://192.168.1.50:1234/v1', 'production'))
-      .rejects.toThrow('no está permitido');
-    await expect(validateConnectionBaseUrl('openai-compatible', 'https://localhost:1234/v1', 'production'))
       .rejects.toThrow('no está permitido');
     await expect(validateConnectionBaseUrl('openai-compatible', 'https://metadata.google.internal/v1', 'production'))
       .rejects.toThrow('no está permitido');

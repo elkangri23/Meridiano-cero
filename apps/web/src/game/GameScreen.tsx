@@ -433,6 +433,13 @@ function validateConnectionForm(selected: ProviderCatalogEntry, connName: string
   return null;
 }
 
+/** Nombre sugerido para una conexión nueva («Mi Ollama», «Mi OpenAI», …). */
+function defaultConnectionName(entry: ProviderCatalogEntry | undefined): string {
+  if (!entry) return '';
+  const short = entry.label.replace(/\s*\(.*\)\s*$/, '').replace(/\s+local\s*$/i, '').trim();
+  return `Mi ${short || entry.id}`;
+}
+
 function ConnectionProviderFields({ selected, baseUrl, onBaseUrl, model, onModel, apiKey, onApiKey }: {
   selected: ProviderCatalogEntry | undefined;
   baseUrl: string; onBaseUrl: (value: string) => void;
@@ -452,41 +459,57 @@ function ConnectionProviderFields({ selected, baseUrl, onBaseUrl, model, onModel
   </>;
 }
 
-function AddConnectionForm({ catalog, csrfToken, onSaved }: {
+/** Mensaje de error al guardar una conexión: el motivo real del servidor
+ * (p. ej. destino no permitido) se muestra tal cual; el genérico solo queda
+ * para el resto de fallos. */
+function connectionSaveErrorMessage(error: unknown): string {
+  if (error instanceof ConnectionsError && error.kind === 'session') return 'La sesión caducó. Vuelve a entrar.';
+  if (error instanceof ConnectionsError && error.detail) return error.detail;
+  return 'No se pudo guardar la conexión. Revisa los datos (el nombre no puede repetirse).';
+}
+
+function AddConnectionForm({ catalog, csrfToken, onSaved, formMessage, formError, onFormMessage, onFormError }: {
   catalog: ProviderCatalogEntry[];
   csrfToken: string;
   onSaved: () => Promise<void>;
+  formMessage: string;
+  formError: string;
+  onFormMessage: (value: string) => void;
+  onFormError: (value: string) => void;
 }) {
-  const [adapterId, setAdapterId] = useState('ollama');
-  const [connName, setConnName] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [model, setModel] = useState('');
+  // El estado arranca con los valores que el formulario muestra: lo que se ve
+  // es lo que se guarda (antes los placeholders sugerían valores que el
+  // estado no tenía y el primer guardado fallaba).
+  const defaultEntry = catalog.find(entry => entry.id === 'ollama') ?? catalog[0];
+  const [adapterId, setAdapterId] = useState(defaultEntry?.id ?? 'ollama');
+  const [connName, setConnName] = useState(() => defaultConnectionName(defaultEntry));
+  const [baseUrl, setBaseUrl] = useState(() => defaultEntry?.needsBaseUrl ? defaultEntry.defaultBaseUrl : '');
+  const [model, setModel] = useState(() => defaultEntry?.defaultModel ?? '');
   const [apiKey, setApiKey] = useState('');
   const [saving, setSaving] = useState(false);
-  const [formMessage, setFormMessage] = useState('');
-  const [formError, setFormError] = useState('');
   const selected = catalog.find(entry => entry.id === adapterId);
 
   function onAdapterChange(value: string) {
     setAdapterId(value);
     const entry = catalog.find(item => item.id === value);
     if (entry) {
+      setConnName(defaultConnectionName(entry));
       setModel(entry.defaultModel);
       setBaseUrl(entry.needsBaseUrl ? entry.defaultBaseUrl : '');
     }
     setApiKey('');
-    setFormError('');
-    setFormMessage('');
+    onFormError('');
+    onFormMessage('');
   }
 
   async function saveConnection(event: FormEvent) {
     event.preventDefault();
     if (!selected || saving) return;
     const validationError = validateConnectionForm(selected, connName, apiKey);
-    if (validationError) { setFormError(validationError); return; }
+    if (validationError) { onFormError(validationError); return; }
     setSaving(true);
-    setFormError('');
-    setFormMessage('');
+    onFormError('');
+    onFormMessage('');
     try {
       const input: { name: string; adapterId: string; baseUrl?: string; model: string; credential?: string; isDefault: boolean } = {
         name: connName.trim(), adapterId: selected.id,
@@ -495,14 +518,16 @@ function AddConnectionForm({ catalog, csrfToken, onSaved }: {
       if (selected.needsBaseUrl) input.baseUrl = baseUrl.trim();
       if (apiKey) input.credential = apiKey;
       await aiConnectionsApi.create(input, new AbortController().signal, { csrfToken });
-      setConnName('');
+      // El formulario vuelve a los valores por defecto del proveedor,
+      // listo para otra conexión.
+      setConnName(defaultConnectionName(selected));
+      setBaseUrl(selected.needsBaseUrl ? selected.defaultBaseUrl : '');
+      setModel(selected.defaultModel);
       setApiKey('');
-      setFormMessage('Conexión guardada y activada.');
+      onFormMessage('Conexión guardada y activada.');
       await onSaved();
     } catch (error) {
-      setFormError(error instanceof ConnectionsError && error.kind === 'session'
-        ? 'La sesión caducó. Vuelve a entrar.'
-        : 'No se pudo guardar la conexión. Revisa los datos (el nombre no puede repetirse).');
+      onFormError(connectionSaveErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -538,6 +563,10 @@ function SettingsContent({ identity, textScale, highContrast, onScale, onContras
   const [loadError, setLoadError] = useState('');
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, ConnectionTestResult>>({});
+  // Los mensajes del formulario de alta viven aquí para poder limpiarlos
+  // cuando la lista cambia por otro lado (borrar o volver al defecto).
+  const [formMessage, setFormMessage] = useState('');
+  const [formError, setFormError] = useState('');
 
   const csrfToken = identity?.csrfToken ?? null;
   const auth = csrfToken ? { csrfToken } : undefined;
@@ -584,12 +613,17 @@ function SettingsContent({ identity, textScale, highContrast, onScale, onContras
   async function removeConnection(id: string) {
     if (!auth) return;
     await aiConnectionsApi.remove(id, new AbortController().signal, auth);
+    // El mensaje de «guardada y activada» queda obsoleto al borrar.
+    setFormMessage('');
+    setFormError('');
     await reload(new AbortController().signal);
   }
 
   async function useServerDefault() {
     if (!auth) return;
     await aiConnectionsApi.useDefault(new AbortController().signal, auth);
+    setFormMessage('');
+    setFormError('');
     await reload(new AbortController().signal);
   }
 
@@ -617,7 +651,10 @@ function SettingsContent({ identity, textScale, highContrast, onScale, onContras
       </div>
       {data.effective.source === 'personal' && <p><button type="button" onClick={() => void useServerDefault()}>Usar el proveedor del servidor</button></p>}
       <h4>Añadir conexión</h4>
-      {csrfToken && <AddConnectionForm catalog={data.catalog} csrfToken={csrfToken} onSaved={() => reload(new AbortController().signal)} />}
+      {csrfToken && <AddConnectionForm
+        catalog={data.catalog} csrfToken={csrfToken} onSaved={() => reload(new AbortController().signal)}
+        formMessage={formMessage} formError={formError} onFormMessage={setFormMessage} onFormError={setFormError}
+      />}
     </>}
     <h4>Presentación</h4>
     <label className="game-setting"><span>Tamaño de texto</span>

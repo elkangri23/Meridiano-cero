@@ -18,6 +18,9 @@ describe('conexiones IA personales (Fase C)', () => {
   const database = createDatabase(config.databaseUrl);
   const owner = createDatabase(readDatabaseUrl(process.env.DATABASE_MIGRATION_URL));
   const app = createApp({ config, database });
+  // Segunda instancia en modo producción para comprobar el rechazo de
+  // destinos locales con su mensaje propio (misma BD y mismas sesiones).
+  const prodApp = createApp({ config: { ...config, mode: 'production' }, database });
 
   type Json = Record<string, unknown>;
   function asJson(value: unknown): Json {
@@ -46,10 +49,12 @@ describe('conexiones IA personales (Fase C)', () => {
       await owner.pool.query("INSERT INTO sessions(token_hash,profile_id,csrf_token,expires_at) VALUES ($1,$2,$3,now()+interval '8 hours')", [tokenDigest(user.player.token), user.player.id, user.player.csrf]);
     }
     await app.ready();
+    await prodApp.ready();
   });
 
   afterAll(async () => {
     await app.close();
+    await prodApp.close();
     for (const user of [userA, userB]) {
       await owner.pool.query('DELETE FROM ai_usage WHERE owner_id=$1', [user.player.id]);
       await owner.pool.query('DELETE FROM ai_connections WHERE owner_id=$1', [user.player.id]);
@@ -178,5 +183,45 @@ describe('conexiones IA personales (Fase C)', () => {
     }
     const list = await app.inject({ url: '/api/v1/ai/connections', headers: userA.headers });
     expect(asJson(list.json()).connections).toEqual([]);
+  });
+
+  it('localhost se normaliza a 127.0.0.1 y el error de destino es honesto', async () => {
+    const created = await app.inject({
+      method: 'POST', url: '/api/v1/ai/connections', headers: userA.headers,
+      payload: { name: 'Local Ollama', adapterId: 'ollama', baseUrl: 'http://localhost:11434', model: 'llama3.1:8b', isDefault: true },
+    });
+    expect(created.statusCode).toBe(201);
+    const createdBody = asJson(created.json());
+    expect(asJson(createdBody.connection).baseUrl).toBe('http://127.0.0.1:11434');
+    const localId = connectionId(createdBody);
+
+    const badUrl = await app.inject({
+      method: 'POST', url: '/api/v1/ai/connections', headers: userA.headers,
+      payload: { name: 'Raro 2', adapterId: 'openai-compatible', baseUrl: 'http://user:pass@example.com/v1', model: 'local-model' },
+    });
+    expect(badUrl.statusCode).toBe(400);
+    expect(asJson(asJson(badUrl.json()).error).code).toBe('INVALID_DESTINATION');
+    expect(asJson(asJson(badUrl.json()).error).message).toBe('La URL del endpoint no es válida.');
+
+    const duplicate = await app.inject({
+      method: 'POST', url: '/api/v1/ai/connections', headers: userA.headers,
+      payload: { name: 'Local Ollama', adapterId: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: 'llama3.1:8b' },
+    });
+    expect(duplicate.statusCode).toBe(400);
+    expect(asJson(asJson(duplicate.json()).error).code).toBe('INVALID_REQUEST');
+
+    const removed = await app.inject({ method: 'DELETE', url: `/api/v1/ai/connections/${localId}`, headers: userA.headers });
+    expect(removed.statusCode).toBe(204);
+  });
+
+  it('en producción localhost se rechaza con el mensaje de la versión alojada', async () => {
+    const response = await prodApp.inject({
+      method: 'POST', url: '/api/v1/ai/connections', headers: userA.headers,
+      payload: { name: 'LM local', adapterId: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'local-model' },
+    });
+    expect(response.statusCode).toBe(400);
+    const body = asJson(response.json());
+    expect(asJson(body.error).code).toBe('INVALID_DESTINATION');
+    expect(asJson(body.error).message as string).toContain('versión alojada');
   });
 });
