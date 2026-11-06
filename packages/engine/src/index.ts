@@ -7,6 +7,7 @@ import { revealInspection, canCollect, revealTalk, queryRule, matureEvidence, re
 import { generatedAnalysis, generatedQueryRule, generatedSuspect, matureGeneratedEvidence, revealGeneratedInspection, revealGeneratedTalk } from './generated-mechanics.js';
 import { requestWarrant, matureSelectedWarrant } from './warrants.js';
 export { canIssueWarrant, knownSuspect } from './warrants.js';
+export { knowsEvidence } from './fixed-evidence.js';
 export { availableOffers } from './offers.js';
 export { liveObjectives } from './final-report.js';
 export type { ActionOffer } from './offers.js';

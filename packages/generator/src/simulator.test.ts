@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generadoFraudeDefinition } from '@meridiano/engine';
-import { simulateCase, type GoldenPathAction } from './simulator.js';
+import { diagnoseGoldenPathFailure, simulateCase, type GoldenPathAction } from './simulator.js';
 
 // La ruta dorada del fixture, como en el test del motor: inspeccionar,
 // recoger, analizar, hablar, consultar, viajar, orden, detener, recuperar.
@@ -43,6 +43,7 @@ describe('simulateCase (T4-08)', () => {
     expect(result.minute).toBeLessThanOrEqual(1440);
     expect(result.checks.map(check => check.name)).toEqual(['golden-path', 'early-finish', 'detain-without-warrant', 'recover-without-access']);
     expect(result.errors).toEqual([]);
+    expect(result.diagnosis).toBeNull();
   });
 
   it('rechaza una ruta dorada que no cierra el caso', () => {
@@ -66,5 +67,56 @@ describe('simulateCase (T4-08)', () => {
     broken.mechanics.suspects = [];
     const result = simulateCase(broken, GOLDEN_PATH, 1440);
     expect(result.playable).toBe(false);
+  });
+});
+
+describe('diagnoseGoldenPathFailure', () => {
+  it('explica una consulta antes de su requisito (EV-03)', () => {
+    // Sin el análisis de EV-02 no hay EV-03, así que registro-facturas
+    // (segunda ciudad) se rechaza aunque se pida en el lugar correcto.
+    const path = GOLDEN_PATH.filter(action => action.type !== 'analyze');
+    const diagnosis = diagnoseGoldenPathFailure(generadoFraudeDefinition, path, 1440);
+    expect(diagnosis).toContain('registro-facturas');
+    expect(diagnosis).toContain('EV-03');
+    expect(diagnosis).toContain('DESPUÉS');
+  });
+
+  it('explica una recuperación sin evidencia de acceso en la orden', () => {
+    // Como el modelo real en el smoke: la orden usa ['EV-03', 'EV-04']
+    // (válida para detener) pero ninguna es de acceso (EV-05, EV-08).
+    const path = GOLDEN_PATH.map(action =>
+      action.type === 'request_warrant'
+        ? { ...action, params: { ...action.params, evidenceIds: ['EV-03', 'EV-04'] } }
+        : action,
+    );
+    const diagnosis = diagnoseGoldenPathFailure(generadoFraudeDefinition, path, 1440);
+    expect(diagnosis).toContain('ninguna es una evidencia de acceso');
+    expect(diagnosis).toContain('EV-05');
+  });
+
+  it('explica una detención antes de que madure la orden', () => {
+    // Sin el wait de 30 min entre la orden y la detención, la orden aún
+    // no ha madurado cuando se intenta detener.
+    const warrantIndex = GOLDEN_PATH.findIndex(action => action.type === 'request_warrant');
+    const path = GOLDEN_PATH.filter((action, index) => !(index === warrantIndex + 1 && action.type === 'wait'));
+    const diagnosis = diagnoseGoldenPathFailure(generadoFraudeDefinition, path, 1440);
+    expect(diagnosis).toContain('aún no ha madurado');
+    expect(diagnosis).toContain('30 min');
+  });
+
+  it('explica una consulta en la ciudad equivocada', () => {
+    // registro-facturas es de Barcelona; pedirla en Madrid se rechaza
+    // por la posición, antes que por sus requisitos.
+    const queryIndex = GOLDEN_PATH.findIndex(action => action.type === 'query' && action.params.topicId === 'registro-facturas');
+    const query = GOLDEN_PATH[queryIndex];
+    if (!query) throw new Error('Sin consulta registro-facturas en el fixture.');
+    const path = [GOLDEN_PATH[0], query, ...GOLDEN_PATH.slice(1, queryIndex), ...GOLDEN_PATH.slice(queryIndex + 1)];
+    const diagnosis = diagnoseGoldenPathFailure(generadoFraudeDefinition, path, 1440);
+    expect(diagnosis).toContain('Barcelona');
+    expect(diagnosis).toContain('Madrid');
+  });
+
+  it('devuelve null cuando la ruta es jugable', () => {
+    expect(diagnoseGoldenPathFailure(generadoFraudeDefinition, GOLDEN_PATH, 1440)).toBeNull();
   });
 });

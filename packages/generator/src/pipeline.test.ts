@@ -1145,3 +1145,30 @@ describe('validación de la etapa 1 (título del expediente)', () => {
     expect(result.valid).toBe(true);
   });
 });
+
+describe('diagnóstico de la etapa 4 en el pipeline', () => {
+  it('el error de la etapa 4 incluye el diagnóstico de la ruta dorada', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    // La ruta nunca se repara: sin el análisis no hay EV-03 y la consulta
+    // registro-facturas se rechaza siempre en la segunda ciudad.
+    const broken = structuredClone(outputs.cluesRules);
+    broken.goldenPath = broken.goldenPath.filter(action => action.type !== 'analyze');
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) return (context as Record<string, unknown>).part === 'a' ? outputs.cluesWorld : broken;
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Diagnóstico/);
+    expect(result.error).toMatch(/EV-03/);
+  });
+});

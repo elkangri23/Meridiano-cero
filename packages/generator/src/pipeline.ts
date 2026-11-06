@@ -383,7 +383,7 @@ function checkGoldenPathPlayable(
   const definition = assembleDefinitionOrFail(clues, premise, npcs, draft, choice, geography, config);
   const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
   const simulation = simulateCase(definition, goldenPath, budgetMinutes);
-  if (!simulation.playable) throw new StageOutputError(`Etapa 4 inválida: la ruta dorada no se puede jugar: ${simulation.errors.join('; ')}`, clues);
+  if (!simulation.playable) throw new StageOutputError(`Etapa 4 inválida: la ruta dorada no se puede jugar: ${simulation.errors.join('; ')}${simulation.diagnosis ? ` Diagnóstico: ${simulation.diagnosis}` : ''}`, clues);
 }
 
 function assembleDefinitionOrFail(
@@ -472,7 +472,7 @@ function simulateStage(draft: CaseDraft, config: PipelineConfig): { playable: bo
   const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
   const simulation = simulateCase(definition, draft.goldenPath, budgetMinutes);
   draft.simulation = simulation;
-  if (!simulation.playable) throw new StageGateError(simulation.errors);
+  if (!simulation.playable) throw new StageGateError(simulation.diagnosis ? [...simulation.errors, `Diagnóstico: ${simulation.diagnosis}`] : simulation.errors);
   return { playable: true, minute: simulation.minute, budgetMinutes };
 }
 
