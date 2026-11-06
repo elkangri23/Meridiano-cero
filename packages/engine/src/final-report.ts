@@ -13,6 +13,15 @@ function objectiveAchieved(def: CaseDefinition, run: CaseRun, id: string): boole
   return false;
 }
 
+/** Objetivos logrados en este momento de la partida, según el estado del
+ * motor (detenciones y objetos recuperados). Es la misma evaluación que
+ * usa el informe final, pero en vivo: el panel de objetivos de la pantalla
+ * de juego la enseña sin esperar al cierre. Los objetivos sin condición
+ * conocida quedan siempre pendientes (no se inventa su logro). */
+export function liveObjectives(def: CaseDefinition, run: CaseRun): string[] {
+  return def.objectives.filter(objective => objectiveAchieved(def, run, objective.id)).map(objective => objective.id);
+}
+
 function result(def: CaseDefinition, run: CaseRun, achieved: string[]): FinalReport['result'] {
   if (run.detentions.some(suspect => canonicalSuspect(def, suspect) !== def.solution)) return 'incorrect';
   if (def.objectives.length > 0 && achieved.length === def.objectives.length) return 'complete';
@@ -20,6 +29,6 @@ function result(def: CaseDefinition, run: CaseRun, achieved: string[]): FinalRep
 }
 
 export function buildFinalReport(def: CaseDefinition, run: CaseRun, reason: FinalReport['reason']): FinalReport {
-  const achieved = def.objectives.filter(objective => objectiveAchieved(def, run, objective.id)).map(objective => objective.id);
+  const achieved = liveObjectives(def, run);
   return { result: result(def, run, achieved), objectivesAchieved: achieved, reason, minute: run.minute };
 }

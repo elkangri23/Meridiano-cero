@@ -29,6 +29,11 @@ export function initialPlayerView(run: StoredRun): InitialPlayerViewDto {
     cities: cities.map(item => ({ id: item.id, name: item.name, country: item.country })),
     locations: [publicLocation], objects: [], dossier: [], conversation: [], pendingRequests: [],
     warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
+    // Objetivos en vivo (lote 2): al empezar, todos pendientes (la partida
+    // inicial no tiene detenciones ni objetos recuperados).
+    objectives: definition.objectives.map(objective => ({
+      id: objective.id, description: objective.description, achieved: false,
+    })),
     caseMeta: caseMeta(definition.id),
     saveCapabilities: { manualLimit: 10, manualCount: 0, canSave: false, canLoad: false },
     recovery: { retryCreationWithSameKey: true, creationLookup: true, operationLookup: false },

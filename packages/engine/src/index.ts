@@ -7,6 +7,7 @@ import { revealInspection, canCollect, revealTalk, queryRule, matureEvidence, re
 import { requestWarrant, matureSelectedWarrant } from './warrants.js';
 export { canIssueWarrant, knownSuspect } from './warrants.js';
 export { availableOffers } from './offers.js';
+export { liveObjectives } from './final-report.js';
 export type { ActionOffer } from './offers.js';
 import { EngineStateError } from './state-error.js';
 export { EngineStateError } from './state-error.js';

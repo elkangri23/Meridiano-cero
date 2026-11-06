@@ -4,7 +4,7 @@
 import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
 import { evidenceText } from '@meridiano/case-schema';
 import { isPublicBatchStep, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
-import { availableOffers, ENGINE_VERSION, type EngineEvent } from '@meridiano/engine';
+import { availableOffers, ENGINE_VERSION, liveObjectives, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
 import { caseBriefing, caseMeta } from './catalog.ts';
 
@@ -50,6 +50,10 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
   const visibleCities = definition.explorationMode === 'guided'
     ? definition.cities
     : run.discoveries.includes('map') ? definition.cities : [city];
+  // Objetivos en vivo (lote 2): la misma evaluación que el informe final,
+  // pero en esta revisión. La descripción es la del expediente; el estado
+  // sale de las detenciones y los objetos recuperados del motor.
+  const achievedObjectives = new Set(liveObjectives(definition, run));
   const discoveredIds = new Set(run.discoveries);
   const locations = definition.locations
     .filter(item => item.id === location.id || discoveredIds.has(item.id))
@@ -101,6 +105,11 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     batch: batchSteps(run.pendingBatch),
     finalReport: publicFinalReport(run),
     officialResult: null,
+    objectives: definition.objectives.map(objective => ({
+      id: objective.id,
+      description: objective.description,
+      achieved: achievedObjectives.has(objective.id),
+    })),
     offers: availableOffers(definition, run),
     briefing: caseBriefing(definition.id),
     caseMeta: caseMeta(definition.id),

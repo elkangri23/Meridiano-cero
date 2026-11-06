@@ -47,6 +47,14 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-case-strip { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:20px; background:var(--panel); border:2px solid var(--edge); padding:12px; }
 .game-case-strip strong { font-size:.9em; font-weight:500; }
 .game-case-strip p { margin-bottom:2px; }
+
+/* Objetivos siempre visibles (lote 2): franja entre la barra de herramientas
+ * y la escena, con el mismo panel azul y borde del resto de la pantalla. */
+.game-objectives { background:var(--panel); border:2px solid var(--edge); padding:12px; margin-bottom:16px; }
+.game-objectives ul { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:8px 24px; }
+.game-objectives li { font-size:.9em; }
+.game-objectives li[data-achieved="true"] { color:var(--gold); }
+.game-objectives li span { color:var(--gold); }
 .game-clock { text-align:right; }
 .game-clock strong { font-size:1.25em; color:var(--gold); }
 .game-clock strong span { color:var(--muted); font-size:.7em; }
