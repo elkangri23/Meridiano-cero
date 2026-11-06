@@ -2,6 +2,7 @@
 // públicos a partir de la definición del caso y el estado del motor.
 // No serializa nunca EngineEvent.payload ni CaseRun internos.
 import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
+import { evidenceText } from '@meridiano/case-schema';
 import { isPublicBatchStep, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
 import { availableOffers, ENGINE_VERSION, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
@@ -127,11 +128,26 @@ const eventSummaries: Record<string, EventNamer> = {
       ? 'Inspección de ' + payload.elementId + ' en ' + location + '.'
       : 'Inspección en ' + location + '.';
   },
-  collect: (_definition, payload) => 'Objeto ' + String(payload.evidenceId ?? '') + ' recogido.',
+  collect: (_definition, payload) => {
+    // El hallazgo se narra con su texto, nunca con el ID crudo (antes:
+    // «Objeto EV-01 recogido.»). Sin texto, se mantiene el resumen anterior.
+    const id = String(payload.evidenceId ?? '');
+    const text = evidenceText(id);
+    return text ? 'Recogido: ' + text : 'Objeto ' + id + ' recogido.';
+  },
   talk: (definition, payload) => {
     const npc = definition.npcs.find(item => item.id === payload.npcId)?.name ?? String(payload.npcId ?? '');
     return 'Conversación con ' + npc + '.';
   },
+  request_warrant: (definition, payload) => {
+    // Antes no tenía resumen propio y caía en el genérico «La investigación
+    // avanza.»: el jugador no sabía ni qué había pedido.
+    const npc = definition.npcs.find(item => item.id === payload.suspectId)?.name ?? String(payload.suspectId ?? '');
+    return 'Solicitud de orden contra ' + npc + '.';
+  },
+  request_matured: (_definition, payload) => payload.type === 'warrant'
+    ? 'Orden concedida.'
+    : 'Una solicitud ha dado resultado.',
   travel: (definition, payload) => {
     const city = definition.cities.find(item => item.id === payload.toCityId)?.name ?? String(payload.toCityId ?? '');
     return 'Viaje a ' + city + '.';
@@ -143,7 +159,6 @@ const eventSummaries: Record<string, EventNamer> = {
   wait: (_definition, payload) => 'Espera de ' + String(payload.minutes ?? '') + ' minutos.',
   action_interrupted: () => 'Acción interrumpida por el plazo.',
   request_submitted: () => 'Solicitud enviada; el resultado llegará a su hora.',
-  request_matured: () => 'Una solicitud ha dado resultado.',
   warrant_denied: () => 'Una orden solicitada ha sido denegada.',
   detain: (definition, payload) => {
     const npc = definition.npcs.find(item => item.id === payload.suspectId)?.name ?? String(payload.suspectId ?? '');

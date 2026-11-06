@@ -60,6 +60,45 @@ export function evidenceText(evidenceId: string): string | undefined {
   return EVIDENCE_TEXTS[evidenceId];
 }
 
+/** Informe final: resultado y motivo del cierre, en español. El motor
+ * trabaja con identificadores en inglés (`complete`, `finished`…); la
+ * pantalla del jugador nunca los enseña tal cual. Un valor desconocido se
+ * devuelve tal cual: nunca se oculta el resultado por no tener texto. */
+export const REPORT_RESULT_TEXT: Record<string, string> = {
+  complete: 'completado',
+  partial: 'parcial',
+  incorrect: 'incorrecto',
+  unresolved: 'sin resolver',
+};
+
+export const REPORT_REASON_TEXT: Record<string, string> = {
+  finished: 'finalizado',
+  deadline: 'plazo agotado',
+};
+
+/** Frase de un resultado del informe final. */
+export function reportResultText(result: string): string {
+  return REPORT_RESULT_TEXT[result] ?? result;
+}
+
+/** Frase de un motivo de cierre del informe final. */
+export function reportReasonText(reason: string): string {
+  return REPORT_REASON_TEXT[reason] ?? reason;
+}
+
+/** Objetivos del caso fijo, como frases: la descripción es la que trae la
+ * definición del expediente (nada inventado). Un identificador desconocido
+ * (p. ej. de un caso generado) se devuelve tal cual. */
+export const OBJECTIVE_TEXT: Record<string, string> = {
+  'obj-detener': 'Detener a Inés con orden válida',
+  'obj-recuperar': 'Recuperar el astrolabio original',
+};
+
+/** Frase de un objetivo logrado del informe final. */
+export function objectiveText(objectiveId: string): string {
+  return OBJECTIVE_TEXT[objectiveId] ?? objectiveId;
+}
+
 /** Hechos que un personaje puede declarar, con su texto, según su
  * conocimiento (RECURRENT_NPCS). */
 export function npcKnowledgeFacts(npcId: string): Array<{ id: string; text: string }> {
