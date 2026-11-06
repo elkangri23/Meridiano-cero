@@ -513,6 +513,41 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/Falta el texto de conocimiento de jorge-vio-facturas/);
   });
 
+  it('reintenta la etapa 3 cuando los hitos vienen como objetos en vez de frases', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage3Calls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) {
+          stage3Calls++;
+          contexts.push(context as Record<string, unknown>);
+          if (stage3Calls === 1) {
+            // Como el modelo real en el smoke: hitos como objetos
+            // { milestone: '...' } en vez de frases.
+            const broken = structuredClone(outputs.npcs);
+            broken.timeline = broken.timeline.map(text => ({ milestone: text })) as unknown as string[];
+            return broken;
+          }
+          return outputs.npcs;
+        }
+        if (stage === 4) return outputs.clues;
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage3Calls).toBe(2);
+    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/cada hito debe ser una frase/);
+  });
+
   it('reintenta la etapa 3 con el error como feedback cuando el conocimiento viene en frase', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);

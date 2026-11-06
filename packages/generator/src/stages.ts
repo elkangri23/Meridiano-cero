@@ -310,7 +310,11 @@ function validateNpcs(output: unknown, castIds: string[], errors: string[]): voi
   const ids = new Set<string>();
   for (const npc of output.npcs) checkNpc(npc, castIds, ids, errors);
   for (const id of castIds) if (!ids.has(id)) errors.push(`Falta el NPC ${id} del reparto.`);
-  if (!Array.isArray(output.timeline) || output.timeline.length < 2 || !output.timeline.every(isNonEmptyString)) errors.push(`timeline debe tener al menos 2 hitos (tiene ${Array.isArray(output.timeline) ? output.timeline.length : 0}).`);
+  if (!Array.isArray(output.timeline) || output.timeline.length < 2) errors.push(`timeline debe tener al menos 2 hitos (tiene ${Array.isArray(output.timeline) ? output.timeline.length : 0}).`);
+  else if (!output.timeline.every(isNonEmptyString)) {
+    const bad = output.timeline.findIndex(item => !isNonEmptyString(item));
+    errors.push(`timeline: cada hito debe ser una frase, no un objeto (el hito ${bad + 1} no lo es).`);
+  }
 }
 
 /** Tipos de evidencia por posición (el esqueleto fijo, como el fixture del
