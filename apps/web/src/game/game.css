@@ -84,6 +84,7 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-console ol li { margin-top:8px; }
 .game-console ol li:first-child { margin-top:0; }
 .game-console .game-log-minute { color:var(--gold); }
+.game-log-detail { display:block; color:var(--paper); margin-top:4px; font-size:.95em; line-height:1.6; }
 .game-narrative-cursor { color:var(--gold); }
 .game-console details { margin-top:12px; }
 .game-console details summary { cursor:pointer; color:var(--muted); font-size:.85em; }
@@ -142,6 +143,20 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-destination-list li { display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid var(--edge); padding:11px 0; }
 .game-destination-list small { display:block; font-size:.7em; color:var(--muted); }
 .game-destination-list button { padding:6px; font-size:.65em; min-height:32px; }
+
+/* Conversación con un personaje: burbujas de chat del prototipo. */
+.game-chat-npc { font-size:.85em; margin-bottom:12px; }
+.game-chat-npc strong { color:var(--gold); }
+.game-chat-turns { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow:auto; }
+.game-chat-turns li { padding:10px 12px; font-size:.85em; line-height:1.6; max-width:92%; }
+.game-chat-turns li span { display:block; }
+.game-chat-speaker { font-size:.7em; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+.game-chat-you { align-self:flex-end; background:var(--gold); color:#000000; border:1px solid #ffffff; }
+.game-chat-you .game-chat-speaker { color:#555555; }
+.game-chat-npc-turn { align-self:flex-start; background:#000000; color:var(--paper); border:1px solid var(--edge); border-left:4px solid var(--teal); }
+.game-chat-form { display:flex; gap:8px; margin-top:12px; }
+.game-chat-form input { flex:1; min-width:0; }
+.game-order-hint { font-size:.75em; color:var(--muted); margin-top:8px; line-height:1.6; }
 
 /* Tarjeta de evidencia del prototipo: gris, texto negro, sombra dura. */
 .game-evidence-card { padding:18px 14px; border:1px solid #ffffff; background:#aaaaaa; color:#000000; box-shadow:4px 4px #000000; margin:12px 0; }

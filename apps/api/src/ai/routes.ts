@@ -68,28 +68,55 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
     };
   }
 
-  function toConverseRequest(body: unknown): AiRequest {
+  function stringList(value: unknown): string[] {
+    return Array.isArray(value) && value.every(item => typeof item === 'string') ? [...value] : [];
+  }
+
+  /** Contexto del NPC tal como lo envía el cliente: solo puede declarar
+   * hechos que conoce y que puede revelar; sin esas listas el director
+   * rompería al filtrar (knownFactIds.includes sobre undefined). */
+  function converseNpc(npc: unknown): NpcContext {
+    const source = isRecord(npc) ? npc : {};
+    return {
+      id: typeof source.id === 'string' ? source.id : '',
+      name: typeof source.name === 'string' ? source.name : '',
+      persona: typeof source.persona === 'string' ? source.persona : '',
+      knownFactIds: stringList(source.knownFactIds),
+      revealableFactIds: stringList(source.revealableFactIds),
+    };
+  }
+
+  function converseFields(body: unknown): { runId: string; text: string; npc: unknown; facts: PublicFact[]; memory: unknown; allowedActs: string[]; requestId: string } {
     if (!isRecord(body)) throw new RunStoreError('INVALID_REQUEST');
     const { runId, text, npc, facts, memory, allowedActs, requestId } = body;
-    if (typeof runId !== 'string' || typeof text !== 'string' || !isRecord(npc) || !Array.isArray(facts) ||
-        !isRecord(memory) || !Array.isArray(allowedActs) || typeof requestId !== 'string') {
+    if (typeof runId !== 'string' || typeof text !== 'string' || typeof requestId !== 'string') {
       throw new RunStoreError('INVALID_REQUEST');
     }
+    if (!isRecord(npc) || !Array.isArray(facts) || !isRecord(memory) || !Array.isArray(allowedActs)) {
+      throw new RunStoreError('INVALID_REQUEST');
+    }
+    return { runId, text, npc, facts, memory, allowedActs, requestId };
+  }
+
+  function toConverseRequest(body: unknown): AiRequest {
+    const fields = converseFields(body);
+    const { runId, text, facts, memory, allowedActs, requestId } = fields;
     if (text.length > 4000) throw new AiError('budget_exceeded');
     if (!allowedActs.length || allowedActs.some(a => !speechActs.includes(a as SpeechAct))) {
       throw new RunStoreError('INVALID_REQUEST');
     }
-    const npcId = typeof npc.id === 'string' ? npc.id : '';
+    const npc = converseNpc(fields.npc);
     return {
       operation: 'converse',
       requestId,
       schema: factualSchema,
       context: {
+        runId,
         text,
-        npc: { id: npcId, name: typeof npc.name === 'string' ? npc.name : '', persona: typeof npc.persona === 'string' ? npc.persona : '' },
+        npc,
         facts: facts.map((f: PublicFact) => ({ id: f.id, text: f.text })),
         allowedActs,
-        memory: restoreMemory(memory, runId, npcId),
+        memory: restoreMemory(memory, runId, npc.id),
       },
       signal: new AbortController().signal,
     };
@@ -245,7 +272,7 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
     const startTime = performance.now();
     try {
       const result = await director.converse(
-        { runId: '', text: aiRequest.context.text as string, npc: aiRequest.context.npc as NpcContext, facts, memory, allowedActs: aiRequest.context.allowedActs as SpeechAct[] },
+        { runId: aiRequest.context.runId as string, text: aiRequest.context.text as string, npc: aiRequest.context.npc as NpcContext, facts, memory, allowedActs: aiRequest.context.allowedActs as SpeechAct[] },
         callOptions
       );
 

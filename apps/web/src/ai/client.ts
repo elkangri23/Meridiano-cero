@@ -34,7 +34,7 @@ export interface AiAuth {
 export interface AiApi {
   interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiInterpretation>;
   narrate(facts: Array<{ id: string; text: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiNarrative>;
-  converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult>;
+  converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string; knownFactIds: string[]; revealableFactIds: string[] }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult>;
   health(signal: AbortSignal): Promise<AiHealth>;
 }
 
@@ -145,7 +145,7 @@ export const aiApi: AiApi = {
     return narrative as AiNarrative;
   },
 
-  async converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult> {
+  async converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string; knownFactIds: string[]; revealableFactIds: string[] }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (auth) headers['x-csrf-token'] = auth.csrfToken;
     const response = await request('/api/v1/ai/converse', signal, { method: 'POST', headers, body: JSON.stringify({ ...input, requestId: crypto.randomUUID() }) });

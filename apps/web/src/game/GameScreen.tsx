@@ -10,7 +10,8 @@ import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
-import { caseLabel } from '@meridiano/case-schema';
+import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts } from '@meridiano/case-schema';
+import type { DiscoveryLookup } from '@meridiano/case-schema';
 import './game.css';
 
 type OrderPhase =
@@ -26,7 +27,7 @@ type ScreenPhase = 'loading' | 'ready' | 'signed_out' | 'not_found' | 'error';
 type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
 
 const windowLabels: Record<WindowId, string> = {
-  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio y comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final',
+  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio y comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación',
 };
 const channelLabels: Record<string, string> = { call: 'Llamada', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Correo', fax: 'Fax' };
 const requestTypeLabels: Record<string, string> = { analysis: 'Análisis', query: 'Consulta', request: 'Solicitud' };
@@ -56,13 +57,63 @@ function contactsFromView(view: PlayerViewDto): Array<{ id: string; name: string
     const id = /^talk:([A-Za-z0-9._:-]+)@/.exec(record)?.[1];
     if (id) met.add(id);
   }
+  const names = npcNamesFromView(view);
+  return [...met].map(id => ({ id, name: names.get(id) ?? id }));
+}
+
+/** Nombres de los personajes a partir de las etiquetas de las ofertas de
+ * hablar («Hablar con X sobre su identidad»). */
+function npcNamesFromView(view: PlayerViewDto): Map<string, string> {
   const names = new Map<string, string>();
   for (const offer of view.offers) {
     if (offer.action.type !== 'talk' || typeof offer.action.params.npcId !== 'string') continue;
     const label = /^Hablar con (.+) sobre su identidad$/.exec(offer.label)?.[1];
     if (label) names.set(offer.action.params.npcId, label);
   }
-  return [...met].map(id => ({ id, name: names.get(id) ?? id }));
+  return names;
+}
+
+/** Resolución de nombres para traducir los hallazgos del motor a frases
+ * (lugares y ciudades de la vista, personajes de las ofertas). */
+function lookupFromView(view: PlayerViewDto): DiscoveryLookup {
+  const locations = new Map(view.locations.map(location => [location.id, location.name]));
+  const cities = new Map(view.cities.map(city => [city.id, city.name]));
+  const npcs = npcNamesFromView(view);
+  return {
+    locationName: id => locations.get(id),
+    cityName: id => cities.get(id),
+    npcName: id => npcs.get(id),
+  };
+}
+
+/** Personaje con el que habla una acción talk, si la hay. */
+function talkTarget(offer: PublicActionOffer | undefined, lookup: DiscoveryLookup): { id: string; name: string } | null {
+  if (offer?.action.type !== 'talk' || typeof offer.action.params.npcId !== 'string') return null;
+  const id = offer.action.params.npcId;
+  return { id, name: lookup.npcName(id) ?? id };
+}
+
+/** Qué contar al jugador tras una acción confirmada: con quién habló y qué
+ * descubrió de nuevo, en frases legibles. Vacío si no hay nada que contar. */
+function actionResultDetail(response: ActionResponseDto, previous: PlayerViewDto | null, offer?: PublicActionOffer): string {
+  // Los nombres de los personajes salen de la vista anterior: la oferta de
+  // hablar puede no estar ya en la vista nueva.
+  const lookup = lookupFromView(previous ?? response);
+  const newDiscoveries = previous ? response.dossier.filter(entry => !previous.dossier.includes(entry)) : [...response.dossier];
+  const discoveryDetail = newDiscoveries.map(entry => discoveryText(entry, lookup)).join(' ');
+  const target = talkTarget(offer, lookup);
+  return [
+    target ? `Hablas con ${target.name}. Te confirma su identidad: pregúntale en la conversación.` : '',
+    discoveryDetail,
+  ].filter(Boolean).join(' ');
+}
+
+/** Aviso de estado tras una acción confirmada. */
+function noticeForOutcome(response: ActionResponseDto, offerLabel: string): string {
+  if (response.outcome === 'case_closed') return `Caso cerrado: ${offerLabel}. El informe final está disponible.`;
+  if (response.outcome === 'impossible') return `No se pudo: ${response.reason ?? offerLabel}.`;
+  if (response.outcome === 'clarification_required') return response.question ?? 'Hace falta aclarar la orden.';
+  return `${offerLabel} · Reloj: ${response.clock.minute} min.`;
 }
 
 function previewOutcome(response: ActionResponseDto, offer: PublicActionOffer, key: string): OrderPhase {
@@ -175,13 +226,21 @@ function OffersSection({ view, disabled, onOffer }: { view: PlayerViewDto; disab
   </section>;
 }
 
-function ConsoleSection({ log, orderHistory }: { log: Array<{ minute: number; summary: string }>; orderHistory: string[] }) {
+type LogEntry = { minute: number; summary: string; detail?: string };
+
+function ConsoleSection({ log, orderHistory }: { log: LogEntry[]; orderHistory: string[] }) {
+  const listRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [log]);
   return <section className="game-console" aria-labelledby="console-heading">
     <p className="game-overline">Cuaderno de campo</p>
     <h2 id="console-heading">Consola narrativa</h2>
-    <ol aria-live="polite">
+    <ol ref={listRef} aria-live="polite">
       {log.length === 0 && <li>La investigación comienza. Inspecciona la escena o elige una acción.</li>}
-      {log.map((entry, index) => <li key={index}><span className="game-log-minute">[min {entry.minute}]</span> {entry.summary}</li>)}
+      {log.map((entry, index) => <li key={index}><span className="game-log-minute">[min {entry.minute}]</span> {entry.summary}
+        {entry.detail && <span className="game-log-detail">{entry.detail}</span>}</li>)}
     </ol>
     <span className="game-narrative-cursor" aria-hidden="true">_</span>
     {orderHistory.length > 0 && <details><summary>Historial de órdenes</summary><ol>{orderHistory.map((item, index) => <li key={index}>{item}</li>)}</ol></details>}
@@ -208,6 +267,7 @@ function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSu
       </button>
     </form>
     <div className="game-order-bottom"><p>Ctrl+Enter para enviar · Las herramientas no consumen tiempo.</p></div>
+    <p className="game-order-hint">Puedes ordenar: inspeccionar un lugar, hablar con alguien, viajar, consultar… Tras cada acción el resultado aparece en la consola. Al hablar con alguien se abre la conversación para preguntarle. <Link to="/glosario">Ver glosario</Link></p>
     {orderPhase.kind === 'clarification' && <div className="game-clarification" role="dialog" aria-label="Aclaración">
       <p><strong>Antes de actuar:</strong> {orderPhase.question}</p>
       <p>Orden original: «{orderPhase.original}»</p>
@@ -313,6 +373,8 @@ function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void
 }
 
 function DossierContent({ view }: { view: PlayerViewDto }) {
+  const lookup = lookupFromView(view);
+  const npcName = (id: string) => lookup.npcName(id);
   return <div>
     <div><h4>Ficha del expediente</h4><p>Delito: {caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating)}.</p></div>
     {view.briefing && <div><h4>Introducción del caso</h4><BriefingText briefing={view.briefing} /></div>}
@@ -324,11 +386,47 @@ function DossierContent({ view }: { view: PlayerViewDto }) {
     <h4>Hallazgos</h4>
     {view.dossier.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin hallazgos todavía.</p></div>
-      : view.dossier.map((entry, index) => <article key={index} className="game-evidence-card"><span className="game-evidence-kind">Hallazgo</span><p>{entry}</p></article>)}
+      : view.dossier.map((entry, index) => <article key={index} className="game-evidence-card"><span className="game-evidence-kind">Hallazgo</span><p>{discoveryText(entry, lookup)}</p></article>)}
     <h4>Conversación registrada</h4>
     {view.conversation.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin conversaciones registradas.</p></div>
-      : <ul className="game-destination-list">{view.conversation.map((entry, index) => <li key={index}><span>{entry}</span></li>)}</ul>}
+      : <ul className="game-destination-list">{view.conversation.map((entry, index) => <li key={index}><span>{conversationRecordText(entry, npcName)}</span></li>)}</ul>}
+  </div>;
+}
+
+type ChatTurn = { from: 'you' | 'npc'; text: string };
+
+/** Conversación con un personaje: se abre sola al confirmar «hablar con»
+ * alguien y muestra su saludo y sus respuestas como burbujas de chat. Los
+ * turnos y la memoria de la conversación se guardan en esta pestaña por
+ * partida y personaje; la memoria del servidor no se persiste (límite
+ * documentado: al recargar la página la conversación sigue en esta pestaña,
+ * pero una sesión nueva empieza de cero). */
+function ChatContent({ npc, turns, draft, busy, error, onDraft, onSend }: {
+  npc: { id: string; name: string } | null; turns: ChatTurn[]; draft: string; busy: boolean; error: string;
+  onDraft: (value: string) => void; onSend: (event: FormEvent) => void;
+}) {
+  if (!npc) {
+    return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span>
+      <p>Habla primero con alguien en persona («hablar con…» o la acción «Hablar con») y la conversación se abrirá aquí.</p></div>;
+  }
+  const role = getNPC(npc.id)?.role ?? '';
+  return <div className="game-chat">
+    <p className="game-chat-npc"><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</p>
+    <ol className="game-chat-turns" data-testid="chat-turns" aria-live="polite">
+      {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
+        <span className="game-chat-speaker">{turn.from === 'you' ? 'Tú' : npc.name}</span>
+        <span>{turn.text}</span>
+      </li>)}
+    </ol>
+    <form onSubmit={onSend} className="game-chat-form">
+      <input type="text" data-testid="chat-input" value={draft} disabled={busy} maxLength={4000}
+        placeholder="Pregúntale por lo que sabe: su tarea, lo que vio…" aria-label="Pregunta para el personaje"
+        onChange={event => onDraft(event.target.value)} />
+      <button type="submit" data-testid="chat-send" disabled={!draft.trim() || busy}>{busy ? 'Preguntando…' : 'Preguntar'}</button>
+    </form>
+    {error && <p className="game-error" role="alert">{error}</p>}
+    <p className="game-panel-note">Hablar en persona no consume tiempo. Preguntar aquí tampoco: el reloj solo avanza al actuar.</p>
   </div>;
 }
 
@@ -743,7 +841,7 @@ export function GameScreen() {
   const [caseTitle, setCaseTitle] = useState<string | null>(null);
   const [phase, setPhase] = useState<ScreenPhase>('loading');
   const [notice, setNotice] = useState('Cargando la partida…');
-  const [log, setLog] = useState<Array<{ minute: number; summary: string }>>([]);
+  const [log, setLog] = useState<LogEntry[]>([]);
   const [draft, setDraft] = useState(() => (runId ? sessionStorage.getItem('meridiano-draft:' + runId) ?? '' : ''));
   const [orderHistory, setOrderHistory] = useState<string[]>([]);
   const [orderPhase, setOrderPhase] = useState<OrderPhase>({ kind: 'idle' });
@@ -759,6 +857,12 @@ export function GameScreen() {
   const [commChannel, setCommChannel] = useState('call');
   const [commText, setCommText] = useState('');
   const [introOpen, setIntroOpen] = useState(false);
+  const [chatNpc, setChatNpc] = useState<{ id: string; name: string } | null>(null);
+  const [chatTurns, setChatTurns] = useState<ChatTurn[]>([]);
+  const [chatMemory, setChatMemory] = useState<unknown>(null);
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState('');
 
   // La intro se abre sola al entrar en una partida nueva (versión 1, minuto
   // 0, activa) salvo que ya se haya descartado en esta pestaña. Queda
@@ -864,13 +968,89 @@ export function GameScreen() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [orderPhase, windows.windows, windows.moving, windows.close]);
 
-  function applyResponse(response: ActionResponseDto, offerLabel: string) {
+  function applyResponse(response: ActionResponseDto, offerLabel: string, offer?: PublicActionOffer) {
+    const previous = view;
     setView(response);
-    setLog(current => [...current, ...response.events.map(event => ({ minute: event.minute, summary: event.summary }))]);
-    if (response.outcome === 'case_closed') setNotice(`Caso cerrado: ${offerLabel}. El informe final está disponible.`);
-    else if (response.outcome === 'impossible') setNotice(`No se pudo: ${response.reason ?? offerLabel}.`);
-    else if (response.outcome === 'clarification_required') setNotice(response.question ?? 'Hace falta aclarar la orden.');
-    else setNotice(`${offerLabel} · Reloj: ${response.clock.minute} min.`);
+    const detail = actionResultDetail(response, previous, offer);
+    const entries: LogEntry[] = response.events.map(event => ({ minute: event.minute, summary: event.summary }));
+    const last = entries[entries.length - 1];
+    if (detail && last) entries[entries.length - 1] = { ...last, detail };
+    else if (detail) entries.push({ minute: response.clock.minute, summary: offerLabel, detail });
+    setLog(current => [...current, ...entries]);
+    setNotice(noticeForOutcome(response, offerLabel));
+    const target = talkTarget(offer, lookupFromView(previous ?? response));
+    if (target) openChat(target.id, target.name);
+  }
+
+  /** Turnos y memoria de una conversación guardados en esta pestaña. */
+  function loadStoredChat(key: string): { turns: ChatTurn[]; memory: unknown } | null {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(key) ?? 'null') as { turns: ChatTurn[]; memory: unknown } | null;
+      return stored && Array.isArray(stored.turns) ? stored : null;
+    } catch { return null; }
+  }
+
+  function saveChat(key: string, turns: ChatTurn[], memory: unknown) {
+    try { sessionStorage.setItem(key, JSON.stringify({ turns, memory })); } catch { /* sin almacenamiento */ }
+  }
+
+  /** Abre la conversación con un personaje: recupera sus turnos y su
+   * memoria de esta pestaña o la inicia con su saludo. */
+  function openChat(npcId: string, npcName: string) {
+    if (!runId) return;
+    const key = `meridiano:chat:${runId}:${npcId}`;
+    const stored = loadStoredChat(key);
+    if (stored) {
+      setChatTurns(stored.turns);
+      setChatMemory(stored.memory ?? null);
+    } else {
+      const greeting = npcGreeting(npcId) ?? `Soy ${npcName}. ¿Qué quieres saber?`;
+      const turns: ChatTurn[] = [{ from: 'npc', text: greeting }];
+      const memory = { schemaVersion: 1, runId, npcId, treatment: 'neutral', turns: [] };
+      setChatTurns(turns);
+      setChatMemory(memory);
+      saveChat(key, turns, memory);
+    }
+    setChatNpc({ id: npcId, name: npcName });
+    setChatError('');
+    windows.open('chat', null);
+  }
+
+  /** Pregunta lista para enviar al personaje, o null si falta algo. */
+  function chatQuestion(): { runId: string; csrfToken: string; npcId: string; name: string; text: string; facts: Array<{ id: string; text: string }>; memory: unknown } | null {
+    const text = chatDraft.trim();
+    if (!text || !runId || !identity || !chatNpc || chatBusy) return null;
+    const npcId = chatNpc.id;
+    return { runId, csrfToken: identity.csrfToken, npcId, name: chatNpc.name, text,
+      facts: npcKnowledgeFacts(npcId),
+      memory: chatMemory ?? { schemaVersion: 1, runId, npcId, treatment: 'neutral', turns: [] } };
+  }
+
+  async function sendChatMessage(event: FormEvent) {
+    event.preventDefault();
+    const question = chatQuestion();
+    if (!question) return;
+    const factIds = question.facts.map(fact => fact.id);
+    const turns: ChatTurn[] = [...chatTurns, { from: 'you', text: question.text }];
+    setChatTurns(turns);
+    setChatDraft('');
+    setChatBusy(true);
+    setChatError('');
+    const controller = new AbortController();
+    try {
+      const result = await aiApi.converse({ runId: question.runId, text: question.text,
+        npc: { id: question.npcId, name: question.name, persona: getNPC(question.npcId)?.role ?? '', knownFactIds: factIds, revealableFactIds: factIds },
+        facts: question.facts, memory: question.memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
+      controller.signal, { csrfToken: question.csrfToken });
+      const next: ChatTurn[] = [...turns, { from: 'npc', text: result.narrative.text }];
+      setChatTurns(next);
+      setChatMemory(result.memory);
+      saveChat(`meridiano:chat:${question.runId}:${question.npcId}`, next, result.memory);
+    } catch {
+      setChatError('La IA no responde. Tu pregunta queda registrada; inténtalo de nuevo.');
+    } finally {
+      setChatBusy(false);
+    }
   }
 
   async function startPreview(offer: PublicActionOffer, trigger: HTMLElement | null) {
@@ -897,7 +1077,7 @@ export function GameScreen() {
     const controller = new AbortController();
     try {
       const response = await gameApi.commit(runId, offer.action, view.version, key, identity, controller.signal);
-      applyResponse(response, offer.label);
+      applyResponse(response, offer.label, offer);
       setOrderPhase({ kind: 'idle' });
       orderInputRef.current?.focus();
     } catch (error) {
@@ -916,7 +1096,7 @@ export function GameScreen() {
     const controller = new AbortController();
     try {
       const response = await gameApi.commit(runId, offer.action, view.version, key, identity, controller.signal);
-      applyResponse(response, offer.label);
+      applyResponse(response, offer.label, offer);
       setOrderPhase({ kind: 'idle' });
     } catch (error) {
       setOrderPhase({ kind: 'error', message: errorMessage(error) });
@@ -1099,6 +1279,10 @@ export function GameScreen() {
     </GameWindow>
     <GameWindow id="report" title="Informe final" state={windows.windows.report} {...windowProps}>
       <ReportContent view={view} />
+    </GameWindow>
+    <GameWindow id="chat" title="Conversación" state={windows.windows.chat} {...windowProps}>
+      <ChatContent npc={chatNpc} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
+        onDraft={setChatDraft} onSend={event => void sendChatMessage(event)} />
     </GameWindow>
   </main>;
 }
