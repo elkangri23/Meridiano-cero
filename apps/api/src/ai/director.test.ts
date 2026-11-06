@@ -114,6 +114,41 @@ describe('Conocimiento y memoria NPC', () => {
   });
 });
 
+describe('Inés Valera responde desde lo que sabe y solo se niega a declarar', () => {
+  const inesFacts = [{ id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' }];
+  const ines = { id: 'ines', name: 'Inés Valera',
+    persona: 'Sospechosa. Restauradora contratada para el traslado del astrolabio. Confirma su identidad y su tarea, pero se niega a declarar sobre el robo.',
+    knownFactIds: ['truth'], revealableFactIds: ['truth'], refusal: 'No voy a declarar sobre el robo.' };
+  function inesConversation(text: string) {
+    return { runId: 'run-a', text, npc: ines, facts: inesFacts,
+      memory: emptyMemory('run-a', 'ines'), allowedActs: ['state', 'acknowledge', 'decline', 'silence'] as const };
+  }
+  it('una pregunta de identidad se responde con su hecho', async () => {
+    const result = await director({ act: 'state', factIds: ['truth'] })
+      .converse(inesConversation('¿Cómo te llamas?'), options);
+    expect(result.narrative).toMatchObject({ act: 'state', source: 'model', factIds: ['truth'] });
+    expect(result.narrative.text).toBe('Soy Inés Valera, restauradora contratada para el traslado del astrolabio.');
+  });
+  it('una negativa del modelo sobre el robo se dice en personaje, no con la genérica', async () => {
+    const result = await director({ act: 'decline', factIds: [] })
+      .converse(inesConversation('¿Robaste tú el astrolabio?'), options);
+    expect(result.narrative).toMatchObject({ act: 'decline', source: 'model', factIds: [] });
+    expect(result.narrative.text).toBe('No voy a declarar sobre el robo.');
+    expect(result.memory.turns.at(-1)).toEqual({ act: 'decline', factIds: [] });
+  });
+  it('una negativa del respaldo también se dice en personaje', async () => {
+    const service = createDirector(createMockProvider(() => { throw new AiError('unavailable'); }));
+    const result = await service.converse({ ...inesConversation('¿Robaste tú el astrolabio?'), allowedActs: ['decline'] }, options);
+    expect(result.narrative).toMatchObject({ act: 'decline', source: 'fallback' });
+    expect(result.narrative.text).toBe('No voy a declarar sobre el robo.');
+  });
+  it('sin negativa propia, la negativa sigue siendo la genérica', async () => {
+    const result = await director({ act: 'decline', factIds: [] }).converse(conversation(), options);
+    expect(result.narrative).toMatchObject({ act: 'decline', source: 'model' });
+    expect(result.narrative.text).toBe('No puedo responder a esa consulta.');
+  });
+});
+
 describe('Restauración de memoria desde almacenamiento no confiable', () => {
   it.each([
     { ...emptyMemory('run-a', 'clerk'), ownerId: 'spoofed' },

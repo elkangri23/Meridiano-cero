@@ -5,6 +5,11 @@ export interface NPCProfile {
   id: string;
   name: string;
   role: string;
+  /** Persona que se envía al modelo al conversar: quién es, sobre qué
+   * responde y a qué se niega. Sale de SPEC-003 (saludos y conocimiento);
+   * no inventa hechos. Sin ella el modelo solo ve el rol («Sospechosa») y
+   * se niega a todo lo que no cubre un hecho autorizado. */
+  persona: string;
   cityId: string;
   knowledge: string[];
   cooperation: number;
@@ -25,6 +30,7 @@ export interface QueryType {
 export const RECURRENT_NPCS: NPCProfile[] = [
   {
     id: 'lucia', name: 'Lucía', role: 'Asistente de investigación', cityId: 'madrid',
+    persona: 'Asistente de investigación del Instituto Horizonte. Responde sobre las personas autorizadas para el traslado y sobre lo que vio.',
     knowledge: ['authorized-persons', 'tomas-moved-box'],
     cooperation: 7,
     availability: { from: 0, to: 1440 },
@@ -32,6 +38,7 @@ export const RECURRENT_NPCS: NPCProfile[] = [
   },
   {
     id: 'emile', name: 'Émile', role: 'Archivo de conservación', cityId: 'paris',
+    persona: 'Archivero de conservación. Responde sobre el registro de herramientas del archivo.',
     knowledge: ['tool-registry'],
     cooperation: 5,
     availability: { from: 0, to: 1440 },
@@ -39,6 +46,7 @@ export const RECURRENT_NPCS: NPCProfile[] = [
   },
   {
     id: 'marta', name: 'Marta', role: 'Depósito de custodia', cityId: 'lisboa',
+    persona: 'Encargada del almacén de depósito. Responde sobre el registro de custodia y la taquilla L-7.',
     knowledge: ['deposit-record', 'locker-l7'],
     cooperation: 6,
     availability: { from: 0, to: 1440 },
@@ -46,6 +54,7 @@ export const RECURRENT_NPCS: NPCProfile[] = [
   },
   {
     id: 'tomas', name: 'Tomás Ríos', role: 'Transportista', cityId: 'madrid',
+    persona: 'Transportista del Instituto Horizonte. Responde sobre su tarea y lo que hizo con la caja.',
     knowledge: ['his-task'],
     cooperation: 8,
     availability: { from: 0, to: 1440 },
@@ -53,6 +62,7 @@ export const RECURRENT_NPCS: NPCProfile[] = [
   },
   {
     id: 'ines', name: 'Inés Valera', role: 'Sospechosa', cityId: 'lisboa',
+    persona: 'Sospechosa. Restauradora contratada para el traslado del astrolabio. Confirma su identidad y su tarea, pero se niega a declarar sobre el robo.',
     knowledge: ['truth'],
     cooperation: 3,
     availability: { from: 0, to: 1440 },

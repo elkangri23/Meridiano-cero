@@ -71,6 +71,19 @@ export function npcKnowledgeFacts(npcId: string): Array<{ id: string; text: stri
   });
 }
 
+/** Negativa en personaje al pedirle que declare sobre el robo. Solo Inés
+ * tiene una: es la sospechosa y su saludo ya avisa de que no declarará.
+ * Los demás personajes no tienen negativa propia y usan la genérica del
+ * director. Negarse no es confesar: no revela la solución ni acusa a nadie. */
+export const NPC_REFUSALS: Record<string, string> = {
+  ines: 'No voy a declarar sobre el robo.',
+};
+
+/** Negativa en personaje de un NPC al declarar sobre el robo, si la tiene. */
+export function npcRefusal(npcId: string): string | undefined {
+  return NPC_REFUSALS[npcId];
+}
+
 /** Saludo de un personaje al empezar a hablar con él. */
 export function npcGreeting(npcId: string): string | undefined {
   return NPC_GREETINGS[npcId];
