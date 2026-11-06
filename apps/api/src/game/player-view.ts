@@ -81,6 +81,9 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     version: run.revision,
     status: run.status,
     caseId: run.definitionId,
+    // Dificultad elegida al crear la partida: la cabecera la enseña junto
+    // al reloj (antes no viajaba en la vista y la web no podía mostrarla).
+    difficulty: run.difficulty,
     clock: { minute: run.minute, deadlineMinutes: definition.deadlineMinutes },
     position: {
       city: { id: city.id, name: city.name, country: city.country },

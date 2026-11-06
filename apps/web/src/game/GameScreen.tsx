@@ -36,6 +36,14 @@ const channelLabels: Record<string, string> = { call: 'Llamada', whatsapp: 'What
 const requestTypeLabels: Record<string, string> = { analysis: 'Análisis', query: 'Consulta', request: 'Solicitud' };
 const evidenceTypeLabels: Record<string, string> = { object: 'objeto', observation: 'observación', testimony: 'testimonio', analysis: 'análisis', record: 'registro' };
 
+/** Dificultad de la partida, tal como se enseña en la cabecera junto al
+ * reloj («Normal · 48 horas»): la etiqueta que la verificación no encontró
+ * porque la vista del jugador no traía el dato. */
+const difficultyLabels: Record<PlayerViewDto['difficulty'], string> = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' };
+function difficultyLabel(difficulty: PlayerViewDto['difficulty']): string {
+  return difficultyLabels[difficulty];
+}
+
 const gameErrorMessages: Record<GameErrorKind, string> = {
   session: 'La sesión caducó. Vuelve al archivo e inicia sesión de nuevo.',
   not_found: 'La partida no existe o no pertenece a tu cuenta.',
@@ -289,6 +297,7 @@ function HeaderSection({ view, caseTitle, detective, clockPulse, onLogout }: { v
       <div><p className="game-overline">Expediente</p><strong>{caseTitle ?? view.caseId}</strong></div>
       <div><p className="game-overline">Delito</p><strong>{caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating)}</strong></div>
       <div><p className="game-overline">Destino actual</p><strong>{view.position.city.name}, {view.position.city.country}</strong></div>
+      <div><p className="game-overline">Dificultad</p><strong data-testid="difficulty">{difficultyLabel(view.difficulty)} · {Math.round(view.clock.deadlineMinutes / 60)} horas</strong></div>
       <div className={`game-clock${clockPulse ? ' game-clock-pulse' : ''}`} data-testid="clock" aria-label={`Reloj del caso: ${view.clock.minute} minutos de ${view.clock.deadlineMinutes}`}>
         <p className="game-overline">Tiempo transcurrido / plazo</p>
         <strong>{view.clock.minute} min<span> / {view.clock.deadlineMinutes} min</span></strong>

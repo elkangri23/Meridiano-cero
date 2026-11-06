@@ -78,6 +78,10 @@ describe('resúmenes de eventos de la consola', () => {
 describe('objetivos en vivo de la vista del jugador', () => {
   it('al empezar, los dos objetivos están pendientes y la vista valida el contrato', () => {
     const view = playerViewDto(astrolabioDefinition, fullRun(), 0);
+    // La dificultad viaja en la vista para que la cabecera la enseñe junto
+    // al reloj (antes no llegaba y la web no podía mostrarla).
+    expect(view.difficulty).toBe('easy');
+    expect(view.clock.deadlineMinutes).toBe(2880);
     expect(view.objectives).toEqual([
       { id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: false },
       { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false },

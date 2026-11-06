@@ -85,6 +85,8 @@ export interface InitialPlayerViewDto {
   branchId: string;
   version: number;
   status: 'active';
+  /** Dificultad elegida al crear la partida (determina su plazo interno). */
+  difficulty: 'easy' | 'normal' | 'hard';
   clock: { minute: 0; deadlineMinutes: number };
   position: {
     city: { id: string; name: string; country: string };
@@ -187,6 +189,9 @@ export function isRunListDto(value: unknown): value is RunListDto {
 
 export interface CaseListDto { items: CaseSummary[]; nextCursor: null }
 function positiveInteger(value: unknown): boolean { return typeof value === 'number' && Number.isSafeInteger(value) && value > 0; }
+function validDifficulty(value: unknown): value is 'easy' | 'normal' | 'hard' {
+  return typeof value === 'string' && ['easy', 'normal', 'hard'].includes(value);
+}
 function caseModes(value: Record<string, unknown>): boolean {
   return (value.contentMode === 'fixed' || value.contentMode === 'generated') &&
     typeof value.difficulty === 'string' && ['easy', 'normal', 'hard'].includes(value.difficulty) &&
@@ -294,8 +299,8 @@ function initialHeader(value: Record<string, unknown>): boolean {
 }
 /** Solo GET inicial: no acepta replay de creación, progreso o campos privados adicionales. */
 export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerViewDto {
-  if (!dtoRecord(value, 'batch,branchId,caseMeta,cities,clock,conversation,detentions,dossier,finalReport,locations,objectives,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
-  if (!initialHeader(value) || !publicCaseMeta(value.caseMeta)) return false;
+  if (!dtoRecord(value, 'batch,branchId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,finalReport,locations,objectives,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
+  if (!initialHeader(value) || !publicCaseMeta(value.caseMeta) || !validDifficulty(value.difficulty)) return false;
   return initialClock(value.clock) && initialCapabilities(value) && initialEmptyCollections(value) && initialGeography(value) && publicObjectives(value.objectives);
 }
 
@@ -311,6 +316,8 @@ export interface PlayerViewDto {
   version: number;
   status: 'active' | 'closed';
   caseId: string;
+  /** Dificultad elegida al crear la partida (determina su plazo interno). */
+  difficulty: 'easy' | 'normal' | 'hard';
   clock: { minute: number; deadlineMinutes: number };
   position: {
     city: { id: string; name: string; country: string };
@@ -537,6 +544,7 @@ function playerViewIdentity(value: Record<string, unknown>): boolean {
   if (value.schemaVersion !== 1 || !uuid(value.runId) || !uuid(value.branchId)) return false;
   if (!positiveInteger(value.version)) return false;
   if (typeof value.caseId !== 'string' || value.caseId.length === 0 || value.caseId.length > 128) return false;
+  if (!validDifficulty(value.difficulty)) return false;
   return value.status === 'active' || value.status === 'closed';
 }
 function validBriefingParagraphs(value: unknown): value is string[] {
@@ -559,7 +567,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,dossier,finalReport,locations,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,finalReport,locations,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;

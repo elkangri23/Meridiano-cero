@@ -12,6 +12,10 @@ async function openGameScreen(page: Page) {
   await creation.getByRole('button', { name: 'Empezar partida' }).click();
   await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
   await expect(page.getByTestId('clock')).toContainText('0 min');
+  // La dificultad se ve en la cabecera junto al reloj, sin desplazar
+  // (la partida se crea con la dificultad por defecto, Normal · 48 h).
+  await expect(page.getByTestId('difficulty')).toBeVisible();
+  await expect(page.getByTestId('difficulty')).toContainText('Normal · 48 horas');
 }
 
 /** Pulsa una oferta y espera el reloj en `minute`. Las acciones costosas o
