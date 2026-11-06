@@ -2,7 +2,7 @@ import { hashDefinition } from '@meridiano/case-schema/server';
 import { isDeepStrictEqual } from 'node:util';
 import type { InitialPlayerViewDto } from '@meridiano/contracts';
 import { createInitialRun, ENGINE_VERSION } from '@meridiano/engine';
-import { findCase } from './catalog.ts';
+import { findCase, caseMeta } from './catalog.ts';
 import { RunStoreError, type StoredRun } from './runs.ts';
 
 /** Fallo cerrado hasta entregar proyección de transiciones, guardados y conversación. */
@@ -29,6 +29,7 @@ export function initialPlayerView(run: StoredRun): InitialPlayerViewDto {
     cities: cities.map(item => ({ id: item.id, name: item.name, country: item.country })),
     locations: [publicLocation], objects: [], dossier: [], conversation: [], pendingRequests: [],
     warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
+    caseMeta: caseMeta(definition.id),
     saveCapabilities: { manualLimit: 10, manualCount: 0, canSave: false, canLoad: false },
     recovery: { retryCreationWithSameKey: true, creationLookup: true, operationLookup: false },
   };

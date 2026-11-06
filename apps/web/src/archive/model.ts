@@ -1,5 +1,5 @@
 import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary } from '@meridiano/contracts';
-import type { ArchiveApi, Filter } from './client';
+import type { ArchiveApi, CreationParams, Filter } from './client';
 import { ArchiveError } from './client';
 import { browserIntents, createRunCoordinator } from './creation';
 import type { CreationView, IntentStorage, CreationOutcome, Difficulty } from './creation';
@@ -141,21 +141,21 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
       notice: result.phase === 'created' ? 'Creación confirmada. Actualiza el archivo para verla.'
         : result.reason ? `Creación sin confirmar: ${result.reason}` : 'Creación sin confirmar. Se conserva la misma referencia; comprobar no crea otra partida.' });
   }
-  async function attemptCreation(caseId: string | null, resend: boolean, difficulty: Difficulty, identity: SessionDto, ticket: Ticket): Promise<CreationOutcome | null> {
+  async function attemptCreation(caseId: string | null, resend: boolean, difficulty: Difficulty, identity: SessionDto, ticket: Ticket, params?: Omit<CreationParams, 'difficulty'>): Promise<CreationOutcome | null> {
     try {
-      const result = caseId === null ? await creator.recover(identity, resend, ticket.signal) : await creator.start(caseId, identity, ticket.signal, difficulty);
+      const result = caseId === null ? await creator.recover(identity, resend, ticket.signal) : await creator.start(caseId, identity, ticket.signal, difficulty, params);
       return ticket.current() ? result : null;
     } catch {
       if (ticket.current()) set({ ...state, phase: 'ready', creation: { phase: 'blocked', caseId: state.creation.caseId, runId: null }, notice: 'No se pudo acceder a la referencia local. No se ha enviado una intención nueva.' });
       return null;
     }
   }
-  async function creation(caseId: string | null, resend: boolean, difficulty: Difficulty = 'normal') {
+  async function creation(caseId: string | null, resend: boolean, difficulty: Difficulty = 'normal', params?: Omit<CreationParams, 'difficulty'>) {
     if (disposed || !session || state.phase !== 'ready') return;
     if (!creationAllowed(caseId)) return;
     const identity = session; const ticket = begin();
     set({ ...state, phase: 'loading', creation: { phase: 'sending', caseId: caseId ?? state.creation.caseId, runId: null }, notice: 'Comprobando la creación…' });
-    const result = await attemptCreation(caseId, resend, difficulty, identity, ticket);
+    const result = await attemptCreation(caseId, resend, difficulty, identity, ticket, params);
     if (result) showCreation(result);
   }
   async function deleteRun(runId: string) {
@@ -177,7 +177,7 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
     openRun, closeRun,
     refresh: () => open(), connect: () => open(true), logout,
     reconnect,
-    createCase: (caseId: string, difficulty: Difficulty = 'normal') => creation(caseId, false, difficulty),
+    createCase: (caseId: string, difficulty: Difficulty = 'normal', params?: Omit<CreationParams, 'difficulty'>) => creation(caseId, false, difficulty, params),
     recoverCreation: (resend = false) => creation(null, resend),
     prepareCreation() { if (state.phase === 'ready' && state.creation.phase === 'created') set({ ...state, creation: { phase: 'idle', caseId: null, runId: null } }); },
     // Descarta la referencia local de una creación pendiente o bloqueada y

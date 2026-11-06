@@ -89,7 +89,7 @@ describe('T3: archivo, cuenta y respuestas tardías', () => {
   it('catálogo permite crear una vez; doble activación no envía otro POST y confirmación no expone clave', async () => {
     const transport = api(); const data = new Map<string, string>();
     const memory = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); }, removeItem: (key: string) => { data.delete(key); } };
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 100, contentVersion: 1, canStart: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 100, contentVersion: 1, canStart: true }], nextCursor: null });
     const delayed = deferred<void>(); transport.create.mockReturnValue(delayed.promise);
     transport.lookup.mockResolvedValue({ schemaVersion: 1, kind: 'create_run', status: 'committed', runId });
     const model = createArchiveModel(transport, memory); await model.refresh();

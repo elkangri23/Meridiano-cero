@@ -41,7 +41,7 @@ describe('T3: frontera HTTP de la pantalla de juego', () => {
     respond({}, 503); await expect(gameApi.view(initialView.runId, signal())).rejects.toEqual(new GameError('unavailable'));
   });
   it('catálogo lista casos y rechaza reglas privadas', async () => {
-    const caseItem = { caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', difficulty: 'normal',
+    const caseItem = { caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal',
       explorationMode: 'guided', deadlineMinutes: 480, contentVersion: 14, canStart: true } as const;
     const fetcher = respond({ items: [caseItem], nextCursor: null });
     expect(await gameApi.catalog(signal())).toEqual([caseItem]);

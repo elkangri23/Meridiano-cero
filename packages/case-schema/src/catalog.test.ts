@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateCatalogParams, getBudgetForParams, getSuggestedDuration, deadlineMinutesForDifficulty, ALLOWED_REGIONS, ALLOWED_CRIME_TYPES } from './catalog.js';
+import { validateCatalogParams, getBudgetForParams, getSuggestedDuration, deadlineMinutesForDifficulty, ALLOWED_REGIONS, ALLOWED_CRIME_TYPES, GDD_CRIME_TYPES, CRIME_TYPE_LABELS, CONTENT_RATING_LABELS, caseLabel } from './catalog.js';
 
 describe('catalog', () => {
   it('acepta parámetros válidos', () => {
@@ -116,5 +116,29 @@ describe('catalog', () => {
   it('ALLOWED_CRIME_TYPES incluye aleatorio', () => {
     expect(ALLOWED_CRIME_TYPES).toContain('aleatorio');
     expect(ALLOWED_CRIME_TYPES).toContain('fraude');
+  });
+
+  it('GDD_CRIME_TYPES sigue el GDD §3 en su orden', () => {
+    expect([...GDD_CRIME_TYPES]).toEqual(['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'aleatorio']);
+  });
+
+  it('cada delito del GDD tiene etiqueta en español', () => {
+    for (const crime of GDD_CRIME_TYPES) {
+      expect((CRIME_TYPE_LABELS[crime] ?? '').length).toBeGreaterThan(0);
+    }
+    expect(CRIME_TYPE_LABELS.robo).toBe('Robo internacional');
+    expect(CRIME_TYPE_LABELS['misterio-historico']).toBe('Misterio histórico');
+    expect(CRIME_TYPE_LABELS.aleatorio).toBe('Aleatorio');
+  });
+
+  it('caseLabel muestra delito y contenido por separado, nunca mezclados', () => {
+    expect(caseLabel('robo', 'familiar')).toBe('Robo internacional · Familiar');
+    expect(caseLabel('fraude', 'general')).toBe('Fraude · General');
+    expect(caseLabel('robo', 'familiar')).not.toBe('Robo Familiar');
+  });
+
+  it('CONTENT_RATING_LABELS distingue Familiar y General', () => {
+    expect(CONTENT_RATING_LABELS.familiar).toBe('Familiar');
+    expect(CONTENT_RATING_LABELS.general).toBe('General');
   });
 });

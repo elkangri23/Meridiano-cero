@@ -5,7 +5,7 @@ Requisitos GDD §3–12. T2-02 y T2-06. Referencias ACC-001/008/009/010/012.
 
 ## Experiencia y verdad fijada
 
-Robo Familiar, presente, dificultad normal, objetivo de 20–30 minutos reales, exploración guiada o libre sobre la misma definición. Ciudades investigables: Madrid, París y Lisboa. Instituciones y personas ficticias; no atribuir el delito a entidades reales. Direcciones y horarios son ficticios.
+Robo (delito) · Familiar (contenido), presente, dificultad normal, objetivo de 20–30 minutos reales, exploración guiada o libre sobre la misma definición. Delito y contenido son dos parámetros distintos (GDD §3/§14): «Robo Familiar» no es el nombre del delito, es la combinación de ambos. Ciudades investigables: Madrid, París y Lisboa. Instituciones y personas ficticias; no atribuir el delito a entidades reales. Direcciones y horarios son ficticios.
 
 Un astrolabio de una exposición del Instituto Horizonte en Madrid desaparece durante un traslado. Inés Valera, restauradora contratada, lo sustituye por una réplica y lo transporta a un almacén de Lisboa. Tomás Ríos, auxiliar inocente, manipuló legítimamente la caja en Madrid. Inés reconoce su identidad, puede negarse a declarar sobre el robo y nunca inventa una coartada. El astrolabio permanece en la taquilla L-7 del almacén hasta la recuperación.
 

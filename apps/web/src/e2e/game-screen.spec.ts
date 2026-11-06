@@ -8,7 +8,7 @@ async function openGameScreen(page: Page) {
   await page.click('button:has-text("Entrar en desarrollo local")');
   const creation = page.locator('.archive-create').first();
   await expect(creation.getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
-  await creation.locator('select').selectOption('astrolabio-tres-ciudades');
+  await creation.getByRole('radio', { name: 'Robo internacional', exact: true }).check();
   await creation.getByRole('button', { name: 'Empezar partida' }).click();
   await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
   await expect(page.getByTestId('clock')).toContainText('0 min');

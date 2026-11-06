@@ -1,8 +1,24 @@
 import { validateCaseDefinition } from '@meridiano/case-schema';
 import { deadlineMinutesForDifficulty, type Difficulty } from '@meridiano/case-schema';
 import type { CaseSummary } from '@meridiano/contracts';
+import type { ContentRating, CrimeType } from '@meridiano/contracts';
 import { astrolabioDefinition } from '@meridiano/engine';
 import { RunStoreError } from './runs.ts';
+
+/** Delito y contenido de cada expediente (GDD §3/§14). Son metadatos del
+ * catálogo, no del motor: el juego no cambia por el delito, pero la
+ * creación y todas las pantallas los muestran siempre juntos
+ * («Robo internacional · Familiar»). Cuando la generación conecte casos
+ * nuevos, su delito/contenido vendrán de su expediente generado. */
+const CASE_META: Record<string, { crimeType: CrimeType; contentRating: ContentRating }> = {
+  [astrolabioDefinition.id]: { crimeType: 'robo', contentRating: 'familiar' },
+};
+
+export function caseMeta(caseId: string): { crimeType: CrimeType; contentRating: ContentRating } {
+  const meta = CASE_META[caseId];
+  if (!meta) throw new RunStoreError('NOT_FOUND');
+  return { ...meta };
+}
 
 export function findCase(caseId: string) {
   if (caseId !== astrolabioDefinition.id) throw new RunStoreError('NOT_FOUND');
@@ -57,10 +73,13 @@ export function caseBriefing(caseId: string): { speaker: string; title: string; 
 
 export function caseSummary(caseId: string): CaseSummary {
   const definition = findCase(caseId);
+  const meta = caseMeta(caseId);
   return {
     caseId: definition.id,
     title: 'El astrolabio de las tres ciudades',
     contentMode: definition.contentMode,
+    crimeType: meta.crimeType,
+    contentRating: meta.contentRating,
     difficulty: definition.difficulty,
     explorationMode: definition.explorationMode,
     deadlineMinutes: definition.deadlineMinutes,

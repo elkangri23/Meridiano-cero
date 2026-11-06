@@ -99,9 +99,15 @@ describe('T3: creación durable en pestaña sin otra intención', () => {
     transport.create.mockImplementation(async () => { stored = [...memory.data.values()][0] ?? ''; });
     const coordinator = createRunCoordinator(transport, memory);
     expect(await coordinator.start('synthetic-case', identity, signal(), 'hard')).toEqual({ phase: 'created', runId });
-    expect(transport.create.mock.calls[0]?.[4]).toBe('hard');
+    expect(transport.create.mock.calls[0]?.[4]).toEqual({ difficulty: 'hard' });
     expect(JSON.parse(stored)).toMatchObject({ caseId: 'synthetic-case', difficulty: 'hard' });
     expect(memory.data.size).toBe(0);
+  });
+  it('el delito y el contenido elegidos se envían al crear junto a la dificultad', async () => {
+    const memory = storage(); const transport = api(); transport.lookup.mockResolvedValue(found);
+    const coordinator = createRunCoordinator(transport, memory);
+    expect(await coordinator.start('synthetic-case', identity, signal(), 'hard', { crimeType: 'robo', contentRating: 'familiar' })).toEqual({ phase: 'created', runId });
+    expect(transport.create.mock.calls[0]?.[4]).toEqual({ difficulty: 'hard', crimeType: 'robo', contentRating: 'familiar' });
   });
   it('intención antigua sin dificultad se acepta como normal y se reutiliza', async () => {
     const memory = storage(); const transport = api();
@@ -109,7 +115,7 @@ describe('T3: creación durable en pestaña sin otra intención', () => {
     const coordinator = createRunCoordinator(transport, memory);
     expect(coordinator.view(profileId)).toEqual({ phase: 'uncertain', caseId: 'synthetic-case', runId: null });
     await coordinator.start('synthetic-case', identity, signal());
-    expect(transport.create.mock.calls[0]?.[4]).toBeUndefined();
+    expect(transport.create.mock.calls[0]?.[4]).toEqual({ difficulty: 'normal' });
   });
   it('otra dificultad con intención incierta no la sobrescribe; descartarla permite empezar de nuevo', async () => {
     const memory = storage(); const transport = api(); const coordinator = createRunCoordinator(transport, memory);
@@ -120,7 +126,7 @@ describe('T3: creación durable en pestaña sin otra intención', () => {
     expect(coordinator.view(profileId).phase).toBe('idle');
     transport.lookup.mockResolvedValue(found);
     expect(await coordinator.start('synthetic-case', identity, signal(), 'hard')).toEqual({ phase: 'created', runId });
-    expect(transport.create.mock.calls[1]?.[4]).toBe('hard');
+    expect(transport.create.mock.calls[1]?.[4]).toEqual({ difficulty: 'hard' });
   });
   it('error de creación con motivo llega como incierta con motivo, no como genérica', async () => {
     const memory = storage(); const transport = api();

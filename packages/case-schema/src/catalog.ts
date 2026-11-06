@@ -1,10 +1,53 @@
 // Catálogo de parámetros para generación de casos (T5-01)
 // SPEC-007: Generación, simulación e intercambio
 
+import type { ContentRating, CrimeType } from '@meridiano/contracts';
+export type { ContentRating, CrimeType } from '@meridiano/contracts';
+
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type ExplorationMode = 'guided' | 'free';
 export type Duration = 'short' | 'medium' | 'long';
 export type ContentMode = 'fixed' | 'generated';
+
+// Delitos del GDD §3 (orden del documento): la lista que ofrece el
+// formulario de «Nueva partida». No confundir con ALLOWED_CRIME_TYPES
+// (T5-01, validación de parámetros de generación) ni con el CrimeType del
+// generador (`packages/generator`): las tres listas no coinciden (T5-01
+// añade extorsión/contrabando/corrupción/falsificación y omite espionaje y
+// misterio histórico; el generador añade homicidio/secuestro, que el GDD
+// §14 solo admite en modo General). Se reconcilian cuando la generación se
+// conecte a la API; hasta entonces, el GDD manda en la creación.
+export const GDD_CRIME_TYPES: readonly CrimeType[] = [
+  'robo',
+  'desaparicion',
+  'fraude',
+  'espionaje',
+  'sabotaje',
+  'misterio-historico',
+  'aleatorio',
+] as const;
+
+export const CRIME_TYPE_LABELS: Record<CrimeType, string> = {
+  robo: 'Robo internacional',
+  desaparicion: 'Desaparición',
+  fraude: 'Fraude',
+  espionaje: 'Espionaje',
+  sabotaje: 'Sabotaje',
+  'misterio-historico': 'Misterio histórico',
+  aleatorio: 'Aleatorio',
+};
+
+export const CONTENT_RATING_LABELS: Record<ContentRating, string> = {
+  familiar: 'Familiar',
+  general: 'General',
+};
+
+/** Etiqueta de un expediente: delito y contenido siempre juntos y por
+ * separado («Robo internacional · Familiar»). «Robo Familiar» no es un
+ * delito: es delito=robo + contenido=Familiar (GDD §3/§14). */
+export function caseLabel(crimeType: CrimeType, contentRating: ContentRating): string {
+  return `${CRIME_TYPE_LABELS[crimeType]} · ${CONTENT_RATING_LABELS[contentRating]}`;
+}
 
 export interface CatalogParams {
   crimeType: string;

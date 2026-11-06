@@ -36,10 +36,11 @@ test.describe('Entrada web: registro, login y partida', () => {
     await expect(page.locator('text=Cuenta creada como Detective E2E.').first()).toBeVisible();
     await page.getByRole('link', { name: 'Ir al archivo' }).click();
     await expect(page.locator('text=Detective: Detective E2E')).toBeVisible();
-    // La entrada al juego: el expediente único viene preseleccionado.
+    // La entrada al juego: el delito robo viene preseleccionado.
     const creation = page.locator('.archive-create').first();
     await expect(creation.getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
-    await expect(creation.locator('select')).toHaveValue('astrolabio-tres-ciudades');
+    await expect(creation.getByRole('radio', { name: 'Robo internacional', exact: true })).toBeChecked();
+    await expect(creation.locator('text=Robo internacional · Familiar')).toBeVisible();
     await creation.getByRole('button', { name: 'Empezar partida' }).click();
     await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
     await expect(page.getByTestId('clock')).toContainText('0 min');

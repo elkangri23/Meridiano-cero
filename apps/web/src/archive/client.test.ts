@@ -64,12 +64,12 @@ describe('T3: frontera HTTP del archivo', () => {
   });
   it('creación con dificultad la envía en el cuerpo; sin ella no se inventa ninguna', async () => {
     const fetcher = respond({ syntheticIgnored: true }, 201);
-    await archiveApi.create('synthetic', 'synthetic-key-easy', session, signal(), 'easy');
+    await archiveApi.create('synthetic', 'synthetic-key-easy', session, signal(), { difficulty: 'easy' });
     expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ body: JSON.stringify({ caseId: 'synthetic', idempotencyKey: 'synthetic-key-easy', difficulty: 'easy' }) });
   });
   it('error de creación conserva el motivo del servidor en lugar del genérico', async () => {
     respond({ error: { code: 'VALIDATION_ERROR', message: 'dificultad no admitida' } }, 400);
-    await expect(archiveApi.create('synthetic', 'synthetic-key-bad', session, signal(), 'easy'))
+    await expect(archiveApi.create('synthetic', 'synthetic-key-bad', session, signal(), { difficulty: 'easy' }))
       .rejects.toEqual(new ArchiveError('unavailable', 'dificultad no admitida'));
   });
   it('borrado de partida exige confirmación; 204 y 404 la dan por borrada', async () => {
