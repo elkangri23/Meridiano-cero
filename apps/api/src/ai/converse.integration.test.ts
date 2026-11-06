@@ -91,4 +91,49 @@ describe('conversación con NPC por ruta', () => {
     const body = asJson(response.json());
     expect(asJson(body.narrative).text).toBe('He registrado tu consulta.');
   });
+
+  // Inés Valera (sospechosa, restauradora): su único hecho conocido es
+  // `truth` y su saludo avisa de que no declarará sobre el robo. En
+  // producción su pregunta fallaba en la UI con «La IA no responde» — la
+  // ruta responde bien (el fallo era el plazo de 8 s del cliente web, no
+  // Inés): estos tests fijan que conversar con ella funciona por ruta.
+  it('conversa con Inés Valera: responde con su hecho y la memoria es suya', async () => {
+    const inesNpc = { id: 'ines', name: 'Inés Valera', persona: 'Sospechosa', knownFactIds: ['truth'], revealableFactIds: ['truth'] };
+    const inesFacts = [{ id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' }];
+    const inesMemory = { schemaVersion: 1, runId, npcId: 'ines', treatment: 'neutral', turns: [] };
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/ai/converse',
+      headers,
+      payload: { runId, text: 'hola, no quieres decir nada?', npc: inesNpc, facts: inesFacts, memory: inesMemory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'], requestId: randomUUID() },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = asJson(response.json());
+    expect(asJson(body.narrative).text).toContain('restauradora');
+    const memory = asJson(body.memory);
+    expect(memory.runId).toBe(runId);
+    expect(memory.npcId).toBe('ines');
+    // Segundo turno con la memoria devuelta: la conversación continúa.
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/v1/ai/converse',
+      headers,
+      payload: { runId, text: '¿qué hiciste con el astrolabio?', npc: inesNpc, facts: inesFacts, memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'], requestId: randomUUID() },
+    });
+    expect(second.statusCode).toBe(200);
+    expect(asJson(asJson(second.json()).narrative).text).toContain('restauradora');
+  });
+
+  it('Inés sin listas de hechos tampoco rompe: responde sin declarar nada', async () => {
+    const inesFacts = [{ id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' }];
+    const inesMemory = { schemaVersion: 1, runId, npcId: 'ines', treatment: 'neutral', turns: [] };
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/ai/converse',
+      headers,
+      payload: { runId, text: 'hola, no quieres decir nada?', npc: { id: 'ines', name: 'Inés Valera', persona: 'Sospechosa' }, facts: inesFacts, memory: inesMemory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'], requestId: randomUUID() },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(asJson(asJson(response.json()).narrative).text).toBe('He registrado tu consulta.');
+  });
 });

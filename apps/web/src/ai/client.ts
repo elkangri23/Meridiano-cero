@@ -65,8 +65,16 @@ async function boundedJson(response: Response): Promise<unknown> {
 interface RequestOptions {
   retries?: number;
   baseDelayMs?: number;
+  timeoutMs?: number;
   shouldRetry?: (error: AiError) => boolean;
 }
+
+/** Plazos por operación: el modelo tarda segundos en responder (conversar
+ * hasta ~35 s en el peor caso medido) y el servidor admite 60 s. El plazo
+ * único de 8 s abortaba cada intento antes de que el servidor contestara:
+ * preguntar a Inés fallaba siempre que el modelo tardaba más de 8 s, con
+ * «La IA no responde», aunque el servidor acababa respondiendo. */
+const AI_TIMEOUTS = { interpret: 15000, narrate: 45000, converse: 55000 } as const;
 
 async function requestWithRetry(
   path: string,
@@ -74,7 +82,7 @@ async function requestWithRetry(
   init: RequestInit = {},
   options: RequestOptions = {}
 ): Promise<Response> {
-  const { retries = 2, baseDelayMs = 500, shouldRetry = () => false } = options;
+  const { retries = 2, baseDelayMs = 500, timeoutMs = 8000, shouldRetry = () => false } = options;
   let attempt = 0;
   let lastError: AiError | undefined;
 
@@ -85,7 +93,7 @@ async function requestWithRetry(
         credentials: 'same-origin',
         cache: 'no-store',
         redirect: 'error',
-        signal: AbortSignal.any([signal, AbortSignal.timeout(8000)])
+        signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
       });
       return response;
     } catch (error) {
@@ -105,10 +113,11 @@ async function requestWithRetry(
   throw lastError ?? new AiError('unavailable');
 }
 
-async function request(path: string, signal: AbortSignal, init: RequestInit = {}): Promise<Response> {
+async function request(path: string, signal: AbortSignal, init: RequestInit = {}, options: { timeoutMs?: number; retries?: number } = {}): Promise<Response> {
   return requestWithRetry(path, signal, init, {
-    retries: 2,
+    retries: options.retries ?? 2,
     baseDelayMs: 500,
+    timeoutMs: options.timeoutMs ?? 8000,
     shouldRetry: (error) => error.kind === 'unavailable' || error.kind === 'timeout'
   });
 }
@@ -128,7 +137,7 @@ export const aiApi: AiApi = {
   async interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiInterpretation> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (auth) headers['x-csrf-token'] = auth.csrfToken;
-    const response = await request('/api/v1/ai/interpret', signal, { method: 'POST', headers, body: JSON.stringify({ text, scene, offers, requestId: crypto.randomUUID() }) });
+    const response = await request('/api/v1/ai/interpret', signal, { method: 'POST', headers, body: JSON.stringify({ text, scene, offers, requestId: crypto.randomUUID() }) }, { timeoutMs: AI_TIMEOUTS.interpret });
     const body = await read(response);
     const interpretation = body.interpretation;
     if (!interpretation || typeof interpretation !== 'object' || !('kind' in interpretation)) throw new AiError('invalid');
@@ -138,7 +147,7 @@ export const aiApi: AiApi = {
   async narrate(facts: Array<{ id: string; text: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiNarrative> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (auth) headers['x-csrf-token'] = auth.csrfToken;
-    const response = await request('/api/v1/ai/narrate', signal, { method: 'POST', headers, body: JSON.stringify({ facts, requestId: crypto.randomUUID() }) });
+    const response = await request('/api/v1/ai/narrate', signal, { method: 'POST', headers, body: JSON.stringify({ facts, requestId: crypto.randomUUID() }) }, { timeoutMs: AI_TIMEOUTS.narrate, retries: 1 });
     const body = await read(response);
     const narrative = body.narrative;
     if (!narrative || typeof narrative !== 'object' || !('text' in narrative)) throw new AiError('invalid');
@@ -148,7 +157,7 @@ export const aiApi: AiApi = {
   async converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string; knownFactIds: string[]; revealableFactIds: string[] }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (auth) headers['x-csrf-token'] = auth.csrfToken;
-    const response = await request('/api/v1/ai/converse', signal, { method: 'POST', headers, body: JSON.stringify({ ...input, requestId: crypto.randomUUID() }) });
+    const response = await request('/api/v1/ai/converse', signal, { method: 'POST', headers, body: JSON.stringify({ ...input, requestId: crypto.randomUUID() }) }, { timeoutMs: AI_TIMEOUTS.converse, retries: 1 });
     const body = await read(response);
     if (!body.narrative || !body.memory) throw new AiError('invalid');
     return { narrative: body.narrative as AiNarrative, memory: body.memory };

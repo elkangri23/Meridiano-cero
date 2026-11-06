@@ -52,16 +52,23 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-clock strong span { color:var(--muted); font-size:.7em; }
 .game-clock small { display:block; font-size:.6em; color:var(--muted); }
 
-/* Reloj de arena: cae la arena y el reloj gira al avanzar el tiempo. */
+/* Reloj de arena: cae la arena y el reloj gira al avanzar el tiempo.
+ * Arreglo del lote 1: la versión anterior era un icono de 18 px con una
+ * animación de una sola pasada que no giraba hasta la mitad del ciclo, así
+ * que en el navegador parecía estático. Ahora es grande (30 px en la
+ * cabecera, 36 px en la escena) y gira en bucle mientras dura el pulso
+ * (2,6 s): la arena cae y se vuelve a llenar en cada vuelta. */
 .game-clock-pulse strong { animation:game-clock-flash 2.4s ease-out 1; }
 @keyframes game-clock-flash { 0% { background:var(--gold); color:#000000; } 100% { background:transparent; color:var(--gold); } }
-.game-hourglass { display:inline-flex; align-items:center; gap:6px; margin-left:8px; color:var(--gold); font-size:.75em; vertical-align:middle; }
-.game-hourglass svg { width:18px; height:24px; image-rendering:pixelated; animation:game-hourglass-flip 2.4s ease-in-out 1; }
-@keyframes game-hourglass-flip { 0%,45% { transform:rotate(0deg); } 55%,100% { transform:rotate(180deg); } }
-.game-hourglass-sand-top { transform-box:fill-box; transform-origin:top; animation:game-hourglass-drain 2.4s linear 1; }
-.game-hourglass-sand-bottom { transform-box:fill-box; transform-origin:bottom; animation:game-hourglass-fill 2.4s linear 1; }
-@keyframes game-hourglass-drain { from { transform:scaleY(1); } to { transform:scaleY(0); } }
-@keyframes game-hourglass-fill { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+.game-hourglass { display:inline-flex; align-items:center; gap:8px; margin-left:8px; color:var(--gold); font-size:.75em; vertical-align:middle; }
+.game-hourglass svg { width:30px; height:40px; image-rendering:pixelated; animation:game-hourglass-spin 1.2s linear infinite; }
+.game-hourglass-scene { margin-left:0; font-size:.85em; }
+.game-hourglass-scene svg { width:36px; height:48px; }
+@keyframes game-hourglass-spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+.game-hourglass-sand-top { transform-box:fill-box; transform-origin:bottom; animation:game-hourglass-drain 1.2s linear infinite; }
+.game-hourglass-sand-bottom { transform-box:fill-box; transform-origin:bottom; animation:game-hourglass-fill 1.2s linear infinite; }
+@keyframes game-hourglass-drain { 0% { transform:scaleY(1); } 50% { transform:scaleY(0); } 100% { transform:scaleY(1); } }
+@keyframes game-hourglass-fill { 0% { transform:scaleY(0); } 50% { transform:scaleY(1); } 100% { transform:scaleY(0); } }
 
 .game-notice { padding:12px 0; min-height:48px; color:var(--gold); }
 .game-error { color:var(--error); }

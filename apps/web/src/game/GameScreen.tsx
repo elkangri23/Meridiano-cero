@@ -12,7 +12,7 @@ import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts } from '@meridiano/case-schema';
+import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts, travelText } from '@meridiano/case-schema';
 import type { DiscoveryLookup } from '@meridiano/case-schema';
 import './game.css';
 
@@ -101,10 +101,19 @@ function actionResultDetail(response: ActionResponseDto, previous: PlayerViewDto
   // Los nombres de los personajes salen de la vista anterior: la oferta de
   // hablar puede no estar ya en la vista nueva.
   const lookup = lookupFromView(previous ?? response);
-  const newDiscoveries = previous ? response.dossier.filter(entry => !previous.dossier.includes(entry)) : [...response.dossier];
+  // Los viajes no añaden evidencias: su detalle es la frase narrativa del
+  // desplazamiento (origen → destino). El marcador `travel:<ciudad>` del
+  // motor queda cubierto por esa frase y no se traduce aparte: si no, la
+  // consola enseñaría la clave cruda o una frase repetida.
+  const travel = offer?.action.type === 'travel' && previous && previous.position.city.id !== response.position.city.id
+    ? travelText(previous.position.city.name, response.position.city.name)
+    : '';
+  const newDiscoveries = (previous ? response.dossier.filter(entry => !previous.dossier.includes(entry)) : [...response.dossier])
+    .filter(entry => !entry.startsWith('travel:'));
   const discoveryDetail = newDiscoveries.map(entry => discoveryText(entry, lookup)).join(' ');
   const target = talkTarget(offer, lookup);
   return [
+    travel,
     target ? `Hablas con ${target.name}. Te confirma su identidad: pregúntale en la conversación.` : '',
     discoveryDetail,
   ].filter(Boolean).join(' ');
@@ -126,21 +135,39 @@ function previewOutcome(response: ActionResponseDto, offer: PublicActionOffer, k
 
 // ── Secciones presentacionales ──────────────────────────────────────────────────
 
-/** Reloj de arena (lote 1 de jugabilidad): cuando el reloj avanza al
- * confirmar una acción, la arena cae y el reloj gira unos segundos junto al
- * «+N min». Es solo cosmético: el motor y las reglas no cambian. */
+/** Icono del reloj de arena, compartido por la cabecera y la escena. */
+function HourglassIcon({ animKey }: { animKey: number }) {
+  return <svg key={animKey} viewBox="0 0 24 32" shapeRendering="crispEdges" focusable="false" aria-hidden="true">
+    <rect x="2" y="0" width="20" height="3" fill="#ffff55" />
+    <rect x="2" y="29" width="20" height="3" fill="#ffff55" />
+    <path d="M4 3H20L12 16Z" fill="#55ffff" />
+    <path d="M4 29H20L12 16Z" fill="#55ffff" />
+    <rect className="game-hourglass-sand-top" x="9" y="6" width="6" height="5" fill="#ffff55" />
+    <rect className="game-hourglass-sand-bottom" x="9" y="22" width="6" height="5" fill="#ffff55" />
+    <rect x="11" y="14" width="2" height="4" fill="#ffff55" />
+  </svg>;
+}
+
+/** Reloj de arena (lote 1 de jugabilidad, arreglado): cuando el reloj avanza
+ * al confirmar una acción, la arena cae y el reloj gira unos segundos junto
+ * al «+N min». Es solo cosmético: el motor y las reglas no cambian. La
+ * primera versión era un icono de 18 px con una animación de una sola
+ * pasada que no giraba hasta la mitad del ciclo, así que en el navegador
+ * parecía estático: ahora es grande (30 px) y gira en bucle mientras dura
+ * el pulso, para que se vea de verdad. */
 function Hourglass({ delta, animKey }: { delta: number; animKey: number }) {
   return <span className="game-hourglass" data-testid="hourglass" role="status" aria-label={`El reloj avanza ${delta} minutos`}>
-    <svg key={animKey} viewBox="0 0 24 32" shapeRendering="crispEdges" focusable="false" aria-hidden="true">
-      <rect x="2" y="0" width="20" height="3" fill="#ffff55" />
-      <rect x="2" y="29" width="20" height="3" fill="#ffff55" />
-      <path d="M4 3H20L12 16Z" fill="#55ffff" />
-      <path d="M4 29H20L12 16Z" fill="#55ffff" />
-      <rect className="game-hourglass-sand-top" x="9" y="6" width="6" height="5" fill="#ffff55" />
-      <rect className="game-hourglass-sand-bottom" x="9" y="22" width="6" height="5" fill="#ffff55" />
-      <rect x="11" y="14" width="2" height="4" fill="#ffff55" />
-    </svg>
+    <HourglassIcon animKey={animKey} />
     <span>+{delta} min</span>
+  </span>;
+}
+
+/** Reloj de arena grande en la escena: el tiempo avanza donde está la
+ * mirada del jugador, no solo en la cabecera. Mismo pulso y mismo estilo. */
+function SceneHourglass({ delta, animKey }: { delta: number; animKey: number }) {
+  return <span className="game-hourglass game-hourglass-scene" data-testid="hourglass-scene" role="status" aria-label={`El reloj avanza ${delta} minutos`}>
+    <HourglassIcon animKey={animKey} />
+    <span>El reloj avanza {delta} min</span>
   </span>;
 }
 
@@ -241,13 +268,13 @@ function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDt
  * inspeccionar, a dónde se puede viajar, y el resto de acciones. Cada oferta
  * sale una sola vez y con su mismo testid, así que la caja de texto libre
  * queda para las órdenes creativas. */
-function SceneSection({ view, disabled, onOffer }: { view: PlayerViewDto; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+function SceneSection({ view, disabled, clockPulse, onOffer }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   const grouped = groupOffers(view.offers);
   return <section className="game-scene" aria-labelledby="scene-heading">
     <div className="game-scene-top"><span>Localización {String(locationIndex).padStart(2, '0')}</span><span>{view.position.city.name.toUpperCase()} · {view.position.city.country}</span></div>
     <SceneArt locationId={view.position.location.id} />
-    <div className="game-scene-caption"><div><p className="game-overline">{view.position.city.name}</p><h2 id="scene-heading">{view.position.location.name}</h2></div></div>
+    <div className="game-scene-caption"><div><p className="game-overline">{view.position.city.name}</p><h2 id="scene-heading">{view.position.location.name}</h2></div>{clockPulse && <SceneHourglass delta={clockPulse.delta} animKey={clockPulse.key} />}</div>
     <p className="game-scene-description">{view.position.location.description}</p>
     <SceneMeta view={view} />
     <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} />
@@ -1397,7 +1424,7 @@ export function GameScreen() {
       <button type="button" onClick={() => void refresh()}>Actualizar vista</button>
     </div>
 
-    <SceneSection view={view} disabled={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
+    <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
     <ConsoleSection log={log} orderHistory={orderHistory} />
     <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
       onDraft={setDraft} onSubmit={interpretOrder} onKeyDown={onOrderKeyDown} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
