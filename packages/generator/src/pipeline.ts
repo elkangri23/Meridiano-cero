@@ -378,14 +378,14 @@ function simulateStage(draft: CaseDraft, config: PipelineConfig): { playable: bo
   return { playable: true, minute: simulation.minute, budgetMinutes };
 }
 
-async function executeLlmStage(stage: 1 | 3 | 4, draft: CaseDraft, choice: ResolvedChoice, geography: SelectedGeography, config: PipelineConfig): Promise<unknown> {
+async function executeLlmStage(stage: 1 | 3 | 4, draft: CaseDraft, choice: ResolvedChoice, geography: SelectedGeography, config: PipelineConfig, feedback?: string[]): Promise<unknown> {
   switch (stage) {
     case 1:
-      return runLlmStage(1, draft, choice, geography, config, {});
+      return runLlmStage(1, draft, choice, geography, config, {}, feedback);
     case 3:
-      return runLlmStage(3, draft, choice, geography, config, { premise: stageOutput(draft, 1) });
+      return runLlmStage(3, draft, choice, geography, config, { premise: stageOutput(draft, 1) }, feedback);
     case 4:
-      return runLlmStage(4, draft, choice, geography, config, { premise: stageOutput(draft, 1), npcs: stageOutput(draft, 3) }, draft.repairFeedback);
+      return runLlmStage(4, draft, choice, geography, config, { premise: stageOutput(draft, 1), npcs: stageOutput(draft, 3) }, [...(draft.repairFeedback ?? []), ...(feedback ?? [])]);
   }
 }
 
@@ -410,11 +410,12 @@ async function executeStage(
   stage: GenerationStage,
   draft: CaseDraft,
   config: PipelineConfig,
+  feedback?: string[],
 ): Promise<unknown> {
   const choice = draft.choice;
   const geography = draft.geography;
   if (!choice || !geography) throw new Error('El borrador no tiene delito ni geografía resueltos.');
-  if (LLM_STAGES.has(stage)) return executeLlmStage(stage as 1 | 3 | 4, draft, choice, geography, config);
+  if (LLM_STAGES.has(stage)) return executeLlmStage(stage as 1 | 3 | 4, draft, choice, geography, config, feedback);
   const deterministic = await executeDeterministicStage(stage, draft, choice, geography, config);
   if (deterministic !== undefined) return deterministic;
   if (stage === 9) return publishStage(draft);
@@ -481,6 +482,23 @@ async function retryOrRejectStage(currentDraft: CaseDraft, checkpoint: CaseDraft
   return null;
 }
 
+/** Una puerta falló: repara (el bucle vuelve a la etapa 4) o rechaza el
+ * borrador si ya se reparó. Devuelve 'repair' o el rechazo. */
+async function handleGateFailure(currentDraft: CaseDraft, checkpoint: CaseDraft['stages'][number], config: PipelineConfig, error: StageGateError): Promise<'repair' | GenerationResult> {
+  if (await repairAfterGateFailure(currentDraft, error, config)) return 'repair';
+  checkpoint.status = 'failed';
+  checkpoint.error = error.message;
+  return rejectDraft(currentDraft, config, `Puerta fallida tras la reparación: ${error.errors.join('; ')}`);
+}
+
+/** Un fallo que no es de puerta: guarda el mensaje como feedback para el
+ * siguiente intento y reintenta (o rechaza al agotar los intentos). */
+async function handleRetryFailure(currentDraft: CaseDraft, checkpoint: CaseDraft['stages'][number], stageNum: number, config: PipelineConfig, error: unknown): Promise<{ feedback: string[]; result: GenerationResult | null }> {
+  const feedback = [error instanceof Error ? error.message : String(error)];
+  const result = await retryOrRejectStage(currentDraft, checkpoint, stageNum, config, error);
+  return { feedback, result };
+}
+
 async function rejectDraft(draft: CaseDraft, config: PipelineConfig, error: string): Promise<GenerationResult> {
   draft.status = 'rejected';
   draft.error = error;
@@ -502,27 +520,33 @@ export async function runPipeline(
 
   await config.checkpointStore.save(currentDraft);
 
+  // Errores de la última tentativa de la etapa en curso: el siguiente
+  // intento del modelo los recibe como feedback (antes reintentaba a
+  // ciegas con el mismo prompt y repetía el mismo fallo).
+  let stageFeedback: string[] | undefined;
+
   for (let stageNum = currentDraft.currentStage; stageNum <= MAX_STAGE; stageNum++) {
     const stage = stageNum as GenerationStage;
     const checkpoint = await beginStage(currentDraft, stageNum, config);
     if (!checkpoint) continue;
 
     try {
-      const output = await executeStage(stage, currentDraft, config);
+      const output = await executeStage(stage, currentDraft, config, stageFeedback);
       await completeStage(currentDraft, checkpoint, output, config);
+      stageFeedback = undefined;
     } catch (error) {
       if (error instanceof StageGateError) {
-        if (await repairAfterGateFailure(currentDraft, error, config)) {
+        const gate = await handleGateFailure(currentDraft, checkpoint, config, error);
+        if (gate === 'repair') {
           stageNum = 3;
           continue;
         }
-        checkpoint.status = 'failed';
-        checkpoint.error = error.message;
-        return rejectDraft(currentDraft, config, `Puerta fallida tras la reparación: ${error.errors.join('; ')}`);
+        return gate;
       }
 
-      const rejected = await retryOrRejectStage(currentDraft, checkpoint, stageNum, config, error);
-      if (rejected) return rejected;
+      const retry = await handleRetryFailure(currentDraft, checkpoint, stageNum, config, error);
+      stageFeedback = retry.feedback;
+      if (retry.result) return retry.result;
 
       // Reintentar la misma etapa
       stageNum--;

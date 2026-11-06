@@ -155,10 +155,13 @@ export function buildStageContext(
     seed: params.seed ?? 0,
     cities: geography.cities,
     contentRules: CONTENT_RULES[choice.contentRating],
+    // Errores de la tentativa anterior (reintento o reparación): el modelo
+    // los recibe para corregir su salida en vez de repetir el mismo fallo.
+    ...(feedback ? { repairFeedback: feedback } : {}),
   };
   if (stage === 1) return base;
   if (stage === 3) return { ...base, premise: prior.premise };
-  if (stage === 4) return { ...base, premise: prior.premise, npcs: prior.npcs, ...(feedback ? { repairFeedback: feedback } : {}) };
+  if (stage === 4) return { ...base, premise: prior.premise, npcs: prior.npcs };
   if (stage === 7) return { ...base, definition: prior.definition, goldenPath: prior.goldenPath, budgetMinutes: prior.budgetMinutes };
   return base;
 }
@@ -268,7 +271,9 @@ function validatePremise(output: unknown, cities: SelectedGeography['cities'], e
 }
 
 function checkNpcKnowledge(npc: Record<string, unknown>, errors: string[]): void {
-  if (!Array.isArray(npc.knowledge) || npc.knowledge.length === 0 || !npc.knowledge.every((token: unknown) => typeof token === 'string' && FACT_ID.test(token))) errors.push(`NPC ${String(npc.id)} con conocimiento inválido.`);
+  if (!Array.isArray(npc.knowledge) || npc.knowledge.length === 0) { errors.push(`NPC ${String(npc.id)} sin conocimiento.`); return; }
+  const invalid = npc.knowledge.filter((token: unknown) => typeof token !== 'string' || !FACT_ID.test(token));
+  if (invalid.length > 0) errors.push(`NPC ${String(npc.id)} con conocimiento inválido: ${JSON.stringify(invalid.slice(0, 3))} (ids cortos en minúsculas con guiones, sin espacios ni frases).`);
   if (typeof npc.cooperation !== 'number' || npc.cooperation < 0 || npc.cooperation > 10) errors.push(`NPC ${String(npc.id)} con cooperación fuera de 0-10.`);
 }
 
@@ -287,7 +292,7 @@ function validateNpcs(output: unknown, castIds: string[], errors: string[]): voi
   const ids = new Set<string>();
   for (const npc of output.npcs) checkNpc(npc, castIds, ids, errors);
   for (const id of castIds) if (!ids.has(id)) errors.push(`Falta el NPC ${id} del reparto.`);
-  if (!Array.isArray(output.timeline) || output.timeline.length < 2 || !output.timeline.every(isNonEmptyString)) errors.push('timeline debe tener al menos 2 hitos.');
+  if (!Array.isArray(output.timeline) || output.timeline.length < 2 || !output.timeline.every(isNonEmptyString)) errors.push(`timeline debe tener al menos 2 hitos (tiene ${Array.isArray(output.timeline) ? output.timeline.length : 0}).`);
 }
 
 /** Tipos de evidencia por posición (el esqueleto fijo, como el fixture del
