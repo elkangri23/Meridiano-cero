@@ -548,6 +548,42 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/cada hito debe ser una frase/);
   });
 
+  it('reintenta la etapa 4 cuando la ruta dorada recoge una observación', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4Calls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          stage4Calls++;
+          contexts.push(context as Record<string, unknown>);
+          if (stage4Calls === 1) {
+            // Como el modelo real en el smoke: collect de EV-01, que es una
+            // observación y no se puede recoger.
+            const broken = structuredClone(outputs.clues);
+            const collect = broken.goldenPath.find(action => action.type === 'collect');
+            if (collect) collect.params = { evidenceId: 'EV-01' };
+            return broken;
+          }
+          return outputs.clues;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4Calls).toBe(2);
+    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/solo se recogen evidencias de tipo object/);
+  });
+
   it('reintenta la etapa 3 con el error como feedback cuando el conocimiento viene en frase', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);

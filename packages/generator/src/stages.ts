@@ -511,6 +511,26 @@ function checkGoldenPath(output: Record<string, unknown>, errors: string[]): voi
   if (!types.includes('recover')) errors.push('goldenPath debe incluir una recuperación.');
   const last = output.goldenPath[output.goldenPath.length - 1];
   if (!isRecord(last) || last.type !== 'finish') errors.push('goldenPath debe terminar con el cierre del caso.');
+  checkGoldenCollects(output, errors);
+}
+
+// Recoger solo sirve para evidencias de tipo object (EV-02, EV-06, EV-11):
+// una observación se revela al inspeccionar y no se recoge; un registro
+// llega por consulta, un análisis por analyze y un testimonio por hablar.
+function checkGoldenCollects(output: Record<string, unknown>, errors: string[]): void {
+  if (!Array.isArray(output.evidence) || !Array.isArray(output.goldenPath)) return;
+  const types = new Map<string, string>();
+  for (const evidence of output.evidence) {
+    if (isRecord(evidence) && typeof evidence.id === 'string' && typeof evidence.type === 'string') types.set(evidence.id, evidence.type);
+  }
+  output.goldenPath.forEach((action: unknown, index: number) => {
+    if (!isRecord(action) || action.type !== 'collect' || !isRecord(action.params)) return;
+    const evidenceId = action.params.evidenceId;
+    if (typeof evidenceId !== 'string') return;
+    const type = types.get(evidenceId);
+    if (type === undefined) errors.push(`goldenPath[${index}] (collect) recoge ${evidenceId}, que no existe.`);
+    else if (type !== 'object') errors.push(`goldenPath[${index}] (collect) recoge ${evidenceId}, de tipo ${type}: solo se recogen evidencias de tipo object.`);
+  });
 }
 
 function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {
