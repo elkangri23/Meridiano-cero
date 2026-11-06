@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { validateCaseDefinition } from '@meridiano/case-schema';
 import { createInMemoryCheckpointStore } from './checkpoint.js';
 import { createGeneratorService, runPipeline, type GenerationParams, type PipelineConfig, type StageLlm } from './pipeline.js';
 import { selectGeography, stageOutputSchema, validateStageOutput, type SelectedGeography } from './stages.js';
@@ -1287,5 +1288,54 @@ describe('validación de la etapa 4 (accessEvidenceIds)', () => {
     const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
     expect(result.valid).toBe(false);
     expect(result.errors.some(error => error.includes('accessEvidenceIds'))).toBe(true);
+  });
+});
+
+describe('validación de la etapa 4 (textos de conocimiento decibles)', () => {
+  it('rechaza una salida 4a con un texto-etiqueta («Información sobre…»)', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = structuredClone({ ...outputs.cluesWorld, ...outputs.cluesRules });
+    const knowledge = (clues as { texts: { knowledge: Record<string, string> } }).texts.knowledge;
+    knowledge['jorge-vio-facturas'] = 'Información sobre la revisión de facturas.';
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'], knowledgeIds: ['jorge-vio-facturas', 'registro-facturas', 'truth'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('etiqueta'))).toBe(true);
+  });
+  it('acepta la salida 4a con frases en primera persona', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = { ...outputs.cluesWorld, ...outputs.cluesRules };
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'], knowledgeIds: ['jorge-vio-facturas', 'registro-facturas', 'truth'] });
+    expect(result.valid).toBe(true);
+  });
+});
+
+describe('validación del expediente completo (textos de conocimiento decibles)', () => {
+  it('el validador v1.5 rechaza el expediente si un texto de conocimiento es etiqueta', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) return stage4Output(outputs, context as Record<string, unknown>);
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    const definition = result.definition!;
+    expect(validateCaseDefinition(definition).valid).toBe(true);
+    const labelled = structuredClone(definition) as unknown as Record<string, unknown>;
+    const texts = labelled.texts as { knowledge: Record<string, string> };
+    texts.knowledge['jorge-vio-facturas'] = 'Conocimiento del mercado de facturas.';
+    const check = validateCaseDefinition(labelled);
+    expect(check.valid).toBe(false);
+    expect(check.errors.some(error => error.includes('etiqueta'))).toBe(true);
   });
 });

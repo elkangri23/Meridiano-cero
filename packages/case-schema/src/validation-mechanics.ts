@@ -1,4 +1,5 @@
 import { check, identifier, integer, isRecord, text, type DataRecord } from './validation-fields.js';
+import { isKnowledgeLabelText } from './fact-texts.js';
 import type { EntityGroups } from './validation-entities.js';
 
 /**
@@ -135,6 +136,12 @@ function checkEvidenceTexts(value: DataRecord, evidenceIds: Set<string>, errors:
 function checkKnowledgeTexts(value: DataRecord, groups: EntityGroups, errors: string[]): void {
   if (!isRecord(value.knowledge)) { errors.push('texts.knowledge: objeto obligatorio.'); return; }
   for (const id of Object.keys(value.knowledge)) check(typeof id === 'string' && id.length > 0, 'texts.knowledge clave inválida', errors);
+  for (const id of Object.keys(value.knowledge)) {
+    const entry = (value.knowledge as DataRecord)[id];
+    if (typeof entry === 'string' && isKnowledgeLabelText(entry)) {
+      errors.push(`texts.knowledge ${id} es una etiqueta de tema, no una frase que diría el personaje`);
+    }
+  }
   for (const npc of groups.npcs) {
     for (const token of stringList(npc.knowledge)) check(text((value.knowledge as DataRecord)[token]), `texts.knowledge falta el texto de ${token}`, errors);
   }

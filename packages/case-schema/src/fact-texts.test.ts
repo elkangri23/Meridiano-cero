@@ -6,7 +6,7 @@ import { RECURRENT_NPCS } from './npc-catalog.js';
 import {
   EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, OBJECTIVE_TEXT,
   REPORT_REASON_TEXT, REPORT_RESULT_TEXT, conversationRecordText,
-  discoveryText, evidenceText, npcGreeting, npcKnowledgeFacts, npcRefusal,
+  discoveryText, evidenceText, isKnowledgeLabelText, npcGreeting, npcKnowledgeFacts, npcRefusal,
   objectiveText, reportReasonText, reportResultText, travelText,
 } from './fact-texts.js';
 
@@ -111,5 +111,25 @@ describe('textos legibles del caso fijo', () => {
     for (const text of [...Object.values(REPORT_RESULT_TEXT), ...Object.values(REPORT_REASON_TEXT), ...Object.values(OBJECTIVE_TEXT)]) {
       expect(text).not.toMatch(/\b(complete|partial|incorrect|unresolved|finished|deadline)\b|obj-/);
     }
+  });
+});
+
+describe('detector de textos-etiqueta de conocimiento', () => {
+  it('detecta las etiquetas de tema de los casos generados', () => {
+    for (const label of [
+      'Información sobre traslados y movimientos de objetos valiosos.',
+      'Conocimiento del mercado de antigüedades y canales de venta.',
+      'Datos sobre los registros de acceso.',
+      'Descripción de los movimientos en Bilbao.',
+    ]) expect(isKnowledgeLabelText(label), label).toBe(true);
+  });
+  it('acepta las frases en primera persona y todos los textos del caso fijo', () => {
+    for (const text of [
+      'Conozco el mercado de antigüedades y los canales de venta.',
+      'Sé que el cuaderno estuvo en Barcelona.',
+      'Llevo el registro de herramientas del archivo y puedo comprobar a quién se asignó cada herramienta.',
+      'La taquilla L-7 es un depósito de custodia del almacén.',
+      ...Object.values(KNOWLEDGE_TEXTS),
+    ]) expect(isKnowledgeLabelText(text), text).toBe(false);
   });
 });

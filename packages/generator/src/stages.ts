@@ -15,7 +15,7 @@
 // resto de etapas (geografía, ensamblaje, validación, simulación,
 // persistencia) son deterministas.
 
-import { GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating } from '@meridiano/case-schema';
+import { GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, isKnowledgeLabelText, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating } from '@meridiano/case-schema';
 import type { GenerationParams, GenerationStage } from './pipeline.js';
 
 /** Delitos generables (lista canónica sin 'aleatorio', que es modo de
@@ -492,7 +492,13 @@ function checkClueMechanics(output: Record<string, unknown>, errors: string[]): 
 function checkClueKnowledgeTexts(texts: Record<string, unknown>, knowledgeIds: string[], errors: string[]): void {
   if (!isRecord(texts.knowledge)) { errors.push('texts.knowledge debe ser un objeto.'); return; }
   for (const id of knowledgeIds) {
-    if (!isNonEmptyString((texts.knowledge as Record<string, unknown>)[id])) errors.push(`Falta el texto de conocimiento de ${id} (uno por cada id de knowledge de la etapa 3).`);
+    const entry = (texts.knowledge as Record<string, unknown>)[id];
+    if (!isNonEmptyString(entry)) errors.push(`Falta el texto de conocimiento de ${id} (uno por cada id de knowledge de la etapa 3).`);
+    // El director muestra el texto del hecho tal cual al declarar: una
+    // etiqueta de tema («Información sobre…») se repite como loro y nunca
+    // suena a conversación. La etapa 4a debe escribir frases en primera
+    // persona que el NPC diría («Conozco…», «Sé que…»).
+    else if (isKnowledgeLabelText(entry)) errors.push(`El texto de conocimiento de ${id} es una etiqueta de tema, no una frase que diría el personaje.`);
   }
 }
 

@@ -101,6 +101,21 @@ export const OBJECTIVE_TEXT: Record<string, string> = {
   'obj-recuperar': 'Recuperar el astrolabio original',
 };
 
+/** Etiquetas de tema que no son frases que diría el personaje («Información
+ * sobre…», «Conocimiento del mercado…», «Datos sobre…»): el director
+ * muestra el texto del hecho tal cual al declarar (`state`), así que una
+ * etiqueta se repite como loro y nunca suena a conversación (GDD §7: el NPC
+ * tiene personalidad y memoria; la conversación la expresa el LLM sin
+ * alterar hechos). La etapa 4a debe escribir frases en primera persona que
+ * el NPC diría («Conozco…», «Sé que…») y el validador rechaza las
+ * etiquetas. Solo detecta el patrón etiqueta: una descripción en tercera
+ * persona («El registro documenta…») no es etiqueta y la acepta el
+ * validador, aunque la regla del prompt pida primera persona. */
+const KNOWLEDGE_LABEL_PATTERN = /^(información|conocimiento|datos|detalles|descripción|gestión|registro|informe)\s+(sobre|de|del)\b/i;
+export function isKnowledgeLabelText(text: string): boolean {
+  return KNOWLEDGE_LABEL_PATTERN.test(text.trim());
+}
+
 /** Frase de un objetivo logrado del informe final. */
 export function objectiveText(objectiveId: string): string {
   return OBJECTIVE_TEXT[objectiveId] ?? objectiveId;
