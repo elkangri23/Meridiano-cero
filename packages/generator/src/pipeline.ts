@@ -359,7 +359,55 @@ async function runSplitStage4(
   const merged = { ...(world as Record<string, unknown>), ...(rules as Record<string, unknown>) };
   const validation = validateStageOutput(4, merged, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft) });
   if (!validation.valid) throw new StageOutputError(`Etapa 4 inválida: ${validation.errors.join('; ')}`, merged);
+  checkGoldenPathPlayable(merged, prior, draft, choice, geography, config);
   return merged;
+}
+
+// La ruta dorada no solo debe tener buena forma: debe JUGARSE por el motor
+// real (cada acción aplicable en orden, con sus requisitos obtenidos antes).
+// Comprobarlo aquí, dentro de la etapa 4, da al modelo el error exacto del
+// motor como feedback de reintento (3 intentos) en vez de quemar la única
+// reparación de la puerta cuando la revisión o la simulación lo detectan.
+function checkGoldenPathPlayable(
+  clues: Record<string, unknown>,
+  prior: Record<string, unknown>,
+  draft: CaseDraft,
+  choice: ResolvedChoice,
+  geography: SelectedGeography,
+  config: PipelineConfig,
+): void {
+  const premise = prior.premise as Record<string, unknown> | undefined;
+  const npcs = prior.npcs as Record<string, unknown> | undefined;
+  const goldenPath = clues.goldenPath as GoldenPathAction[] | undefined;
+  if (!premise || !npcs || !Array.isArray(goldenPath)) throw new StageOutputError('Etapa 4 inválida: falta la premisa, los NPC o la ruta dorada.', clues);
+  const definition = assembleDefinitionOrFail(clues, premise, npcs, draft, choice, geography, config);
+  const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
+  const simulation = simulateCase(definition, goldenPath, budgetMinutes);
+  if (!simulation.playable) throw new StageOutputError(`Etapa 4 inválida: la ruta dorada no se puede jugar: ${simulation.errors.join('; ')}`, clues);
+}
+
+function assembleDefinitionOrFail(
+  clues: Record<string, unknown>,
+  premise: Record<string, unknown>,
+  npcs: Record<string, unknown>,
+  draft: CaseDraft,
+  choice: ResolvedChoice,
+  geography: SelectedGeography,
+  config: PipelineConfig,
+): ReturnType<typeof assembleDefinition> {
+  try {
+    return assembleDefinition({
+      caseId: config.caseId ?? `generado-${choice.crimeType}-${draft.params.seed ?? 0}`,
+      choice,
+      params: draft.params,
+      geography,
+      premise,
+      npcs,
+      clues,
+    });
+  } catch (error) {
+    throw new StageOutputError(`Etapa 4 inválida: no se puede ensamblar la definición: ${error instanceof Error ? error.message : String(error)}`, clues);
+  }
 }
 
 /** Etapa 5: ensambla la definición desde las salidas 1, 3 y 4. */

@@ -243,10 +243,11 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(result.draft.stages.every(stage => stage.status === 'completed')).toBe(true);
   });
 
-  it('repara la etapa 4 cuando la simulación falla y luego valida', async () => {
+  it('repara la etapa 4 cuando la revisión semántica falla y luego valida', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
     let stage4bCalls = 0;
+    let stage7Calls = 0;
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
@@ -254,9 +255,45 @@ describe('pipeline con LLM simulado (T4-08)', () => {
         if (stage === 4) {
           if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
           stage4bCalls++;
+          return outputs.cluesRules;
+        }
+        if (stage === 7) {
+          stage7Calls++;
+          // Primera revisión: la red de pistas no convence; el pipeline
+          // repara la etapa 4 y la segunda revisión la acepta.
+          if (stage7Calls === 1) return { coherent: false, issues: ['La motivación no se sigue de las evidencias.'] };
+          return { coherent: true, issues: [] };
+        }
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(result.draft.repairUsed).toBe(true);
+    expect(result.draft.repairFeedback?.length).toBeGreaterThan(0);
+    expect(stage4bCalls).toBe(2);
+  });
+
+  it('reintenta la etapa 4 cuando la ruta dorada no se puede jugar por el motor', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4bCalls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          contexts.push(context as Record<string, unknown>);
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
           if (stage4bCalls === 1) {
-            // Primera red de pistas: la orden se pide con evidencias que no
-            // autorizan nada; la simulación la rechaza y el pipeline repara.
+            // Como el modelo real en el smoke: la orden se pide con
+            // evidencias que no autorizan nada; el motor no puede aplicar
+            // ese paso y la etapa 4 lo rechaza con el error del motor.
             const broken = structuredClone(outputs.cluesRules);
             const warrant = broken.goldenPath.find(action => action.type === 'request_warrant');
             if (warrant) warrant.params = { suspectId: 'carmen', evidenceIds: ['EV-01', 'EV-02'] };
@@ -273,9 +310,10 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(result.draft.repairUsed).toBe(true);
-    expect(result.draft.repairFeedback?.length).toBeGreaterThan(0);
+    expect(result.draft.repairUsed).not.toBe(true);
     expect(stage4bCalls).toBe(2);
+    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/no se puede jugar/);
   });
 
   it('reintenta la etapa 1 con el error como feedback cuando los ids vienen como suspect_01', async () => {
