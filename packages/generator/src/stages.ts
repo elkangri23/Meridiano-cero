@@ -197,10 +197,28 @@ export const STAGE_OUTPUT_SCHEMAS: Record<number, Record<string, unknown>> = {
     type: 'object',
     required: ['locations', 'evidence', 'mechanics', 'texts', 'goldenPath'],
     properties: {
-      locations: { type: 'array', minItems: 3, maxItems: 3 },
-      evidence: { type: 'array', minItems: 11, maxItems: 11 },
-      mechanics: { type: 'object' },
-      texts: { type: 'object' },
+      // Los nombres de campo son EXACTOS: la mecánica solo referencia ids
+      // definidos en esta misma salida (lugares, EV-01..EV-11, NPC de la
+      // etapa 1). Un id inventado en la mecánica no existe y el borrador
+      // se rechaza. Las consultas usan `id` (kebab-case, p. ej.
+      // registro-mercantil), NO `queryId`; los sospechosos usan `id` con
+      // el id del NPC, NO `suspectId`; las evidencias concedidas usan
+      // `evidenceId`, NO `grantsEvidenceId`.
+      locations: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', required: ['id', 'name', 'cityId', 'description'] } },
+      evidence: { type: 'array', minItems: 11, maxItems: 11, items: { type: 'object', required: ['id', 'type', 'origin', 'relations'] } },
+      mechanics: {
+        type: 'object',
+        required: ['inspectables', 'queries', 'analyses', 'talkEvidence', 'suspects', 'recovery'],
+        properties: {
+          inspectables: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', required: ['locationId', 'elementId', 'label', 'evidenceId'] } },
+          queries: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', required: ['id', 'label', 'cityId', 'locationId', 'evidenceId', 'requires', 'delayMinutes'] } },
+          analyses: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['inputEvidenceId', 'resultEvidenceId', 'delayMinutes'] } },
+          talkEvidence: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['npcId', 'topicId', 'label', 'evidenceId'] } },
+          suspects: { type: 'array', minItems: 1, maxItems: 2, items: { type: 'object', required: ['id', 'cityId', 'locationId', 'knownFromEvidence', 'warrantCombinations'] } },
+          recovery: { type: 'object', required: ['objectId', 'label', 'cityId', 'locationId', 'evidenceId', 'requiresAccessWarrant'] },
+        },
+      },
+      texts: { type: 'object', required: ['evidence', 'knowledge', 'greetings'] },
       goldenPath: { type: 'array', minItems: 10, maxItems: 40 },
     },
   },
@@ -335,6 +353,44 @@ const MECHANIC_COUNTS: Array<{ key: string; count: number; message: string }> = 
   { key: 'talkEvidence', count: 1, message: 'mechanics.talkEvidence debe tener 1 tema.' },
 ];
 
+const MECHANIC_FIELDS: Array<{ key: string; fields: Array<[string, 'nonempty' | 'string' | 'array' | 'number' | 'boolean']> }> = [
+  // elementId admite cadena vacía: la primera inspeccionable es la sala
+  // misma (inspeccionar la sala, sin elemento concreto).
+  { key: 'inspectables', fields: [['locationId', 'nonempty'], ['elementId', 'string'], ['label', 'nonempty'], ['evidenceId', 'nonempty']] },
+  { key: 'queries', fields: [['id', 'nonempty'], ['label', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['evidenceId', 'nonempty'], ['requires', 'array'], ['delayMinutes', 'number']] },
+  { key: 'analyses', fields: [['inputEvidenceId', 'nonempty'], ['resultEvidenceId', 'nonempty'], ['delayMinutes', 'number']] },
+  { key: 'talkEvidence', fields: [['npcId', 'nonempty'], ['topicId', 'nonempty'], ['label', 'nonempty'], ['evidenceId', 'nonempty']] },
+  { key: 'suspects', fields: [['id', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['knownFromEvidence', 'array'], ['warrantCombinations', 'array']] },
+];
+
+function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[]): void {
+  for (const group of MECHANIC_FIELDS) {
+    const entries = mechanics[group.key];
+    if (!Array.isArray(entries)) continue;
+    entries.forEach((entry, index) => {
+      if (!isRecord(entry)) { errors.push(`mechanics.${group.key}[${index}] no es un objeto.`); return; }
+      for (const [field, kind] of group.fields) {
+        const value = entry[field];
+        const ok = kind === 'nonempty' ? isNonEmptyString(value)
+          : kind === 'string' ? typeof value === 'string'
+          : kind === 'array' ? Array.isArray(value)
+          : kind === 'number' ? typeof value === 'number'
+          : typeof value === 'boolean';
+        if (!ok) errors.push(`mechanics.${group.key}[${index}] debe tener ${field} (${kind}).`);
+      }
+    });
+  }
+  const recovery = mechanics.recovery;
+  if (isRecord(recovery)) {
+    const recoveryFields: Array<[string, 'nonempty' | 'boolean']> = [['objectId', 'nonempty'], ['label', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['evidenceId', 'nonempty'], ['requiresAccessWarrant', 'boolean']];
+    for (const [field, kind] of recoveryFields) {
+      const value = recovery[field];
+      const ok = kind === 'nonempty' ? isNonEmptyString(value) : typeof value === 'boolean';
+      if (!ok) errors.push(`mechanics.recovery debe tener ${field} (${kind}).`);
+    }
+  }
+}
+
 function checkClueMechanics(output: Record<string, unknown>, errors: string[]): void {
   if (!isRecord(output.mechanics)) { errors.push('mechanics debe ser un objeto.'); return; }
   const mechanics = output.mechanics;
@@ -343,6 +399,7 @@ function checkClueMechanics(output: Record<string, unknown>, errors: string[]): 
   }
   if (!Array.isArray(mechanics.suspects) || mechanics.suspects.length < 1 || mechanics.suspects.length > 2) errors.push('mechanics.suspects debe tener 1 o 2 sospechosos.');
   if (!isRecord(mechanics.recovery)) errors.push('mechanics.recovery debe ser un objeto.');
+  checkMechanicFields(mechanics, errors);
 }
 
 function checkClueTexts(output: Record<string, unknown>, castIds: string[], errors: string[]): void {
