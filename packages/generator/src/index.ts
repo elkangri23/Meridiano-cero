@@ -5,6 +5,7 @@ export {
   runPipeline,
   createGeneratorService,
   StageGateError,
+  StageOutputError,
   MAX_REPAIRS_PER_DRAFT,
 } from './pipeline.js';
 

@@ -260,6 +260,17 @@ export class StageGateError extends Error {
   }
 }
 
+/** Salida de etapa inválida: lleva la salida consigo para que el borrador
+ * rechazado conserve la última tentativa y se pueda diagnosticar qué
+ * nombre de campo o referencia inventó el modelo. */
+export class StageOutputError extends Error {
+  readonly invalidOutput: unknown;
+  constructor(message: string, invalidOutput: unknown) {
+    super(message);
+    this.invalidOutput = invalidOutput;
+  }
+}
+
 function stageOutput(draft: CaseDraft, stage: GenerationStage): unknown {
   return draft.stages[stage - 1]?.output;
 }
@@ -308,7 +319,7 @@ async function runLlmStage(
   const stageContext = buildStageContext(stage, choice, draft.params, geography, prior, feedback);
   const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage, context: stageContext, schema: stageOutputSchema(stage), signal }));
   const validation = validateStageOutput(stage, output, { geography, castIds: castIds(draft) });
-  if (!validation.valid) throw new Error(`Etapa ${stage} inválida: ${validation.errors.join('; ')}`);
+  if (!validation.valid) throw new StageOutputError(`Etapa ${stage} inválida: ${validation.errors.join('; ')}`, output);
   return output;
 }
 
@@ -470,6 +481,9 @@ async function completeStage(currentDraft: CaseDraft, checkpoint: CaseDraft['sta
 async function retryOrRejectStage(currentDraft: CaseDraft, checkpoint: CaseDraft['stages'][number], stageNum: number, config: PipelineConfig, error: unknown): Promise<GenerationResult | null> {
   checkpoint.retryCount++;
   const err = error instanceof Error ? error.message : String(error);
+  // La última tentativa inválida queda en el checkpoint: sin ella no se
+  // puede saber qué inventó el modelo cuando la etapa falla tras 3 intentos.
+  if (error instanceof StageOutputError) checkpoint.output = error.invalidOutput;
   if (checkpoint.retryCount >= config.maxRetriesPerStage) {
     checkpoint.status = 'failed';
     checkpoint.error = err;

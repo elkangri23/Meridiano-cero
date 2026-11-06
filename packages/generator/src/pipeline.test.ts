@@ -451,6 +451,8 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(result.success).toBe(false);
     expect(result.draft.status).toBe('rejected');
     expect(result.error).toMatch(/Etapa 1/);
+    // La última tentativa inválida queda en el checkpoint para diagnosticar.
+    expect(result.draft.stages[0]?.output).toEqual({ title: 'x' });
   });
 
   it('falla con un error claro sin proveedor de generación', async () => {
