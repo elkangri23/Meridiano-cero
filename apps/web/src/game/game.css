@@ -52,6 +52,17 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-clock strong span { color:var(--muted); font-size:.7em; }
 .game-clock small { display:block; font-size:.6em; color:var(--muted); }
 
+/* Reloj de arena: cae la arena y el reloj gira al avanzar el tiempo. */
+.game-clock-pulse strong { animation:game-clock-flash 2.4s ease-out 1; }
+@keyframes game-clock-flash { 0% { background:var(--gold); color:#000000; } 100% { background:transparent; color:var(--gold); } }
+.game-hourglass { display:inline-flex; align-items:center; gap:6px; margin-left:8px; color:var(--gold); font-size:.75em; vertical-align:middle; }
+.game-hourglass svg { width:18px; height:24px; image-rendering:pixelated; animation:game-hourglass-flip 2.4s ease-in-out 1; }
+@keyframes game-hourglass-flip { 0%,45% { transform:rotate(0deg); } 55%,100% { transform:rotate(180deg); } }
+.game-hourglass-sand-top { transform-box:fill-box; transform-origin:top; animation:game-hourglass-drain 2.4s linear 1; }
+.game-hourglass-sand-bottom { transform-box:fill-box; transform-origin:bottom; animation:game-hourglass-fill 2.4s linear 1; }
+@keyframes game-hourglass-drain { from { transform:scaleY(1); } to { transform:scaleY(0); } }
+@keyframes game-hourglass-fill { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+
 .game-notice { padding:12px 0; min-height:48px; color:var(--gold); }
 .game-error { color:var(--error); }
 
@@ -71,11 +82,16 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-scene-meta { padding:0 12px 12px; font-size:.85em; color:var(--muted); }
 .game-scene-meta p { margin-top:4px; }
 
-/* Ofertas. */
-.game-offers { border:2px solid var(--edge); background:var(--panel); padding:16px; margin-bottom:16px; }
-.game-offers h2 { margin:8px 0 12px; }
-.game-offers ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px; }
-.game-offers > p { color:var(--muted); font-size:.9em; }
+/* Acciones dentro de la escena: quién hay aquí, viajes y el resto. */
+.game-scene-group { border-top:1px solid var(--edge); padding:12px; }
+.game-scene-group > .game-overline { display:block; margin-bottom:8px; }
+.game-scene-group ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px; }
+.game-scene-group p { margin-top:8px; }
+.game-scene-group p:first-child { margin-top:0; }
+.game-scene-npc { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; }
+.game-scene-npc > span { font-size:.85em; }
+.game-scene-npc strong { color:var(--gold); font-weight:500; }
+.game-scene-closed { padding:12px; color:var(--muted); font-size:.9em; }
 
 /* Consola narrativa: cuaderno de campo del prototipo. */
 .game-console { border:2px solid var(--edge); border-left:4px solid var(--gold); background:var(--panel); padding:12px 16px; margin-bottom:16px; }
@@ -86,6 +102,8 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-console .game-log-minute { color:var(--gold); }
 .game-log-detail { display:block; color:var(--paper); margin-top:4px; font-size:.95em; line-height:1.6; }
 .game-narrative-cursor { color:var(--gold); }
+.game-typing-cursor { color:var(--gold); animation:game-typing-blink .8s steps(1) infinite; }
+@keyframes game-typing-blink { 0%,50% { opacity:1; } 51%,100% { opacity:0; } }
 .game-console details { margin-top:12px; }
 .game-console details summary { cursor:pointer; color:var(--muted); font-size:.85em; }
 .game-console details ol { max-height:none; }
@@ -111,6 +129,18 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-preview > p { font-size:.9em; margin-top:8px; }
 .game-preview-facts { margin:20px 0; border-block:1px solid var(--edge); padding:12px 0; font-size:.75em; display:flex; justify-content:space-between; gap:15px; }
 .game-preview-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:25px; }
+
+/* Animación de viaje: ruta con el avión cruzando el mapa (Carmen Sandiego). */
+.game-travel { position:fixed; inset:0; z-index:30; display:grid; place-items:center; background:rgba(0,0,0,.8); padding:16px; pointer-events:none; }
+.game-travel-panel { pointer-events:auto; border:4px double #ffffff; box-shadow:8px 8px #000000; background:var(--panel); padding:24px; max-width:520px; width:100%; }
+.game-travel-panel > p { font-size:.9em; margin-top:8px; }
+.game-travel-route { position:relative; height:56px; margin:16px 0 8px; }
+.game-travel-line { position:absolute; left:0; right:0; top:18px; border-top:2px dashed var(--gold); }
+.game-travel-plane { position:absolute; top:8px; left:4%; width:28px; height:auto; image-rendering:pixelated; animation:game-travel-plane 2.4s linear 1 forwards; }
+@keyframes game-travel-plane { from { left:4%; } to { left:88%; } }
+.game-travel-city { position:absolute; top:28px; font-size:.75em; }
+.game-travel-from { left:0; }
+.game-travel-to { right:0; }
 
 /* Ventanas de herramienta: diálogo del prototipo con barra negra. */
 .game-window { position:absolute; z-index:20; width:min(28rem, calc(100vw - 32px)); border:2px solid var(--edge); background:var(--panel); box-shadow:8px 8px 0 #000000; }

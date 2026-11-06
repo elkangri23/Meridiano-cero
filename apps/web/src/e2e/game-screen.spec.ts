@@ -153,6 +153,32 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(dossier).toContainText('Hablaste con Tomás Ríos (min 0).');
   });
 
+  test('Jugabilidad lote 1: acciones en la escena, fondo por ciudad, animación de viaje y reloj de arena', async ({ page }) => {
+    await openGameScreen(page);
+    // Acciones visibles en la escena: los NPC presentes con su rol y lo inspeccionable.
+    await expect(page.locator('.game-scene')).toContainText('Tomás Ríos · Transportista');
+    await expect(page.locator('.game-scene')).toContainText('Lucía · Asistente de investigación');
+    await expect(page.getByTestId('offer-talk:tomas:identidad')).toBeVisible();
+    await expect(page.getByTestId('offer-inspect:MAD-SALA')).toBeVisible();
+    // Fondo de Madrid al empezar.
+    await expect(page.getByTestId('scene-art')).toHaveAttribute('data-location', 'MAD-SALA');
+    // Viajar desde la escena: animación de viaje, fondo de París y reloj de arena.
+    await page.getByTestId('offer-travel:paris').click();
+    await expect(page.getByTestId('preview-dialog')).toBeVisible();
+    await page.getByTestId('preview-confirm').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('travel-animation')).toBeVisible();
+    await expect(page.getByTestId('travel-animation')).toContainText('De Madrid a París');
+    await expect(page.getByTestId('hourglass')).toBeVisible();
+    await expect(page.getByTestId('hourglass')).toContainText('+180 min');
+    await expect(page.getByTestId('scene-art')).toHaveAttribute('data-location', 'PAR-ARCH');
+    await expect(page.getByTestId('clock')).toContainText('180 min');
+    await expect(page.getByTestId('travel-animation')).toBeHidden({ timeout: 10000 });
+    // En París, la escena muestra a Émile y el archivo.
+    await expect(page.locator('.game-scene')).toContainText('Émile · Archivo de conservación');
+    await expect(page.getByTestId('offer-inspect:PAR-ARCH')).toBeVisible();
+  });
+
   // Los dos tests de Ajustes comparten el perfil local de desarrollo y el
   // proveedor efectivo: en serie para que uno no vea activa la conexión del
   // otro (ni deje una conexión activa que cambie la interpretación en el

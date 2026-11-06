@@ -6,6 +6,8 @@ import { aiApi, AiError } from '../ai/client';
 import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
 import type { AiConnection, ConnectionsResponse, ConnectionTestResult, ProviderCatalogEntry } from '../ai/connections';
 import { gameApi, GameError } from './client';
+import { SceneArt } from './scene-art';
+import { groupOffers } from './scene-offers';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
@@ -124,7 +126,25 @@ function previewOutcome(response: ActionResponseDto, offer: PublicActionOffer, k
 
 // ── Secciones presentacionales ──────────────────────────────────────────────────
 
-function HeaderSection({ view, caseTitle, detective, onLogout }: { view: PlayerViewDto; caseTitle: string | null; detective: string; onLogout: (() => void) | null }) {
+/** Reloj de arena (lote 1 de jugabilidad): cuando el reloj avanza al
+ * confirmar una acción, la arena cae y el reloj gira unos segundos junto al
+ * «+N min». Es solo cosmético: el motor y las reglas no cambian. */
+function Hourglass({ delta, animKey }: { delta: number; animKey: number }) {
+  return <span className="game-hourglass" data-testid="hourglass" role="status" aria-label={`El reloj avanza ${delta} minutos`}>
+    <svg key={animKey} viewBox="0 0 24 32" shapeRendering="crispEdges" focusable="false" aria-hidden="true">
+      <rect x="2" y="0" width="20" height="3" fill="#ffff55" />
+      <rect x="2" y="29" width="20" height="3" fill="#ffff55" />
+      <path d="M4 3H20L12 16Z" fill="#55ffff" />
+      <path d="M4 29H20L12 16Z" fill="#55ffff" />
+      <rect className="game-hourglass-sand-top" x="9" y="6" width="6" height="5" fill="#ffff55" />
+      <rect className="game-hourglass-sand-bottom" x="9" y="22" width="6" height="5" fill="#ffff55" />
+      <rect x="11" y="14" width="2" height="4" fill="#ffff55" />
+    </svg>
+    <span>+{delta} min</span>
+  </span>;
+}
+
+function HeaderSection({ view, caseTitle, detective, clockPulse, onLogout }: { view: PlayerViewDto; caseTitle: string | null; detective: string; clockPulse: { key: number; delta: number } | null; onLogout: (() => void) | null }) {
   return <header className="game-header">
     <div className="game-agency">
       <div className="game-brand">
@@ -144,103 +164,158 @@ function HeaderSection({ view, caseTitle, detective, onLogout }: { view: PlayerV
       <div><p className="game-overline">Expediente</p><strong>{caseTitle ?? view.caseId}</strong></div>
       <div><p className="game-overline">Delito</p><strong>{caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating)}</strong></div>
       <div><p className="game-overline">Destino actual</p><strong>{view.position.city.name}, {view.position.city.country}</strong></div>
-      <div className="game-clock" data-testid="clock" aria-label={`Reloj del caso: ${view.clock.minute} minutos de ${view.clock.deadlineMinutes}`}>
+      <div className={`game-clock${clockPulse ? ' game-clock-pulse' : ''}`} data-testid="clock" aria-label={`Reloj del caso: ${view.clock.minute} minutos de ${view.clock.deadlineMinutes}`}>
         <p className="game-overline">Tiempo transcurrido / plazo</p>
         <strong>{view.clock.minute} min<span> / {view.clock.deadlineMinutes} min</span></strong>
+        {clockPulse && <Hourglass delta={clockPulse.delta} animKey={clockPulse.key} />}
         <small>{view.status === 'closed' ? 'Cerrada' : 'Activa'} · El reloj avanza solo al actuar</small>
       </div>
     </div>
   </header>;
 }
 
-/** Arte de escena genérico (decorativo): mismo motivo pixel de la maqueta
- * (ventana con skyline, mesa y caja) sin pretender ser la localización
- * concreta, porque el juego no tiene ilustración por localización. */
-function SceneArt() {
-  return <div className="game-scene-art" aria-hidden="true">
-    <svg viewBox="0 0 320 160" shapeRendering="crispEdges" focusable="false">
-      <rect width="320" height="160" fill="#555555" />
-      <path d="M0 0H8V120H0ZM312 0H320V120H312Z" fill="#aaaaaa" />
-      <rect y="116" width="320" height="44" fill="#aa5500" />
-      <path d="M0 116H320V120H0ZM0 136H320V140H0ZM0 156H320V160H0ZM64 120H68V136H64ZM192 120H196V136H192ZM128 140H132V156H128ZM256 140H260V156H256Z" fill="#000000" />
-      <rect x="28" y="16" width="104" height="84" fill="#000000" />
-      <rect x="32" y="20" width="96" height="76" fill="#aaaaaa" />
-      <rect x="36" y="24" width="88" height="68" fill="#55ffff" />
-      <path d="M36 72H48V60H60V68H76V52H88V64H104V56H116V72H124V92H36Z" fill="#00aaaa" />
-      <path d="M76 24H80V92H76ZM36 48H124V52H36Z" fill="#000000" />
-      <rect x="224" y="24" width="64" height="48" fill="#000000" />
-      <rect x="228" y="28" width="56" height="40" fill="#aa5500" />
-      <rect x="232" y="32" width="48" height="32" fill="#0000aa" />
-      <path d="M232 56H240V48H248V40H256V48H264V56H280V64H232Z" fill="#00aaaa" />
-      <path d="M176 0H180V24H176ZM168 24H188V28H168ZM164 28H192V32H164Z" fill="#000000" />
-      <rect x="164" y="32" width="28" height="4" fill="#ffff55" />
-      <rect x="56" y="112" width="212" height="8" fill="#ffff55" />
-      <rect x="56" y="120" width="212" height="8" fill="#000000" />
-      <path d="M64 128H72V152H64ZM252 128H260V152H252Z" fill="#aaaaaa" />
-      <rect x="100" y="76" width="80" height="36" fill="#aa5500" />
-      <path d="M100 76H180V80H100ZM100 92H180V96H100ZM100 108H180V112H100Z" fill="#000000" />
-      <path d="M108 76H116V112H108ZM164 76H172V112H164Z" fill="#aaaaaa" />
-      <rect x="204" y="104" width="32" height="8" fill="#ffffff" />
-      <rect x="208" y="100" width="12" height="4" fill="#ffffff" />
-      <rect x="208" y="108" width="24" height="4" fill="#aaaaaa" />
-    </svg>
+/** Fila de un personaje presente en la escena: nombre y rol, con su botón
+ * de hablar. El rol sale del catálogo de NPC (sin inventar nada). */
+function SceneNpcOffer({ offer, view, disabled, onOffer }: { offer: PublicActionOffer; view: PlayerViewDto; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+  const npcId = typeof offer.action.params.npcId === 'string' ? offer.action.params.npcId : '';
+  const npc = getNPC(npcId);
+  const name = npc?.name ?? npcNamesFromView(view).get(npcId) ?? npcId;
+  return <div className="game-scene-npc">
+    <span><strong>{name}</strong>{npc?.role ? ` · ${npc.role}` : ''}</span>
+    <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
+      onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}</button>
   </div>;
 }
 
-function SceneSection({ view }: { view: PlayerViewDto }) {
+/** Lista de ofertas con su botón cada una (viajes u otras acciones). */
+function SceneOfferList({ offers, disabled, onOffer }: { offers: PublicActionOffer[]; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+  return <ul>{offers.map(offer => (
+    <li key={offer.id}>
+      <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
+        onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}{offer.detail ? ` · ${offer.detail}` : ''}</button>
+    </li>))}</ul>;
+}
+
+/** Estado de la escena: evidencias en poder, solicitudes, órdenes y
+ * detenciones. Solo se muestra lo que hay. */
+function SceneMeta({ view }: { view: PlayerViewDto }) {
+  return <div className="game-scene-meta">
+    {view.objects.length > 0 && <p>En tu poder: {view.objects.map(item => item.id).join(', ')}</p>}
+    {view.pendingRequests.length > 0 && <p>Solicitudes pendientes: {view.pendingRequests.map(item => `${requestTypeLabels[item.type] ?? item.type} (min ${item.dueMinute})`).join(', ')}</p>}
+    {view.warrants.length > 0 && <p>Órdenes: {view.warrants.join(', ')}</p>}
+    {view.detentions.length > 0 && <p>Detenciones: {view.detentions.join(', ')}</p>}
+  </div>;
+}
+
+/** Acciones de la escena, agrupadas: quién hay aquí, viajes y el resto. */
+function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+  const finishOffer = grouped.finish;
+  if (view.status === 'closed') return <p className="game-scene-closed">La partida está cerrada. Consulta el informe final.</p>;
+  return <>
+    {(grouped.talk.length > 0 || grouped.inspect.length > 0) && <div className="game-scene-group">
+      <p className="game-overline">En esta escena</p>
+      {grouped.talk.map(offer => (
+        <SceneNpcOffer key={offer.id} offer={offer} view={view} disabled={disabled} onOffer={onOffer} />
+      ))}
+      {grouped.inspect.map(offer => (
+        <p key={offer.id}><button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
+          onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}{offer.detail ? ` · ${offer.detail}` : ''}</button></p>
+      ))}
+    </div>}
+    {grouped.travel.length > 0 && <div className="game-scene-group">
+      <p className="game-overline">Viajes</p>
+      <SceneOfferList offers={grouped.travel} disabled={disabled} onOffer={onOffer} />
+    </div>}
+    {(grouped.other.length > 0 || finishOffer) && <div className="game-scene-group">
+      <p className="game-overline">Otras acciones</p>
+      <SceneOfferList offers={grouped.other} disabled={disabled} onOffer={onOffer} />
+      {finishOffer && <p><button type="button" className="game-primary-button" data-testid="offer-finish" disabled={disabled}
+        onClick={event => onOffer(finishOffer, event.currentTarget)}>{finishOffer.label}</button></p>}
+    </div>}
+  </>;
+}
+
+/** Escena (lote 1 de jugabilidad): el arte es propio de cada localización
+ * (ver scene-art.tsx) y las acciones disponibles del motor se muestran
+ * agrupadas dentro de la escena: quién hay aquí (con su rol) y qué se puede
+ * inspeccionar, a dónde se puede viajar, y el resto de acciones. Cada oferta
+ * sale una sola vez y con su mismo testid, así que la caja de texto libre
+ * queda para las órdenes creativas. */
+function SceneSection({ view, disabled, onOffer }: { view: PlayerViewDto; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
+  const grouped = groupOffers(view.offers);
   return <section className="game-scene" aria-labelledby="scene-heading">
     <div className="game-scene-top"><span>Localización {String(locationIndex).padStart(2, '0')}</span><span>{view.position.city.name.toUpperCase()} · {view.position.city.country}</span></div>
-    <SceneArt />
+    <SceneArt locationId={view.position.location.id} />
     <div className="game-scene-caption"><div><p className="game-overline">{view.position.city.name}</p><h2 id="scene-heading">{view.position.location.name}</h2></div></div>
     <p className="game-scene-description">{view.position.location.description}</p>
-    <div className="game-scene-meta">
-      {view.objects.length > 0 && <p>En tu poder: {view.objects.map(item => item.id).join(', ')}</p>}
-      {view.pendingRequests.length > 0 && <p>Solicitudes pendientes: {view.pendingRequests.map(item => `${requestTypeLabels[item.type] ?? item.type} (min ${item.dueMinute})`).join(', ')}</p>}
-      {view.warrants.length > 0 && <p>Órdenes: {view.warrants.join(', ')}</p>}
-      {view.detentions.length > 0 && <p>Detenciones: {view.detentions.join(', ')}</p>}
-    </div>
+    <SceneMeta view={view} />
+    <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} />
   </section>;
 }
 
-function OffersSection({ view, disabled, onOffer }: { view: PlayerViewDto; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
-  const closed = view.status === 'closed';
-  const offers = view.offers.filter(offer => offer.action.type !== 'travel' && offer.action.type !== 'finish');
-  const finishOffer = view.offers.find(offer => offer.action.type === 'finish');
-  return <section className="game-offers" aria-labelledby="offers-heading">
-    <p className="game-overline">Acciones del motor</p>
-    <h2 id="offers-heading">Acciones disponibles</h2>
-    {closed
-      ? <p>La partida está cerrada. Consulta el informe final.</p>
-      : offers.length === 0
-        ? <p>No hay acciones disponibles en este momento.</p>
-        : <ul>{offers.map(offer => (
-          <li key={offer.id}>
-            <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
-              onClick={event => onOffer(offer, event.currentTarget)}>
-              {offer.label}{offer.detail ? ` · ${offer.detail}` : ''}
-            </button>
-          </li>))}</ul>}
-    {finishOffer && !closed && <p><button type="button" className="game-primary-button" data-testid="offer-finish" disabled={disabled}
-      onClick={event => onOffer(finishOffer, event.currentTarget)}>{finishOffer.label}</button></p>}
-  </section>;
+/** Escribe el texto de forma progresiva, como en una máquina de escribir
+ * (estilo MS-DOS): el resultado de la última acción aparece poco a poco en
+ * vez de hacerlo de golpe. Con movimiento reducido se muestra entero. */
+function useTypewriter(text: string, active: boolean): string {
+  const reduced = useMemo(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (reduced) { setShown(text.length); return; }
+    if (!active) { setShown(0); return; }
+    setShown(0);
+    if (text.length === 0) return;
+    const duration = Math.min(1200, Math.max(250, text.length * 10));
+    const step = Math.max(1, Math.ceil(text.length / Math.ceil(duration / 40)));
+    const timer = window.setInterval(() => {
+      setShown(current => {
+        const next = current + step;
+        if (next >= text.length) { window.clearInterval(timer); return text.length; }
+        return next;
+      });
+    }, 40);
+    return () => window.clearInterval(timer);
+  }, [text, active, reduced]);
+  return text.slice(0, shown);
 }
 
 type LogEntry = { minute: number; summary: string; detail?: string };
 
+/** ¿Sigue escribiéndose la última entrada de la consola? */
+function isLastEntryTyping(last: LogEntry | undefined, summaryTyped: string, detailTyped: string): boolean {
+  if (!last) return false;
+  return summaryTyped.length < last.summary.length ||
+    (last.detail !== undefined && detailTyped.length < last.detail.length);
+}
+
+/** Una entrada de la consola: el resumen y, si lo hay, el detalle de los
+ * descubrimientos. La última entrada se escribe progresivamente (los textos
+ * ya vienen escritos por el hook de la consola). */
+function ConsoleLogItem({ entry, isLast, summaryTyped, detailTyped, typing }: { entry: LogEntry; isLast: boolean; summaryTyped: string; detailTyped: string; typing: boolean }) {
+  return <li><span className="game-log-minute">[min {entry.minute}]</span> {isLast ? summaryTyped : entry.summary}
+    {entry.detail && <span className="game-log-detail">{isLast ? detailTyped : entry.detail}</span>}
+    {isLast && typing && <span className="game-typing-cursor" aria-hidden="true">▌</span>}</li>;
+}
+
 function ConsoleSection({ log, orderHistory }: { log: LogEntry[]; orderHistory: string[] }) {
   const listRef = useRef<HTMLOListElement>(null);
+  const last = log[log.length - 1];
+  // La última entrada se escribe progresivamente: primero el resumen y,
+  // cuando termina, el detalle de los descubrimientos.
+  const summaryTyped = useTypewriter(last?.summary ?? '', true);
+  const detailTyped = useTypewriter(last?.detail ?? '', !!last && summaryTyped === last.summary);
+  const lastTyping = isLastEntryTyping(last, summaryTyped, detailTyped);
   useEffect(() => {
     const list = listRef.current;
     if (list) list.scrollTop = list.scrollHeight;
-  }, [log]);
+  }, [log, summaryTyped, detailTyped]);
   return <section className="game-console" aria-labelledby="console-heading">
     <p className="game-overline">Cuaderno de campo</p>
     <h2 id="console-heading">Consola narrativa</h2>
     <ol ref={listRef} aria-live="polite">
       {log.length === 0 && <li>La investigación comienza. Inspecciona la escena o elige una acción.</li>}
-      {log.map((entry, index) => <li key={index}><span className="game-log-minute">[min {entry.minute}]</span> {entry.summary}
-        {entry.detail && <span className="game-log-detail">{entry.detail}</span>}</li>)}
+      {log.map((entry, index) => <ConsoleLogItem key={index} entry={entry} isLast={index === log.length - 1}
+        summaryTyped={summaryTyped} detailTyped={detailTyped} typing={lastTyping} />)}
     </ol>
     <span className="game-narrative-cursor" aria-hidden="true">_</span>
     {orderHistory.length > 0 && <details><summary>Historial de órdenes</summary><ol>{orderHistory.map((item, index) => <li key={index}>{item}</li>)}</ol></details>}
@@ -280,6 +355,78 @@ function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSu
       <button type="button" onClick={onCancel}>Descartar</button>
     </div>}
   </section>;
+}
+
+/** Animación de viaje estilo Carmen Sandiego (lote 1 de jugabilidad): al
+ * confirmar un viaje, una ruta con el avión cruzando el mapa aparece unos
+ * segundos sobre la pantalla mientras el reloj ya avanzó y la escena ya es
+ * la de destino. No bloquea nada: los clics pasan por debajo salvo el botón
+ * «Seguir», y se cierra sola. */
+function TravelOverlay({ travel, onDismiss }: { travel: { from: string; to: string; detail: string }; onDismiss: () => void }) {
+  return <div className="game-travel" data-testid="travel-animation" role="status">
+    <div className="game-travel-panel">
+      <p className="game-overline">Viaje</p>
+      <p><strong>De {travel.from} a {travel.to}</strong>{travel.detail ? ` · ${travel.detail}` : ''}</p>
+      <div className="game-travel-route" aria-hidden="true">
+        <span className="game-travel-line" />
+        <svg className="game-travel-plane" viewBox="0 0 24 16" shapeRendering="crispEdges" focusable="false">
+          <rect x="4" y="7" width="16" height="2" fill="#ffff55" />
+          <rect x="10" y="3" width="3" height="10" fill="#ffff55" />
+          <rect x="2" y="5" width="3" height="6" fill="#ffff55" />
+          <rect x="18" y="6" width="4" height="4" fill="#ffff55" />
+        </svg>
+        <span className="game-travel-city game-travel-from">{travel.from}</span>
+        <span className="game-travel-city game-travel-to">{travel.to}</span>
+      </div>
+      <p className="game-panel-note">El reloj ya avanzó: estás en {travel.to}.</p>
+      <button type="button" onClick={onDismiss}>Seguir</button>
+    </div>
+  </div>;
+}
+
+function TravelOverlaySlot({ travel, onDismiss }: { travel: { from: string; to: string; detail: string; key: number } | null; onDismiss: () => void }) {
+  if (!travel) return null;
+  return <TravelOverlay travel={travel} onDismiss={onDismiss} />;
+}
+
+/** Minutos que avanzó el reloj al confirmar una acción. */
+function clockDelta(previous: PlayerViewDto | null, response: ActionResponseDto): number {
+  const before = previous?.clock.minute ?? response.clock.minute;
+  return response.clock.minute - before;
+}
+
+/** Datos de la animación de viaje: de dónde a dónde y con qué duración. */
+function travelPayload(previous: PlayerViewDto | null, response: ActionResponseDto, offer: PublicActionOffer): { from: string; to: string; detail: string; key: number } {
+  return { from: previous?.position.city.name ?? '', to: response.position.city.name, detail: offer.detail ?? '', key: Date.now() };
+}
+
+/** Reloj de arena y animación de viaje (lote 1 de jugabilidad): efectos
+ * cosméticos que se disparan al confirmar una acción, según cuánto avanzó
+ * el reloj y si la acción fue un viaje. Viven en un hook para no engordar
+ * applyResponse con ramas. */
+function useTimeFeedback() {
+  const [clockPulse, setClockPulse] = useState<{ key: number; delta: number } | null>(null);
+  const [travel, setTravel] = useState<{ from: string; to: string; detail: string; key: number } | null>(null);
+  const pulseTimerRef = useRef<number | null>(null);
+  const travelTimerRef = useRef<number | null>(null);
+  const apply = useCallback((previous: PlayerViewDto | null, response: ActionResponseDto, offer?: PublicActionOffer) => {
+    const delta = clockDelta(previous, response);
+    if (delta > 0) {
+      if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
+      setClockPulse({ key: Date.now(), delta });
+      pulseTimerRef.current = window.setTimeout(() => setClockPulse(null), 2600);
+    }
+    if (offer?.action.type === 'travel') {
+      if (travelTimerRef.current !== null) window.clearTimeout(travelTimerRef.current);
+      setTravel(travelPayload(previous, response, offer));
+      travelTimerRef.current = window.setTimeout(() => setTravel(null), 2800);
+    }
+  }, []);
+  const dismissTravel = useCallback(() => {
+    if (travelTimerRef.current !== null) window.clearTimeout(travelTimerRef.current);
+    setTravel(null);
+  }, []);
+  return { clockPulse, travel, apply, dismissTravel };
 }
 
 function PreviewDialog({ phase, confirmRef, onConfirm, onCancel }: {
@@ -863,6 +1010,8 @@ export function GameScreen() {
   const [chatDraft, setChatDraft] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState('');
+  // Lote 1 de jugabilidad: reloj de arena y animación de viaje (ver hook).
+  const timeFeedback = useTimeFeedback();
 
   // La intro se abre sola al entrar en una partida nueva (versión 1, minuto
   // 0, activa) salvo que ya se haya descartado en esta pestaña. Queda
@@ -978,6 +1127,7 @@ export function GameScreen() {
     else if (detail) entries.push({ minute: response.clock.minute, summary: offerLabel, detail });
     setLog(current => [...current, ...entries]);
     setNotice(noticeForOutcome(response, offerLabel));
+    timeFeedback.apply(previous, response, offer);
     const target = talkTarget(offer, lookupFromView(previous ?? response));
     if (target) openChat(target.id, target.name);
   }
@@ -1229,7 +1379,7 @@ export function GameScreen() {
   };
 
   return <main className={`game${highContrast ? ' game-high-contrast' : ''}`} data-testid="game-screen" style={{ fontSize: `${16 * textScale / 100}px` }}>
-    <HeaderSection view={view} caseTitle={caseTitle} detective={identity?.profile.displayName ?? '—'} onLogout={identity ? () => {
+    <HeaderSection view={view} caseTitle={caseTitle} detective={identity?.profile.displayName ?? '—'} clockPulse={timeFeedback.clockPulse} onLogout={identity ? () => {
       void archiveApi.logout(identity.csrfToken, new AbortController().signal).finally(() => navigate('/'));
     } : null} />
 
@@ -1247,11 +1397,12 @@ export function GameScreen() {
       <button type="button" onClick={() => void refresh()}>Actualizar vista</button>
     </div>
 
-    <SceneSection view={view} />
-    <OffersSection view={view} disabled={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
+    <SceneSection view={view} disabled={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
     <ConsoleSection log={log} orderHistory={orderHistory} />
     <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
       onDraft={setDraft} onSubmit={interpretOrder} onKeyDown={onOrderKeyDown} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
+
+    <TravelOverlaySlot travel={timeFeedback.travel} onDismiss={timeFeedback.dismissTravel} />
 
     {orderPhase.kind === 'preview' && <PreviewDialog phase={orderPhase} confirmRef={confirmButtonRef}
       onConfirm={() => void confirmPreview()} onCancel={cancelOrder} />}
