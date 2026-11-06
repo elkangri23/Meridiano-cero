@@ -98,7 +98,9 @@ describe('conversación con NPC por ruta', () => {
   // ruta responde bien (el fallo era el plazo de 8 s del cliente web, no
   // Inés): estos tests fijan que conversar con ella funciona por ruta.
   it('conversa con Inés Valera: responde con su hecho y la memoria es suya', async () => {
-    const inesNpc = { id: 'ines', name: 'Inés Valera', persona: 'Sospechosa', knownFactIds: ['truth'], revealableFactIds: ['truth'] };
+    const inesNpc = { id: 'ines', name: 'Inés Valera',
+      persona: 'Sospechosa. Restauradora contratada para el traslado del astrolabio. Confirma su identidad y su tarea, pero se niega a declarar sobre el robo.',
+      knownFactIds: ['truth'], revealableFactIds: ['truth'], refusal: 'No voy a declarar sobre el robo.' };
     const inesFacts = [{ id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' }];
     const inesMemory = { schemaVersion: 1, runId, npcId: 'ines', treatment: 'neutral', turns: [] };
     const response = await app.inject({

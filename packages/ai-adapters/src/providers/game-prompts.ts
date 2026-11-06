@@ -53,9 +53,13 @@ Salida: JSON con { act, factIds }
 CONVERSAR CON NPC
 Entrada: persona del NPC, hechos conocidos (cada uno con su id), fragmento de conversación, trato recibido, actos de habla permitidos (allowedActs).
 Salida: JSON con { act, factIds }
-- act: un acto de habla de allowedActs ('inform' | 'question' | 'refusal' | 'evasion' | 'silence' | 'state' | 'acknowledge' | 'decline', según lo permitido).
-- factIds: lista con los ids EXACTOS de los hechos revelados, copiados tal cual de la entrada (debe ser subset de los hechos conocidos; [] si no se revela nada).
-El NPC NO sabe la solución. Puede mentir, evadir, o guardar silencio según su personalidad.`,
+- act: un acto de habla de allowedActs. Solo existen estos cuatro: 'state', 'acknowledge', 'decline', 'silence'. No uses ningún otro.
+- 'state': la pregunta se responde con uno o varios hechos autorizados (la identidad del NPC, su tarea, lo que vio). factIds con los ids EXACTOS de esos hechos, copiados tal cual de la entrada.
+- 'acknowledge': la pregunta NO se puede responder con los hechos autorizados y NO pide declarar sobre el robo, acusar a nadie ni revelar hechos no autorizados. factIds debe ser [].
+- 'decline': SOLO cuando la pregunta pide declarar sobre el robo, acusar a alguien o revelar hechos que no están autorizados. factIds debe ser [].
+- 'silence': SOLO cuando el personaje se niega a hablar en absoluto. factIds debe ser [].
+- Sobre su identidad, su tarea y lo que vio, el NPC responde con los hechos autorizados; nunca se niega a eso. La negativa ('decline') es solo para declarar sobre el robo.
+El NPC NO sabe la solución. No inventes hechos ni reveles culpabilidad.`,
 
     generateCase: `
 GENERAR CASO

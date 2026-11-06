@@ -12,6 +12,14 @@ describe('npc-catalog', () => {
     expect(lucia?.knowledge).toContain('authorized-persons');
   });
 
+  it('cada NPC tiene una persona para el modelo, no solo el rol', () => {
+    for (const npc of RECURRENT_NPCS) {
+      expect(npc.persona.length, npc.id).toBeGreaterThan(npc.role.length);
+      expect(npc.persona.trim(), npc.id).not.toBe('');
+    }
+    expect(getNPC('ines')?.persona).toContain('se niega a declarar sobre el robo');
+  });
+
   it('getNPCsByCity devuelve NPCs de la ciudad correcta', () => {
     const madridNPCs = getNPCsByCity('madrid');
     expect(madridNPCs.length).toBeGreaterThanOrEqual(1);

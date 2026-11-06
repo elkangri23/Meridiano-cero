@@ -12,7 +12,7 @@ import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts, travelText } from '@meridiano/case-schema';
+import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal, travelText } from '@meridiano/case-schema';
 import type { DiscoveryLookup } from '@meridiano/case-schema';
 import './game.css';
 
@@ -1215,8 +1215,9 @@ export function GameScreen() {
     setChatError('');
     const controller = new AbortController();
     try {
+      const refusal = npcRefusal(question.npcId);
       const result = await aiApi.converse({ runId: question.runId, text: question.text,
-        npc: { id: question.npcId, name: question.name, persona: getNPC(question.npcId)?.role ?? '', knownFactIds: factIds, revealableFactIds: factIds },
+        npc: { id: question.npcId, name: question.name, persona: getNPC(question.npcId)?.persona ?? '', knownFactIds: factIds, revealableFactIds: factIds, ...(refusal ? { refusal } : {}) },
         facts: question.facts, memory: question.memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
       controller.signal, { csrfToken: question.csrfToken });
       const next: ChatTurn[] = [...turns, { from: 'npc', text: result.narrative.text }];

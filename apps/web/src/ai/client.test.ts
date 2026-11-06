@@ -15,7 +15,9 @@ const runId = '11111111-1111-4111-8111-111111111111';
 const inesInput = {
   runId,
   text: 'hola, no quieres decir nada?',
-  npc: { id: 'ines', name: 'Inés Valera', persona: 'Sospechosa', knownFactIds: ['truth'], revealableFactIds: ['truth'] },
+  npc: { id: 'ines', name: 'Inés Valera',
+    persona: 'Sospechosa. Restauradora contratada para el traslado del astrolabio. Confirma su identidad y su tarea, pero se niega a declarar sobre el robo.',
+    knownFactIds: ['truth'], revealableFactIds: ['truth'], refusal: 'No voy a declarar sobre el robo.' },
   facts: [{ id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' }],
   memory: { schemaVersion: 1, runId, npcId: 'ines', treatment: 'neutral', turns: [] },
   allowedActs: ['state', 'acknowledge', 'decline', 'silence'],
@@ -56,4 +58,13 @@ describe('plazos del cliente de IA', () => {
     await expect(aiApi.converse(inesInput, signal(), auth)).resolves
       .toMatchObject({ narrative: { text: expect.stringContaining('restauradora') } });
   }, 20_000);
+
+  it('conversar envía la persona del catálogo y la negativa en personaje', async () => {
+    const fetcher = respond(narrativeBody);
+    await aiApi.converse(inesInput, signal(), auth);
+    const init = fetcher.mock.calls[0]?.[1] as { body?: unknown } | undefined;
+    const body = JSON.parse(String(init?.body ?? '{}')) as { npc?: { persona?: unknown; refusal?: unknown } };
+    expect(body.npc?.persona).toContain('se niega a declarar sobre el robo');
+    expect(body.npc?.refusal).toBe('No voy a declarar sobre el robo.');
+  });
 });

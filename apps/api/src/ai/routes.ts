@@ -77,12 +77,15 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
    * rompería al filtrar (knownFactIds.includes sobre undefined). */
   function converseNpc(npc: unknown): NpcContext {
     const source = isRecord(npc) ? npc : {};
+    const refusal = typeof source.refusal === 'string' && source.refusal.length > 0 && source.refusal.length <= 200
+      ? source.refusal : undefined;
     return {
       id: typeof source.id === 'string' ? source.id : '',
       name: typeof source.name === 'string' ? source.name : '',
       persona: typeof source.persona === 'string' ? source.persona : '',
       knownFactIds: stringList(source.knownFactIds),
       revealableFactIds: stringList(source.revealableFactIds),
+      ...(refusal ? { refusal } : {}),
     };
   }
 

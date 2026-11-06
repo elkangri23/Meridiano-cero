@@ -4,8 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import { RECURRENT_NPCS } from './npc-catalog.js';
 import {
-  EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, conversationRecordText,
-  discoveryText, evidenceText, npcGreeting, npcKnowledgeFacts, travelText,
+  EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, conversationRecordText,
+  discoveryText, evidenceText, npcGreeting, npcKnowledgeFacts, npcRefusal, travelText,
 } from './fact-texts.js';
 
 const lookup = {
@@ -59,6 +59,14 @@ describe('textos legibles del caso fijo', () => {
     expect(conversationRecordText('talk:lucia@30', lookup.npcName)).toBe('Hablaste con Lucía (min 30).');
     expect(conversationRecordText('communication_received:req-2@30', lookup.npcName)).toBe('Respuesta recibida (min 30).');
     expect(conversationRecordText('algo-raro', lookup.npcName)).toBe('algo-raro');
+  });
+
+  it('solo Inés tiene negativa en personaje, y negarse no revela la solución', () => {
+    expect(Object.keys(NPC_REFUSALS)).toEqual(['ines']);
+    expect(npcRefusal('ines')).toBe('No voy a declarar sobre el robo.');
+    expect(npcRefusal('tomas')).toBeUndefined();
+    expect(npcRefusal('marta')).toBeUndefined();
+    expect(NPC_REFUSALS.ines).not.toMatch(/culpable|robé|robaste|astrolabio.*(tengo|tiene|está)/i);
   });
 
   it('el primer viaje a cada ciudad se lee como frase, nunca como clave cruda', () => {

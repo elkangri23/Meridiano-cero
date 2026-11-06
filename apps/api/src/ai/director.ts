@@ -132,9 +132,14 @@ export function createDirector(provider: AiProvider) {
       npc: { id: input.npc.id, name: input.npc.name, persona: input.npc.persona },
       memory: memoryForContext(restored, facts) };
     const narrative = await factual('converse', facts, input.allowedActs, context, options);
-    const memory = narrative.act === null ? input.memory :
-      remember(restored, narrative.factIds, narrative.act);
-    return { narrative, memory };
+    // Una negativa en personaje, no la genérica: si el modelo (o el
+    // respaldo) se niega y el personaje tiene su frase, esa es la que ve
+    // el jugador. Sin frase propia, 'decline' sigue siendo la genérica.
+    const rendered = narrative.act === 'decline' && input.npc.refusal
+      ? { ...narrative, text: input.npc.refusal } : narrative;
+    const memory = rendered.act === null ? input.memory :
+      remember(restored, rendered.factIds, rendered.act);
+    return { narrative: rendered, memory };
   }
   return { interpretAction, narrateResult, converse };
 }

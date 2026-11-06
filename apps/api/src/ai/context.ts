@@ -11,6 +11,10 @@ export interface NpcContext {
   persona: string;
   knownFactIds: readonly string[];
   revealableFactIds: readonly string[];
+  /** Negativa en personaje al declarar sobre el robo, si el personaje la
+   * tiene (solo Inés). El director la usa como texto de 'decline' en vez
+   * de la genérica; sin ella, 'decline' sigue siendo la frase genérica. */
+  refusal?: string;
 }
 export const speechActs = ['state', 'acknowledge', 'decline', 'silence'] as const;
 export type SpeechAct = typeof speechActs[number];
