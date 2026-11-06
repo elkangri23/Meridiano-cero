@@ -304,6 +304,24 @@ export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerVi
   return initialClock(value.clock) && initialCapabilities(value) && initialEmptyCollections(value) && initialGeography(value) && publicObjectives(value.objectives);
 }
 
+/** Datos de conversación de un personaje para la charla libre: lo que la
+ * web necesita para construir la petición converse sin el catálogo fijo del
+ * astrolabio. Para el caso fijo salen del catálogo (misma persona,
+ * conocimiento, saludo y negativa que antes); para un expediente generado
+ * salen de su definición (persona y conocimiento de sus NPC, textos de
+ * conocimiento, saludos y negativas si las trae). Sin esto, un NPC generado
+ * llegaba al director sin hechos ni persona y cada pregunta salía como
+ * «He registrado tu consulta.». */
+export interface NpcChatEntry {
+  id: string;
+  name: string;
+  role?: string;
+  persona: string;
+  knowledge: Array<{ id: string; text: string }>;
+  greeting?: string;
+  refusal?: string;
+}
+
 /** Vista general del jugador (Fase A): proyección completa de una partida en
  * cualquier revisión. La vista inicial es un caso particular de esta forma
  * (minute 0, colecciones vacías). Difiere de PlayerView (motor) en que incluye
@@ -328,6 +346,10 @@ export interface PlayerViewDto {
   objects: Array<{ id: string; type: string; origin: string; minute: number; admissible: boolean }>;
   dossier: string[];
   conversation: string[];
+  /** Datos de conversación de cada personaje del expediente (ver
+   * NpcChatEntry): la charla libre los usa para construir la petición
+   * converse. Sin esta lista, la web solo conocía el catálogo fijo. */
+  npcChat: NpcChatEntry[];
   pendingRequests: Array<{ id: string; type: 'analysis' | 'query' | 'request'; dueMinute: number }>;
   warrants: string[];
   detentions: string[];
@@ -528,11 +550,44 @@ function publicOffers(value: unknown): value is PublicActionOffer[] {
   return Array.isArray(value) && value.length <= 64 && value.every(isPublicActionOffer) &&
     new Set(value.map(item => item.id)).size === value.length;
 }
+function publicNpcChatFact(value: unknown): value is NpcChatEntry['knowledge'][number] {
+  if (!dtoRecord(value, 'id,text')) return false;
+  return boundedString(value.id, 128) && typeof value.text === 'string' && value.text.length > 0 && value.text.length <= 2000;
+}
+function npcChatKeys(value: Record<string, unknown>): boolean {
+  const keys = Object.keys(value);
+  if (!['id', 'name', 'persona', 'knowledge'].every(key => keys.includes(key))) return false;
+  return keys.every(key => ['id', 'name', 'role', 'persona', 'knowledge', 'greeting', 'refusal'].includes(key));
+}
+function npcChatStrings(value: Record<string, unknown>): boolean {
+  if (!boundedString(value.id, 128)) return false;
+  if (!boundedString(value.name, 128)) return false;
+  if (typeof value.persona !== 'string' || value.persona.length > 2000) return false;
+  if (value.role !== undefined && !boundedString(value.role, 128)) return false;
+  if (!optionalBoundedString(value.greeting, 2000)) return false;
+  return optionalBoundedString(value.refusal, 200);
+}
+function npcChatKnowledge(value: unknown): value is NpcChatEntry['knowledge'] {
+  if (!Array.isArray(value) || value.length > 16) return false;
+  if (!value.every(publicNpcChatFact)) return false;
+  return new Set(value.map(item => item.id)).size === value.length;
+}
+function publicNpcChatEntry(value: unknown): value is NpcChatEntry {
+  if (!isPlainRecord(value)) return false;
+  if (!npcChatKeys(value)) return false;
+  if (!npcChatStrings(value)) return false;
+  return npcChatKnowledge(value.knowledge);
+}
+function publicNpcChat(value: unknown): value is NpcChatEntry[] {
+  return Array.isArray(value) && value.length <= 64 && value.every(publicNpcChatEntry) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
 function generalCollections(value: Record<string, unknown>): boolean {
   if (!publicObjects(value.objects) || !publicRequests(value.pendingRequests)) return false;
   if (!stringList(value.dossier, 1000, 128) || !stringList(value.conversation, 1000, 16000)) return false;
   if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
   if (!publicObjectives(value.objectives)) return false;
+  if (!publicNpcChat(value.npcChat)) return false;
   return publicOffers(value.offers);
 }
 function generalReports(value: Record<string, unknown>): boolean {
@@ -567,7 +622,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,finalReport,locations,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,finalReport,locations,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;

@@ -108,7 +108,17 @@ describe('catálogo e inicio por HTTP con PostgreSQL real', () => {
     expect(view.cities.map((city: { id: string }) => city.id)).toEqual(['madrid', 'paris', 'lisboa']);
     expect(view.locations).toHaveLength(1);
     expect(view.saveCapabilities).toEqual({ manualLimit: 10, manualCount: 0, canSave: true, canLoad: false });
-    for (const marker of ['ines-valera', 'solution', 'definitionHash', 'ownerId', 'engineState', 'knowledge', 'cooperation']) expect(response.body).not.toContain(marker);
+    // La vista NO filtra datos internos de la definición (solución,
+    // hash, propietario, estado del motor, cooperación de cada NPC).
+    // `knowledge` ya no está en esta lista: la vista lleva `npcChat`,
+    // la lista curada de hechos que cada personaje puede declarar (id +
+    // texto), que es justo lo que la charla libre necesita; no incluye
+    // la solución ni los datos internos del expediente.
+    for (const marker of ['ines-valera', 'solution', 'definitionHash', 'ownerId', 'engineState', 'cooperation']) expect(response.body).not.toContain(marker);
+    expect(view.npcChat.map((entry: { id: string }) => entry.id)).toEqual(['lucia', 'emile', 'marta', 'tomas', 'ines']);
+    expect(view.npcChat.find((entry: { id: string }) => entry.id === 'ines')?.knowledge).toEqual([
+      { id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' },
+    ]);
     expect(view.finalReport).toBeNull();
   });
 

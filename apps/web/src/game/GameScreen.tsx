@@ -7,6 +7,7 @@ import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
 import type { AiConnection, ConnectionsResponse, ConnectionTestResult, ProviderCatalogEntry } from '../ai/connections';
 import { gameApi, GameError } from './client';
 import { needsConfirmationDialog } from './action-confirmation';
+import { chatFacts, chatGreeting, chatNpcName, chatPersona, chatRefusal, chatRole, findChatEntry } from './npc-chat';
 import { SceneArt } from './scene-art';
 import { groupOffers } from './scene-offers';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
@@ -73,13 +74,18 @@ function contactsFromView(view: PlayerViewDto): Array<{ id: string; name: string
 }
 
 /** Nombres de los personajes a partir de las etiquetas de las ofertas de
- * hablar («Hablar con X sobre su identidad»). */
+ * hablar («Hablar con X sobre su identidad») y de los datos de charla del
+ * caso en curso: sin estos últimos, un NPC generado sin oferta visible
+ * enseña su id crudo en el dossier y en la consola. */
 function npcNamesFromView(view: PlayerViewDto): Map<string, string> {
   const names = new Map<string, string>();
   for (const offer of view.offers) {
     if (offer.action.type !== 'talk' || typeof offer.action.params.npcId !== 'string') continue;
     const label = /^Hablar con (.+) sobre su identidad$/.exec(offer.label)?.[1];
     if (label) names.set(offer.action.params.npcId, label);
+  }
+  for (const entry of view.npcChat) {
+    if (!names.has(entry.id)) names.set(entry.id, entry.name);
   }
   return names;
 }
@@ -309,13 +315,15 @@ function HeaderSection({ view, caseTitle, detective, clockPulse, onLogout }: { v
 }
 
 /** Fila de un personaje presente en la escena: nombre y rol, con su botón
- * de hablar. El rol sale del catálogo de NPC (sin inventar nada). */
+ * de hablar. Nombre y rol salen de los datos de charla del caso en curso,
+ * con el catálogo como respaldo (sin inventar nada). */
 function SceneNpcOffer({ offer, view, disabled, onOffer }: { offer: PublicActionOffer; view: PlayerViewDto; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const npcId = typeof offer.action.params.npcId === 'string' ? offer.action.params.npcId : '';
-  const npc = getNPC(npcId);
-  const name = npc?.name ?? npcNamesFromView(view).get(npcId) ?? npcId;
+  const entry = findChatEntry(view, npcId);
+  const name = chatNpcName(entry, getNPC(npcId)?.name) ?? npcNamesFromView(view).get(npcId) ?? npcId;
+  const role = chatRole(entry, getNPC(npcId)?.role ?? '');
   return <div className="game-scene-npc">
-    <span><strong>{name}</strong>{npc?.role ? ` · ${npc.role}` : ''}</span>
+    <span><strong>{name}</strong>{role ? ` · ${role}` : ''}</span>
     <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
       onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}</button>
   </div>;
@@ -702,15 +710,15 @@ type ChatTurn = { from: 'you' | 'npc'; text: string };
  * partida y personaje; la memoria del servidor no se persiste (límite
  * documentado: al recargar la página la conversación sigue en esta pestaña,
  * pero una sesión nueva empieza de cero). */
-function ChatContent({ npc, turns, draft, busy, error, onDraft, onSend }: {
-  npc: { id: string; name: string } | null; turns: ChatTurn[]; draft: string; busy: boolean; error: string;
+function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend }: {
+  npc: { id: string; name: string } | null; view: PlayerViewDto; turns: ChatTurn[]; draft: string; busy: boolean; error: string;
   onDraft: (value: string) => void; onSend: (event: FormEvent) => void;
 }) {
   if (!npc) {
     return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span>
       <p>Habla primero con alguien en persona («hablar con…» o la acción «Hablar con») y la conversación se abrirá aquí.</p></div>;
   }
-  const role = getNPC(npc.id)?.role ?? '';
+  const role = chatRole(findChatEntry(view, npc.id), getNPC(npc.id)?.role ?? '');
   return <div className="game-chat">
     <p className="game-chat-npc"><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</p>
     <ol className="game-chat-turns" data-testid="chat-turns" aria-live="polite">
@@ -1310,7 +1318,7 @@ export function GameScreen() {
       setChatTurns(stored.turns);
       setChatMemory(stored.memory ?? null);
     } else {
-      const greeting = npcGreeting(npcId) ?? `Soy ${npcName}. ¿Qué quieres saber?`;
+      const greeting = chatGreeting(findChatEntry(view, npcId), npcGreeting(npcId), npcName);
       const turns: ChatTurn[] = [{ from: 'npc', text: greeting }];
       const memory = { schemaVersion: 1, runId, npcId, treatment: 'neutral', turns: [] };
       setChatTurns(turns);
@@ -1328,7 +1336,7 @@ export function GameScreen() {
     if (!text || !runId || !identity || !chatNpc || chatBusy) return null;
     const npcId = chatNpc.id;
     return { runId, csrfToken: identity.csrfToken, npcId, name: chatNpc.name, text,
-      facts: npcKnowledgeFacts(npcId),
+      facts: chatFacts(findChatEntry(view, npcId), npcKnowledgeFacts(npcId)),
       memory: chatMemory ?? { schemaVersion: 1, runId, npcId, treatment: 'neutral', turns: [] } };
   }
 
@@ -1344,9 +1352,9 @@ export function GameScreen() {
     setChatError('');
     const controller = new AbortController();
     try {
-      const refusal = npcRefusal(question.npcId);
+      const refusal = chatRefusal(findChatEntry(view, question.npcId), npcRefusal(question.npcId));
       const result = await aiApi.converse({ runId: question.runId, text: question.text,
-        npc: { id: question.npcId, name: question.name, persona: getNPC(question.npcId)?.persona ?? '', knownFactIds: factIds, revealableFactIds: factIds, ...(refusal ? { refusal } : {}) },
+        npc: { id: question.npcId, name: question.name, persona: chatPersona(findChatEntry(view, question.npcId), getNPC(question.npcId)?.persona ?? ''), knownFactIds: factIds, revealableFactIds: factIds, ...(refusal ? { refusal } : {}) },
         facts: question.facts, memory: question.memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
       controller.signal, { csrfToken: question.csrfToken });
       const next: ChatTurn[] = [...turns, { from: 'npc', text: result.narrative.text }];
@@ -1605,7 +1613,7 @@ export function GameScreen() {
       <ReportContent view={view} />
     </GameWindow>
     <GameWindow id="chat" title="Conversación" state={windows.windows.chat} {...windowProps}>
-      <ChatContent npc={chatNpc} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
+      <ChatContent npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
         onDraft={setChatDraft} onSend={event => void sendChatMessage(event)} />
     </GameWindow>
   </main>;

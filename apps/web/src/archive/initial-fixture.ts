@@ -9,6 +9,7 @@ export const initialView: PlayerViewDto = {
   cities: [{ id: 'synthetic-city', name: 'Ciudad sintética', country: 'País de prueba' }],
   locations: [{ id: 'synthetic-room', name: 'Sala sintética', description: 'Descripción pública de prueba.' }],
   objects: [], dossier: [], conversation: [], pendingRequests: [], warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
+  npcChat: [],
   objectives: [
     { id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: false },
     { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false },

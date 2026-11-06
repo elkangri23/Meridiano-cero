@@ -100,4 +100,46 @@ describe('objetivos en vivo de la vista del jugador', () => {
     const wrong = playerViewDto(astrolabioDefinition, fullRun({ detentions: ['tomas'] }), 0);
     expect(wrong.objectives.every(objective => !objective.achieved)).toBe(true);
   });
+
+  it('la vista lleva los datos de charla de cada personaje y valida el contrato', () => {
+    const view = playerViewDto(astrolabioDefinition, fullRun(), 0);
+    const ines = view.npcChat.find(entry => entry.id === 'ines');
+    expect(ines).toMatchObject({
+      name: 'Inés Valera',
+      refusal: 'No voy a declarar sobre el robo.',
+    });
+    expect(ines?.knowledge).toEqual([
+      { id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' },
+    ]);
+    expect(isPlayerViewDto(view)).toBe(true);
+  });
+
+  it('un expediente generado lleva en la vista los datos de sus propios NPC', () => {
+    const definition = structuredClone(astrolabioDefinition) as unknown as import('@meridiano/case-schema').CaseDefinition;
+    definition.npcs = [
+      { id: 'marcos', name: 'Marcos', cityId: 'bilbao',
+        knowledge: ['mercado-negro'], cooperation: 6,
+        role: 'Comerciante', persona: 'Soy comerciante y conozco el mercado de antigüedades.' },
+    ];
+    definition.texts = {
+      evidence: {},
+      knowledge: { 'mercado-negro': 'Conocimiento del mercado de antigüedades y canales de venta.' },
+      greetings: { marcos: 'Buenos días, soy Marcos. Me dedico al comercio de antigüedades.' },
+    };
+    const view = playerViewDto(definition, fullRun(), 0);
+    expect(view.npcChat).toEqual([
+      {
+        id: 'marcos',
+        name: 'Marcos',
+        role: 'Comerciante',
+        persona: 'Soy comerciante y conozco el mercado de antigüedades.',
+        knowledge: [
+          { id: 'identity', text: 'Soy Marcos, Comerciante.' },
+          { id: 'mercado-negro', text: 'Conocimiento del mercado de antigüedades y canales de venta.' },
+        ],
+        greeting: 'Buenos días, soy Marcos. Me dedico al comercio de antigüedades.',
+      },
+    ]);
+    expect(isPlayerViewDto(view)).toBe(true);
+  });
 });

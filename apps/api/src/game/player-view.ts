@@ -7,6 +7,7 @@ import { isPublicBatchStep, type PlayerViewDto, type PublicEvent } from '@meridi
 import { availableOffers, ENGINE_VERSION, liveObjectives, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
 import { briefingForDefinition, metaForDefinition } from './catalog.ts';
+import { npcChatForDefinition } from './npc-chat.ts';
 
 type FullRun = StoredRun & CaseRun;
 
@@ -94,6 +95,10 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     objects,
     dossier: [...run.discoveries],
     conversation: [...run.conversationRecords],
+    // Datos de charla libre de cada personaje del expediente: sin ellos la
+    // web solo conocía el catálogo fijo y un NPC generado llegaba al
+    // director sin hechos ni persona.
+    npcChat: npcChatForDefinition(definition),
     pendingRequests: run.pendingRequests.map(request => {
       const payload = (request.payload ?? {}) as Record<string, unknown>;
       const method = payload.method;
