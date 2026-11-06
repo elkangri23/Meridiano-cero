@@ -191,7 +191,7 @@ export const STAGE_OUTPUT_SCHEMAS: Record<number, Record<string, unknown>> = {
       truth: { type: 'string' },
       solution: { type: 'object', required: ['id', 'name', 'role', 'cityId'] },
       decoy: { type: 'object', required: ['id', 'name', 'role', 'cityId'] },
-      witnesses: { type: 'array', minItems: 1, maxItems: 2 },
+      witnesses: { type: 'array', minItems: 1, maxItems: 2, items: { type: 'object', required: ['id', 'name', 'role', 'cityId'] } },
       motive: { type: 'string' },
       objectives: { type: 'object', required: ['detain', 'recover'] },
       objectLabel: { type: 'string' },
@@ -290,7 +290,7 @@ function checkCastMember(member: unknown, cityIds: Set<string>, ids: Set<string>
   ids.add(String(member.id));
   if (!isNonEmptyString(member.name)) errors.push(`NPC ${String(member.id)} sin nombre.`);
   if (!isNonEmptyString(member.role)) errors.push(`NPC ${String(member.id)} sin rol.`);
-  if (typeof member.cityId !== 'string' || !cityIds.has(member.cityId)) errors.push(`NPC ${String(member.id)} en ciudad desconocida.`);
+  if (typeof member.cityId !== 'string' || !cityIds.has(member.cityId)) errors.push(`NPC ${String(member.id)} en ciudad desconocida: cada NPC (solución, señuelo y testigos) necesita cityId, un id EXACTO de cities.`);
 }
 
 function checkPremiseBriefing(output: Record<string, unknown>, errors: string[]): void {
