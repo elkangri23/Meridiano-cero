@@ -24,6 +24,12 @@ Contratos: SPEC-007/010 y resiliencia. Diseñar CAS/fencing y terminales, checkp
 
 Salida: dos workers reales con barreras reproducen lease vencido, cancelación/publicación, muerte tras checkpoint y corte global. Solo una publicación, reserva conciliable y ningún envío nuevo tras corte. Importaciones hostiles sintéticas rechazadas sin fetch ni cambios al expediente previo. Ensayo de equidad con dos usuarios y saturación documentada.
 
+## T4-08
+
+Contratos: SPEC-007 y GDD §3/§14. Conectar la generación de casos a la API y a la UI: redactar los 9 estadios del pipeline con un LLM real (prompts, extracción y validación de JSON, revisión semántica, simulación de rutas), jobs persistentes en PostgreSQL con worker, rutas de generación asíncronas con estado, catálogo de expedientes generados con intro propia, y control de contenido Familiar/General en la narración. Reconciliar las tres listas de delito (GDD §3, ALLOWED_CRIME_TYPES de T5-01, CrimeType del generador) y separar el contenido del modo SORPRÉNDEME del generador.
+
+Salida: elegir un delito del GDD crea un expediente nuevo validado y jugable (no el astrolabio disfrazado); la generación rechazada o incompleta no crea partida; el delito y el contenido se muestran siempre juntos («Robo internacional · Familiar»). El generador actual es solo un esqueleto sin llamadas LLM: este trabajo es una fase entera, no un arreglo.
+
 ## T5-07
 
 Contratos: SPEC-001/002/006/008. Ampliar corpus de propiedades con semillas reproducibles y límites del reloj/grafo/lotes; comprobar carrera versionada y consecuencias plausibles. Detectar cualquier ambigüedad de reglas antes de codificar expectativas nuevas. Verificar UI con nombres/textos largos, traducción faltante, RTL, TTS, audio bloqueado y rama restaurada.

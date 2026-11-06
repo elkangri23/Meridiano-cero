@@ -1,12 +1,17 @@
 import { isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto } from '@meridiano/contracts';
-import type { PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto } from '@meridiano/contracts';
+import type { PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto, CrimeType, ContentRating } from '@meridiano/contracts';
 
 export type Filter = 'all' | 'active' | 'closed';
+
+/** Parámetros de creación que el servidor valida contra el expediente
+ * (delito y contenido deben corresponderle; un reintento sin ellos sigue
+ * funcionando porque se derivan del expediente). */
+export interface CreationParams { difficulty?: 'easy' | 'normal' | 'hard'; crimeType?: CrimeType; contentRating?: ContentRating }
 
 export interface ArchiveApi {
   initial(runId: string, signal: AbortSignal): Promise<PlayerViewDto>;
   cases(signal: AbortSignal): Promise<CaseListDto>;
-  create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal, difficulty?: 'easy' | 'normal' | 'hard'): Promise<void>;
+  create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal, params?: CreationParams): Promise<void>;
   lookup(key: string, identity: SessionDto, signal: AbortSignal): Promise<RunCreationLookupDto | null>;
   deleteRun(runId: string, identity: SessionDto, signal: AbortSignal): Promise<void>;
   me(signal: AbortSignal): Promise<SessionDto | null>;
@@ -96,6 +101,14 @@ function mutationHeaders(identity: SessionDto) {
   return { 'content-type': 'application/json', 'x-csrf-token': identity.csrfToken, 'x-expected-profile-id': identity.profile.id };
 }
 
+function creationBody(caseId: string, key: string, params?: CreationParams): Record<string, string> {
+  const body: Record<string, string> = { caseId, idempotencyKey: key };
+  if (params?.difficulty) body.difficulty = params.difficulty;
+  if (params?.crimeType) body.crimeType = params.crimeType;
+  if (params?.contentRating) body.contentRating = params.contentRating;
+  return body;
+}
+
 export const archiveApi: ArchiveApi = {
   async initial(runId: string, signal: AbortSignal): Promise<PlayerViewDto> {
     if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(runId)) throw new ArchiveError('invalid');
@@ -111,10 +124,8 @@ export const archiveApi: ArchiveApi = {
   },
 
   async create(caseId: string, key: string, identity: SessionDto, signal: AbortSignal,
-    difficulty?: 'easy' | 'normal' | 'hard'): Promise<void> {
-    const body: Record<string, string> = { caseId, idempotencyKey: key };
-    if (difficulty) body.difficulty = difficulty;
-    const response = await request('/api/v1/runs', signal, { method: 'POST', headers: mutationHeaders(identity), body: JSON.stringify(body) });
+    params?: CreationParams): Promise<void> {
+    const response = await request('/api/v1/runs', signal, { method: 'POST', headers: mutationHeaders(identity), body: JSON.stringify(creationBody(caseId, key, params)) });
     if (response.status === 200 || response.status === 201) { await response.body?.cancel(); return; }
     // El mensaje de error real llega a la UI: antes se tragaba con el
     // «unavailable» genérico y la creación quedaba como «pendiente de

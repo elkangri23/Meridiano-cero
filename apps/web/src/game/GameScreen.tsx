@@ -10,6 +10,7 @@ import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
+import { caseLabel } from '@meridiano/case-schema';
 import './game.css';
 
 type OrderPhase =
@@ -90,6 +91,7 @@ function HeaderSection({ view, caseTitle, detective, onLogout }: { view: PlayerV
     </div>
     <div className="game-case-strip">
       <div><p className="game-overline">Expediente</p><strong>{caseTitle ?? view.caseId}</strong></div>
+      <div><p className="game-overline">Delito</p><strong>{caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating)}</strong></div>
       <div><p className="game-overline">Destino actual</p><strong>{view.position.city.name}, {view.position.city.country}</strong></div>
       <div className="game-clock" data-testid="clock" aria-label={`Reloj del caso: ${view.clock.minute} minutos de ${view.clock.deadlineMinutes}`}>
         <p className="game-overline">Tiempo transcurrido / plazo</p>
@@ -312,6 +314,7 @@ function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void
 
 function DossierContent({ view }: { view: PlayerViewDto }) {
   return <div>
+    <div><h4>Ficha del expediente</h4><p>Delito: {caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating)}.</p></div>
     {view.briefing && <div><h4>Introducción del caso</h4><BriefingText briefing={view.briefing} /></div>}
     <h4>Evidencias en tu poder</h4>
     {view.objects.length === 0

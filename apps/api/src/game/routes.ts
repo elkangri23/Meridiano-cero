@@ -5,11 +5,13 @@ import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
 import { createSessionStore, tokenDigest } from '../auth/store.ts';
 import { cookieToken, matches } from '../auth/session-security.ts';
-import { caseSummary, findCase, listCases, findDefinitionById, applyDifficulty, definitionForRun } from './catalog.ts';
+import { caseSummary, findCase, listCases, findDefinitionById, applyDifficulty, definitionForRun, caseMeta } from './catalog.ts';
 import { initialPlayerView } from './initial-view.ts';
 import { createStoredRun, deleteStoredRun, readStoredRun, readFullRun, lookupRunCreation, RunStoreError } from './runs.ts';
 import { ENGINE_VERSION, type Action } from '@meridiano/engine';
 import type { Difficulty } from '@meridiano/case-schema';
+import { GDD_CRIME_TYPES } from '@meridiano/case-schema';
+import type { ContentRating, CrimeType } from '@meridiano/contracts';
 import { commitAction, commitLoad } from './transitions.ts';
 import { playerViewDto } from './player-view.ts';
 import { eq, and, desc, sql } from 'drizzle-orm';
@@ -27,14 +29,40 @@ function parseDifficulty(value: unknown): Difficulty {
   return value as Difficulty;
 }
 
-function createBody(value: unknown): { caseId: string; idempotencyKey: string; difficulty: Difficulty } {
+function parseCrimeType(value: unknown): CrimeType | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !(GDD_CRIME_TYPES as readonly string[]).includes(value)) throw new RunStoreError('INVALID_REQUEST');
+  return value as CrimeType;
+}
+
+function parseContentRating(value: unknown): ContentRating | undefined {
+  if (value === undefined) return undefined;
+  if (value !== 'familiar' && value !== 'general') throw new RunStoreError('INVALID_REQUEST');
+  return value;
+}
+
+function createBody(value: unknown): { caseId: string; idempotencyKey: string; difficulty: Difficulty; crimeType?: CrimeType | undefined; contentRating?: ContentRating | undefined } {
   if (!isRecord(value)) throw new RunStoreError('INVALID_REQUEST');
-  const keys = Object.keys(value).sort().join(',');
-  if (keys !== 'caseId,idempotencyKey' && keys !== 'caseId,difficulty,idempotencyKey') throw new RunStoreError('INVALID_REQUEST');
-  const { caseId, idempotencyKey, difficulty } = value;
+  const allowed = new Set(['caseId', 'difficulty', 'idempotencyKey', 'crimeType', 'contentRating']);
+  if (!Object.keys(value).every(key => allowed.has(key))) throw new RunStoreError('INVALID_REQUEST');
+  const { caseId, idempotencyKey, difficulty, crimeType, contentRating } = value;
   if (typeof caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(caseId) ||
       !isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
-  return { caseId, idempotencyKey, difficulty: parseDifficulty(difficulty) };
+  return { caseId, idempotencyKey, difficulty: parseDifficulty(difficulty), crimeType: parseCrimeType(crimeType), contentRating: parseContentRating(contentRating) };
+}
+
+/** Delito y contenido elegidos deben coincidir con el expediente: son
+ * parámetros reales de la creación, no adornos. El cliente los envía desde
+ * el formulario; un reintento sin ellos sigue funcionando (se derivan del
+ * expediente). */
+function assertCreationParams(caseId: string, crimeType: CrimeType | undefined, contentRating: ContentRating | undefined): void {
+  const meta = caseMeta(caseId);
+  if (crimeType !== undefined && crimeType !== meta.crimeType) {
+    throw new RunStoreError('VALIDATION_ERROR', 'El delito elegido no corresponde al expediente elegido.');
+  }
+  if (contentRating !== undefined && contentRating !== meta.contentRating) {
+    throw new RunStoreError('VALIDATION_ERROR', 'El contenido elegido no corresponde al expediente elegido.');
+  }
 }
 
 function deleteRunBody(value: unknown): { confirm: boolean } {
@@ -215,6 +243,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     available(() => listStoredRuns(database, digest(request), request.query)));
   app.post('/api/v1/runs', { onRequest: authorize }, async (request, reply) => {
     const body = createBody(request.body);
+    assertCreationParams(body.caseId, body.crimeType, body.contentRating);
     const definition = applyDifficulty(findCase(body.caseId), body.difficulty);
     const created = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey, expectedProfile(request)));
     // La vista es la actual (en un replay puede haber progreso posterior).

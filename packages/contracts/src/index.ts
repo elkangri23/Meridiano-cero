@@ -19,6 +19,14 @@ export interface FinalReport {
   minute: number;
 }
 
+/** Delito de un expediente (GDD §3). Tres cosas distintas que no hay que
+ * mezclar: `crimeType` es el delito (robo, desaparición, fraude…);
+ * `contentRating` es el nivel de contenido (Familiar/General, GDD §14); y
+ * `contentMode` (fixed/generated) es el origen del expediente, no su tono.
+ * «Robo Familiar» no es un delito: es delito=robo + contenido=Familiar. */
+export type CrimeType = 'robo' | 'desaparicion' | 'fraude' | 'espionaje' | 'sabotaje' | 'misterio-historico' | 'aleatorio';
+export type ContentRating = 'familiar' | 'general';
+
 export interface PlayerView {
   runId: string;
   version: number;
@@ -40,6 +48,9 @@ export interface CaseSummary {
   caseId: string;
   title: string;
   contentMode: 'fixed' | 'generated';
+  /** Delito del expediente (GDD §3) y nivel de contenido (GDD §14). */
+  crimeType: CrimeType;
+  contentRating: ContentRating;
   difficulty: 'easy' | 'normal' | 'hard';
   explorationMode: 'guided' | 'free';
   deadlineMinutes: number;
@@ -71,6 +82,8 @@ export interface InitialPlayerViewDto {
   batch: null;
   finalReport: null;
   officialResult: null;
+  /** Delito y contenido del expediente (GDD §3/§14). */
+  caseMeta: { crimeType: CrimeType; contentRating: ContentRating };
   saveCapabilities: { manualLimit: 10; manualCount: 0; canSave: false; canLoad: false };
   recovery: { retryCreationWithSameKey: true; creationLookup: true; operationLookup: false };
 }
@@ -154,10 +167,12 @@ function positiveInteger(value: unknown): boolean { return typeof value === 'num
 function caseModes(value: Record<string, unknown>): boolean {
   return (value.contentMode === 'fixed' || value.contentMode === 'generated') &&
     typeof value.difficulty === 'string' && ['easy', 'normal', 'hard'].includes(value.difficulty) &&
-    (value.explorationMode === 'guided' || value.explorationMode === 'free');
+    (value.explorationMode === 'guided' || value.explorationMode === 'free') &&
+    typeof value.crimeType === 'string' && ['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'aleatorio'].includes(value.crimeType) &&
+    (value.contentRating === 'familiar' || value.contentRating === 'general');
 }
 function caseItem(value: unknown): value is CaseSummary {
-  if (!dtoRecord(value, 'canStart,caseId,contentMode,contentVersion,deadlineMinutes,difficulty,explorationMode,title')) return false;
+  if (!dtoRecord(value, 'canStart,caseId,contentMode,contentRating,contentVersion,crimeType,deadlineMinutes,difficulty,explorationMode,title')) return false;
   if (typeof value.caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.caseId) || !shortText(value.title)) return false;
   return caseModes(value) && positiveInteger(value.deadlineMinutes) && positiveInteger(value.contentVersion) && typeof value.canStart === 'boolean';
 }
@@ -211,10 +226,13 @@ function initialGeography(value: Record<string, unknown>): boolean {
   return cities.some(item => item.id === city.id && item.name === city.name && item.country === city.country) &&
     locations.some(item => item.id === location.id && item.name === location.name && item.description === location.description);
 }
+function initialHeader(value: Record<string, unknown>): boolean {
+  return value.schemaVersion === 1 && uuid(value.runId) && uuid(value.branchId) && value.version === 1 && value.status === 'active';
+}
 /** Solo GET inicial: no acepta replay de creación, progreso o campos privados adicionales. */
 export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerViewDto {
-  if (!dtoRecord(value, 'batch,branchId,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
-  if (value.schemaVersion !== 1 || !uuid(value.runId) || !uuid(value.branchId) || value.version !== 1 || value.status !== 'active') return false;
+  if (!dtoRecord(value, 'batch,branchId,caseMeta,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
+  if (!initialHeader(value) || !publicCaseMeta(value.caseMeta)) return false;
   return initialClock(value.clock) && initialCapabilities(value) && initialEmptyCollections(value) && initialGeography(value);
 }
 
@@ -261,6 +279,10 @@ export interface PlayerViewDto {
    * empezar. La presenta Margaret Sullivan; es breve, omisible y siempre
    * recuperable en el dossier. Null si el expediente no trae introducción. */
   briefing: { speaker: string; title: string; paragraphs: string[] } | null;
+  /** Delito y contenido del expediente (GDD §3/§14): se muestran siempre
+   * juntos («Robo internacional · Familiar»), nunca mezclados en un solo
+   * nombre. */
+  caseMeta: { crimeType: CrimeType; contentRating: ContentRating };
   saveCapabilities: { manualLimit: 10; manualCount: number; canSave: boolean; canLoad: boolean };
   recovery: { retryCreationWithSameKey: true; creationLookup: true; operationLookup: false };
 }
@@ -445,6 +467,14 @@ function validBriefingParagraphs(value: unknown): value is string[] {
   return Array.isArray(value) && value.length >= 1 && value.length <= 8 &&
     value.every(item => typeof item === 'string' && item.trim().length > 0 && item.length <= 2000);
 }
+function publicCaseMeta(value: unknown): value is { crimeType: CrimeType; contentRating: ContentRating } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).sort().join(',') !== 'contentRating,crimeType') return false;
+  return typeof record.crimeType === 'string' &&
+    ['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'aleatorio'].includes(record.crimeType) &&
+    (record.contentRating === 'familiar' || record.contentRating === 'general');
+}
 function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (value === null) return true;
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -453,12 +483,13 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'batch,branchId,briefing,caseId,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;
   if (!playerViewIdentity(value)) return false;
   if (!publicBriefing(value.briefing)) return false;
+  if (!publicCaseMeta(value.caseMeta)) return false;
   if (!generalClock(value.clock) || !generalCapabilities(value) || !initialGeography(value)) return false;
   return generalCollections(value) && generalReports(value);
 }

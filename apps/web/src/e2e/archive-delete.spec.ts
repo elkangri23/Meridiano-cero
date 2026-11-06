@@ -7,7 +7,12 @@ test('crear con dificultad difícil muestra la intro y se puede borrar desde el 
   await page.click('button:has-text("Entrar en desarrollo local")');
   const creation = page.locator('.archive-create').first();
   await expect(creation.getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
-  await creation.locator('select').selectOption('astrolabio-tres-ciudades');
+  // Delito y contenido siempre juntos: «Robo internacional · Familiar».
+  await expect(creation.locator('text=Robo internacional · Familiar')).toBeVisible();
+  await expect(creation.getByRole('radio', { name: /Fraude/ })).toBeDisabled();
+  await creation.getByRole('button', { name: 'SORPRÉNDEME' }).click();
+  await expect(creation.locator('text=Ha elegido:')).toBeVisible();
+  await creation.getByRole('radio', { name: 'Robo internacional', exact: true }).check();
   await creation.getByRole('radio', { name: /Difícil/ }).check();
   await creation.getByRole('button', { name: 'Empezar partida' }).click();
   await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
@@ -24,6 +29,7 @@ test('crear con dificultad difícil muestra la intro y se puede borrar desde el 
   await expect(page.getByRole('heading', { name: 'Mis partidas' })).toBeVisible();
   const row = page.locator('tr', { hasText: reference! });
   await expect(row).toContainText('Difícil');
+  await expect(row).toContainText('Robo internacional · Familiar');
   await row.getByRole('button', { name: 'Borrar' }).click();
   await row.getByRole('button', { name: 'Sí, borrar' }).click();
   await expect(page.locator('tr', { hasText: reference! })).toHaveCount(0);

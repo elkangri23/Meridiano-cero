@@ -1,6 +1,6 @@
 import { isIdempotencyKey } from '@meridiano/contracts';
 import type { SessionDto } from '@meridiano/contracts';
-import type { ArchiveApi } from './client';
+import type { ArchiveApi, CreationParams } from './client';
 import { ArchiveError } from './client';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
@@ -70,7 +70,7 @@ export function createRunCoordinator(api: ArchiveApi, storage: IntentStorage) {
       return { phase: 'uncertain' };
     }
   }
-  async function send(intent: Intent, identity: SessionDto, signal: AbortSignal): Promise<CreationOutcome> {
+  async function send(intent: Intent, identity: SessionDto, signal: AbortSignal, params?: CreationParams): Promise<CreationOutcome> {
     signal.throwIfAborted();
     // El error de crear se guarda como motivo: antes se tragaba con
     // Promise.allSettled y la creación quedaba como «pendiente de confirmar»
@@ -78,7 +78,7 @@ export function createRunCoordinator(api: ArchiveApi, storage: IntentStorage) {
     // creación falló por red tras crearse en el servidor, el ledger lo dirá.
     let reason: string | undefined;
     try {
-      await api.create(intent.caseId, intent.idempotencyKey, identity, signal, intent.difficulty);
+      await api.create(intent.caseId, intent.idempotencyKey, identity, signal, params ?? (intent.difficulty ? { difficulty: intent.difficulty } : undefined));
     } catch (error) {
       if (error instanceof ArchiveError) reason = error.detail;
     }
@@ -98,7 +98,7 @@ export function createRunCoordinator(api: ArchiveApi, storage: IntentStorage) {
       try { const intent = pending(profileId); return { phase: intent ? 'uncertain' : 'idle', caseId: intent?.caseId ?? null, runId: null }; }
       catch { return { phase: 'blocked', caseId: null, runId: null }; }
     },
-    async start(caseId: string, identity: SessionDto, signal: AbortSignal, difficulty: Difficulty = 'normal') {
+    async start(caseId: string, identity: SessionDto, signal: AbortSignal, difficulty: Difficulty = 'normal', params?: Omit<CreationParams, 'difficulty'>) {
       const previous = pending(identity.profile.id);
       // Otra elección (caso o dificultad) no sobrescribe una intención
       // incierta: el usuario la resuelve (comprobar/reintentar) o la
@@ -107,7 +107,10 @@ export function createRunCoordinator(api: ArchiveApi, storage: IntentStorage) {
       if (previous && (previous.caseId !== caseId || (previous.difficulty ?? 'normal') !== difficulty)) throw new CreationBlocked();
       const intent = previous ?? { schemaVersion: 1, profileId: identity.profile.id, caseId, difficulty, idempotencyKey: crypto.randomUUID() };
       if (!previous) remember(intent);
-      return send(intent, identity, signal);
+      // Delito y contenido no van en la intención: se derivan del expediente
+      // (caseId) y el servidor los valida al crear; un reintento tras
+      // recargar los vuelve a derivar igual.
+      return send(intent, identity, signal, { difficulty, ...params });
     },
     async recover(identity: SessionDto, resend: boolean, signal: AbortSignal) {
       const intent = pending(identity.profile.id);

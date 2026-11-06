@@ -3,10 +3,21 @@ import { InitialRun } from './InitialRun';
 import { NewRun } from './NewRun';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChangeEvent } from 'react';
+import { caseLabel } from '@meridiano/case-schema';
 import { archiveApi } from './client';
 import { createArchiveModel } from './model';
-import type { ConnectionStatus } from './model';
+import type { ArchiveState, ConnectionStatus } from './model';
 import './archive.css';
+
+const difficultyLabels: Record<string, string> = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' };
+
+/** Delito y contenido del expediente de una partida («Robo internacional ·
+ * Familiar»); «—» si el expediente ya no está en el catálogo. */
+function caseLabelFor(state: ArchiveState, caseId: string): string {
+  const entry = state.cases.find(item => item.caseId === caseId);
+  if (!entry) return '—';
+  return caseLabel(entry.crimeType, entry.contentRating);
+}
 
 function connectionStatusLabel(status: ConnectionStatus): string {
   switch (status) {
@@ -24,8 +35,6 @@ function connectionStatusColor(status: ConnectionStatus): string {
     default: return '#aaaaaa';
   }
 }
-
-const difficultyLabels: Record<string, string> = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' };
 
 function renderArchiveList(state: any, model: any, busy: boolean, filter: (e: any) => void, opener: any, closeRun: any, deleteTarget: string | null, setDeleteTarget: (runId: string | null) => void) {
   if (!state.profile) return null;
@@ -50,8 +59,8 @@ function renderArchiveList(state: any, model: any, busy: boolean, filter: (e: an
       {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
       {state.page && state.page.items.length > 0 && (
         <div className="archive-scroll" role="region" aria-label="Tabla de partidas, desplazable" tabIndex={0}>
-          <table><caption>Partidas de la cuenta actual</caption><thead><tr><th scope="col">Expediente</th><th scope="col">Referencia</th><th scope="col">Estado</th><th scope="col">Dificultad</th><th scope="col">Reloj</th><th scope="col">Creación</th><th scope="col">Consulta</th><th scope="col">Jugar</th><th scope="col">Borrar</th></tr></thead>
-            <tbody>{state.page.items.map((item: any) => <tr key={item.runId}><td>{item.caseTitle ?? 'Expediente sin ficha disponible'}</td><td><code title={item.runId}>{item.runId.slice(0, 8)}</code></td><td>{item.status === 'active' ? 'Activa' : 'Cerrada'}</td><td>{difficultyLabels[item.difficulty] ?? item.difficulty}</td><td>{item.minute} min</td><td><time dateTime={item.createdAt}>{item.createdAt.toLocaleString()}</time></td><td><button type="button" disabled={busy} aria-label={'Consultar partida ' + item.runId.slice(0, 8)} onClick={event => { opener.current = event.currentTarget; void model.openRun(item.runId); }}>Consultar</button></td><td><Link to={'/runs/' + item.runId}>{item.status === 'active' ? 'Jugar' : 'Revisar'}</Link></td><td>{deleteTarget === item.runId ? <span><button type="button" disabled={busy} onClick={() => { setDeleteTarget(null); void model.deleteRun(item.runId); }}>Sí, borrar</button>{' '}<button type="button" disabled={busy} onClick={() => setDeleteTarget(null)}>Cancelar</button></span> : <button type="button" disabled={busy} aria-label={'Borrar partida ' + item.runId.slice(0, 8)} onClick={() => setDeleteTarget(item.runId)}>Borrar</button>}</td></tr>)}</tbody>
+          <table><caption>Partidas de la cuenta actual</caption><thead><tr><th scope="col">Expediente</th><th scope="col">Delito</th><th scope="col">Referencia</th><th scope="col">Estado</th><th scope="col">Dificultad</th><th scope="col">Reloj</th><th scope="col">Creación</th><th scope="col">Consulta</th><th scope="col">Jugar</th><th scope="col">Borrar</th></tr></thead>
+            <tbody>{state.page.items.map((item: any) => <tr key={item.runId}><td>{item.caseTitle ?? 'Expediente sin ficha disponible'}</td><td>{caseLabelFor(state, item.caseId)}</td><td><code title={item.runId}>{item.runId.slice(0, 8)}</code></td><td>{item.status === 'active' ? 'Activa' : 'Cerrada'}</td><td>{difficultyLabels[item.difficulty] ?? item.difficulty}</td><td>{item.minute} min</td><td><time dateTime={item.createdAt}>{item.createdAt.toLocaleString()}</time></td><td><button type="button" disabled={busy} aria-label={'Consultar partida ' + item.runId.slice(0, 8)} onClick={event => { opener.current = event.currentTarget; void model.openRun(item.runId); }}>Consultar</button></td><td><Link to={'/runs/' + item.runId}>{item.status === 'active' ? 'Jugar' : 'Revisar'}</Link></td><td>{deleteTarget === item.runId ? <span><button type="button" disabled={busy} onClick={() => { setDeleteTarget(null); void model.deleteRun(item.runId); }}>Sí, borrar</button>{' '}<button type="button" disabled={busy} onClick={() => setDeleteTarget(null)}>Cancelar</button></span> : <button type="button" disabled={busy} aria-label={'Borrar partida ' + item.runId.slice(0, 8)} onClick={() => setDeleteTarget(item.runId)}>Borrar</button>}</td></tr>)}</tbody>
           </table>
         </div>
       )}
