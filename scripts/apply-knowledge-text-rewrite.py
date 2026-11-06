@@ -150,6 +150,9 @@ def psql_query(psql_cmd: str, sql: str) -> str:
 
 
 def db_mode(map_data: dict, psql_cmd: str, execute: bool) -> None:
+    # Salida no alineada y sin cabeceras: sin -At psql devuelve tabla alineada
+    # y corta las líneas largas (el JSON quedaría truncado al parsear).
+    psql_cmd = f"{psql_cmd} -At"
     ids = [case["case_id"] for case in map_data["cases"]]
     id_list = ", ".join(sql_str(case_id) for case_id in ids)
     out = psql_query(
