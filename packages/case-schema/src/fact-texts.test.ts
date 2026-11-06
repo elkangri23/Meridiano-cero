@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { RECURRENT_NPCS } from './npc-catalog.js';
 import {
   EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, conversationRecordText,
-  discoveryText, evidenceText, npcGreeting, npcKnowledgeFacts,
+  discoveryText, evidenceText, npcGreeting, npcKnowledgeFacts, travelText,
 } from './fact-texts.js';
 
 const lookup = {
@@ -59,5 +59,24 @@ describe('textos legibles del caso fijo', () => {
     expect(conversationRecordText('talk:lucia@30', lookup.npcName)).toBe('Hablaste con Lucía (min 30).');
     expect(conversationRecordText('communication_received:req-2@30', lookup.npcName)).toBe('Respuesta recibida (min 30).');
     expect(conversationRecordText('algo-raro', lookup.npcName)).toBe('algo-raro');
+  });
+
+  it('el primer viaje a cada ciudad se lee como frase, nunca como clave cruda', () => {
+    // El motor registra el primer viaje como descubrimiento `travel:<ciudad>`.
+    for (const city of ['madrid', 'paris', 'lisboa'] as const) {
+      const text = discoveryText(`travel:${city}`, lookup);
+      expect(text, city).not.toBe(`travel:${city}`);
+      expect(text, city).not.toMatch(/travel:/);
+      expect(text, city).toContain(lookup.cityName(city));
+    }
+    expect(discoveryText('travel:desconocida', lookup)).toBe('Viaje realizado.');
+  });
+
+  it('la frase de viaje nombra el origen y el destino', () => {
+    expect(travelText('Madrid', 'París')).toBe('Sales de Madrid y llegas a París.');
+    expect(travelText('París', 'Madrid')).toBe('Sales de París y llegas a Madrid.');
+    expect(travelText(undefined, 'Lisboa')).toBe('Llegas a Lisboa.');
+    // Sin cambio de ciudad no hay desplazamiento que narrar.
+    expect(travelText('Madrid', 'Madrid')).toBe('Llegas a Madrid.');
   });
 });

@@ -76,9 +76,19 @@ export function npcGreeting(npcId: string): string | undefined {
   return NPC_GREETINGS[npcId];
 }
 
+/** Frase del primer viaje a una ciudad (`travel:<ciudad>`): el motor lo
+ * registra como descubrimiento. Nunca se muestra la clave cruda. */
+function travelDiscovery(id: string, lookup: DiscoveryLookup): string | undefined {
+  if (!id.startsWith('travel:')) return undefined;
+  const city = lookup.cityName(id.slice('travel:'.length));
+  return city ? `Viajas a ${city}.` : 'Viaje realizado.';
+}
+
 /** Frase para un marcador del motor (análisis, identidad, ubicación,
  * respuesta recibida u orden denegada); undefined si no es un marcador. */
 function markerDiscovery(id: string, lookup: DiscoveryLookup): string | undefined {
+  const travel = travelDiscovery(id, lookup);
+  if (travel) return travel;
   if (id.startsWith('analysis:')) {
     const inner = evidenceText(id.slice('analysis:'.length));
     return inner ? `Análisis completado: ${inner}` : id;
@@ -94,6 +104,13 @@ function markerDiscovery(id: string, lookup: DiscoveryLookup): string | undefine
   if (id.startsWith('communication_received:')) return 'Llegó la respuesta a tu solicitud.';
   if (id.startsWith('warrant-denied:')) return 'Una orden solicitada ha sido denegada.';
   return undefined;
+}
+
+/** Frase narrativa de un viaje confirmado: de la ciudad de origen a la de
+ * destino. Solo usa nombres que el jugador ya conoce; no inventa hechos
+ * del caso (es narración genérica de desplazamiento). */
+export function travelText(fromCity: string | undefined, toCity: string): string {
+  return fromCity && fromCity !== toCity ? `Sales de ${fromCity} y llegas a ${toCity}.` : `Llegas a ${toCity}.`;
 }
 
 /** Frase legible para un hallazgo del dossier. Los identificadores que el

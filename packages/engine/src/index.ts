@@ -370,11 +370,12 @@ function previewTravel(def: CaseDefinition, run: CaseRun, action: Action): Actio
   }
   nextTripCount(run);
   const baseCost = duration.minutes;
+  const destination = def.cities.find(city => city.id === toCityId);
   const preview: ActionPreview = {
     actionType: 'travel',
     estimatedMinutes: baseCost,
     estimatedEndTime: run.minute + baseCost,
-    description: `Viaje a ${toCityId}: ${baseCost} minutos estimados; puede haber retrasos.`,
+    description: `Viaje a ${destination?.name ?? toCityId}: ${baseCost} minutos estimados; puede haber retrasos.`,
   };
   return { status: 'confirmation_required', run, events: [], preview };
 }

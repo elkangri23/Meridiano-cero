@@ -162,9 +162,21 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('offer-inspect:MAD-SALA')).toBeVisible();
     // Fondo de Madrid al empezar.
     await expect(page.getByTestId('scene-art')).toHaveAttribute('data-location', 'MAD-SALA');
+    // Inspeccionar: el reloj de arena se ve de verdad, en la cabecera y en
+    // la escena (arreglo: antes era un icono de 18 px de una sola pasada).
+    await page.getByTestId('offer-inspect:MAD-SALA').click();
+    await expect(page.getByTestId('preview-dialog')).toBeVisible();
+    await page.getByTestId('preview-confirm').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('clock')).toContainText('10 min');
+    await expect(page.getByTestId('hourglass')).toBeVisible();
+    await expect(page.getByTestId('hourglass')).toContainText('+10 min');
+    await expect(page.getByTestId('hourglass-scene')).toBeVisible();
+    await expect(page.getByTestId('hourglass-scene')).toContainText('El reloj avanza 10 min');
     // Viajar desde la escena: animación de viaje, fondo de París y reloj de arena.
     await page.getByTestId('offer-travel:paris').click();
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
+    await expect(page.getByTestId('preview-dialog')).toContainText('Viaje a París');
     await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(page.getByTestId('travel-animation')).toBeVisible();
@@ -172,7 +184,11 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('hourglass')).toBeVisible();
     await expect(page.getByTestId('hourglass')).toContainText('+180 min');
     await expect(page.getByTestId('scene-art')).toHaveAttribute('data-location', 'PAR-ARCH');
-    await expect(page.getByTestId('clock')).toContainText('180 min');
+    await expect(page.getByTestId('clock')).toContainText('190 min');
+    // La consola narra el viaje con frase (origen → destino), nunca con la
+    // clave cruda del motor (arreglo: antes enseñaba `travel:paris`).
+    await expect(page.locator('.game-console')).toContainText('Sales de Madrid y llegas a París.');
+    await expect(page.locator('.game-console')).not.toContainText('travel:paris');
     await expect(page.getByTestId('travel-animation')).toBeHidden({ timeout: 10000 });
     // En París, la escena muestra a Émile y el archivo.
     await expect(page.locator('.game-scene')).toContainText('Émile · Archivo de conservación');
