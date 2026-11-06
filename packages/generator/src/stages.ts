@@ -354,7 +354,7 @@ function checkClueEvidence(output: Record<string, unknown>, locationIds: Set<str
     const expectedId = `EV-${String(index + 1).padStart(2, '0')}`;
     if (evidence.id !== expectedId) errors.push(`La evidencia ${index + 1} debe ser ${expectedId}.`);
     if (evidence.type !== EVIDENCE_SLOT_TYPES[index]) errors.push(`La evidencia ${expectedId} debe ser de tipo ${EVIDENCE_SLOT_TYPES[index]}.`);
-    if (typeof evidence.origin !== 'string' || (!locationIds.has(evidence.origin) && !cityIds.has(evidence.origin))) errors.push(`La evidencia ${expectedId} tiene origen desconocido.`);
+    if (typeof evidence.origin !== 'string' || (!locationIds.has(evidence.origin) && !cityIds.has(evidence.origin))) errors.push(`La evidencia ${expectedId} tiene origen desconocido: ${String(evidence.origin)} (debe ser un id de lugar o de ciudad de esta salida, nunca un personaje).`);
     checkEvidenceRelations(evidence, expectedId, errors);
   });
 }
