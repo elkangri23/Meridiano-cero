@@ -750,6 +750,20 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/es el esquema JSON, no los datos/);
   });
 
+  it('acepta ids de lugar largos y naturales como MAL-BIBLIOTECA', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    // Como el modelo real en el smoke: BIBLIOTECA tiene 10 letras, fuera
+    // del límite antiguo de 3-8; el motor no exige ids cortos.
+    outputs.cluesWorld.locations[0].id = 'MAL-BIBLIOTECA';
+    const llm = fakeLlm(outputs);
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+  });
+
   it('reintenta la etapa 4 cuando el análisis EV-03 usa EV-02 como origen', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);

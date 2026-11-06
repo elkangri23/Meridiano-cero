@@ -275,7 +275,7 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 const NPC_ID = /^[a-z][a-z0-9-]{0,31}$/;
-const LOCATION_ID = /^[A-Z]{2,4}-[A-Z]{3,8}$/;
+const LOCATION_ID = /^[A-Z]{2,4}-[A-Z]{3,12}$/;
 const EVIDENCE_ID = /^EV-\d{2}$/;
 const FACT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
@@ -349,7 +349,7 @@ export const EVIDENCE_SLOT_TYPES = ['observation', 'object', 'analysis', 'record
 
 function checkClueLocation(location: unknown, cityIds: Set<string>, locationIds: Set<string>, errors: string[]): void {
   if (!isRecord(location)) { errors.push('Un lugar no es un objeto.'); return; }
-  if (typeof location.id !== 'string' || !LOCATION_ID.test(location.id)) errors.push(`id de lugar inválido: ${String(location.id)} (mayúsculas: 2-4 letras de ciudad + guion + 3-8 letras, p. ej. MAD-SALA, nunca minúsculas).`);
+  if (typeof location.id !== 'string' || !LOCATION_ID.test(location.id)) errors.push(`id de lugar inválido: ${String(location.id)} (mayúsculas: 2-4 letras de ciudad + guion + 3-12 letras, p. ej. MAD-SALA, nunca minúsculas).`);
   locationIds.add(String(location.id));
   if (typeof location.cityId !== 'string' || !cityIds.has(location.cityId)) errors.push(`Lugar ${String(location.id)} en ciudad desconocida.`);
   if (!isNonEmptyString(location.name) || !isNonEmptyString(location.description)) errors.push(`Lugar ${String(location.id)} sin nombre o descripción.`);
