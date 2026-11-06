@@ -12,7 +12,7 @@ import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal, travelText } from '@meridiano/case-schema';
+import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
 import type { DiscoveryLookup } from '@meridiano/case-schema';
 import './game.css';
 
@@ -76,7 +76,10 @@ function npcNamesFromView(view: PlayerViewDto): Map<string, string> {
 }
 
 /** Resolución de nombres para traducir los hallazgos del motor a frases
- * (lugares y ciudades de la vista, personajes de las ofertas). */
+ * (lugares y ciudades de la vista, personajes de las ofertas). El nombre de
+ * un personaje sale del catálogo cuando la oferta ya no está en la vista:
+ * sin este respaldo, un marcador `identity:<npc>` o `location:<npc>` de
+ * alguien sin oferta visible enseñaría el ID crudo. */
 function lookupFromView(view: PlayerViewDto): DiscoveryLookup {
   const locations = new Map(view.locations.map(location => [location.id, location.name]));
   const cities = new Map(view.cities.map(city => [city.id, city.name]));
@@ -84,8 +87,20 @@ function lookupFromView(view: PlayerViewDto): DiscoveryLookup {
   return {
     locationName: id => locations.get(id),
     cityName: id => cities.get(id),
-    npcName: id => npcs.get(id),
+    npcName: id => npcs.get(id) ?? getNPC(id)?.name,
   };
+}
+
+/** Órdenes en la escena: `warrant:<npc>` nombra al sospechoso y
+ * `warrant:access` es la orden de acceso. Sin esto la escena enseñaba los
+ * IDs crudos (`warrant:ines`). */
+function warrantText(id: string): string {
+  if (id === 'warrant:access') return 'Orden de acceso';
+  if (id.startsWith('warrant:')) {
+    const name = getNPC(id.slice('warrant:'.length))?.name ?? id.slice('warrant:'.length);
+    return `Orden contra ${name}`;
+  }
+  return id;
 }
 
 /** Personaje con el que habla una acción talk, si la hay. */
@@ -95,28 +110,110 @@ function talkTarget(offer: PublicActionOffer | undefined, lookup: DiscoveryLooku
   return { id, name: lookup.npcName(id) ?? id };
 }
 
+/** Frase del viaje de una acción confirmada, si cambió de ciudad. */
+function travelDetail(offer: PublicActionOffer | undefined, previous: PlayerViewDto | null, response: ActionResponseDto): string {
+  if (offer?.action.type !== 'travel' || !previous || previous.position.city.id === response.position.city.id) return '';
+  return travelText(previous.position.city.name, response.position.city.name);
+}
+
+/** Hallazgos nuevos del dossier, en frases legibles. */
+function discoveryDetail(response: ActionResponseDto, previous: PlayerViewDto | null, lookup: DiscoveryLookup): string {
+  const entries = (previous ? response.dossier.filter(entry => !previous.dossier.includes(entry)) : [...response.dossier])
+    .filter(entry => !entry.startsWith('travel:'));
+  return entries.map(entry => discoveryText(entry, lookup)).join(' ');
+}
+
+/** Solicitudes enviadas por la acción: qué se pidió y cuándo llega el
+ * resultado. El resumen del servidor no puede decirlo (su evento solo lleva
+ * el ID de la solicitud). */
+function submittedDetail(response: ActionResponseDto, previous: PlayerViewDto | null, offer: PublicActionOffer | undefined, lookup: DiscoveryLookup): string {
+  const added = previous
+    ? response.pendingRequests.filter(request => !previous.pendingRequests.some(item => item.id === request.id))
+    : [...response.pendingRequests];
+  return added.map(request => {
+    const due = `El resultado llegará sobre el minuto ${request.dueMinute}.`;
+    if (offer?.action.type === 'request_warrant' && typeof offer.action.params.suspectId === 'string') {
+      const name = lookup.npcName(offer.action.params.suspectId) ?? offer.action.params.suspectId;
+      return `Has solicitado una orden contra ${name}. ${due}`;
+    }
+    return offer ? `Has enviado «${offer.label}». ${due}` : due;
+  }).join(' ');
+}
+
+/** Órdenes concedidas al madurar: no dejan hallazgo en el dossier, así que
+ * sin esta línea el jugador no sabría que ya tiene la orden. */
+function warrantDetail(response: ActionResponseDto, previous: PlayerViewDto | null): string {
+  const added = previous
+    ? response.warrants.filter(item => !previous.warrants.includes(item))
+    : [...response.warrants];
+  return added.map(item => `${warrantText(item)} concedida.`).join(' ');
+}
+
+/** Detenciones nuevas: quedan registradas y el caso sigue abierto (la
+ * detención no cierra; el informe final la valorará). */
+function detentionDetail(response: ActionResponseDto, previous: PlayerViewDto | null, lookup: DiscoveryLookup): string {
+  const added = previous
+    ? response.detentions.filter(item => !previous.detentions.includes(item))
+    : [...response.detentions];
+  return added.map(item => {
+    const name = lookup.npcName(item) ?? item;
+    return `${name} queda detenida. El caso sigue abierto.`;
+  }).join(' ');
+}
+
 /** Qué contar al jugador tras una acción confirmada: con quién habló y qué
- * descubrió de nuevo, en frases legibles. Vacío si no hay nada que contar. */
+ * descubrió de nuevo, en frases legibles. Vacío si no hay nada que contar.
+ * Cada acción confirmada deja narración: antes solo la dejaban los viajes,
+ * hablar y las acciones con hallazgos nuevos en el dossier — recoger, pedir
+ * una consulta o una orden, esperar a que madurase una orden, detener y
+ * cerrar solo dejaban el resumen de una línea (y recoger, además, el ID
+ * crudo). Inspeccionar sin hallazgos y esperar sin que llegue nada lo dicen
+ * explícitamente, para que la acción no parezca no haber hecho nada. */
+/** Frase de la conversación al hablar con alguien. */
+function talkDetail(offer: PublicActionOffer | undefined, lookup: DiscoveryLookup): string {
+  const target = talkTarget(offer, lookup);
+  return target ? `Hablas con ${target.name}. Te confirma su identidad: pregúntale en la conversación.` : '';
+}
+
+/** Frase del cierre: dónde está el informe final. */
+function finishDetail(response: ActionResponseDto, offer: PublicActionOffer | undefined): string {
+  return response.status === 'closed' && offer?.action.type === 'finish'
+    ? 'El informe final está disponible en la ventana «Informe final».'
+    : '';
+}
+
+/** Cuando nada de lo anterior contó nada: inspeccionar sin hallazgos y
+ * esperar sin que llegue nada lo dicen explícitamente, para que la acción
+ * no parezca no haber hecho nada. */
+function emptyDetail(offer: PublicActionOffer | undefined, told: boolean): string {
+  if (told) return '';
+  if (offer?.action.type === 'inspect') return 'No encuentras nada nuevo aquí.';
+  if (offer?.action.type === 'wait') return 'No llega nada nuevo.';
+  return '';
+}
+
+/** Qué contar al jugador tras una acción confirmada: con quién habló y qué
+ * descubrió de nuevo, en frases legibles. Vacío si no hay nada que contar.
+ * Cada acción confirmada deja narración: antes solo la dejaban los viajes,
+ * hablar y las acciones con hallazgos nuevos en el dossier — recoger, pedir
+ * una consulta o una orden, esperar a que madurase una orden, detener y
+ * cerrar solo dejaban el resumen de una línea (y recoger, además, el ID
+ * crudo). */
 function actionResultDetail(response: ActionResponseDto, previous: PlayerViewDto | null, offer?: PublicActionOffer): string {
   // Los nombres de los personajes salen de la vista anterior: la oferta de
   // hablar puede no estar ya en la vista nueva.
   const lookup = lookupFromView(previous ?? response);
-  // Los viajes no añaden evidencias: su detalle es la frase narrativa del
-  // desplazamiento (origen → destino). El marcador `travel:<ciudad>` del
-  // motor queda cubierto por esa frase y no se traduce aparte: si no, la
-  // consola enseñaría la clave cruda o una frase repetida.
-  const travel = offer?.action.type === 'travel' && previous && previous.position.city.id !== response.position.city.id
-    ? travelText(previous.position.city.name, response.position.city.name)
-    : '';
-  const newDiscoveries = (previous ? response.dossier.filter(entry => !previous.dossier.includes(entry)) : [...response.dossier])
-    .filter(entry => !entry.startsWith('travel:'));
-  const discoveryDetail = newDiscoveries.map(entry => discoveryText(entry, lookup)).join(' ');
-  const target = talkTarget(offer, lookup);
-  return [
-    travel,
-    target ? `Hablas con ${target.name}. Te confirma su identidad: pregúntale en la conversación.` : '',
-    discoveryDetail,
-  ].filter(Boolean).join(' ');
+  const parts = [
+    travelDetail(offer, previous, response),
+    discoveryDetail(response, previous, lookup),
+    talkDetail(offer, lookup),
+    submittedDetail(response, previous, offer, lookup),
+    warrantDetail(response, previous),
+    detentionDetail(response, previous, lookup),
+    finishDetail(response, offer),
+  ];
+  const told = parts.some(part => part !== '');
+  return [...parts, emptyDetail(offer, told)].filter(Boolean).join(' ');
 }
 
 /** Aviso de estado tras una acción confirmada. */
@@ -224,13 +321,15 @@ function SceneOfferList({ offers, disabled, onOffer }: { offers: PublicActionOff
 }
 
 /** Estado de la escena: evidencias en poder, solicitudes, órdenes y
- * detenciones. Solo se muestra lo que hay. */
+ * detenciones. Solo se muestra lo que hay. Los identificadores se traducen:
+ * las órdenes y detenciones nombran a la persona, y cada evidencia lleva su
+ * tipo en español (antes se veían `warrant:ines`, `ines` y `EV-06` solos). */
 function SceneMeta({ view }: { view: PlayerViewDto }) {
   return <div className="game-scene-meta">
-    {view.objects.length > 0 && <p>En tu poder: {view.objects.map(item => item.id).join(', ')}</p>}
+    {view.objects.length > 0 && <p>En tu poder: {view.objects.map(item => `${item.id} (${evidenceTypeLabels[item.type] ?? item.type})`).join(', ')}</p>}
     {view.pendingRequests.length > 0 && <p>Solicitudes pendientes: {view.pendingRequests.map(item => `${requestTypeLabels[item.type] ?? item.type} (min ${item.dueMinute})`).join(', ')}</p>}
-    {view.warrants.length > 0 && <p>Órdenes: {view.warrants.join(', ')}</p>}
-    {view.detentions.length > 0 && <p>Detenciones: {view.detentions.join(', ')}</p>}
+    {view.warrants.length > 0 && <p>Órdenes: {view.warrants.map(warrantText).join(', ')}</p>}
+    {view.detentions.length > 0 && <p>Detenciones: {view.detentions.map(id => getNPC(id)?.name ?? id).join(', ')}</p>}
   </div>;
 }
 
@@ -973,13 +1072,16 @@ function SettingsContent({ identity, textScale, highContrast, onScale, onContras
 
 function ReportContent({ view }: { view: PlayerViewDto }) {
   if (!view.finalReport) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>El informe final estará disponible al cerrar el caso.</p></div>;
+  // El motor devuelve el resultado, el motivo y los objetivos como
+  // identificadores en inglés; la pantalla los traduce a frases. La nota
+  // anterior prometía un «informe completo (verdad y omisiones)» que no
+  // existe (REQ-G12-05, T2-05, en curso): se retira para no prometerlo.
   return <div>
-    <p className="game-report-result">Resultado: <strong>{view.finalReport.result}</strong> · Motivo: {view.finalReport.reason} · Minuto: {view.finalReport.minute}</p>
+    <p className="game-report-result">Resultado: <strong>{reportResultText(view.finalReport.result)}</strong> · Motivo: {reportReasonText(view.finalReport.reason)} · Minuto: {view.finalReport.minute}</p>
     <h4>Objetivos logrados</h4>
     {view.finalReport.objectivesAchieved.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Ningún objetivo registrado.</p></div>
-      : <ul className="game-report-objectives">{view.finalReport.objectivesAchieved.map((item, index) => <li key={index}>{item}</li>)}</ul>}
-    <p className="game-panel-note">El informe completo (verdad y omisiones) solo se muestra tras el cierre, y ya está cerrado.</p>
+      : <ul className="game-report-objectives">{view.finalReport.objectivesAchieved.map((item, index) => <li key={index}>{objectiveText(item)}</li>)}</ul>}
   </div>;
 }
 

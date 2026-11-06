@@ -4,8 +4,10 @@
 import { describe, expect, it } from 'vitest';
 import { RECURRENT_NPCS } from './npc-catalog.js';
 import {
-  EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, conversationRecordText,
-  discoveryText, evidenceText, npcGreeting, npcKnowledgeFacts, npcRefusal, travelText,
+  EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, OBJECTIVE_TEXT,
+  REPORT_REASON_TEXT, REPORT_RESULT_TEXT, conversationRecordText,
+  discoveryText, evidenceText, npcGreeting, npcKnowledgeFacts, npcRefusal,
+  objectiveText, reportReasonText, reportResultText, travelText,
 } from './fact-texts.js';
 
 const lookup = {
@@ -86,5 +88,28 @@ describe('textos legibles del caso fijo', () => {
     expect(travelText(undefined, 'Lisboa')).toBe('Llegas a Lisboa.');
     // Sin cambio de ciudad no hay desplazamiento que narrar.
     expect(travelText('Madrid', 'Madrid')).toBe('Llegas a Madrid.');
+  });
+
+  it('el informe final se lee en español: resultado, motivo y objetivos', () => {
+    // El motor devuelve identificadores en inglés; la pantalla nunca los enseña tal cual.
+    expect(Object.keys(REPORT_RESULT_TEXT).sort()).toEqual(['complete', 'incorrect', 'partial', 'unresolved']);
+    expect(reportResultText('complete')).toBe('completado');
+    expect(reportResultText('partial')).toBe('parcial');
+    expect(reportResultText('incorrect')).toBe('incorrecto');
+    expect(reportResultText('unresolved')).toBe('sin resolver');
+    expect(Object.keys(REPORT_REASON_TEXT).sort()).toEqual(['deadline', 'finished']);
+    expect(reportReasonText('finished')).toBe('finalizado');
+    expect(reportReasonText('deadline')).toBe('plazo agotado');
+    expect(Object.keys(OBJECTIVE_TEXT).sort()).toEqual(['obj-detener', 'obj-recuperar']);
+    expect(objectiveText('obj-detener')).toBe('Detener a Inés con orden válida');
+    expect(objectiveText('obj-recuperar')).toBe('Recuperar el astrolabio original');
+    // Sin texto no se oculta el valor: se devuelve tal cual (casos generados).
+    expect(reportResultText('desconocido')).toBe('desconocido');
+    expect(reportReasonText('desconocido')).toBe('desconocido');
+    expect(objectiveText('obj-desconocido')).toBe('obj-desconocido');
+    // Nada en español a medias: ningún texto del informe lleva literales en inglés.
+    for (const text of [...Object.values(REPORT_RESULT_TEXT), ...Object.values(REPORT_REASON_TEXT), ...Object.values(OBJECTIVE_TEXT)]) {
+      expect(text).not.toMatch(/\b(complete|partial|incorrect|unresolved|finished|deadline)\b|obj-/);
+    }
   });
 });

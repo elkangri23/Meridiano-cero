@@ -64,6 +64,28 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     // Informe final disponible en la ventana correspondiente.
     await page.click('button:has-text("Informe final")');
     await expect(page.locator('text=Resultado:')).toBeVisible();
+    // Informe final en español: resultado y motivo traducidos, objetivos
+    // como frases (antes: `complete`, `finished`, `obj-detener`…).
+    const report = page.getByRole('dialog', { name: 'Informe final' }).locator('.game-window-body');
+    await expect(report).toContainText('Resultado: completado');
+    await expect(report).toContainText('Motivo: finalizado');
+    await expect(report).toContainText('Detener a Inés con orden válida');
+    await expect(report).toContainText('Recuperar el astrolabio original');
+    await expect(report).not.toContainText('obj-detener');
+    await expect(report).not.toContainText('obj-recuperar');
+    await expect(report).not.toContainText('complete ·');
+    await expect(report).not.toContainText('finished');
+    // La consola narró cada acción: recoger con su hallazgo (no el ID),
+    // consultas y orden con su vencimiento, orden concedida, detención y cierre.
+    const console = page.locator('.game-console');
+    await expect(console).toContainText('Recogido: La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(console).not.toContainText('Objeto EV-02 recogido.');
+    await expect(console).toContainText('El resultado llegará sobre el minuto 120.');
+    await expect(console).toContainText('Has solicitado una orden contra Inés Valera.');
+    await expect(console).toContainText('Orden contra Inés Valera concedida.');
+    await expect(console).toContainText('Inés Valera queda detenida. El caso sigue abierto.');
+    await expect(console).toContainText('El informe final está disponible en la ventana «Informe final».');
+    await expect(console).not.toContainText('La investigación avanza.');
   });
 
   test('Ruta B completa (485 min) con guardar y reanudar a mitad de ruta', async ({ page }) => {
@@ -145,6 +167,11 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     // Inspeccionar: el resultado se ve en la consola, no solo en el dossier.
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await expect(page.locator('.game-console')).toContainText('La caja está a la vista. Su etiqueta remite al archivo de París.');
+    // Recoger: la consola narra el hallazgo con su texto, nunca el ID crudo.
+    await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);
+    await playOffer(page, 'offer-collect:EV-02', 30);
+    await expect(page.locator('.game-console')).toContainText('Recogido: La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(page.locator('.game-console')).not.toContainText('Objeto EV-02 recogido.');
     // El dossier muestra los hallazgos con texto legible, no IDs crudos.
     await page.click('button:has-text("Dossier")');
     const dossier = page.locator('.game-window-body');
