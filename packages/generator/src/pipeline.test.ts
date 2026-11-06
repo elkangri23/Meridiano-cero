@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createInMemoryCheckpointStore } from './checkpoint.js';
 import { createGeneratorService, runPipeline, type GenerationParams, type PipelineConfig, type StageLlm } from './pipeline.js';
-import { selectGeography, type SelectedGeography } from './stages.js';
+import { selectGeography, stageOutputSchema, type SelectedGeography } from './stages.js';
 
 // Doble del modelo: construye las salidas de etapa a partir del contexto que
 // recibe (las ciudades elegidas), con el mismo esqueleto que el fixture del
@@ -716,6 +716,38 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(stage4bCalls).toBe(2);
     const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/EV-02.*no se puede obtener/);
+  });
+
+  it('reintenta la etapa 4 cuando el modelo devuelve el esquema en vez de los datos', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4aCalls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          contexts.push(context as Record<string, unknown>);
+          if ((context as Record<string, unknown>).part === 'b') return outputs.cluesRules;
+          stage4aCalls++;
+          // Como el modelo real en el smoke: devuelve el esquema JSON
+          // (type/properties) en vez de los lugares y las evidencias.
+          if (stage4aCalls === 1) return stageOutputSchema(4);
+          return outputs.cluesWorld;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4aCalls).toBe(2);
+    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/es el esquema JSON, no los datos/);
   });
 
   it('reintenta la etapa 4 cuando la ruta dorada empieza viajando a la ciudad de inicio', async () => {

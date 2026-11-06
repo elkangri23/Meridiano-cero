@@ -735,6 +735,7 @@ export function validateStagePart(
   context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[]; world?: unknown },
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
+  if (checkSchemaEcho(output, errors)) return { valid: false, errors };
   if (part === 'a') validateClueWorld(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors);
   else validateClueRules(output, context.world, context.geography, errors);
   return { valid: errors.length === 0, errors };
@@ -752,11 +753,23 @@ function validateReview(output: unknown, errors: string[]): void {
  * validador v1.5 y el simulador en las etapas 6 y 8. */
 export function validateStageOutput(stage: GenerationStage, output: unknown, context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[] }): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
+  if (checkSchemaEcho(output, errors)) return { valid: false, errors };
   if (stage === 1) validatePremise(output, context.geography.cities, errors);
   else if (stage === 3) validateNpcs(output, context.castIds, errors);
   else if (stage === 4) validateClues(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors);
   else if (stage === 7) validateReview(output, errors);
   return { valid: errors.length === 0, errors };
+}
+
+// El modelo a veces devuelve el ESQUEMA (type/properties) en vez de los
+// datos. Sin un mensaje propio, el error es solo «Falta la clave X» y el
+// reintento repite el eco.
+function checkSchemaEcho(output: unknown, errors: string[]): boolean {
+  if (isRecord(output) && output.type === 'object' && isRecord(output.properties)) {
+    errors.push('La salida es el esquema JSON, no los datos: devuelve el contenido de la etapa (lugares, evidencias, textos…), no la descripción del esquema.');
+    return true;
+  }
+  return false;
 }
 
 // ── Ensamblaje (etapa 5, determinista) ───────────────────────────────────────
