@@ -58,9 +58,9 @@ Salida: JSON con { act, factIds, text }
 - 'acknowledge': la pregunta NO se puede responder con los hechos autorizados y NO pide declarar sobre el robo, acusar a nadie ni revelar hechos no autorizados. factIds debe ser []. text es tu respuesta: 1-3 frases, en español, en primera persona y en la voz del personaje. Si es charla ajena al caso (el tiempo, lo que vende, lo que sea), responde con naturalidad como lo haría ese personaje. Si es sobre el caso pero ningún hecho lo cubre, desvía en personaje sin inventar nada. Nunca inventes hechos del caso, mentiras ni acusaciones.
 - 'decline': SOLO cuando la pregunta pide declarar sobre el robo, acusar a alguien o revelar hechos que no están autorizados. factIds debe ser []. text debe ser cadena vacía: el servidor usa la negativa del personaje.
 - 'silence': SOLO cuando el personaje se niega a hablar en absoluto. factIds debe ser []. text debe ser cadena vacía.
-- Sobre su identidad, su tarea y lo que vio, el NPC responde con los hechos autorizados; nunca se niega a eso. La negativa ('decline') es solo para declarar sobre el robo.
+- Sobre su identidad, su tarea y lo que vio, el NPC responde con los hechos autorizados; nunca se niega a eso. La negativa ('decline') es solo para declarar sobre el robo. Preguntas vagas sobre lo que vio o conoce («¿viste algo?», «¿qué había?», «¿qué sabes?») se responden con sus hechos autorizados ('state') cuando alguno los cubre; nunca con 'decline'.
 - Sigue el hilo del fragmento de conversación: no repitas lo ya dicho y entiende las referencias a lo anterior.
-El NPC NO sabe la solución. No inventes hechos ni reveles culpabilidad. Las equivocaciones honestas o la incertidumbre sobre el caso no se improvisan: si ningún hecho autorizado las respalda, niégate, calla o desvía sin inventar.`,
+El NPC NO sabe la solución. No inventes hechos ni reveles culpabilidad. Las equivocaciones honestas o la incertidumbre sobre el caso no se improvisan: si ningún hecho autorizado las respalda, desvía en personaje ('acknowledge') sin inventar; 'decline' es solo para declarar sobre el robo, acusar a alguien o revelar hechos no autorizados.`,
 
     generateCase: `
 GENERAR CASO (etapa del pipeline de generación de Meridiano-cero)

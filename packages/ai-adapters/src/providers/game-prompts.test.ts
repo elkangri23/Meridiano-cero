@@ -29,6 +29,16 @@ describe('prompt de conversación', () => {
     expect(prompt).toMatch(/identidad, su tarea y lo que vio.*responde con los hechos autorizados/s);
     expect(prompt).toMatch(/nunca se niega a eso/s);
   });
+
+  it('las preguntas vagas sobre lo visto se responden con sus hechos, nunca con decline', () => {
+    // Sin esta regla el modelo negaba «¿viste algo?» y «¿Qué objetos había?»
+    // con decline: la frase «si ningún hecho las respalda, niégate, calla o
+    // desvía» le daba la negativa como opción para la incertidumbre.
+    expect(prompt).toMatch(/¿viste algo\?.*se responden con sus hechos autorizados \('state'\)/s);
+    expect(prompt).toMatch(/nunca con 'decline'/s);
+    expect(prompt).not.toContain('niégate, calla o desvía');
+    expect(prompt).toMatch(/desvía en personaje \('acknowledge'\) sin inventar/s);
+  });
 });
 
 describe('validación de salida de conversación', () => {
