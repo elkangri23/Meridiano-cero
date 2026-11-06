@@ -1,9 +1,11 @@
-// Generador de casos (T4-01)
-// Pipeline por etapas con checkpoint y esquema de expediente
+// Generador de casos (T4-08)
+// Pipeline por etapas con LLM real, checkpoint y puerta de validación
 
 export {
   runPipeline,
   createGeneratorService,
+  StageGateError,
+  MAX_REPAIRS_PER_DRAFT,
 } from './pipeline.js';
 
 export type {
@@ -19,10 +21,33 @@ export type {
   GenerationStage,
   GenerationResult,
   PipelineConfig,
+  StageLlm,
   GenerationValidator,
   GeneratorService,
   CheckpointStore,
 } from './pipeline.js';
+
+export {
+  GENERATABLE_CRIMES,
+  DEADLINE_BY_DURATION,
+  STAGE_OUTPUT_SCHEMAS,
+  EVIDENCE_SLOT_TYPES,
+  resolveGenerationChoice,
+  selectGeography,
+  travelMinutes,
+  seededRandom,
+  buildStageContext,
+  validateStageOutput as validateStageOutputShape,
+  assembleDefinition,
+  premiseBriefing,
+} from './stages.js';
+
+export type {
+  GeneratableCrime,
+  ResolvedChoice,
+  SelectedGeography,
+  StageContext,
+} from './stages.js';
 
 export {
   createInMemoryCheckpointStore,
@@ -89,12 +114,11 @@ export type {
 } from './validator.js';
 
 export {
-  RouteSimulator,
-  createRouteSimulator,
+  simulateCase,
 } from './simulator.js';
 
 export type {
-  SimulationConfig,
-  RouteSimulationResult,
-  SimulationSuiteResult,
+  GoldenPathAction,
+  SimulationCheck,
+  SimulationResult,
 } from './simulator.js';

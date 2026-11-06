@@ -1,296 +1,147 @@
-// Simulador de rutas para pipeline de generación (T4-03)
-// Suite de solvencia con presupuestos, rutas alternativas, errores, cooperación y retrasos
+// Simulador de jugabilidad para el pipeline de generación (T4-08).
+//
+// La versión anterior (T4-03) solo contaba escenarios: generaba combinaciones
+// de cooperación/retrasos sin jugar el motor. Esta ejecuta la ruta dorada
+// declarada por el generador a través del motor real, con la misma semilla
+// del expediente, y comprueba cuatro cosas: (a) la ruta dorada completa el
+// caso con los dos objetivos dentro del presupuesto; (b) cerrar en el
+// minuto 0 no resuelve nada (el caso no se resuelve solo); (c) detener sin
+// orden es imposible (la puerta de la orden funciona); (d) recuperar sin
+// acceso es imposible (la puerta de acceso funciona). Si alguna falla, el
+// borrador se rechaza o se repara, nunca se publica.
 
-export type SimulationConfig = {
-  runsPerScenario: number;
-  cooperationLevels: number[];
-  delayScenarios: number[];
-  simulateTransportErrors: boolean;
-  simulateAIErrors: boolean;
-  seeds: number[];
-  maxBudgetByDifficulty: Record<string, number>;
-};
+import { hashDefinition } from '@meridiano/case-schema/server';
+import { confirmAction, createInitialRun, resolveAction } from '@meridiano/engine';
+import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
 
-export const DEFAULT_SIMULATION_CONFIG: SimulationConfig = {
-  runsPerScenario: 10,
-  cooperationLevels: [3, 5, 7, 9],
-  delayScenarios: [0, 30, 60, 120],
-  simulateTransportErrors: true,
-  simulateAIErrors: true,
-  seeds: [42, 123, 456, 789, 1024, 2048, 4096, 8192],
-  maxBudgetByDifficulty: {
-    easy: 300,
-    normal: 480,
-    hard: 600,
-  },
-};
+export interface GoldenPathAction {
+  type: string;
+  params: Record<string, unknown>;
+}
 
-export interface RouteSimulationResult {
-  scenarioId: string;
-  params: {
-    crimeType: string;
-    difficulty: string;
-    explorationMode: string;
-    duration: string;
-    region: string;
-    surpriseMode: string;
-    seed: number;
-    catalogVersion: string;
+export interface SimulationCheck {
+  name: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface SimulationResult {
+  playable: boolean;
+  minute: number;
+  budgetMinutes: number;
+  result: 'complete' | 'partial' | 'incorrect' | 'unresolved' | null;
+  objectivesAchieved: string[];
+  checks: SimulationCheck[];
+  errors: string[];
+}
+
+function freshRun(definition: CaseDefinition): CaseRun {
+  return createInitialRun(definition, 'simulator', 'simulation-run', hashDefinition(definition));
+}
+
+function apply(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction): { run: CaseRun; status: string; reason: string | undefined } {
+  const preview = resolveAction(definition, run, { type: action.type, params: action.params } as never);
+  if (preview.status === 'confirmation_required') {
+    const confirmed = confirmAction(definition, run, { type: action.type, params: action.params } as never);
+    return { run: confirmed.run, status: confirmed.status, reason: 'reason' in confirmed ? String(confirmed.reason) : undefined };
+  }
+  return { run: preview.run, status: preview.status, reason: 'reason' in preview ? String(preview.reason) : undefined };
+}
+
+interface GoldenPathOutcome {
+  check: SimulationCheck;
+  minute: number;
+  result: SimulationResult['result'];
+  objectivesAchieved: string[];
+}
+
+function checkGoldenPath(definition: CaseDefinition, goldenPath: GoldenPathAction[], budgetMinutes: number): GoldenPathOutcome {
+  const fail = (detail: string, minute = 0): GoldenPathOutcome => ({ check: { name: 'golden-path', passed: false, detail }, minute, result: null, objectivesAchieved: [] });
+  let run = freshRun(definition);
+  for (let index = 0; index < goldenPath.length; index++) {
+    const action = goldenPath[index];
+    if (!action) continue;
+    const result = apply(definition, run, action);
+    if (result.status !== 'applied' && result.status !== 'case_closed') {
+      return fail(`Paso ${index + 1} (${action.type}) no se pudo aplicar: ${result.reason ?? result.status}.`, run.minute);
+    }
+    run = result.run;
+    if (run.status === 'closed') break;
+  }
+  if (run.status !== 'closed' || !run.finalReport) {
+    return fail('La ruta dorada no cierra el caso.', run.minute);
+  }
+  if (run.finalReport.result !== 'complete') {
+    return fail(`La ruta dorada termina en ${run.finalReport.result}, no en completado.`, run.minute);
+  }
+  const missing = definition.objectives.map(objective => objective.id).filter(id => !run.finalReport?.objectivesAchieved.includes(id));
+  if (missing.length > 0) {
+    return fail(`Objetivos sin lograr: ${missing.join(', ')}.`, run.minute);
+  }
+  if (run.minute > budgetMinutes) {
+    return fail(`La ruta dorada tarda ${run.minute} min, por encima del presupuesto de ${budgetMinutes} min.`, run.minute);
+  }
+  return {
+    check: { name: 'golden-path', passed: true, detail: `Ruta dorada completa en ${run.minute} min (presupuesto ${budgetMinutes} min).` },
+    minute: run.minute,
+    result: run.finalReport.result,
+    objectivesAchieved: [...run.finalReport.objectivesAchieved],
   };
-  cooperation: number;
-  delay: number;
-  transportError: boolean;
-  aiError: boolean;
-  seed: number;
-  success: boolean;
-  completedStages: number;
-  totalTime: number;
-  budgetUsed: number;
-  budgetLimit: number;
-  withinBudget: boolean;
-  error?: string;
-  route: 'success' | 'partial' | 'failed' | 'detention' | 'timeout' | 'budget_exceeded';
 }
 
-export interface SimulationSuiteResult {
-  config: SimulationConfig;
-  totalRuns: number;
-  successfulRuns: number;
-  failedRuns: number;
-  partialRuns: number;
-  detentionRuns: number;
-  timeoutRuns: number;
-  budgetExceededRuns: number;
-  byDifficulty: Record<string, { total: number; success: number; avgTime: number; avgBudget: number }>;
-  byCooperation: Record<number, { total: number; success: number }>;
-  byDelay: Record<number, { total: number; success: number }>;
-  results: RouteSimulationResult[];
-  summary: {
-    overallSuccessRate: number;
-    avgTime: number;
-    avgBudget: number;
-    criticalIssues: string[];
+function checkEarlyFinish(definition: CaseDefinition): SimulationCheck {
+  const run = freshRun(definition);
+  const result = apply(definition, run, { type: 'finish', params: {} });
+  if (result.status !== 'case_closed' || !result.run.finalReport) {
+    return { name: 'early-finish', passed: false, detail: 'Cerrar en el minuto 0 no cierra el caso.' };
+  }
+  if (result.run.finalReport.result !== 'unresolved') {
+    return { name: 'early-finish', passed: false, detail: `Cerrar en el minuto 0 da ${result.run.finalReport.result}, no sin resolver.` };
+  }
+  return { name: 'early-finish', passed: true, detail: 'Cerrar en el minuto 0 queda sin resolver.' };
+}
+
+function checkDetainWithoutWarrant(definition: CaseDefinition): SimulationCheck {
+  const suspect = definition.mechanics?.suspects.find(entry => entry.id === definition.solution);
+  if (!suspect) return { name: 'detain-without-warrant', passed: false, detail: 'La mecánica no declara al sospechoso solución.' };
+  const run = freshRun(definition);
+  const result = apply(definition, run, { type: 'detain', params: { suspectId: suspect.id, warrantId: 'warrant:' + suspect.id, locationId: suspect.locationId, mode: 'interactive' } });
+  if (result.status !== 'impossible') {
+    return { name: 'detain-without-warrant', passed: false, detail: `Detener sin orden devolvió ${result.status}.` };
+  }
+  return { name: 'detain-without-warrant', passed: true, detail: 'Detener sin orden es imposible.' };
+}
+
+function checkRecoverWithoutAccess(definition: CaseDefinition): SimulationCheck {
+  const recovery = definition.mechanics?.recovery;
+  if (!recovery) return { name: 'recover-without-access', passed: false, detail: 'La mecánica no declara la recuperación.' };
+  const run = freshRun(definition);
+  const result = apply(definition, run, { type: 'recover', params: { objectId: recovery.objectId } });
+  if (result.status !== 'impossible') {
+    return { name: 'recover-without-access', passed: false, detail: `Recuperar sin acceso devolvió ${result.status}.` };
+  }
+  return { name: 'recover-without-access', passed: true, detail: 'Recuperar sin acceso es imposible.' };
+}
+
+/** Ejecuta las cuatro comprobaciones de jugabilidad sobre un expediente
+ * generado. `budgetMinutes` es el plazo de la partida más difícil (la mitad
+ * del plazo base del expediente): la ruta dorada debe caber ahí. */
+export function simulateCase(definition: CaseDefinition, goldenPath: GoldenPathAction[], budgetMinutes: number): SimulationResult {
+  const golden = checkGoldenPath(definition, goldenPath, budgetMinutes);
+  const checks = [
+    golden.check,
+    checkEarlyFinish(definition),
+    checkDetainWithoutWarrant(definition),
+    checkRecoverWithoutAccess(definition),
+  ];
+  const errors = checks.filter(check => !check.passed).map(check => check.detail);
+  return {
+    playable: errors.length === 0,
+    minute: golden.minute,
+    budgetMinutes,
+    result: golden.result,
+    objectivesAchieved: golden.objectivesAchieved,
+    checks,
+    errors,
   };
-}
-
-export class RouteSimulator {
-  private config: SimulationConfig;
-
-  constructor(config: Partial<SimulationConfig>) {
-    this.config = { ...DEFAULT_SIMULATION_CONFIG, ...config };
-  }
-
-  generateScenarios(_params: any): Array<{ cooperation: number; delay: number; transportError: boolean; aiError: boolean; seed: number }> {
-    const scenarios: any[] = [];
-
-    for (const cooperation of this.config.cooperationLevels) {
-      for (const delay of this.config.delayScenarios) {
-        for (const seed of this.config.seeds) {
-          scenarios.push({ cooperation, delay, transportError: false, aiError: false, seed });
-
-          if (this.config.simulateTransportErrors) {
-            scenarios.push({ cooperation, delay, transportError: true, aiError: false, seed });
-          }
-
-          if (this.config.simulateAIErrors) {
-            scenarios.push({ cooperation, delay, transportError: false, aiError: true, seed });
-          }
-
-          if (this.config.simulateTransportErrors && this.config.simulateAIErrors) {
-            scenarios.push({ cooperation, delay, transportError: true, aiError: true, seed });
-          }
-        }
-      }
-    }
-
-    return scenarios;
-  }
-
-  async runSimulation(params: any, scenario: any, _pipelineConfig: any): Promise<any> {
-    const startTime = Date.now();
-    const scenarioId = `${params.difficulty}-${params.crimeType}-c${scenario.cooperation}-d${scenario.delay}-t${scenario.transportError}-a${scenario.aiError}-s${scenario.seed}`;
-
-    const budgetLimit = this.config.maxBudgetByDifficulty[params.difficulty] ?? 480;
-    let budgetUsed = 0;
-    let completedStages = 0;
-    let success = false;
-    let route: RouteSimulationResult['route'] = 'failed';
-    let error: string | undefined;
-
-    try {
-      this.createInitialDraft(params);
-
-      for (let stageNum = 1; stageNum <= 9; stageNum++) {
-        const stageCost = this.calculateStageCost(stageNum);
-        budgetUsed += stageCost;
-
-        if (budgetUsed > (this.config.maxBudgetByDifficulty[params.difficulty] ?? 480)) {
-          throw new Error('Presupuesto excedido');
-        }
-
-        if (scenario.transportError && Math.random() < 0.15) {
-          throw new Error('Error de transporte simulado');
-        }
-
-        if (scenario.aiError && Math.random() < 0.1) {
-          throw new Error('Error de IA simulado');
-        }
-
-        if (scenario.cooperation < 4 && Math.random() < 0.3) {
-          throw new Error('Cooperación insuficiente');
-        }
-
-        if (stageNum >= 7 && scenario.cooperation < 5 && Math.random() < 0.2) {
-          route = 'detention';
-          throw new Error('Detención errónea');
-        }
-
-        completedStages++;
-      }
-
-      success = true;
-      route = 'success';
-    } catch (err) {
-      success = false;
-      error = err instanceof Error ? err.message : String(err);
-
-      if (error.indexOf('Presupuesto') >= 0) route = 'budget_exceeded';
-      else if (error.indexOf('Detención') >= 0) route = 'detention';
-      else if (completedStages >= 5) route = 'partial';
-      else if (error.indexOf('timeout') >= 0 || completedStages === 0) route = 'timeout';
-      else route = 'failed';
-    }
-
-    const totalTime = Date.now() - startTime;
-
-    return {
-      scenarioId,
-      params,
-      cooperation: scenario.cooperation,
-      delay: scenario.delay,
-      transportError: scenario.transportError,
-      aiError: scenario.aiError,
-      seed: scenario.seed,
-      success,
-      completedStages,
-      totalTime,
-      budgetUsed,
-      budgetLimit,
-      withinBudget: budgetUsed <= budgetLimit,
-      error,
-      route,
-    };
-  }
-
-  calculateStageTime(stageNum: number, cooperation: number, delay: number): number {
-    const baseTimes = [0, 15, 10, 20, 15, 10, 10, 20, 15, 10];
-    const base = baseTimes[stageNum] || 10;
-    const coopFactor = cooperation >= 7 ? 0.8 : cooperation >= 5 ? 1.0 : 1.5;
-    return Math.round(base * coopFactor + delay);
-  }
-
-  calculateStageCost(stage: number): number {
-    const costs = [0, 20, 15, 25, 20, 15, 10, 20, 15, 10];
-    return costs[stage] || 10;
-  }
-
-  createInitialDraft(params: any): any {
-    const now = new Date().toISOString();
-    return {
-      id: `sim-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      params,
-      status: 'validating',
-      createdAt: now,
-      updatedAt: now,
-      currentStage: 1,
-      stages: Array.from({ length: 9 }, (_, i) => ({
-        stage: i + 1,
-        name: `stage-${i + 1}`,
-        status: 'pending' as const,
-        retryCount: 0,
-      })),
-    };
-  }
-
-  async runFullSuite(baseParams: any, pipelineConfig: any): Promise<any> {
-    const scenarios = this.generateScenarios(baseParams);
-    const results: any[] = [];
-
-    for (const scenario of scenarios) {
-      for (let run = 0; run < this.config.runsPerScenario; run++) {
-        const result = await this.runSimulation(baseParams, scenario, pipelineConfig);
-        results.push(result);
-      }
-    }
-
-    return this.aggregateResults(results);
-  }
-
-  aggregateResults(results: any[]): any {
-    const totalRuns = results.length;
-    const successfulRuns = results.filter((r: any) => r.success).length;
-    const failedRuns = results.filter((r: any) => r.route === 'failed').length;
-    const partialRuns = results.filter((r: any) => r.route === 'partial').length;
-    const detentionRuns = results.filter((r: any) => r.route === 'detention').length;
-    const timeoutRuns = results.filter((r: any) => r.route === 'timeout').length;
-    const budgetExceededRuns = results.filter((r: any) => r.route === 'budget_exceeded').length;
-
-    const byDifficulty: any = {};
-    const byCooperation: Record<number, { total: number; success: number }> = {};
-    const byDelay: Record<number, { total: number; success: number }> = {};
-
-    for (const r of results) {
-      const diff = r.params.difficulty;
-      const diffAgg = byDifficulty[diff] ?? { total: 0, success: 0, avgTime: 0, avgBudget: 0 };
-      byDifficulty[diff] = diffAgg;
-      diffAgg.total++;
-      if (r.success) diffAgg.success++;
-      diffAgg.avgTime += r.totalTime;
-      diffAgg.avgBudget += r.budgetUsed;
-
-      const coopAgg = byCooperation[r.cooperation] ?? { total: 0, success: 0 };
-      byCooperation[r.cooperation] = coopAgg;
-      coopAgg.total++;
-      if (r.success) coopAgg.success++;
-
-      const delayAgg = byDelay[r.delay] ?? { total: 0, success: 0 };
-      byDelay[r.delay] = delayAgg;
-      delayAgg.total++;
-      if (r.success) delayAgg.success++;
-    }
-
-    const criticalIssues: string[] = [];
-    const overallSuccessRate = successfulRuns / results.length;
-    if (overallSuccessRate < 0.7) criticalIssues.push('Tasa de éxito global por debajo del 70%');
-    if (detentionRuns / results.length > 0.15) criticalIssues.push('Demasiadas detenciones erróneas (>15%)');
-    if (budgetExceededRuns / results.length > 0.1) criticalIssues.push('Demasiados casos exceden presupuesto (>10%)');
-
-    const avgTime = results.reduce((sum: number, r: any) => sum + r.totalTime, 0) / results.length;
-    const avgBudget = results.reduce((sum: number, r: any) => sum + r.budgetUsed, 0) / results.length;
-
-    return {
-      config: this.config,
-      totalRuns,
-      successfulRuns,
-      failedRuns,
-      partialRuns,
-      detentionRuns,
-      timeoutRuns,
-      budgetExceededRuns,
-      byDifficulty,
-      byCooperation,
-      byDelay,
-      results,
-      summary: {
-        overallSuccessRate,
-        avgTime,
-        avgBudget,
-        criticalIssues,
-      },
-    };
-  }
-}
-
-export function createRouteSimulator(config: any) {
-  return new RouteSimulator(config);
 }

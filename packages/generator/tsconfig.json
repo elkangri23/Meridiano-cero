@@ -10,7 +10,8 @@
     "sourceMap": true,
     "composite": true,
     "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
-    "noEmit": false
+    "noEmit": false,
+    "types": ["node"]
   },
   "include": ["src/**/*.ts", "vitest.config.ts"],
   "exclude": ["dist", "node_modules"]

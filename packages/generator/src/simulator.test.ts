@@ -1,177 +1,69 @@
 import { describe, it, expect } from 'vitest';
-import { createRouteSimulator, DEFAULT_SIMULATION_CONFIG } from './simulator.js';
+import { generadoFraudeDefinition } from '@meridiano/engine';
+import { simulateCase, type GoldenPathAction } from './simulator.js';
 
-describe('RouteSimulator (T4-03)', () => {
-  describe('DEFAULT_SIMULATION_CONFIG', () => {
-    it('tiene configuración por defecto correcta', () => {
-      expect(DEFAULT_SIMULATION_CONFIG.runsPerScenario).toBe(10);
-      expect(DEFAULT_SIMULATION_CONFIG.cooperationLevels).toEqual([3, 5, 7, 9]);
-      expect(DEFAULT_SIMULATION_CONFIG.delayScenarios).toEqual([0, 30, 60, 120]);
-      expect(DEFAULT_SIMULATION_CONFIG.simulateTransportErrors).toBe(true);
-      expect(DEFAULT_SIMULATION_CONFIG.simulateAIErrors).toBe(true);
-      expect(DEFAULT_SIMULATION_CONFIG.seeds.length).toBeGreaterThan(0);
-      expect(DEFAULT_SIMULATION_CONFIG.maxBudgetByDifficulty).toEqual({
-        easy: 300,
-        normal: 480,
-        hard: 600,
-      });
-    });
+// La ruta dorada del fixture, como en el test del motor: inspeccionar,
+// recoger, analizar, hablar, consultar, viajar, orden, detener, recuperar.
+const GOLDEN_PATH: GoldenPathAction[] = [
+  { type: 'inspect', params: { targetId: 'MAD-OFIC' } },
+  { type: 'inspect', params: { targetId: 'MAD-OFIC', elementId: 'cajon' } },
+  { type: 'collect', params: { evidenceId: 'EV-02' } },
+  { type: 'analyze', params: { evidenceId: 'EV-02' } },
+  { type: 'inspect', params: { targetId: 'MAD-OFIC', elementId: 'archivador' } },
+  { type: 'collect', params: { evidenceId: 'EV-06' } },
+  { type: 'talk', params: { npcId: 'jorge', topicId: 'identidad' } },
+  { type: 'talk', params: { npcId: 'jorge', topicId: 'facturas' } },
+  { type: 'query', params: { topicId: 'accesos-jorge' } },
+  { type: 'wait', params: { minutes: 30 } },
+  { type: 'wait', params: { minutes: 30 } },
+  { type: 'wait', params: { minutes: 30 } },
+  { type: 'travel', params: { toCityId: 'barcelona' } },
+  { type: 'query', params: { topicId: 'registro-facturas' } },
+  { type: 'query', params: { topicId: 'registro-envios' } },
+  { type: 'query', params: { topicId: 'firma-contrato' } },
+  { type: 'wait', params: { minutes: 30 } },
+  { type: 'travel', params: { toCityId: 'valencia' } },
+  { type: 'query', params: { topicId: 'custodia-contrato' } },
+  { type: 'wait', params: { minutes: 30 } },
+  { type: 'request_warrant', params: { suspectId: 'carmen', evidenceIds: ['EV-06', 'EV-07', 'EV-08'] } },
+  { type: 'wait', params: { minutes: 30 } },
+  { type: 'talk', params: { npcId: 'carmen', topicId: 'identidad' } },
+  { type: 'detain', params: { suspectId: 'carmen', warrantId: 'warrant:carmen', locationId: 'VLC-ALM', mode: 'interactive' } },
+  { type: 'recover', params: { objectId: 'contrato-original' } },
+  { type: 'finish', params: {} },
+];
+
+describe('simulateCase (T4-08)', () => {
+  it('la ruta dorada del fixture es jugable dentro del presupuesto', () => {
+    const result = simulateCase(generadoFraudeDefinition, GOLDEN_PATH, 1440);
+    expect(result.playable).toBe(true);
+    expect(result.result).toBe('complete');
+    expect(result.objectivesAchieved).toEqual(['obj-detener', 'obj-recuperar']);
+    expect(result.minute).toBeGreaterThan(0);
+    expect(result.minute).toBeLessThanOrEqual(1440);
+    expect(result.checks.map(check => check.name)).toEqual(['golden-path', 'early-finish', 'detain-without-warrant', 'recover-without-access']);
+    expect(result.errors).toEqual([]);
   });
 
-  describe('createRouteSimulator', () => {
-    it('crea simulador con configuración por defecto', () => {
-      const simulator = createRouteSimulator({});
-      expect(simulator).toBeInstanceOf(Object);
-    });
-
-    it('permite sobrescribir configuración', () => {
-      const simulator = createRouteSimulator({ runsPerScenario: 5, cooperationLevels: [5] });
-      expect((simulator as any).config.runsPerScenario).toBe(5);
-      expect((simulator as any).config.cooperationLevels).toEqual([5]);
-    });
+  it('rechaza una ruta dorada que no cierra el caso', () => {
+    const short = GOLDEN_PATH.slice(0, 5);
+    const result = simulateCase(generadoFraudeDefinition, short, 1440);
+    expect(result.playable).toBe(false);
+    expect(result.errors.some(error => error.includes('no cierra el caso'))).toBe(true);
   });
 
-  describe('generateScenarios', () => {
-    it('genera escenarios base sin errores', () => {
-      const simulator = createRouteSimulator({});
-      const scenarios = simulator.generateScenarios({
-        crimeType: 'robo',
-        difficulty: 'normal',
-        explorationMode: 'guided',
-        duration: 'medium',
-        region: 'europa',
-        surpriseMode: 'familiar',
-        seed: 42,
-        catalogVersion: '1.0.0',
-      });
-
-      // Con 4 niveles cooperación x 4 retrasos x 8 semillas = 128 base
-      // Sin errores de transporte/IA = 128
-      // Con error transporte = 128
-      // Con error IA = 128
-      // Con ambos = 128
-      // Total = 512
-      expect(scenarios.length).toBeGreaterThan(100);
-    });
-
-    it('genera menos escenarios si se desactivan errores', () => {
-      const simulator = createRouteSimulator({ simulateTransportErrors: false, simulateAIErrors: false });
-
-      const scenarios = simulator.generateScenarios({
-        crimeType: 'robo',
-        difficulty: 'normal',
-        explorationMode: 'guided',
-        duration: 'medium',
-        region: 'europa',
-        surpriseMode: 'familiar',
-        seed: 42,
-        catalogVersion: '1.0.0',
-      });
-
-      // Solo 4 cooperación x 4 retrasos x 8 semillas = 128
-      expect(scenarios.length).toBe(128);
-    });
+  it('rechaza una ruta dorada por encima del presupuesto', () => {
+    const result = simulateCase(generadoFraudeDefinition, GOLDEN_PATH, 60);
+    expect(result.playable).toBe(false);
+    expect(result.errors.some(error => error.includes('presupuesto'))).toBe(true);
   });
 
-  describe('runSimulation', () => {
-    it('ejecuta simulación y devuelve resultado', async () => {
-      const simulator = createRouteSimulator(
-        { runsPerScenario: 1, cooperationLevels: [7], delayScenarios: [0], seeds: [42], simulateTransportErrors: false, simulateAIErrors: false }
-      );
-
-      const result = await simulator.runSimulation({
-        crimeType: 'robo',
-        difficulty: 'normal',
-        explorationMode: 'guided',
-        duration: 'medium',
-        region: 'europa',
-        surpriseMode: 'familiar',
-        seed: 42,
-        catalogVersion: '1.0.0',
-      }, {
-        cooperation: 7,
-        delay: 0,
-        transportError: false,
-        aiError: false,
-        seed: 42,
-      }, {
-        maxRetriesPerStage: 2,
-        stageTimeoutMs: 5000,
-        enableSemanticReview: false,
-        enableSimulation: true,
-      });
-
-      expect(result).toBeDefined();
-      expect(result.scenarioId).toContain('normal');
-      expect(result.success).toBe(true);
-      expect(result.route).toBe('success');
-      expect(result.completedStages).toBe(9);
-      expect(result.budgetUsed).toBeLessThanOrEqual(480);
-    });
-
-    it('maneja presupuesto excedido', async () => {
-      const simulator = createRouteSimulator(
-        { runsPerScenario: 1, cooperationLevels: [3], delayScenarios: [120], seeds: [42], simulateTransportErrors: false, simulateAIErrors: false }
-      );
-
-      // easy budget = 300, con cooperación baja + retraso alto puede exceder
-      const result = await simulator.runSimulation({
-        crimeType: 'robo',
-        difficulty: 'easy',
-        explorationMode: 'guided',
-        duration: 'medium',
-        region: 'europa',
-        surpriseMode: 'familiar',
-        seed: 42,
-        catalogVersion: '1.0.0',
-      }, {
-        cooperation: 3,
-        delay: 120,
-        transportError: false,
-        aiError: false,
-        seed: 42,
-      }, {
-        maxRetriesPerStage: 2,
-        stageTimeoutMs: 5000,
-        enableSemanticReview: false,
-        enableSimulation: true,
-      });
-
-      expect(result.route).toBeOneOf(['budget_exceeded', 'failed', 'partial', 'detention', 'timeout']);
-    });
-  });
-
-  describe('runFullSuite', () => {
-    it('ejecuta suite completa y devuelve resultados agregados', async () => {
-      const simulator = createRouteSimulator(
-        { runsPerScenario: 2, cooperationLevels: [5, 7], delayScenarios: [0, 30], seeds: [42, 123], simulateTransportErrors: false, simulateAIErrors: false }
-      );
-
-      const result = await simulator.runFullSuite({
-        crimeType: 'robo',
-        difficulty: 'normal',
-        explorationMode: 'guided',
-        duration: 'medium',
-        region: 'europa',
-        surpriseMode: 'familiar',
-        seed: 42,
-        catalogVersion: '1.0.0',
-      }, {
-        maxRetriesPerStage: 2,
-        stageTimeoutMs: 5000,
-        enableSemanticReview: false,
-        enableSimulation: true,
-      });
-
-      expect(result.totalRuns).toBeGreaterThan(0);
-      expect(result.successfulRuns).toBeGreaterThanOrEqual(0);
-      expect(result.failedRuns).toBeGreaterThanOrEqual(0);
-      expect(result.byDifficulty).toBeDefined();
-      expect(result.byCooperation).toBeDefined();
-      expect(result.byDelay).toBeDefined();
-      expect(result.summary.overallSuccessRate).toBeGreaterThanOrEqual(0);
-      expect(result.summary.overallSuccessRate).toBeLessThanOrEqual(1);
-      expect(result.results.length).toBeGreaterThan(0);
-    });
+  it('rechaza un expediente cuya solución no es detenible sin orden', () => {
+    // El fixture es correcto; aquí se comprueba la puerta (c) con un caso
+    // roto: si la mecánica no declara al sospechoso solución, no es jugable.
+    const broken = structuredClone(generadoFraudeDefinition);
+    broken.mechanics!.suspects = [];
+    const result = simulateCase(broken, GOLDEN_PATH, 1440);
+    expect(result.playable).toBe(false);
   });
 });
