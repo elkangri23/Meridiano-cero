@@ -115,7 +115,60 @@ function stepFallback(action: GoldenPathAction, index: number, engineError: stri
   return `Paso ${index + 1} (${action.type} ${JSON.stringify(action.params)}): ${engineError} Revisa los requisitos de esta acción en la mecánica y en qué punto de la ruta ocurre.`;
 }
 
-function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, index: number, engineError: string): string {
+// ── Evidencia pendiente ─────────────────────────────────────────────────────
+// Una consulta o un análisis NO entrega su evidencia al instante: la pide y
+// el resultado llega solo cuando pasa el tiempo (delayMinutes), al esperar,
+// viajar o inspeccionar. Mientras tanto la evidencia está «en curso»: el
+// motor la rechaza como requisito, pero no es desconocida ni está mal
+// ordenada — lo que falta es una espera después del paso que la pidió.
+// Sin distinguirla, el diagnóstico decía «mueve la consulta DESPUÉS del
+// paso que la revela» aunque ya iba después, y el modelo no podía arreglarlo
+// (dos jobs en Media cayeron así en la etapa 4).
+
+function pendingEvidence(run: CaseRun): Map<string, { dueMinute: number; method: string }> {
+  const pending = new Map<string, { dueMinute: number; method: string }>();
+  for (const request of run.pendingRequests) {
+    if (request.type !== 'fixed_evidence') continue;
+    const payload = request.payload;
+    if (!payload || typeof payload !== 'object') continue;
+    const record = payload as Record<string, unknown>;
+    const evidenceId = record.evidenceId;
+    if (typeof evidenceId !== 'string' || pending.has(evidenceId)) continue;
+    pending.set(evidenceId, {
+      dueMinute: request.dueMinute,
+      method: typeof record.method === 'string' ? record.method : 'query',
+    });
+  }
+  return pending;
+}
+
+/** Paso de la ruta que pidió una evidencia pendiente, con su retardo. */
+function requestingStep(definition: CaseDefinition, goldenPath: GoldenPathAction[], index: number, evidenceId: string): { stepIndex: number; label: string; delayMinutes: number } | null {
+  for (let stepIndex = 0; stepIndex < index; stepIndex++) {
+    const action = goldenPath[stepIndex];
+    if (!action) continue;
+    if (action.type === 'query') {
+      const rule = definition.mechanics?.queries.find(entry => entry.id === paramId(action, 'topicId'));
+      if (rule?.evidenceId === evidenceId) return { stepIndex, label: `la consulta «${rule.id}»`, delayMinutes: rule.delayMinutes };
+    }
+    if (action.type === 'analyze') {
+      const rule = definition.mechanics?.analyses.find(entry => entry.inputEvidenceId === paramId(action, 'evidenceId'));
+      if (rule?.resultEvidenceId === evidenceId) return { stepIndex, label: `el análisis de ${rule.inputEvidenceId}`, delayMinutes: rule.delayMinutes };
+    }
+  }
+  return null;
+}
+
+function pendingDiagnosis(definition: CaseDefinition, run: CaseRun, goldenPath: GoldenPathAction[], index: number, evidenceId: string): string | null {
+  const pending = pendingEvidence(run);
+  if (!pending.has(evidenceId)) return null;
+  const request = requestingStep(definition, goldenPath, index, evidenceId);
+  const wait = request ? Math.max(1, request.delayMinutes) : 30;
+  const where = request ? `${request.label} en el paso ${request.stepIndex + 1}` : 'un paso anterior';
+  return `${evidenceId} ya está pedida (${where}) pero su resultado aún no ha llegado: una consulta o un análisis no entrega su evidencia al instante, solo cuando pasa el tiempo. Añade un wait de al menos ${wait} min —o un viaje— después de ese paso, antes de usar ${evidenceId}.`;
+}
+
+function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
   const step = `Paso ${index + 1} (query)`;
   const topicId = paramId(action, 'topicId');
   const rule = definition.mechanics?.queries.find(entry => entry.id === topicId);
@@ -127,6 +180,11 @@ function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenP
     return `${step}: la consulta «${topicId}» exige estar en ${cityLabel(definition, rule.cityId)} / ${locationLabel(definition, rule.locationId)} y estás en ${positionLabel(definition, run)}. Viaja antes a esa ciudad y vuelve a intentarlo en ese lugar.`;
   }
   if (rule.requires.length > 0 && !rule.requires.some(id => knowsEvidence(run, id))) {
+    const pending = rule.requires.find(id => pendingEvidence(run).has(id));
+    if (pending) {
+      const cause = pendingDiagnosis(definition, run, goldenPath, index, pending);
+      if (cause) return `${step}: la consulta «${topicId}» exige haber obtenido antes ${pending}. ${cause}`;
+    }
     return `${step}: la consulta «${topicId}» exige haber obtenido antes al menos una de estas evidencias: ${rule.requires.join(', ')}. En este punto conoces: ${knownEvidenceList(run)}. Mueve la consulta DESPUÉS del paso que revela una de ellas.`;
   }
   if (knowsEvidence(run, rule.evidenceId)) {
@@ -193,7 +251,7 @@ function diagnoseDetain(definition: CaseDefinition, run: CaseRun, action: Golden
   return stepFallback(action, index, engineError);
 }
 
-function diagnoseRequestWarrant(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, index: number, engineError: string): string {
+function diagnoseRequestWarrant(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
   const step = `Paso ${index + 1} (request_warrant)`;
   const suspectId = paramId(action, 'suspectId');
   const suspect = definition.mechanics?.suspects.find(entry => entry.id === suspectId);
@@ -206,6 +264,11 @@ function diagnoseRequestWarrant(definition: CaseDefinition, run: CaseRun, action
     : [];
   const unknown = evidenceIds.filter(id => !knowsEvidence(run, id));
   if (unknown.length > 0) {
+    const pending = unknown.find(id => pendingEvidence(run).has(id));
+    if (pending) {
+      const cause = pendingDiagnosis(definition, run, goldenPath, index, pending);
+      if (cause) return `${step}: ${pending} aún no se conoce. ${cause}`;
+    }
     return `${step}: estas evidencias aún no se conocen: ${unknown.join(', ')}. Pide la orden solo con evidencias ya obtenidas.`;
   }
   if (!canIssueWarrant(definition, run, suspectId, evidenceIds)) {
@@ -252,12 +315,20 @@ function diagnoseInspect(definition: CaseDefinition, run: CaseRun, action: Golde
   return stepFallback(action, index, engineError);
 }
 
-function diagnoseAnalyze(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, index: number, engineError: string): string {
+function diagnoseAnalyze(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
   const step = `Paso ${index + 1} (analyze)`;
   const evidenceId = paramId(action, 'evidenceId');
   const rule = definition.mechanics?.analyses.find(entry => entry.inputEvidenceId === evidenceId);
   if (!rule) return `${step}: no hay ningún análisis declarado para ${evidenceId}.`;
-  if (!run.inventory.includes(evidenceId)) return `${step}: ${evidenceId} no está en tu poder: recógela antes de analizarla.`;
+  if (!run.inventory.includes(evidenceId)) {
+    const pending = pendingDiagnosis(definition, run, goldenPath, index, evidenceId);
+    if (pending) return `${step}: ${evidenceId} aún no está en tu poder. ${pending}`;
+    return `${step}: ${evidenceId} no está en tu poder: recógela antes de analizarla.`;
+  }
+  if (pendingEvidence(run).has(rule.resultEvidenceId)) {
+    const cause = pendingDiagnosis(definition, run, goldenPath, index, rule.resultEvidenceId);
+    if (cause) return `${step}: el análisis de ${evidenceId} ya está en curso. ${cause}`;
+  }
   if (knowsEvidence(run, rule.resultEvidenceId)) return `${step}: el análisis ya dio su resultado (${rule.resultEvidenceId} ya se conoce). Quita este paso.`;
   return stepFallback(action, index, engineError);
 }
@@ -283,13 +354,13 @@ function diagnoseTravel(definition: CaseDefinition, run: CaseRun, action: Golden
 
 function diagnoseStep(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
   switch (action.type) {
-    case 'query': return diagnoseQuery(definition, run, action, index, engineError);
+    case 'query': return diagnoseQuery(definition, run, action, goldenPath, index, engineError);
     case 'recover': return diagnoseRecover(definition, run, action, goldenPath, index, engineError);
     case 'detain': return diagnoseDetain(definition, run, action, index, engineError);
-    case 'request_warrant': return diagnoseRequestWarrant(definition, run, action, index, engineError);
+    case 'request_warrant': return diagnoseRequestWarrant(definition, run, action, goldenPath, index, engineError);
     case 'collect': return diagnoseCollect(definition, run, action, index, engineError);
     case 'inspect': return diagnoseInspect(definition, run, action, index, engineError);
-    case 'analyze': return diagnoseAnalyze(definition, run, action, index, engineError);
+    case 'analyze': return diagnoseAnalyze(definition, run, action, goldenPath, index, engineError);
     case 'talk': return diagnoseTalk(definition, run, action, index, engineError);
     case 'travel': return diagnoseTravel(definition, run, action, index, engineError);
     default: return stepFallback(action, index, engineError);

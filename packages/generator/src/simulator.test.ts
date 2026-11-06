@@ -121,3 +121,38 @@ describe('diagnoseGoldenPathFailure', () => {
     expect(diagnoseGoldenPathFailure(generadoFraudeDefinition, GOLDEN_PATH, 1440)).toBeNull();
   });
 });
+
+describe('diagnoseGoldenPathFailure (evidencia pendiente)', () => {
+  it('explica una consulta cuyo requisito está pedido pero aún no ha madurado', () => {
+    // En el fixture, accesos-jorge no exige nada; aquí exige EV-03, que el
+    // análisis de EV-02 pide pero aún no entrega (delay 90, sin espera).
+    const definition = structuredClone(generadoFraudeDefinition);
+    const query = definition.mechanics?.queries.find(entry => entry.id === 'accesos-jorge');
+    if (!query) throw new Error('Sin consulta accesos-jorge en el fixture.');
+    query.requires = ['EV-03'];
+    const path: GoldenPathAction[] = [
+      { type: 'inspect', params: { targetId: 'MAD-OFIC' } },
+      { type: 'inspect', params: { targetId: 'MAD-OFIC', elementId: 'cajon' } },
+      { type: 'collect', params: { evidenceId: 'EV-02' } },
+      { type: 'analyze', params: { evidenceId: 'EV-02' } },
+      { type: 'query', params: { topicId: 'accesos-jorge' } },
+    ];
+    const diagnosis = diagnoseGoldenPathFailure(definition, path, 1440);
+    expect(diagnosis).toContain('EV-03');
+    expect(diagnosis).toContain('aún no ha llegado');
+    expect(diagnosis).toContain('90 min');
+  });
+
+  it('explica un análisis repetido mientras su resultado está en curso', () => {
+    const path: GoldenPathAction[] = [
+      { type: 'inspect', params: { targetId: 'MAD-OFIC' } },
+      { type: 'inspect', params: { targetId: 'MAD-OFIC', elementId: 'cajon' } },
+      { type: 'collect', params: { evidenceId: 'EV-02' } },
+      { type: 'analyze', params: { evidenceId: 'EV-02' } },
+      { type: 'analyze', params: { evidenceId: 'EV-02' } },
+    ];
+    const diagnosis = diagnoseGoldenPathFailure(generadoFraudeDefinition, path, 1440);
+    expect(diagnosis).toContain('ya está en curso');
+    expect(diagnosis).toContain('90 min');
+  });
+});

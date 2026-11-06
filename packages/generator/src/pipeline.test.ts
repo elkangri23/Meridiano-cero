@@ -1172,3 +1172,24 @@ describe('diagnóstico de la etapa 4 en el pipeline', () => {
     expect(result.error).toMatch(/EV-03/);
   });
 });
+
+describe('validación de la etapa 4 (delayMinutes)', () => {
+  it('rechaza una consulta con delayMinutes 0 (el resultado quedaría en curso)', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = { ...outputs.cluesWorld, ...structuredClone(outputs.cluesRules) };
+    const mechanics = clues.mechanics as { queries: Array<{ delayMinutes: number }> };
+    mechanics.queries[0]!.delayMinutes = 0;
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('delayMinutes'))).toBe(true);
+  });
+
+  it('acepta delayMinutes 30 en las consultas del doble', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = { ...outputs.cluesWorld, ...outputs.cluesRules };
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(true);
+  });
+});

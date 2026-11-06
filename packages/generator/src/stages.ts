@@ -447,6 +447,15 @@ function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[
         if (!ok) errors.push(`mechanics.${group.key}[${index}] debe tener ${field} (${kind}).`);
       }
       checkMechanicId(group, entry, index, errors);
+      // El validador v1.5 exige delayMinutes entero entre 1 y 240: con 0 el
+      // resultado queda en curso y el paso siguiente que lo necesita se
+      // rechaza en la simulación sin que el diagnóstico de orden lo explique.
+      if ((group.key === 'queries' || group.key === 'analyses') && 'delayMinutes' in entry) {
+        const delay = entry.delayMinutes;
+        if (typeof delay !== 'number' || !Number.isInteger(delay) || delay < 1 || delay > 240) {
+          errors.push(`mechanics.${group.key}[${index}] delayMinutes debe ser un entero entre 1 y 240 (es ${String(delay)}).`);
+        }
+      }
     });
   }
   const recovery = mechanics.recovery;
