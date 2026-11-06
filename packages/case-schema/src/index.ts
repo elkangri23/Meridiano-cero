@@ -2,7 +2,7 @@ export * from './types.js';
 export * from './validator.js';
 export { LEGACY_ASTROLABIO_ID, legacyAstrolabioSuspect } from './legacy-astrolabio.js';
 // Re-export catalog types without duplication - catalog.ts re-exports types from types.js
-export { validateCatalogParams, getBudgetForParams, getSuggestedDuration, deadlineMinutesForDifficulty, DIFFICULTY_DEADLINE_FACTOR, GDD_CRIME_TYPES, CRIME_TYPE_LABELS, CONTENT_RATING_LABELS, caseLabel, type CatalogParams, type CatalogValidationResult, type Duration, type CrimeType, type ContentRating } from './catalog.js';
+export { validateCatalogParams, getBudgetForParams, getSuggestedDuration, deadlineMinutesForDifficulty, DIFFICULTY_DEADLINE_FACTOR, GDD_CRIME_TYPES, GENERAL_ONLY_CRIMES, crimeAllowedForRating, CRIME_TYPE_LABELS, CONTENT_RATING_LABELS, caseLabel, type CatalogParams, type CatalogValidationResult, type Duration, type CrimeType, type ContentRating } from './catalog.js';
 export { GEOGRAPHIC_CATALOG, DEFAULT_TRAVEL_ROUTES, getCity, getRoute, getReachableCities, searchCities, type GeographicCity, type TravelRoute } from './geography-catalog.js';
 export { RECURRENT_NPCS, COMMUNICATION_CHANNELS, QUERY_TYPES, getNPC, getNPCsByCity, getQueryType, getChannelCost, searchNPCs, type NPCProfile, type CommunicationChannel, type QueryType } from './npc-catalog.js';
 export { calculateCaseOutcome, createInitialCareer, applyOutcome, applySanction, resolveSanction, getActiveSanctions, getRank, type CaseResult, type CareerRecord, type SanctionRecord, type CaseOutcome } from './career.js';
@@ -17,3 +17,5 @@ export { runInitialSetup, runHealthChecks, getAdminPanelConfig, type SetupConfig
 export { hashPassword, verifyPassword } from './auth-utils.js';
 export { planMigrations, runHealthReport, checkSaveCompatibility, RUNBOOK_CLEAN_INSTALL, RUNBOOK_MIGRATION_UPGRADE, RUNBOOK_ROLLBACK, type MigrationPlan, type HealthReport, type SaveCompatibilityResult, type RunbookStep } from './migration-health.js';
 export { createBackupConfig, runFullBackup, runIncrementalBackup, restoreBackup, measureRPO_RTO, recordRestoreTest, computeChecksum, type BackupConfig, type BackupMetadata, type RestoreResult, type RPO_RTO_Metrics } from './backup-restore.js';export { EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, OBJECTIVE_TEXT, REPORT_REASON_TEXT, REPORT_RESULT_TEXT, evidenceText, npcKnowledgeFacts, npcGreeting, npcRefusal, discoveryText, conversationRecordText, travelText, reportResultText, reportReasonText, objectiveText, type DiscoveryLookup } from './fact-texts.js';
+export { validateMechanics } from './validation-mechanics.js';
+export { FAMILY_FORBIDDEN_TERMS, validateGeneratedContent } from './validation-content.js';

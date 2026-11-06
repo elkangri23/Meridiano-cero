@@ -24,7 +24,7 @@ export interface FinalReport {
  * `contentRating` es el nivel de contenido (Familiar/General, GDD §14); y
  * `contentMode` (fixed/generated) es el origen del expediente, no su tono.
  * «Robo Familiar» no es un delito: es delito=robo + contenido=Familiar. */
-export type CrimeType = 'robo' | 'desaparicion' | 'fraude' | 'espionaje' | 'sabotaje' | 'misterio-historico' | 'aleatorio';
+export type CrimeType = 'robo' | 'desaparicion' | 'fraude' | 'espionaje' | 'sabotaje' | 'misterio-historico' | 'aleatorio' | 'extorsion' | 'contrabando' | 'corrupcion' | 'falsificacion' | 'homicidio' | 'secuestro';
 export type ContentRating = 'familiar' | 'general';
 
 export interface PlayerView {

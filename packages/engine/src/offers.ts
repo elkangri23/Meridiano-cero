@@ -3,6 +3,7 @@ import type { Action } from './types.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
 import { knowsEvidence, canCollect, queryRule, inspectedEvidence, listQueryIds, listInspectableElements } from './fixed-evidence.js';
 import { canIssueWarrant, knownSuspect } from './warrants.js';
+import { generatedAnalysis, generatedDetentionAvailable, generatedInspectLabel, generatedQueryRule, isGeneratedCase, listGeneratedInspectableElements } from './generated-mechanics.js';
 
 /**
  * Acciones que el jugador puede intentar desde el estado actual, calculadas
@@ -44,6 +45,7 @@ function warrantPending(run: CaseRun, suspectId: string): boolean {
 }
 
 function detentionAvailable(def: CaseDefinition, run: CaseRun, suspectId: string): boolean {
+  if (!isFixedCase(def)) return generatedDetentionAvailable(def, run, suspectId);
   const suspect = fixedSuspect(suspectId);
   if (!suspect || !isFixedCase(def)) return false;
   // Espejo de detentionAuthorized (index.ts): conocido, presente, con orden y sin detener.
@@ -58,10 +60,10 @@ function inspectOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const offers: ActionOffer[] = [{ id: `inspect:${location.id}`, label: `Inspeccionar ${location.name}`,
     action: { type: 'inspect', params: { targetId: location.id } } }];
   if (!run.discoveries.includes(location.id)) return offers;
-  for (const element of listInspectableElements(location.id)) {
-    const evidenceId = inspectedEvidence(location.id, element);
+  for (const element of [...listInspectableElements(location.id), ...listGeneratedInspectableElements(def, location.id)]) {
+    const evidenceId = inspectedEvidence(location.id, element) ?? def.mechanics?.inspectables.find(entry => entry.locationId === location.id && entry.elementId === element)?.evidenceId;
     if (evidenceId && !knowsEvidence(run, evidenceId)) {
-      offers.push({ id: `inspect:${location.id}:${element}`, label: `Inspeccionar ${elementLabel[element] ?? element}`,
+      offers.push({ id: `inspect:${location.id}:${element}`, label: `Inspeccionar ${generatedInspectLabel(def, location.id, element) ?? elementLabel[element] ?? element}`,
         action: { type: 'inspect', params: { targetId: location.id, elementId: element } } });
     }
   }
@@ -85,11 +87,25 @@ function talkOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
       offers.push({ id: 'talk:lucia:caja', label: 'Preguntar a Lucía por la caja',
         action: { type: 'talk', params: { npcId: 'lucia', topicId: 'caja' } } });
     }
+    // Expedientes generados (T4-08): temas declarados en la mecánica.
+    for (const entry of def.mechanics?.talkEvidence.filter(item => item.npcId === npc.id) ?? []) {
+      if (knowsEvidence(run, entry.evidenceId)) continue;
+      if (entry.requiresRelation && (run.npcRelations[npc.id] ?? 0) <= 0) continue;
+      offers.push({ id: `talk:${npc.id}:${entry.topicId}`, label: entry.label,
+        action: { type: 'talk', params: { npcId: npc.id, topicId: entry.topicId } } });
+    }
   }
   return offers;
 }
 
 function queryOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
+  if (isGeneratedCase(def)) {
+    return (def.mechanics?.queries ?? [])
+      .map(query => ({ query, rule: generatedQueryRule(def, run, query.id) }))
+      .filter(entry => entry.rule && !run.discoveries.includes(entry.rule.evidenceId))
+      .map((entry): ActionOffer => ({ id: `query:${entry.query.id}`, label: entry.query.label,
+        detail: `La respuesta tarda ${entry.query.delayMinutes} min`, action: { type: 'query', params: { topicId: entry.query.id } } }));
+  }
   return listQueryIds()
     .map(queryId => ({ queryId, rule: queryRule(def, run, queryId) }))
     .filter(entry => entry.rule && !run.discoveries.includes(entry.rule.evidenceId))
@@ -98,6 +114,12 @@ function queryOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
 }
 
 function analyzeOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
+  if (isGeneratedCase(def)) {
+    return (def.mechanics?.analyses ?? [])
+      .filter(rule => generatedAnalysis(def, run, rule.inputEvidenceId))
+      .map((rule): ActionOffer => ({ id: `analyze:${rule.inputEvidenceId}`, label: `Analizar ${rule.inputEvidenceId} en el laboratorio`,
+        detail: `El resultado tarda ${rule.delayMinutes} min`, action: { type: 'analyze', params: { evidenceId: rule.inputEvidenceId } } }));
+  }
   if (!isFixedCase(def) || !run.inventory.includes('EV-02') || run.discoveries.includes('EV-03')) return [];
   return [{ id: 'analyze:EV-02', label: 'Analizar EV-02 en el laboratorio',
     detail: 'El resultado tarda 90 min', action: { type: 'analyze', params: { evidenceId: 'EV-02' } } }];
@@ -120,28 +142,40 @@ function waitOffer(run: CaseRun): ActionOffer[] {
     : [];
 }
 
+/** Sospechosos con oferta de orden/detención: los del caso fijo o los
+ * declarados en la mecánica de un expediente generado. */
+function suspectIds(def: CaseDefinition): string[] {
+  return isGeneratedCase(def)
+    ? (def.mechanics?.suspects.map(suspect => suspect.id) ?? [])
+    : ['ines', 'tomas'];
+}
+
 function warrantOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const knownEvidenceIds = def.evidence.filter(item => knowsEvidence(run, item.id)).map(item => item.id);
   if (knownEvidenceIds.length === 0) return [];
-  return ['ines', 'tomas']
-    .map(suspectId => fixedSuspect(suspectId))
-    .filter((suspect): suspect is NonNullable<typeof suspect> => suspect !== undefined &&
-      knownSuspect(run, suspect.id) && !warrantPending(run, suspect.id) && canIssueWarrant(def, run, suspect.id))
-    .map((suspect): ActionOffer => ({ id: `request_warrant:${suspect.id}`, label: `Solicitar orden contra ${npcName(def, suspect.id)}`,
+  return suspectIds(def)
+    .filter(suspectId => knownSuspect(def, run, suspectId) && !warrantPending(run, suspectId) && canIssueWarrant(def, run, suspectId))
+    .map((suspectId): ActionOffer => ({ id: `request_warrant:${suspectId}`, label: `Solicitar orden contra ${npcName(def, suspectId)}`,
       detail: 'Se resuelve en 30 min',
-      action: { type: 'request_warrant', params: { suspectId: suspect.id, evidenceIds: knownEvidenceIds } } }));
+      action: { type: 'request_warrant', params: { suspectId, evidenceIds: knownEvidenceIds } } }));
 }
 
 function detainOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
-  return ['ines', 'tomas']
-    .map(suspectId => fixedSuspect(suspectId))
-    .filter((suspect): suspect is NonNullable<typeof suspect> => suspect !== undefined && detentionAvailable(def, run, suspect.id))
-    .map((suspect): ActionOffer => ({ id: `detain:${suspect.id}`, label: `Detener a ${npcName(def, suspect.id)}`,
-      action: { type: 'detain', params: { suspectId: suspect.id, warrantId: 'warrant:' + suspect.id, locationId: suspect.locationId, mode: 'interactive' } } }));
+  return suspectIds(def)
+    .filter(suspectId => detentionAvailable(def, run, suspectId))
+    .map((suspectId): ActionOffer => ({ id: `detain:${suspectId}`, label: `Detener a ${npcName(def, suspectId)}`,
+      action: { type: 'detain', params: { suspectId, warrantId: 'warrant:' + suspectId, locationId: def.mechanics?.suspects.find(suspect => suspect.id === suspectId)?.locationId ?? fixedSuspect(suspectId)?.locationId ?? '', mode: 'interactive' } } }));
 }
 
 function recoverOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const access = run.warrants.includes('warrant:access') || run.discoveries.includes('forced-entry');
+  if (isGeneratedCase(def)) {
+    const recovery = def.mechanics?.recovery;
+    if (!recovery || run.position.cityId !== recovery.cityId || run.position.locationId !== recovery.locationId ||
+        (recovery.requiresAccessWarrant && !access) || run.recoveredObjects.includes(recovery.objectId)) return [];
+    return [{ id: `recover:${recovery.objectId}`, label: recovery.label,
+      action: { type: 'recover', params: { objectId: recovery.objectId } } }];
+  }
   if (!isFixedCase(def) || run.position.cityId !== 'lisboa' || run.position.locationId !== 'LIS-ALM' ||
       !access || run.recoveredObjects.includes(ORIGINAL_OBJECT)) return [];
   return [{ id: 'recover:astrolabio-original', label: 'Recuperar el astrolabio original',

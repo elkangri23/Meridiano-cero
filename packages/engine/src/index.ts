@@ -4,6 +4,7 @@ import { materialMinutes, confirmation } from './timed-action.js';
 import { appendRequest, pendingEvidence } from './requests.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
 import { revealInspection, canCollect, revealTalk, queryRule, matureEvidence, revealEvidence } from './fixed-evidence.js';
+import { generatedAnalysis, generatedQueryRule, generatedSuspect, matureGeneratedEvidence, revealGeneratedInspection, revealGeneratedTalk } from './generated-mechanics.js';
 import { requestWarrant, matureSelectedWarrant } from './warrants.js';
 export { canIssueWarrant, knownSuspect } from './warrants.js';
 export { availableOffers } from './offers.js';
@@ -160,6 +161,11 @@ function applyMaterial(def: CaseDefinition, run: CaseRun, action: Action): Actio
 
 // ── Inspect ───────────────────────────────────────────────────────────────────
 
+/** Revela lo que la inspección descubre: vía fija o vía genérica (T4-08). */
+function revealInspect(def: CaseDefinition, run: CaseRun, target: string, element?: string): CaseRun {
+  return isFixedCase(def) ? revealInspection(def, run, target, element) : revealGeneratedInspection(def, run, target, element);
+}
+
 function doInspect(def: CaseDefinition, run: CaseRun, targetId: string): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
   const location = def.locations.find((l) => l.id === targetId);
   if (!location || !location.accessible || location.cityId !== run.position.cityId) {
@@ -174,7 +180,7 @@ function doInspect(def: CaseDefinition, run: CaseRun, targetId: string): { run: 
     discoveries: newDiscoveries,
   };
   const events = [makeEvent(run.minute, 'inspect', { targetId, general: true })];
-  return { run: revealInspection(def, newRun, targetId), events };
+  return { run: revealInspect(def, newRun, targetId), events };
 }
 
 function doInspectSpecific(def: CaseDefinition, run: CaseRun, targetId: string, elementId: string): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
@@ -191,7 +197,7 @@ function doInspectSpecific(def: CaseDefinition, run: CaseRun, targetId: string, 
     discoveries: newDiscoveries,
   };
   const events = [makeEvent(run.minute, 'inspect', { targetId, elementId, specific: true })];
-  return { run: revealInspection(def, newRun, targetId, elementId), events };
+  return { run: revealInspect(def, newRun, targetId, elementId), events };
 }
 
 // ── Collect ───────────────────────────────────────────────────────────────────
@@ -235,7 +241,7 @@ function doTalk(def: CaseDefinition, run: CaseRun, npcId: string, topicId?: unkn
     conversationRecords: newRecords,
     npcRelations: newRelations,
   };
-  const revealed = revealTalk(def, newRun, npcId, topicId);
+  const revealed = isFixedCase(def) ? revealTalk(def, newRun, npcId, topicId) : revealGeneratedTalk(def, newRun, npcId, topicId);
   const factIds = revealed.discoveries.filter(id => !run.discoveries.includes(id));
   const events = [makeEvent(run.minute, 'talk', { npcId, factIds })];
   return { run: revealed, events };
@@ -283,6 +289,8 @@ function queueEvidence(run: CaseRun, evidenceId: string, delay: number, method: 
 }
 
 function requestAnalysis(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  const generic = generatedAnalysis(def, run, action.params.evidenceId);
+  if (generic) return queueEvidence(run, generic.resultEvidenceId, generic.delayMinutes, 'analyze');
   if (!isFixedCase(def) || action.params.evidenceId !== 'EV-02' || !run.inventory.includes('EV-02')) {
     return { status: 'impossible', run, events: [], reason: 'Análisis no disponible.' };
   }
@@ -291,10 +299,10 @@ function requestAnalysis(def: CaseDefinition, run: CaseRun, action: Action): Act
 }
 
 function requestQuery(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  const rule = queryRule(def, run, action.params.topicId);
+  const rule = queryRule(def, run, action.params.topicId) ?? generatedQueryRule(def, run, action.params.topicId);
   if (!rule) return { status: 'impossible', run, events: [], reason: 'Consulta no disponible.' };
   if (run.discoveries.includes(rule.evidenceId)) return { status: 'impossible', run, events: [], reason: 'Consulta ya disponible.' };
-  return queueEvidence(run, rule.evidenceId, 30, 'query');
+  return queueEvidence(run, rule.evidenceId, rule.delayMinutes, 'query');
 }
 
 function processMaturedRequests(def: CaseDefinition, run: CaseRun, newMinute: number, expired: boolean): { run: CaseRun; matured: ScheduledResult[] } {
@@ -307,7 +315,9 @@ function processMaturedRequests(def: CaseDefinition, run: CaseRun, newMinute: nu
     matured.push(request);
     if (request.type === 'warrant') currentRun = matureSelectedWarrant(def, currentRun, request);
     if (request.type === 'analyze') currentRun = matureAnalysis(currentRun, request);
-    if (request.type === 'fixed_evidence') currentRun = matureEvidence(def, currentRun, request);
+    if (request.type === 'fixed_evidence') currentRun = isFixedCase(def)
+      ? matureEvidence(def, currentRun, request)
+      : matureGeneratedEvidence(def, currentRun, request);
     if (request.type === 'communicate') currentRun = matureCommunication(currentRun, request);
   }
   return { run: { ...currentRun, pendingRequests: remaining }, matured };
@@ -433,7 +443,22 @@ function detentionAuthorized(run: CaseRun, suspect: NonNullable<ReturnType<typeo
 }
 
 function resolveDetention(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  if (!isFixedCase(def)) return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
+  if (!isFixedCase(def)) {
+    // Expediente generado (T4-08): misma autorización que el caso fijo.
+    const suspect = typeof action.params.suspectId === 'string' ? generatedSuspect(def, action.params.suspectId) : undefined;
+    if (!suspect || action.params.mode !== 'interactive' || action.params.locationId !== suspect.locationId) {
+      return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
+    }
+    const known = run.discoveries.includes('identity:' + suspect.id) && run.discoveries.includes('location:' + suspect.id);
+    const present = run.position.cityId === suspect.cityId && run.position.locationId === suspect.locationId;
+    const warrant = 'warrant:' + suspect.id;
+    if (!known || !present || action.params.warrantId !== warrant || !run.warrants.includes(warrant)) {
+      return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
+    }
+    if (run.detentions.includes(suspect.id)) return { status: 'impossible', run, events: [], reason: 'Detención ya realizada.' };
+    return { status: 'applied', run: { ...run, version: run.version + 1, detentions: [...run.detentions, suspect.id] },
+      events: [makeEvent(run.minute, 'detain', { suspectId: suspect.id })] };
+  }
   const suspect = typeof action.params.suspectId === 'string' ? fixedSuspect(action.params.suspectId) : undefined;
   if (!suspect || action.params.mode !== 'interactive' || action.params.locationId !== suspect.locationId) {
     return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
@@ -447,6 +472,21 @@ function resolveDetention(def: CaseDefinition, run: CaseRun, action: Action): Ac
 }
 
 function resolveRecovery(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  if (!isFixedCase(def)) {
+    // Expediente generado (T4-08): misma recuperación que el caso fijo.
+    const recovery = def.mechanics?.recovery;
+    const irregular = run.discoveries.includes('forced-entry');
+    const access = run.warrants.includes('warrant:access') || irregular;
+    if (!recovery || action.params.objectId !== recovery.objectId || run.position.cityId !== recovery.cityId ||
+        run.position.locationId !== recovery.locationId || (recovery.requiresAccessWarrant && !access)) {
+      return { status: 'impossible', run, events: [], reason: 'Recuperación no disponible.' };
+    }
+    if (run.recoveredObjects.includes(recovery.objectId)) return { status: 'impossible', run, events: [], reason: 'Objeto ya recuperado.' };
+    const revealed = revealEvidence(def, run, recovery.evidenceId, run.minute, 'recover');
+    return { status: 'applied', run: { ...revealed, version: run.version + 1, recoveredObjects: [...run.recoveredObjects, recovery.objectId],
+      inventory: [...run.inventory, recovery.evidenceId], admissibility: { ...revealed.admissibility, [recovery.evidenceId]: !irregular } },
+      events: [makeEvent(run.minute, 'recover', { objectId: recovery.objectId, irregular })] };
+  }
   const irregular = run.discoveries.includes('forced-entry');
   const access = run.warrants.includes('warrant:access') || irregular;
   if (!isFixedCase(def) || action.params.objectId !== ORIGINAL_OBJECT || run.position.cityId !== 'lisboa' || run.position.locationId !== 'LIS-ALM' || !access) {
@@ -591,4 +631,5 @@ export function createInitialRun(
 }
 
 export { astrolabioDefinition } from './fixtures/case-astrolabio.js';
+export { generadoFraudeDefinition } from './fixtures/case-generado-fraude.js';
 export { previewAction };

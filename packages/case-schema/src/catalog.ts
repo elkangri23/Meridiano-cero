@@ -10,13 +10,12 @@ export type Duration = 'short' | 'medium' | 'long';
 export type ContentMode = 'fixed' | 'generated';
 
 // Delitos del GDD §3 (orden del documento): la lista que ofrece el
-// formulario de «Nueva partida». No confundir con ALLOWED_CRIME_TYPES
-// (T5-01, validación de parámetros de generación) ni con el CrimeType del
-// generador (`packages/generator`): las tres listas no coinciden (T5-01
-// añade extorsión/contrabando/corrupción/falsificación y omite espionaje y
-// misterio histórico; el generador añade homicidio/secuestro, que el GDD
-// §14 solo admite en modo General). Se reconcilian cuando la generación se
-// conecte a la API; hasta entonces, el GDD manda en la creación.
+// formulario de «Nueva partida». RECONCILIADA en T4-08 (SPEC-007): unión de
+// GDD §3, ALLOWED_CRIME_TYPES de T5-01 (que añadía extorsión/contrabando/
+// corrupción/falsificación y omitía espionaje y misterio histórico) y el
+// CrimeType del generador (que añadía homicidio/secuestro, que el GDD §14
+// solo admite en modo General). `aleatorio` sigue siendo modo de selección,
+// no delito.
 export const GDD_CRIME_TYPES: readonly CrimeType[] = [
   'robo',
   'desaparicion',
@@ -24,8 +23,25 @@ export const GDD_CRIME_TYPES: readonly CrimeType[] = [
   'espionaje',
   'sabotaje',
   'misterio-historico',
+  'extorsion',
+  'contrabando',
+  'corrupcion',
+  'falsificacion',
+  'homicidio',
+  'secuestro',
   'aleatorio',
 ] as const;
+
+/** Delitos que solo se admiten en contenido General (GDD §14): homicidio y
+ * secuestro son temas perturbadores y nunca salen en Familiar. */
+export const GENERAL_ONLY_CRIMES: readonly CrimeType[] = ['homicidio', 'secuestro'] as const;
+
+/** ¿Se puede generar/jugar este delito con este nivel de contenido? */
+export function crimeAllowedForRating(crimeType: CrimeType, contentRating: ContentRating): boolean {
+  if (crimeType === 'aleatorio') return true;
+  if (contentRating === 'general') return true;
+  return !GENERAL_ONLY_CRIMES.includes(crimeType);
+}
 
 export const CRIME_TYPE_LABELS: Record<CrimeType, string> = {
   robo: 'Robo internacional',
@@ -34,6 +50,12 @@ export const CRIME_TYPE_LABELS: Record<CrimeType, string> = {
   espionaje: 'Espionaje',
   sabotaje: 'Sabotaje',
   'misterio-historico': 'Misterio histórico',
+  extorsion: 'Extorsión',
+  contrabando: 'Contrabando',
+  corrupcion: 'Corrupción',
+  falsificacion: 'Falsificación',
+  homicidio: 'Homicidio',
+  secuestro: 'Secuestro',
   aleatorio: 'Aleatorio',
 };
 
@@ -70,18 +92,9 @@ export const ALLOWED_REGIONS = [
   'zaragoza',
 ] as const;
 
-// Tipos de delito permitidos
-export const ALLOWED_CRIME_TYPES = [
-  'aleatorio',
-  'fraude',
-  'robo',
-  'sabotaje',
-  'desaparicion',
-  'extorsion',
-  'contrabando',
-  'corrupcion',
-  'falsificacion',
-] as const;
+// Tipos de delito permitidos (T4-08: la misma lista canónica que
+// GDD_CRIME_TYPES, incluido 'aleatorio' como modo de selección).
+export const ALLOWED_CRIME_TYPES = GDD_CRIME_TYPES;
 
 // Presupuesto de tiempo por dificultad (minutos internos)
 export const DIFFICULTY_BUDGET: Record<Difficulty, number> = {

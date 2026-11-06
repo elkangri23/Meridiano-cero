@@ -1,6 +1,6 @@
 import { hashDefinition } from '@meridiano/case-schema/server';
 import { describe, it, expect } from 'vitest';
-import { createInitialRun, resolveAction, confirmAction, projectToPlayerView } from './index.js';
+import { createInitialRun, resolveAction, confirmAction, projectToPlayerView, generadoFraudeDefinition } from './index.js';
 import type { CaseDefinition } from '@meridiano/case-schema';
 
 const def: CaseDefinition = {
@@ -45,11 +45,24 @@ describe('engine', () => {
   });
 
   it('collect adds to inventory', () => {
-    const run = createInitialRun(def, 'owner-1', 'run-1', hashDefinition(def));
-    const result = resolveAction(def, run, { type: 'collect', params: { evidenceId: 'ev-1' } });
+    // La recogida exige haber descubierto el objeto (T4-08: antes, un caso
+    // no fijo permitía recoger cualquier evidencia sin descubrirla). Se
+    // ejerce con el expediente generado: inspeccionar el cajón revela EV-02
+    // y solo entonces se puede recoger.
+    const generated = generadoFraudeDefinition;
+    let run = createInitialRun(generated, 'owner-1', 'run-1', hashDefinition(generated));
+    const apply = (type: 'inspect' | 'collect', params: Record<string, unknown>) => {
+      const preview = resolveAction(generated, run, { type, params });
+      const result = preview.status === 'confirmation_required' ? confirmAction(generated, run, { type, params }) : preview;
+      if (result.status === 'applied') run = result.run;
+      return result;
+    };
+    apply('inspect', { targetId: 'MAD-OFIC' });
+    apply('inspect', { targetId: 'MAD-OFIC', elementId: 'cajon' });
+    const result = apply('collect', { evidenceId: 'EV-02' });
     expect(result.status).toBe('applied');
     if (result.status === 'applied') {
-      expect(result.run.inventory).toContain('ev-1');
+      expect(result.run.inventory).toContain('EV-02');
     }
   });
 

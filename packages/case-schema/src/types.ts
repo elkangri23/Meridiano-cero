@@ -28,6 +28,12 @@ export interface NPC {
   cityId: string;
   knowledge: string[];
   cooperation: number;
+  /** Rol visible en la escena y el chat (p. ej. «Transportista»). Solo lo
+   * traen los expedientes generados; el caso fijo lo resuelve por catálogo. */
+  role?: string;
+  /** Persona que se envía al modelo al conversar (quién es, sobre qué
+   * responde y a qué se niega). Solo la traen los expedientes generados. */
+  persona?: string;
 }
 
 export interface Evidence {
@@ -58,6 +64,95 @@ export interface ScheduledResult {
   payload: unknown;
 }
 
+/**
+ * Mecánica declarativa de un expediente generado (T4-08). El motor del caso
+ * fijo tiene esta misma mecánica hardcodeada en `fixed-evidence.ts`,
+ * `warrants.ts` y `offers.ts`; los expedientes generados la declaran aquí y
+ * el motor la ejecuta por la vía genérica. `requires` es «cualquiera de»
+ * (basta conocer una de las evidencias listadas). `reveals` son marcadores
+ * extra de descubrimiento al revelar (p. ej. una ciudad nueva o la
+ * ubicación de un sospechoso).
+ */
+export interface MechanicsInspectable {
+  locationId: string;
+  elementId: string;
+  label: string;
+  evidenceId: string;
+  reveals?: string[];
+}
+
+export interface MechanicsQuery {
+  id: string;
+  label: string;
+  cityId: string;
+  locationId: string;
+  evidenceId: string;
+  requires: string[];
+  delayMinutes: number;
+  reveals?: string[];
+}
+
+export interface MechanicsAnalysis {
+  inputEvidenceId: string;
+  resultEvidenceId: string;
+  delayMinutes: number;
+}
+
+export interface MechanicsTalkEvidence {
+  npcId: string;
+  topicId: string;
+  label: string;
+  evidenceId: string;
+  requiresRelation?: boolean;
+}
+
+export interface MechanicsSuspect {
+  id: string;
+  cityId: string;
+  locationId: string;
+  /** Evidencias que hacen conocido al sospechoso (además de su identidad). */
+  knownFromEvidence: string[];
+  /** Combinaciones de evidencias admisibles que autorizan la orden. */
+  warrantCombinations: string[][];
+  /** Evidencias que, al incluirse en una orden concedida, dan acceso
+   * (p. ej. abrir la taquilla del depósito). */
+  accessEvidenceIds?: string[];
+}
+
+export interface MechanicsRecovery {
+  objectId: string;
+  /** Etiqueta legible de la acción (p. ej. «Recuperar el astrolabio original»). */
+  label: string;
+  cityId: string;
+  locationId: string;
+  evidenceId: string;
+  requiresAccessWarrant: boolean;
+}
+
+export interface CaseMechanics {
+  inspectables: MechanicsInspectable[];
+  queries: MechanicsQuery[];
+  analyses: MechanicsAnalysis[];
+  talkEvidence: MechanicsTalkEvidence[];
+  suspects: MechanicsSuspect[];
+  recovery: MechanicsRecovery;
+}
+
+/**
+ * Textos narrativos de un expediente generado (T4-08). El caso fijo los
+ * tiene hardcodeados en `fact-texts.ts`; los generados los traen aquí.
+ * `evidence` es el hecho revelado por cada evidencia; `knowledge`, lo que
+ * cada personaje puede contar sobre lo que sabe (en primera persona);
+ * `greetings`, el saludo al hablar con cada NPC; `refusals`, la negativa en
+ * personaje (normalmente solo la del sospechoso sobre el delito).
+ */
+export interface CaseTexts {
+  evidence: Record<string, string>;
+  knowledge: Record<string, string>;
+  greetings: Record<string, string>;
+  refusals?: Record<string, string>;
+}
+
 export interface CaseDefinition {
   id: string;
   schemaVersion: number;
@@ -80,6 +175,12 @@ export interface CaseDefinition {
   travelDurations: TravelDuration[];
   scheduledResults: ScheduledResult[];
   validationReport: ValidationReport;
+  /** Mecánica ejecutable (solo expedientes generados; el caso fijo usa su
+   * vía propia). Ausente en el astrolabio: su hash no cambia. */
+  mechanics?: CaseMechanics;
+  /** Textos narrativos (solo expedientes generados; el caso fijo usa
+   * `fact-texts.ts`). Ausente en el astrolabio: su hash no cambia. */
+  texts?: CaseTexts;
 }
 
 export interface ValidationReport {

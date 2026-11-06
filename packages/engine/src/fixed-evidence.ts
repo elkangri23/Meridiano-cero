@@ -2,13 +2,13 @@ import { EngineStateError } from './state-error.js';
 import type { CaseDefinition, CaseRun, ScheduledResult } from '@meridiano/case-schema';
 import { isFixedCase } from './fixed-case.js';
 
-type QueryRule = { city: string; location: string; evidenceId: string; requires: readonly string[] };
+type QueryRule = { city: string; location: string; evidenceId: string; requires: readonly string[]; delayMinutes: number };
 const queries: Readonly<Record<string, QueryRule>> = {
-  'herramienta-hv17': { city: 'paris', location: 'PAR-ARCH', evidenceId: 'EV-04', requires: ['EV-03'] },
-  'traslado-ines': { city: 'paris', location: 'PAR-ARCH', evidenceId: 'EV-05', requires: [] },
-  'firma-sello': { city: 'paris', location: 'PAR-ARCH', evidenceId: 'EV-07', requires: ['EV-06'] },
-  'custodia-envio': { city: 'lisboa', location: 'LIS-ALM', evidenceId: 'EV-08', requires: ['EV-05', 'EV-07'] },
-  'accesos-tomas': { city: 'madrid', location: 'MAD-SALA', evidenceId: 'EV-10', requires: [] },
+  'herramienta-hv17': { city: 'paris', location: 'PAR-ARCH', evidenceId: 'EV-04', requires: ['EV-03'], delayMinutes: 30 },
+  'traslado-ines': { city: 'paris', location: 'PAR-ARCH', evidenceId: 'EV-05', requires: [], delayMinutes: 30 },
+  'firma-sello': { city: 'paris', location: 'PAR-ARCH', evidenceId: 'EV-07', requires: ['EV-06'], delayMinutes: 30 },
+  'custodia-envio': { city: 'lisboa', location: 'LIS-ALM', evidenceId: 'EV-08', requires: ['EV-05', 'EV-07'], delayMinutes: 30 },
+  'accesos-tomas': { city: 'madrid', location: 'MAD-SALA', evidenceId: 'EV-10', requires: [], delayMinutes: 30 },
 };
 
 export function listQueryIds(): string[] {
@@ -52,7 +52,14 @@ export function revealInspection(def: CaseDefinition, run: CaseRun, target: stri
 }
 
 export function canCollect(def: CaseDefinition, run: CaseRun, id: string): boolean {
-  if (!isFixedCase(def)) return true;
+  if (!isFixedCase(def)) {
+    // Expediente generado (T4-08): un objeto se recoge cuando ya se conoce y
+    // está en el lugar actual. (Sin importar generated-mechanics: este módulo
+    // es su dependencia y el ciclo de importaciones lo rompería.)
+    const evidence = def.evidence.find(item => item.id === id);
+    if (!evidence || evidence.type !== 'object') return false;
+    return run.discoveries.includes(id) && evidence.origin === run.position.locationId;
+  }
   if (!['EV-02', 'EV-06'].includes(id) || !run.discoveries.includes(id)) return false;
   const evidence = def.evidence.find(item => item.id === id);
   return evidence?.origin === run.position.locationId;

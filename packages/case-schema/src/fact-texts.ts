@@ -5,7 +5,13 @@
 // ha revelado el identificador correspondiente, así que nunca filtra
 // spoilers. El motor sigue trabajando con IDs; esto solo traduce lo que el
 // jugador ya ha descubierto a frases que una persona puede leer.
+//
+// Los expedientes generados (T4-08) traen sus propios textos en
+// `CaseDefinition.texts`: las funciones de este módulo aceptan un `texts`
+// opcional y, cuando está presente, lo usan en vez del catálogo fijo. Sin
+// él, el comportamiento es el de siempre (caso fijo).
 import { RECURRENT_NPCS } from './npc-catalog.js';
+import type { CaseTexts } from './types.js';
 
 /** Hecho revelado por cada evidencia (SPEC-003, tabla de evidencias). */
 export const EVIDENCE_TEXTS: Record<string, string> = {
@@ -55,9 +61,10 @@ export interface DiscoveryLookup {
   npcName: (id: string) => string | undefined;
 }
 
-/** Texto de una evidencia, si existe. */
-export function evidenceText(evidenceId: string): string | undefined {
-  return EVIDENCE_TEXTS[evidenceId];
+/** Texto de una evidencia, si existe. Con `texts` (expediente generado), el
+ * texto viene del expediente; sin él, del catálogo fijo. */
+export function evidenceText(evidenceId: string, texts?: CaseTexts): string | undefined {
+  return texts ? texts.evidence[evidenceId] : EVIDENCE_TEXTS[evidenceId];
 }
 
 /** Informe final: resultado y motivo del cierre, en español. El motor
@@ -100,12 +107,13 @@ export function objectiveText(objectiveId: string): string {
 }
 
 /** Hechos que un personaje puede declarar, con su texto, según su
- * conocimiento (RECURRENT_NPCS). */
-export function npcKnowledgeFacts(npcId: string): Array<{ id: string; text: string }> {
-  const npc = RECURRENT_NPCS.find(item => item.id === npcId);
-  if (!npc) return [];
-  return npc.knowledge.flatMap(id => {
-    const text = KNOWLEDGE_TEXTS[id];
+ * conocimiento (RECURRENT_NPCS). Con `texts` y `knowledgeIds` (expediente
+ * generado), el conocimiento y los textos vienen del expediente. */
+export function npcKnowledgeFacts(npcId: string, texts?: CaseTexts, knowledgeIds?: string[]): Array<{ id: string; text: string }> {
+  const knowledge = texts ? (knowledgeIds ?? []) : (RECURRENT_NPCS.find(item => item.id === npcId)?.knowledge ?? []);
+  const source = texts ? texts.knowledge : KNOWLEDGE_TEXTS;
+  return knowledge.flatMap(id => {
+    const text = source[id];
     return text ? [{ id, text }] : [];
   });
 }
@@ -119,13 +127,13 @@ export const NPC_REFUSALS: Record<string, string> = {
 };
 
 /** Negativa en personaje de un NPC al declarar sobre el robo, si la tiene. */
-export function npcRefusal(npcId: string): string | undefined {
-  return NPC_REFUSALS[npcId];
+export function npcRefusal(npcId: string, texts?: CaseTexts): string | undefined {
+  return texts ? texts.refusals?.[npcId] : NPC_REFUSALS[npcId];
 }
 
 /** Saludo de un personaje al empezar a hablar con él. */
-export function npcGreeting(npcId: string): string | undefined {
-  return NPC_GREETINGS[npcId];
+export function npcGreeting(npcId: string, texts?: CaseTexts): string | undefined {
+  return texts ? texts.greetings[npcId] : NPC_GREETINGS[npcId];
 }
 
 /** Frase del primer viaje a una ciudad (`travel:<ciudad>`): el motor lo
@@ -138,11 +146,11 @@ function travelDiscovery(id: string, lookup: DiscoveryLookup): string | undefine
 
 /** Frase para un marcador del motor (análisis, identidad, ubicación,
  * respuesta recibida u orden denegada); undefined si no es un marcador. */
-function markerDiscovery(id: string, lookup: DiscoveryLookup): string | undefined {
+function markerDiscovery(id: string, lookup: DiscoveryLookup, texts?: CaseTexts): string | undefined {
   const travel = travelDiscovery(id, lookup);
   if (travel) return travel;
   if (id.startsWith('analysis:')) {
-    const inner = evidenceText(id.slice('analysis:'.length));
+    const inner = evidenceText(id.slice('analysis:'.length), texts);
     return inner ? `Análisis completado: ${inner}` : id;
   }
   if (id.startsWith('identity:')) {
@@ -172,10 +180,10 @@ export function travelText(fromCity: string | undefined, toCity: string): string
  * (`analysis:EV-xx`), respuestas recibidas y órdenes denegadas. Un
  * identificador desconocido se devuelve tal cual: nunca se oculta un
  * hallazgo por no tener texto. */
-export function discoveryText(id: string, lookup: DiscoveryLookup): string {
-  const evidence = EVIDENCE_TEXTS[id];
+export function discoveryText(id: string, lookup: DiscoveryLookup, texts?: CaseTexts): string {
+  const evidence = texts ? texts.evidence[id] : EVIDENCE_TEXTS[id];
   if (evidence) return evidence;
-  const marker = markerDiscovery(id, lookup);
+  const marker = markerDiscovery(id, lookup, texts);
   if (marker) return marker;
   const location = lookup.locationName(id);
   if (location) return `Lugar conocido: ${location}.`;

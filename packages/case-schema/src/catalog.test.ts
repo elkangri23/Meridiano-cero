@@ -118,8 +118,8 @@ describe('catalog', () => {
     expect(ALLOWED_CRIME_TYPES).toContain('fraude');
   });
 
-  it('GDD_CRIME_TYPES sigue el GDD §3 en su orden', () => {
-    expect([...GDD_CRIME_TYPES]).toEqual(['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'aleatorio']);
+  it('GDD_CRIME_TYPES es la lista canónica reconciliada en T4-08 (SPEC-007)', () => {
+    expect([...GDD_CRIME_TYPES]).toEqual(['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'extorsion', 'contrabando', 'corrupcion', 'falsificacion', 'homicidio', 'secuestro', 'aleatorio']);
   });
 
   it('cada delito del GDD tiene etiqueta en español', () => {

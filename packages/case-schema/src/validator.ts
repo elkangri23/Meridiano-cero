@@ -1,5 +1,6 @@
 import { validateShape } from './validation-shape.js';
 import { validateExecutableContent } from './validation-content.js';
+import { validateMechanics } from './validation-mechanics.js';
 import { validateKnowledge } from './validation-knowledge.js';
 import { validateMap } from './validation-map.js';
 import type { ValidationReport } from './types.js';
@@ -58,6 +59,7 @@ export function validateCaseDefinition(def: unknown): { valid: boolean; errors: 
   validateMap(groups, errors);
   validateKnowledge(def, groups, errors);
   validateExecutableContent(def, errors);
+  validateMechanics(def, groups, errors);
   report(def.validationReport, errors);
   return { valid: errors.length === 0, errors };
 }

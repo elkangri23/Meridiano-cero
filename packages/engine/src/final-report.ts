@@ -8,7 +8,11 @@ function canonicalSuspect(def: CaseDefinition, id: string): string {
 
 function objectiveAchieved(def: CaseDefinition, run: CaseRun, id: string): boolean {
   if (id === 'obj-detener') return run.detentions.some(suspect => canonicalSuspect(def, suspect) === def.solution);
-  if (id === 'obj-recuperar' && isFixedCase(def)) return run.recoveredObjects.includes(ORIGINAL_OBJECT);
+  if (id === 'obj-recuperar') {
+    // Expediente generado (T4-08): el objeto a recuperar lo declara la mecánica.
+    const objectId = isFixedCase(def) ? ORIGINAL_OBJECT : def.mechanics?.recovery.objectId;
+    return objectId !== undefined && run.recoveredObjects.includes(objectId);
+  }
   // El formato heredado no define condiciones para objetivos arbitrarios.
   return false;
 }
