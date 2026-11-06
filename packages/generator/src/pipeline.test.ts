@@ -643,6 +643,48 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/viaja a .* la ciudad actual/);
   });
 
+  it('reintenta la etapa 4 cuando la ruta dorada empieza inspeccionando en otra ciudad', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const secondCity = geography.cities[1];
+    if (!secondCity) throw new Error('Sin segunda ciudad.');
+    const secondLocation = outputs.cluesWorld.locations.find(location => location.cityId === secondCity.id);
+    if (!secondLocation) throw new Error('Sin lugar en la segunda ciudad.');
+    let stage4bCalls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          contexts.push(context as Record<string, unknown>);
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
+            // Como el modelo real en el smoke: la ruta empieza inspeccionando
+            // un lugar de otra ciudad (el modelo creía empezar allí) y luego
+            // viaja a la ciudad de inicio, que ya es la actual.
+            const broken = structuredClone(outputs.cluesRules);
+            const first = broken.goldenPath[0];
+            if (first) first.params = { targetId: secondLocation.id };
+            return broken;
+          }
+          return outputs.cluesRules;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4bCalls).toBe(2);
+    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/cada acción ocurre en la ciudad donde estás/);
+  });
+
   it('reintenta la etapa 3 con el error como feedback cuando el conocimiento viene en frase', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);

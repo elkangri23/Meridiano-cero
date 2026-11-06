@@ -162,7 +162,7 @@ export function buildStageContext(
   };
   if (stage === 1) return base;
   if (stage === 3) return { ...base, premise: prior.premise };
-  if (stage === 4) return stage4Context(base, prior, part);
+  if (stage === 4) return { ...stage4Context(base, prior, part), startCityId: geography.cities[0]?.id ?? '' };
   if (stage === 7) return { ...base, definition: prior.definition, goldenPath: prior.goldenPath, budgetMinutes: prior.budgetMinutes };
   return base;
 }
@@ -537,22 +537,81 @@ function checkGoldenPath(output: Record<string, unknown>, startCityId: string, e
   const last = output.goldenPath[output.goldenPath.length - 1];
   if (!isRecord(last) || last.type !== 'finish') errors.push('goldenPath debe terminar con el cierre del caso.');
   checkGoldenCollects(output, errors);
-  checkGoldenTravels(output, startCityId, errors);
+  checkGoldenPositions(output, startCityId, errors);
 }
 
-// La ruta empieza en la ciudad de inicio: un viaje a la ciudad actual no
-// existe (no hay ruta de una ciudad a sí misma). Se sigue la posición por
-// la ruta y cada viaje debe ir a una ciudad distinta de la actual.
-function checkGoldenTravels(output: Record<string, unknown>, startCityId: string, errors: string[]): void {
+// La ruta empieza en la ciudad de inicio y cada acción ocurre en la ciudad
+// donde se está en ese momento: un viaje a la ciudad actual no existe (no
+// hay ruta de una ciudad a sí misma) y no se puede inspeccionar, consultar
+// ni detener en una ciudad distinta. Se sigue la posición por la ruta.
+function checkGoldenPositions(output: Record<string, unknown>, startCityId: string, errors: string[]): void {
   if (!Array.isArray(output.goldenPath)) return;
+  const cityOfLocation = cityOfLocations(output);
+  const cityOfQuery = cityOfQueries(output);
   let currentCity = startCityId;
   output.goldenPath.forEach((action: unknown, index: number) => {
-    if (!isRecord(action) || action.type !== 'travel' || !isRecord(action.params)) return;
-    const toCityId = action.params.toCityId;
-    if (typeof toCityId !== 'string') return;
-    if (toCityId === currentCity) errors.push(`goldenPath[${index}] (travel) viaja a ${toCityId}, la ciudad actual: la ruta empieza en la ciudad de inicio y cada viaje va a una ciudad distinta.`);
-    currentCity = toCityId;
+    if (!isRecord(action)) return;
+    currentCity = checkGoldenPosition(action, index, currentCity, cityOfLocation, cityOfQuery, errors);
   });
+}
+
+// Lugar → ciudad (para inspeccionar y detener en la ruta dorada).
+function cityOfLocations(output: Record<string, unknown>): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!Array.isArray(output.locations)) return map;
+  for (const location of output.locations) {
+    if (isRecord(location) && typeof location.id === 'string' && typeof location.cityId === 'string') map.set(location.id, location.cityId);
+  }
+  return map;
+}
+
+// Consulta → ciudad (para consultar en la ruta dorada).
+function cityOfQueries(output: Record<string, unknown>): Map<string, string> {
+  const map = new Map<string, string>();
+  const mechanics = output.mechanics;
+  if (!isRecord(mechanics) || !Array.isArray(mechanics.queries)) return map;
+  for (const query of mechanics.queries) {
+    if (isRecord(query) && typeof query.id === 'string' && typeof query.cityId === 'string') map.set(query.id, query.cityId);
+  }
+  return map;
+}
+
+// Comprueba una acción de la ruta dorada contra la ciudad actual y devuelve
+// la ciudad tras la acción (cambia solo al viajar).
+function checkGoldenPosition(
+  action: Record<string, unknown>,
+  index: number,
+  currentCity: string,
+  cityOfLocation: Map<string, string>,
+  cityOfQuery: Map<string, string>,
+  errors: string[],
+): string {
+  if (!isRecord(action.params)) return currentCity;
+  if (action.type === 'travel') {
+    const toCityId = action.params.toCityId;
+    if (typeof toCityId !== 'string') return currentCity;
+    if (toCityId === currentCity) errors.push(`goldenPath[${index}] (travel) viaja a ${toCityId}, la ciudad actual: la ruta empieza en la ciudad de inicio y cada viaje va a una ciudad distinta.`);
+    return toCityId;
+  }
+  const city = actionCity(action, cityOfLocation, cityOfQuery);
+  if (city && city !== currentCity) errors.push(`goldenPath[${index}] (${action.type}) ocurre en ${city} estando en ${currentCity}: cada acción ocurre en la ciudad donde estás en ese momento de la ruta.`);
+  return currentCity;
+}
+
+// Ciudad donde ocurre una acción de la ruta (sin viajar): inspeccionar y
+// detener por el lugar, consultar por la ciudad de la consulta.
+function actionCity(action: Record<string, unknown>, cityOfLocation: Map<string, string>, cityOfQuery: Map<string, string>): string | undefined {
+  const params = action.params;
+  if (!isRecord(params)) return undefined;
+  if (action.type === 'inspect' || action.type === 'detain') {
+    const locationId = action.type === 'inspect' ? params.targetId : params.locationId;
+    return typeof locationId === 'string' ? cityOfLocation.get(locationId) : undefined;
+  }
+  if (action.type === 'query') {
+    const topicId = params.topicId;
+    return typeof topicId === 'string' ? cityOfQuery.get(topicId) : undefined;
+  }
+  return undefined;
 }
 
 // Recoger solo sirve para evidencias de tipo object (EV-02, EV-06, EV-11):
