@@ -12,7 +12,7 @@ function fakeOutputs(geography: SelectedGeography) {
   const [start, second, third] = geography.cities;
   if (!start || !second || !third) throw new Error('Geografía incompleta.');
   const locStart = `${start.id.slice(0, 3).toUpperCase()}-OFIC`;
-  const locSecond = `${second.id.slice(0, 3).toUpperCase()}-ARCH`;
+  const locSecond = `${second.id.slice(0, 3).toUpperCase()}-GALERIA`;
   const locThird = `${third.id.slice(0, 3).toUpperCase()}-ALM`;
   const premise = {
     title: 'El contrato de las facturas falsas',
