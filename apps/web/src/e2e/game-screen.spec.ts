@@ -128,6 +128,31 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('clock')).toContainText('10 min');
   });
 
+  test('Feedback visible: hablar abre el chat con respuesta e inspeccionar muestra el hallazgo', async ({ page }) => {
+    await openGameScreen(page);
+    // La pista de cómo se juega está visible al empezar.
+    await expect(page.locator('text=Tras cada acción el resultado aparece en la consola.')).toBeVisible();
+    // Hablar con Tomás: la conversación se abre sola con su saludo.
+    await playOffer(page, 'offer-talk:tomas:identidad', 0);
+    const chat = page.getByTestId('chat-turns');
+    await expect(chat).toBeVisible();
+    await expect(chat).toContainText('Soy Tomás Ríos, transportista');
+    // Preguntar en el chat: la respuesta del personaje se ve como burbuja.
+    await page.getByTestId('chat-input').fill('¿qué hiciste con la caja?');
+    await page.getByTestId('chat-send').click();
+    await expect(chat).toContainText('caja vacía', { timeout: 15000 });
+    await page.keyboard.press('Escape');
+    // Inspeccionar: el resultado se ve en la consola, no solo en el dossier.
+    await playOffer(page, 'offer-inspect:MAD-SALA', 10);
+    await expect(page.locator('.game-console')).toContainText('La caja está a la vista. Su etiqueta remite al archivo de París.');
+    // El dossier muestra los hallazgos con texto legible, no IDs crudos.
+    await page.click('button:has-text("Dossier")');
+    const dossier = page.locator('.game-window-body');
+    await expect(dossier).toContainText('La caja está a la vista');
+    await expect(dossier).not.toContainText('EV-01');
+    await expect(dossier).toContainText('Hablaste con Tomás Ríos (min 0).');
+  });
+
   // Los dos tests de Ajustes comparten el perfil local de desarrollo y el
   // proveedor efectivo: en serie para que uno no vea activa la conexión del
   // otro (ni deje una conexión activa que cambie la interpretación en el
