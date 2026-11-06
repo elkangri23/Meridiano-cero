@@ -4,7 +4,7 @@ import type { EntityGroups } from './validation-entities.js';
 const rootFields = 'catalogVersion,cities,contentMode,contentVersion,deadlineMinutes,difficulty,engineCompatibility,evidence,explorationMode,facts,id,locations,npcs,objectives,rules,scheduledResults,schemaVersion,seed,solution,travelDurations,validationReport';
 /** Campos opcionales de la raíz (T4-08): solo los traen los expedientes
  * generados; el caso fijo no los tiene y su hash no cambia. */
-const rootOptionalFields = 'mechanics,texts';
+const rootOptionalFields = 'briefing,catalogMeta,mechanics,texts';
 const entityFields: Readonly<Record<keyof EntityGroups, string>> = {
   cities: 'country,id,name',
   locations: 'accessible,cityId,description,id,name',

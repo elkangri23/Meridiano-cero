@@ -62,10 +62,15 @@ Salida: JSON con { act, factIds }
 El NPC NO sabe la solución. No inventes hechos ni reveles culpabilidad.`,
 
     generateCase: `
-GENERAR CASO
-Entrada: parámetros de generación, catálogo, verdad, motivaciones.
-Salida: JSON con { crimeType, objectives[], truth, motivations, difficulty, duration, region }
-NO incluyas solución ni secretos.`,
+GENERAR CASO (etapa del pipeline de generación de Meridiano-cero)
+El contexto autorizado trae: { stage, crimeType, contentRating, duration, seed, cities, contentRules, premise?, npcs?, definition?, goldenPath?, budgetMinutes?, repairFeedback? } y el esquema JSON de salida de esa etapa.
+- Lee el campo stage del contexto: 1 premisa, 3 NPC, 4 red de pistas y textos, 7 revisión semántica.
+- Salida: SOLO el JSON de esa etapa, con las claves exactas del esquema del contexto. No añadas claves, pensamientos ni texto fuera del JSON.
+- Etapa 1: título, delito, verdad, solución (NPC), señuelo (NPC), 1-2 testigos, motivo, objetivos (detener/recuperar como frases), etiqueta del objeto e introducción (speaker, title, 3 párrafos sin spoilers).
+- Etapa 3: NPC del reparto con persona, conocimiento (ids) y cooperación 0-10, más cronología.
+- Etapa 4: 3 lugares (uno por ciudad), 11 evidencias EV-01..EV-11 con los tipos fijados por el esquema, mecánica completa (inspeccionables, consultas, análisis, conversación, sospechosos, recuperación), textos (evidencia, conocimiento, saludos, negativas) y ruta dorada que resuelve el caso.
+- Etapa 7: { coherent, issues }: revisa si la definición es coherente (la solución se sigue de las evidencias, los requisitos son alcanzables, los tiempos caben en el presupuesto) y lista los problemas concretos; coherent=false si hay alguno.
+- Respeta contentRules (Familiar: sin asesinatos ni temas perturbadores). No inventes ciudades fuera de la lista cities del contexto, ni hechos fuera del expediente. Nunca reveles la solución fuera del JSON de la etapa.`,
 
     validateCase: `
 VALIDAR CASO
@@ -141,7 +146,10 @@ export function validateGameOutput(functionName: AIFunction, value: unknown): vo
       validateFactual(obj);
       break;
     case 'generateCase':
-      requireField(obj, 'truth', 'string');
+      // La salida de generación varía por etapa (premisa, NPC, pistas,
+      // revisión) y la valida en forma el pipeline (stages.ts), no el
+      // adaptador: aquí solo se exige un objeto JSON no vacío.
+      if (Object.keys(obj).length === 0) throw new Error('INVALID_OUTPUT');
       break;
   }
 }

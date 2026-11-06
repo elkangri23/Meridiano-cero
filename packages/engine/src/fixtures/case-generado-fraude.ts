@@ -76,6 +76,16 @@ export const generadoFraudeDefinition: CaseDefinition = {
     errors: [],
     status: 'validated',
   },
+  briefing: {
+    speaker: 'Margaret Sullivan',
+    title: 'El contrato de las facturas falsas',
+    paragraphs: [
+      'Un contrato de la empresa, en Madrid, ha aparecido con facturas que no cuadran. Eres detective de la agencia internacional A.C.M.E. y el caso es tuyo.',
+      'Empiezas en la oficina de contratación de Madrid, donde se firmó el contrato. Habla con quien estaba allí, inspecciona la oficina y sigue el rastro: el caso puede llevarte a Barcelona y a Valencia si las pruebas te llevan hasta allí.',
+      'Tu trabajo es averiguar quién falsificó las facturas, reunir pruebas que lo demuestren y recuperar el contrato original. Para detener a alguien necesitarás una orden válida. El reloj del caso marca tu plazo: cuando se agote, la investigación se cierra.',
+    ],
+  },
+  catalogMeta: { crimeType: 'fraude', contentRating: 'familiar' },
   mechanics: {
     inspectables: [
       { locationId: 'MAD-OFIC', elementId: '', label: 'Inspeccionar la oficina', evidenceId: 'EV-01', reveals: ['barcelona'] },

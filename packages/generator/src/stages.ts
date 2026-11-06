@@ -368,7 +368,7 @@ export interface AssemblyInput {
  * se elige al crearla y multiplica el plazo. El informe de validación es
  * provisional: la etapa 6 lo sustituye por el real. */
 export function assembleDefinition(input: AssemblyInput): CaseDefinition {
-  const { caseId, params, geography, premise, npcs, clues } = input;
+  const { caseId, choice, params, geography, premise, npcs, clues } = input;
   const cast = [premise.solution, premise.decoy, ...(premise.witnesses as Array<Record<string, unknown>>)] as Array<Record<string, unknown>>;
   const npcStage = (npcs.npcs as Array<Record<string, unknown>>);
   const cluesStage = clues as unknown as { locations: Array<Record<string, unknown>>; evidence: Array<Record<string, unknown>>; mechanics: CaseMechanics; texts: CaseTexts; goldenPath: Array<{ type: string; params: Record<string, unknown> }> };
@@ -426,12 +426,16 @@ export function assembleDefinition(input: AssemblyInput): CaseDefinition {
     validationReport: { validatorVersion: '1.5.0', scenarios: ['structural'], errors: [], status: 'validated' },
     mechanics: cluesStage.mechanics,
     texts: cluesStage.texts,
+    // La definición es autocontenida: la intro y el delito/contenido viajan
+    // con ella, así la vista del jugador no necesita otra fuente.
+    briefing: premiseBriefing(premise),
+    catalogMeta: { crimeType: choice.crimeType, contentRating: choice.contentRating },
   };
   return definition;
 }
 
-/** La introducción del caso (briefing sin spoilers) vive en la premisa, no
- * en la definición: el catálogo la sirve junto al expediente. */
+/** La introducción del caso (briefing sin spoilers) vive en la premisa y se
+ * copia en la definición al ensamblar: la definición es autocontenida. */
 export function premiseBriefing(premise: Record<string, unknown>): { speaker: string; title: string; paragraphs: string[] } {
   const briefing = premise.briefing as Record<string, unknown>;
   return {

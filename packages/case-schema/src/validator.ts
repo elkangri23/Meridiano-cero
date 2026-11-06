@@ -20,6 +20,24 @@ function metadata(d: DataRecord, errors: string[]) {
   check(text(d.catalogVersion), 'catalogVersion', errors);
   check(integer(d.deadlineMinutes, 1), 'deadlineMinutes', errors);
   check(text(d.solution), 'solution', errors);
+  // Metadatos opcionales de los expedientes generados (T4-08): si están,
+  // tienen que tener forma. La intro es lo que ve el jugador al empezar.
+  if (d.briefing !== undefined) {
+    if (!isRecord(d.briefing)) { errors.push('briefing: objeto obligatorio.'); }
+    else {
+      check(text(d.briefing.speaker), 'briefing.speaker', errors);
+      check(text(d.briefing.title), 'briefing.title', errors);
+      const paragraphs = strings(d.briefing.paragraphs, 'briefing.paragraphs', errors);
+      check(paragraphs.length >= 1, 'briefing.paragraphs no vacío', errors);
+    }
+  }
+  if (d.catalogMeta !== undefined) {
+    if (!isRecord(d.catalogMeta)) { errors.push('catalogMeta: objeto obligatorio.'); }
+    else {
+      check(typeof d.catalogMeta.crimeType === 'string' && d.catalogMeta.crimeType.length > 0, 'catalogMeta.crimeType', errors);
+      check(d.catalogMeta.contentRating === 'familiar' || d.catalogMeta.contentRating === 'general', 'catalogMeta.contentRating', errors);
+    }
+  }
 }
 
 function collections(d: DataRecord, errors: string[]): EntityGroups {

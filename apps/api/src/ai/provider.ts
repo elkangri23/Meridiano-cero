@@ -1,4 +1,4 @@
-export type AiOperation = 'interpretAction' | 'narrateResult' | 'converse';
+export type AiOperation = 'interpretAction' | 'narrateResult' | 'converse' | 'generateCase';
 export type AiErrorCode = 'unavailable' | 'timeout' | 'cancelled' | 'invalid_response' | 'budget_exceeded';
 export class AiError extends Error {
   readonly code: AiErrorCode;

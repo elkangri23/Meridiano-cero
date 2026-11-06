@@ -257,3 +257,50 @@ export const baseMigrations = pgTable('base_migrations', {
   hash: text('hash').notNull(),
   appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Generación de casos (T4-08): jobs persistentes y catálogo publicado.
+export const generationJobs = pgTable('generation_jobs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  ownerId: uuid('owner_id').notNull().references(() => profiles.id),
+  status: text('status').notNull().default('queued'), // queued, running, done, failed, cancelled
+  crimeType: text('crime_type').notNull(),
+  contentRating: text('content_rating').notNull().default('familiar'), // familiar, general
+  duration: text('duration').notNull().default('medium'), // short, medium, long
+  seed: integer('seed'),
+  stage: integer('stage').notNull().default(0),
+  progress: jsonb('progress').notNull().default({}),
+  draft: jsonb('draft'),
+  caseId: text('case_id'),
+  error: text('error'),
+  leaseOwner: text('lease_owner'),
+  leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+}, table => [
+  index('generation_jobs_owner_created_idx').on(table.ownerId, table.createdAt, table.id),
+  check('generation_jobs_status', sql`${table.status} IN ('queued', 'running', 'done', 'failed', 'cancelled')`),
+  check('generation_jobs_rating', sql`${table.contentRating} IN ('familiar', 'general')`),
+  check('generation_jobs_duration', sql`${table.duration} IN ('short', 'medium', 'long')`),
+  check('generation_jobs_stage', sql`${table.stage} >= 0 AND ${table.stage} <= 9`),
+]);
+
+export const generatedCases = pgTable('generated_cases', {
+  caseId: text('case_id').primaryKey(),
+  title: text('title').notNull(),
+  crimeType: text('crime_type').notNull(),
+  contentRating: text('content_rating').notNull(),
+  duration: text('duration').notNull(),
+  definition: jsonb('definition').notNull(),
+  definitionHash: text('definition_hash').notNull(),
+  jobId: uuid('job_id').references(() => generationJobs.id),
+  createdBy: uuid('created_by').notNull().references(() => profiles.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index('generated_cases_crime_idx').on(table.crimeType, table.contentRating, table.createdAt, table.caseId),
+  check('generated_cases_rating', sql`${table.contentRating} IN ('familiar', 'general')`),
+  check('generated_cases_duration', sql`${table.duration} IN ('short', 'medium', 'long')`),
+  check('generated_cases_hash', sql`${table.definitionHash} ~ '^[a-f0-9]{64}$'`),
+  check('generated_cases_definition_object', sql`jsonb_typeof(${table.definition}) = 'object'`),
+]);

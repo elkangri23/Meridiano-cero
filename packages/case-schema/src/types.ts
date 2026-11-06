@@ -1,4 +1,4 @@
-import type { FinalReport } from '@meridiano/contracts';
+import type { ContentRating, CrimeType, FinalReport } from '@meridiano/contracts';
 export type { FinalReport, PlayerView } from '@meridiano/contracts';
 
 // Tipos puros del expediente. Sin secretos de solución en PlayerView.
@@ -181,6 +181,12 @@ export interface CaseDefinition {
   /** Textos narrativos (solo expedientes generados; el caso fijo usa
    * `fact-texts.ts`). Ausente en el astrolabio: su hash no cambia. */
   texts?: CaseTexts;
+  /** Introducción del caso (solo expedientes generados; la del astrolabio
+   * vive en el catálogo de la API). Sin spoilers. */
+  briefing?: { speaker: string; title: string; paragraphs: string[] };
+  /** Delito y contenido del expediente (solo generados; el astrolabio los
+   * tiene en el catálogo de la API). */
+  catalogMeta?: { crimeType: CrimeType; contentRating: ContentRating };
 }
 
 export interface ValidationReport {
