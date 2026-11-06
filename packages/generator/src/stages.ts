@@ -503,7 +503,7 @@ function checkGoldenActions(output: Record<string, unknown>, errors: string[]): 
   return output.goldenPath.map((action: unknown) => isRecord(action) && typeof action.type === 'string' ? action.type : '');
 }
 
-function checkGoldenPath(output: Record<string, unknown>, errors: string[]): void {
+function checkGoldenPath(output: Record<string, unknown>, startCityId: string, errors: string[]): void {
   if (!Array.isArray(output.goldenPath) || output.goldenPath.length < 10 || output.goldenPath.length > 40) errors.push('goldenPath debe tener entre 10 y 40 acciones.');
   if (!Array.isArray(output.goldenPath)) return;
   const types = checkGoldenActions(output, errors);
@@ -512,6 +512,22 @@ function checkGoldenPath(output: Record<string, unknown>, errors: string[]): voi
   const last = output.goldenPath[output.goldenPath.length - 1];
   if (!isRecord(last) || last.type !== 'finish') errors.push('goldenPath debe terminar con el cierre del caso.');
   checkGoldenCollects(output, errors);
+  checkGoldenTravels(output, startCityId, errors);
+}
+
+// La ruta empieza en la ciudad de inicio: un viaje a la ciudad actual no
+// existe (no hay ruta de una ciudad a sí misma). Se sigue la posición por
+// la ruta y cada viaje debe ir a una ciudad distinta de la actual.
+function checkGoldenTravels(output: Record<string, unknown>, startCityId: string, errors: string[]): void {
+  if (!Array.isArray(output.goldenPath)) return;
+  let currentCity = startCityId;
+  output.goldenPath.forEach((action: unknown, index: number) => {
+    if (!isRecord(action) || action.type !== 'travel' || !isRecord(action.params)) return;
+    const toCityId = action.params.toCityId;
+    if (typeof toCityId !== 'string') return;
+    if (toCityId === currentCity) errors.push(`goldenPath[${index}] (travel) viaja a ${toCityId}, la ciudad actual: la ruta empieza en la ciudad de inicio y cada viaje va a una ciudad distinta.`);
+    currentCity = toCityId;
+  });
 }
 
 // Recoger solo sirve para evidencias de tipo object (EV-02, EV-06, EV-11):
@@ -541,7 +557,7 @@ function validateClues(output: unknown, geography: SelectedGeography, castIds: s
   if (locationIds) checkClueEvidence(output, locationIds, cityIds, errors);
   checkClueMechanics(output, errors);
   checkClueTexts(output, castIds, knowledgeIds, errors);
-  checkGoldenPath(output, errors);
+  checkGoldenPath(output, geography.cities[0]?.id ?? '', errors);
 }
 
 function validateReview(output: unknown, errors: string[]): void {
