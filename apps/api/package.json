@@ -15,6 +15,7 @@
     "@meridiano/case-schema": "workspace:*",
     "@meridiano/contracts": "workspace:*",
     "@meridiano/engine": "workspace:*",
+    "@meridiano/generator": "workspace:*",
     "argon2": "^0.45.2",
     "drizzle-orm": "0.45.4",
     "fastify": "5.12.7",

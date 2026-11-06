@@ -2,12 +2,13 @@ import { hashDefinition } from '@meridiano/case-schema/server';
 import { isDeepStrictEqual } from 'node:util';
 import type { InitialPlayerViewDto } from '@meridiano/contracts';
 import { createInitialRun, ENGINE_VERSION } from '@meridiano/engine';
-import { findCase, caseMeta } from './catalog.ts';
+import type { Database } from '../database/connection.ts';
+import { findCase, metaForDefinition } from './catalog.ts';
 import { RunStoreError, type StoredRun } from './runs.ts';
 
 /** Fallo cerrado hasta entregar proyección de transiciones, guardados y conversación. */
-export function initialPlayerView(run: StoredRun): InitialPlayerViewDto {
-  const definition = storedDefinition(run.definitionId);
+export async function initialPlayerView(db: Database['orm'], run: StoredRun): Promise<InitialPlayerViewDto> {
+  const definition = await storedDefinition(db, run.definitionId);
   const definitionHash = hashDefinition(definition);
   const initial = createInitialRun(definition, run.ownerId, run.id, definitionHash);
   const expected = expectedInitial(initial, run.engineVersion);
@@ -34,14 +35,14 @@ export function initialPlayerView(run: StoredRun): InitialPlayerViewDto {
     objectives: definition.objectives.map(objective => ({
       id: objective.id, description: objective.description, achieved: false,
     })),
-    caseMeta: caseMeta(definition.id),
+    caseMeta: metaForDefinition(definition),
     saveCapabilities: { manualLimit: 10, manualCount: 0, canSave: false, canLoad: false },
     recovery: { retryCreationWithSameKey: true, creationLookup: true, operationLookup: false },
   };
 }
 
-function storedDefinition(id: string) {
-  try { return findCase(id); }
+async function storedDefinition(db: Database['orm'], id: string) {
+  try { return await findCase(db, id); }
   catch { throw new RunStoreError('DEPENDENCY_UNAVAILABLE'); }
 }
 

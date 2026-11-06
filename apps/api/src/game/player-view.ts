@@ -6,7 +6,7 @@ import { evidenceText } from '@meridiano/case-schema';
 import { isPublicBatchStep, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
 import { availableOffers, ENGINE_VERSION, liveObjectives, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
-import { caseBriefing, caseMeta } from './catalog.ts';
+import { briefingForDefinition, metaForDefinition } from './catalog.ts';
 
 type FullRun = StoredRun & CaseRun;
 
@@ -111,8 +111,8 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
       achieved: achievedObjectives.has(objective.id),
     })),
     offers: availableOffers(definition, run),
-    briefing: caseBriefing(definition.id),
-    caseMeta: caseMeta(definition.id),
+    briefing: briefingForDefinition(definition),
+    caseMeta: metaForDefinition(definition),
     saveCapabilities: {
       manualLimit: 10,
       manualCount,

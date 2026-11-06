@@ -55,8 +55,8 @@ function createBody(value: unknown): { caseId: string; idempotencyKey: string; d
  * parámetros reales de la creación, no adornos. El cliente los envía desde
  * el formulario; un reintento sin ellos sigue funcionando (se derivan del
  * expediente). */
-function assertCreationParams(caseId: string, crimeType: CrimeType | undefined, contentRating: ContentRating | undefined): void {
-  const meta = caseMeta(caseId);
+async function assertCreationParams(database: Database, caseId: string, crimeType: CrimeType | undefined, contentRating: ContentRating | undefined): Promise<void> {
+  const meta = await caseMeta(database.orm, caseId);
   if (crimeType !== undefined && crimeType !== meta.crimeType) {
     throw new RunStoreError('VALIDATION_ERROR', 'El delito elegido no corresponde al expediente elegido.');
   }
@@ -236,15 +236,15 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       throw new RunStoreError('INVALID_REQUEST');
     }
     // Un caso en el catálogo actual: no hay segunda página ni cursores emitidos.
-    return { items: listCases(), nextCursor: null };
+    return { items: await listCases(database.orm), nextCursor: null };
   });
-  app.get<{ Params: { caseId: string } }>('/api/v1/cases/:caseId', { onRequest: authorize }, async request => caseSummary(request.params.caseId));
+  app.get<{ Params: { caseId: string } }>('/api/v1/cases/:caseId', { onRequest: authorize }, async request => caseSummary(database.orm, request.params.caseId));
   app.get<{ Querystring: Record<string, unknown> }>('/api/v1/runs', { onRequest: authorize }, request =>
     available(() => listStoredRuns(database, digest(request), request.query)));
   app.post('/api/v1/runs', { onRequest: authorize }, async (request, reply) => {
     const body = createBody(request.body);
-    assertCreationParams(body.caseId, body.crimeType, body.contentRating);
-    const definition = applyDifficulty(findCase(body.caseId), body.difficulty);
+    await assertCreationParams(database, body.caseId, body.crimeType, body.contentRating);
+    const definition = applyDifficulty(await findCase(database.orm, body.caseId), body.difficulty);
     const created = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey, expectedProfile(request)));
     // La vista es la actual (en un replay puede haber progreso posterior).
     const run = await available(() => readFullRun(database, digest(request), created.run.id));
@@ -274,10 +274,10 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
   app.get<{ Params: { runId: string } }>('/api/v1/runs/:runId', { onRequest: authorize }, async request => {
     const run = await available(() => readFullRun(database, digest(request), request.params.runId));
     // Motores antiguos: se conserva la vista inicial (503 si no es inicial virgen).
-    if (run.engineVersion !== ENGINE_VERSION) return initialPlayerView(run);
+    if (run.engineVersion !== ENGINE_VERSION) return initialPlayerView(database.orm, run);
     // La definición gobierna con los parámetros persistidos de esta partida
     // (dificultad y plazo elegidos al crearla), no con los del catálogo.
-    const definition = definitionForRun(run.definitionId, run.difficulty, run.deadlineMinutes);
+    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes);
     const manualCount = await available(() => saveCount(database, run.id));
     return playerViewDto(definition, run, manualCount);
   });
@@ -322,7 +322,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         .orderBy(desc(manualSaves.createdAt))
         .limit(limitNum + 1);
 
-      const definition = findDefinitionById(run.definitionId);
+      const definition = await findDefinitionById(database.orm, run.definitionId);
       const items = saves.slice(0, limitNum).map(s => ({
         saveId: s.id,
         runId: request.params.runId,

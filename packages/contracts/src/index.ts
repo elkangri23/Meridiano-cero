@@ -58,6 +58,25 @@ export interface CaseSummary {
   canStart: boolean;
 }
 
+/** Un job de generación de casos (T4-08): asíncrono, con estado y progreso.
+ * El borrador no se expone: solo el estado, la etapa y, al terminar, el
+ * expediente publicado (caseId) o el motivo del rechazo (error). */
+export interface GenerationJobDto {
+  jobId: string;
+  status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
+  stage: number;
+  crimeType: CrimeType;
+  contentRating: ContentRating;
+  duration: 'short' | 'medium' | 'long';
+  caseId: string | null;
+  error: string | null;
+  progress: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
 /** Primera entrega HTTP: únicamente partidas iniciales sin acciones ejecutadas.
  * El resto del DTO se ampliará junto a sus transiciones y proyecciones. */
 export interface InitialPlayerViewDto {

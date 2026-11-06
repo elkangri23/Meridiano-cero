@@ -9,7 +9,7 @@ async function start(): Promise<void> {
   const config = readAppConfig(process.env);
   const database = createDatabase(config.databaseUrl);
   const state = { draining: false };
-  const app = createApp({ config, database, state, telemetry: createTelemetry(process.stdout), mailer: createMailer(process.env) });
+  const app = createApp({ config, database, state, telemetry: createTelemetry(process.stdout), mailer: createMailer(process.env), generationWorker: true });
   app.addHook('onClose', async () => { await database.pool.end(); });
   const shutdown = createShutdown({
     state, close: () => app.close(),

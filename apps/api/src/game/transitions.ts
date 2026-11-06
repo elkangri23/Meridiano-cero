@@ -15,7 +15,7 @@ import { findDefinitionById, definitionForRun } from './catalog.ts';
 import { playerViewDto, projectEvents } from './player-view.ts';
 
 type FullRun = StoredRun & CaseRun;
-type Definition = ReturnType<typeof findDefinitionById>;
+type Definition = Awaited<ReturnType<typeof findDefinitionById>>;
 
 async function lockedRun(client: PoolClient, ownerId: string, runId: string): Promise<FullRun> {
   // Mismo guarda que ownedRun: un id mal formado es 404, no un error de Postgres.
@@ -157,7 +157,7 @@ export async function commitAction(
   return inSession(database, digest, async (client, ownerId) => {
     const run = await lockedRun(client, ownerId, runId);
     if (run.status === 'closed') throw new RunStoreError('RUN_CLOSED');
-    const definition = definitionForRun(run.definitionId, run.difficulty, run.deadlineMinutes);
+    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes);
     const manualCount = await manualSaveCount(client, runId);
 
     // Preview explícito: solo lectura, sin persistencia ni registro.
@@ -262,7 +262,7 @@ export async function commitLoad(
   return inSession(database, digest, async (client, ownerId) => {
     const run = await lockedRun(client, ownerId, runId);
     if (run.status === 'closed') throw new RunStoreError('RUN_CLOSED');
-    const definition = definitionForRun(run.definitionId, run.difficulty, run.deadlineMinutes);
+    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes);
     const loadDigest = createHash('sha256').update(JSON.stringify(['load', saveId])).digest('hex');
 
     // Replay por idempotencia ANTES de rechazar una revisión vieja.

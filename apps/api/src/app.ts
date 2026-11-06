@@ -2,6 +2,8 @@ import { registerRuntime } from './runtime.ts';
 import type { RuntimeState } from './lifecycle.ts';
 import type { Telemetry } from './telemetry.ts';
 import { registerGameRoutes } from './game/routes.ts';
+import { registerGenerationRoutes } from './generation/routes.ts';
+import { startGenerationWorker } from './generation/worker.ts';
 import { registerAiRoutes } from './ai/routes.ts';
 import { registerAiConnectionRoutes } from './ai/connections-routes.ts';
 import { RunStoreError } from './game/runs.ts';
@@ -19,12 +21,12 @@ import type { HealthResponse } from '@meridiano/contracts';
  * seguro del validador); el resto usa el mensaje genérico para no filtrar
  * detalles. */
 function runStoreErrorMessage(error: RunStoreError): string {
-  return (error.code === 'INVALID_DESTINATION' || error.code === 'VALIDATION_ERROR') && error.detail
+  return (error.code === 'INVALID_DESTINATION' || error.code === 'VALIDATION_ERROR' || error.code === 'GENERATION_LIMIT') && error.detail
     ? error.detail
     : 'No se pudo completar la solicitud.';
 }
 
-export function createApp(options?: { config: AppConfig; database: Database; state?: RuntimeState; telemetry?: Telemetry; mailer?: Mailer | null }) {
+export function createApp(options?: { config: AppConfig; database: Database; state?: RuntimeState; telemetry?: Telemetry; mailer?: Mailer | null; generationWorker?: boolean }) {
   const app: FastifyInstance = Fastify({ logger: false, requestTimeout: 65_000, connectionTimeout: 65_000,
     // Plazos alineados de fuera a dentro con la IA: el proveedor admite
     // 60 s (AI_TIMEOUT_MS / timeoutMs por defecto), así que el servidor
@@ -58,6 +60,13 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
     // config.localAuth es false allí (fail-closed en config.ts).
     if (options.config.registrationEnabled) registerPublicAuth(app, options.config, options.database, options.mailer ?? null);
     registerGameRoutes(app, options.config, options.database, ready);
+    registerGenerationRoutes(app, options.config, options.database, ready);
+    // El worker de generación vive en el proceso de la API (T4-08). Solo se
+    // arranca en el servidor real: los tests lo crean a mano cuando lo necesitan.
+    if (options.generationWorker) {
+      const worker = startGenerationWorker(options.database, options.config);
+      app.addHook('onClose', async () => { worker.stop(); });
+    }
     registerAiRoutes(app, options.config, options.database);
     registerAiConnectionRoutes(app, options.config, options.database);
   }
@@ -70,6 +79,7 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
         SESSION_REQUIRED: 401, SESSION_CHANGED: 409, NOT_FOUND: 404, IDEMPOTENCY_CONFLICT: 409, INVALID_REQUEST: 400,
         CASE_NOT_READY: 409, DEPENDENCY_UNAVAILABLE: 503, ORIGIN_REJECTED: 403, CSRF_REJECTED: 403, SAVE_LIMIT_REACHED: 409,
         VERSION_CONFLICT: 409, RUN_CLOSED: 409, SAVE_NOT_ACTIVE: 400, SAVE_INCOMPATIBLE: 422, INVALID_DESTINATION: 400, VALIDATION_ERROR: 400,
+        GENERATION_LIMIT: 429,
       } as const;
       // Solo INVALID_DESTINATION y VALIDATION_ERROR llevan mensaje propio (ver runStoreErrorMessage).
       return reply.code(statuses[error.code]).send({ error: { code: error.code, message: runStoreErrorMessage(error), requestId: request.id } });
