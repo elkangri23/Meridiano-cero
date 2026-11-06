@@ -108,9 +108,10 @@ describe('diagnoseGoldenPathFailure', () => {
     // registro-facturas es de Barcelona; pedirla en Madrid se rechaza
     // por la posición, antes que por sus requisitos.
     const queryIndex = GOLDEN_PATH.findIndex(action => action.type === 'query' && action.params.topicId === 'registro-facturas');
+    const first = GOLDEN_PATH[0];
     const query = GOLDEN_PATH[queryIndex];
-    if (!query) throw new Error('Sin consulta registro-facturas en el fixture.');
-    const path = [GOLDEN_PATH[0], query, ...GOLDEN_PATH.slice(1, queryIndex), ...GOLDEN_PATH.slice(queryIndex + 1)];
+    if (!first || !query) throw new Error('Sin consulta registro-facturas en el fixture.');
+    const path = [first, query, ...GOLDEN_PATH.slice(1, queryIndex), ...GOLDEN_PATH.slice(queryIndex + 1)];
     const diagnosis = diagnoseGoldenPathFailure(generadoFraudeDefinition, path, 1440);
     expect(diagnosis).toContain('Barcelona');
     expect(diagnosis).toContain('Madrid');
