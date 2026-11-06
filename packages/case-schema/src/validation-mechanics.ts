@@ -82,28 +82,34 @@ function talkEvidence(mechanics: DataRecord, groups: EntityGroups, errors: strin
   }
 }
 
+function checkWarrantCombinations(entry: DataRecord, groups: EntityGroups, errors: string[]): void {
+  const combinations = Array.isArray(entry.warrantCombinations) ? entry.warrantCombinations : [];
+  check(combinations.length >= 1, 'mechanics.suspects.warrantCombinations vacío', errors);
+  for (const combination of combinations) {
+    const ids = stringList(combination);
+    check(Array.isArray(combination) && ids.length >= 1, 'mechanics.suspects.warrantCombinations combinación vacía', errors);
+    for (const id of ids) check(groups.evidence.some(evidence => evidence.id === id), 'mechanics.suspects.warrantCombinations evidencia inexistente', errors);
+  }
+}
+
+function checkSuspect(entry: DataRecord, groups: EntityGroups, errors: string[]): void {
+  check(identifier(entry.id) && groups.npcs.some(npc => npc.id === entry.id), 'mechanics.suspects.id inexistente', errors);
+  check(identifier(entry.cityId) && groups.cities.some(city => city.id === entry.cityId), 'mechanics.suspects.cityId inexistente', errors);
+  check(identifier(entry.locationId) && groups.locations.some(location => location.id === entry.locationId && location.cityId === entry.cityId), 'mechanics.suspects.locationId inexistente o en otra ciudad', errors);
+  const known = stringList(entry.knownFromEvidence);
+  check(Array.isArray(entry.knownFromEvidence) && known.length >= 1, 'mechanics.suspects.knownFromEvidence vacío', errors);
+  for (const id of known) check(groups.evidence.some(evidence => evidence.id === id), 'mechanics.suspects.knownFromEvidence inexistente', errors);
+  checkWarrantCombinations(entry, groups, errors);
+  if (entry.accessEvidenceIds !== undefined) {
+    for (const id of stringList(entry.accessEvidenceIds)) check(groups.evidence.some(evidence => evidence.id === id), 'mechanics.suspects.accessEvidenceIds inexistente', errors);
+  }
+}
+
 function suspects(mechanics: DataRecord, def: DataRecord, groups: EntityGroups, errors: string[]): void {
   const entries = recordList(mechanics.suspects);
   check(Array.isArray(mechanics.suspects) && entries.length >= 1, 'mechanics.suspects: al menos un sospechoso', errors);
   check(entries.some(entry => entry.id === def.solution), 'mechanics.suspects debe incluir la solución', errors);
-  for (const entry of entries) {
-    check(identifier(entry.id) && groups.npcs.some(npc => npc.id === entry.id), 'mechanics.suspects.id inexistente', errors);
-    check(identifier(entry.cityId) && groups.cities.some(city => city.id === entry.cityId), 'mechanics.suspects.cityId inexistente', errors);
-    check(identifier(entry.locationId) && groups.locations.some(location => location.id === entry.locationId && location.cityId === entry.cityId), 'mechanics.suspects.locationId inexistente o en otra ciudad', errors);
-    const known = stringList(entry.knownFromEvidence);
-    check(Array.isArray(entry.knownFromEvidence) && known.length >= 1, 'mechanics.suspects.knownFromEvidence vacío', errors);
-    for (const id of known) check(groups.evidence.some(evidence => evidence.id === id), 'mechanics.suspects.knownFromEvidence inexistente', errors);
-    const combinations = Array.isArray(entry.warrantCombinations) ? entry.warrantCombinations : [];
-    check(combinations.length >= 1, 'mechanics.suspects.warrantCombinations vacío', errors);
-    for (const combination of combinations) {
-      const ids = stringList(combination);
-      check(Array.isArray(combination) && ids.length >= 1, 'mechanics.suspects.warrantCombinations combinación vacía', errors);
-      for (const id of ids) check(groups.evidence.some(evidence => evidence.id === id), 'mechanics.suspects.warrantCombinations evidencia inexistente', errors);
-    }
-    if (entry.accessEvidenceIds !== undefined) {
-      for (const id of stringList(entry.accessEvidenceIds)) check(groups.evidence.some(evidence => evidence.id === id), 'mechanics.suspects.accessEvidenceIds inexistente', errors);
-    }
-  }
+  for (const entry of entries) checkSuspect(entry, groups, errors);
 }
 
 function recovery(mechanics: DataRecord, groups: EntityGroups, errors: string[]): void {
@@ -120,31 +126,24 @@ function recovery(mechanics: DataRecord, groups: EntityGroups, errors: string[])
   check(typeof entry.requiresAccessWarrant === 'boolean', 'mechanics.recovery.requiresAccessWarrant', errors);
 }
 
-function texts(def: DataRecord, groups: EntityGroups, errors: string[]): void {
-  const value = def.texts;
-  if (!isRecord(value)) { errors.push('texts: objeto obligatorio en un expediente generado.'); return; }
-  const evidenceIds = new Set(groups.evidence.map(entry => String(entry.id)));
-  const npcIds = new Set(groups.npcs.map(entry => String(entry.id)));
-  if (isRecord(value.evidence)) {
-    for (const id of Object.keys(value.evidence)) check(evidenceIds.has(id), 'texts.evidence referencia desconocida', errors);
-    for (const id of evidenceIds) check(text((value.evidence as DataRecord)[id]), `texts.evidence falta el texto de ${id}`, errors);
-  } else {
-    errors.push('texts.evidence: objeto obligatorio.');
+function checkEvidenceTexts(value: DataRecord, evidenceIds: Set<string>, errors: string[]): void {
+  if (!isRecord(value.evidence)) { errors.push('texts.evidence: objeto obligatorio.'); return; }
+  for (const id of Object.keys(value.evidence)) check(evidenceIds.has(id), 'texts.evidence referencia desconocida', errors);
+  for (const id of evidenceIds) check(text((value.evidence as DataRecord)[id]), `texts.evidence falta el texto de ${id}`, errors);
+}
+
+function checkKnowledgeTexts(value: DataRecord, groups: EntityGroups, errors: string[]): void {
+  if (!isRecord(value.knowledge)) { errors.push('texts.knowledge: objeto obligatorio.'); return; }
+  for (const id of Object.keys(value.knowledge)) check(typeof id === 'string' && id.length > 0, 'texts.knowledge clave inválida', errors);
+  for (const npc of groups.npcs) {
+    for (const token of stringList(npc.knowledge)) check(text((value.knowledge as DataRecord)[token]), `texts.knowledge falta el texto de ${token}`, errors);
   }
-  if (isRecord(value.knowledge)) {
-    for (const id of Object.keys(value.knowledge)) check(typeof id === 'string' && id.length > 0, 'texts.knowledge clave inválida', errors);
-    for (const npc of groups.npcs) {
-      for (const token of stringList(npc.knowledge)) check(text((value.knowledge as DataRecord)[token]), `texts.knowledge falta el texto de ${token}`, errors);
-    }
-  } else {
-    errors.push('texts.knowledge: objeto obligatorio.');
-  }
-  if (isRecord(value.greetings)) {
-    for (const id of Object.keys(value.greetings)) check(npcIds.has(id), 'texts.greetings referencia desconocida', errors);
-    for (const id of npcIds) check(text((value.greetings as DataRecord)[id]), `texts.greetings falta el saludo de ${id}`, errors);
-  } else {
-    errors.push('texts.greetings: objeto obligatorio.');
-  }
+}
+
+function checkGreetingTexts(value: DataRecord, npcIds: Set<string>, errors: string[]): void {
+  if (!isRecord(value.greetings)) { errors.push('texts.greetings: objeto obligatorio.'); return; }
+  for (const id of Object.keys(value.greetings)) check(npcIds.has(id), 'texts.greetings referencia desconocida', errors);
+  for (const id of npcIds) check(text((value.greetings as DataRecord)[id]), `texts.greetings falta el saludo de ${id}`, errors);
   if (value.refusals !== undefined) {
     if (isRecord(value.refusals)) {
       for (const id of Object.keys(value.refusals)) check(npcIds.has(id), 'texts.refusals referencia desconocida', errors);
@@ -152,6 +151,16 @@ function texts(def: DataRecord, groups: EntityGroups, errors: string[]): void {
       errors.push('texts.refusals: objeto obligatorio cuando está presente.');
     }
   }
+}
+
+function texts(def: DataRecord, groups: EntityGroups, errors: string[]): void {
+  const value = def.texts;
+  if (!isRecord(value)) { errors.push('texts: objeto obligatorio en un expediente generado.'); return; }
+  const evidenceIds = new Set(groups.evidence.map(entry => String(entry.id)));
+  const npcIds = new Set(groups.npcs.map(entry => String(entry.id)));
+  checkEvidenceTexts(value, evidenceIds, errors);
+  checkKnowledgeTexts(value, groups, errors);
+  checkGreetingTexts(value, npcIds, errors);
 }
 
 /** Mecánica y textos de un expediente generado; el caso fijo queda exento. */

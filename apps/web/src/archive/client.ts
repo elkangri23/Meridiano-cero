@@ -1,5 +1,5 @@
-import { isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto } from '@meridiano/contracts';
-import type { PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto, CrimeType, ContentRating } from '@meridiano/contracts';
+import { isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto, isGenerationJobDto, isGenerationJobListDto } from '@meridiano/contracts';
+import type { PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto, CrimeType, ContentRating, GenerationJobDto, GenerationJobListDto } from '@meridiano/contracts';
 
 export type Filter = 'all' | 'active' | 'closed';
 
@@ -18,7 +18,14 @@ export interface ArchiveApi {
   connect(signal: AbortSignal): Promise<SessionDto | null>;
   list(filter: Filter, cursor: string | null, signal: AbortSignal): Promise<RunListDto>;
   logout(csrf: string, signal: AbortSignal): Promise<void>;
+  generationJobs(signal: AbortSignal): Promise<GenerationJobListDto>;
+  createGenerationJob(params: GenerationJobParams, identity: SessionDto, signal: AbortSignal): Promise<GenerationJobDto>;
+  cancelGenerationJob(jobId: string, identity: SessionDto, signal: AbortSignal): Promise<GenerationJobDto>;
 }
+
+/** Parámetros de generación (T4-08): delito opcional (sin él, el servidor
+ * sortea entre los 12), contenido y duración del expediente a generar. */
+export interface GenerationJobParams { crimeType?: CrimeType; contentRating?: ContentRating; duration?: 'short' | 'medium' | 'long' }
 
 export class ArchiveError extends Error {
   constructor(readonly kind: 'unavailable' | 'invalid', readonly detail?: string) { super(kind); }
@@ -89,6 +96,18 @@ async function readRunCreationLookupDto(response: Response): Promise<RunCreation
 }
 
 
+
+async function readGenerationJobDto(response: Response): Promise<GenerationJobDto> {
+  const body = await read(response);
+  if (!isGenerationJobDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
+
+async function readGenerationJobListDto(response: Response): Promise<GenerationJobListDto> {
+  const body = await read(response);
+  if (!isGenerationJobListDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
 
 async function readSessionDtoOrNull(response: Response): Promise<SessionDto | null> {
   const body = await read(response);
@@ -178,5 +197,32 @@ export const archiveApi: ArchiveApi = {
     const response = await request('/api/v1/auth/logout', signal, { method: 'POST', headers: { 'x-csrf-token': csrf } });
     await response.body?.cancel();
     if (response.status !== 204) throw new ArchiveError('unavailable');
+  },
+
+  async generationJobs(signal: AbortSignal): Promise<GenerationJobListDto> {
+    const response = await request('/api/v1/generation/jobs', signal);
+    return readGenerationJobListDto(response);
+  },
+
+  async createGenerationJob(params: GenerationJobParams, identity: SessionDto, signal: AbortSignal): Promise<GenerationJobDto> {
+    const body: Record<string, string> = {};
+    if (params.crimeType) body.crimeType = params.crimeType;
+    if (params.contentRating) body.contentRating = params.contentRating;
+    if (params.duration) body.duration = params.duration;
+    const response = await request('/api/v1/generation/jobs', signal, { method: 'POST', headers: mutationHeaders(identity), body: JSON.stringify(body) });
+    if (response.status === 201) return readGenerationJobDto(response);
+    let detail: string | undefined;
+    try {
+      const parsed = await boundedJson(response);
+      if (isValidBody(parsed) && isValidBody(parsed.error) && typeof parsed.error.message === 'string') detail = parsed.error.message;
+    } catch { /* el detalle es opcional; sin él queda el mensaje genérico */ }
+    throw new ArchiveError('unavailable', detail);
+  },
+
+  async cancelGenerationJob(jobId: string, identity: SessionDto, signal: AbortSignal): Promise<GenerationJobDto> {
+    if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(jobId)) throw new ArchiveError('invalid');
+    const response = await request('/api/v1/generation/jobs/' + encodeURIComponent(jobId) + '/cancel', signal,
+      { method: 'POST', headers: mutationHeaders(identity), body: '{}' });
+    return readGenerationJobDto(response);
   },
 };

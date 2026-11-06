@@ -191,7 +191,7 @@ function caseModes(value: Record<string, unknown>): boolean {
   return (value.contentMode === 'fixed' || value.contentMode === 'generated') &&
     typeof value.difficulty === 'string' && ['easy', 'normal', 'hard'].includes(value.difficulty) &&
     (value.explorationMode === 'guided' || value.explorationMode === 'free') &&
-    typeof value.crimeType === 'string' && ['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'aleatorio'].includes(value.crimeType) &&
+    typeof value.crimeType === 'string' && ['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'aleatorio', 'extorsion', 'contrabando', 'corrupcion', 'falsificacion', 'homicidio', 'secuestro'].includes(value.crimeType) &&
     (value.contentRating === 'familiar' || value.contentRating === 'general');
 }
 function caseItem(value: unknown): value is CaseSummary {
@@ -206,6 +206,46 @@ export function isCaseListDto(value: unknown): value is CaseListDto {
 export function isRunCreationLookupDto(value: unknown): value is RunCreationLookupDto {
   return dtoRecord(value, 'kind,runId,schemaVersion,status') && value.schemaVersion === 1 &&
     value.kind === 'create_run' && value.status === 'committed' && uuid(value.runId);
+}
+
+export interface GenerationJobListDto { items: GenerationJobDto[] }
+const GENERATION_CRIMES = ['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'aleatorio', 'extorsion', 'contrabando', 'corrupcion', 'falsificacion', 'homicidio', 'secuestro'];
+const GENERATION_STATUSES = ['queued', 'running', 'done', 'failed', 'cancelled'];
+function generationJobStage(value: Record<string, unknown>): boolean {
+  if (!uuid(value.jobId)) return false;
+  return Number.isSafeInteger(value.stage) && (value.stage as number) >= 0 && (value.stage as number) <= 9;
+}
+function generationJobEnums(value: Record<string, unknown>): boolean {
+  if (typeof value.status !== 'string' || !GENERATION_STATUSES.includes(value.status)) return false;
+  if (typeof value.crimeType !== 'string' || !GENERATION_CRIMES.includes(value.crimeType)) return false;
+  if (value.contentRating !== 'familiar' && value.contentRating !== 'general') return false;
+  if (value.duration !== 'short' && value.duration !== 'medium' && value.duration !== 'long') return false;
+  return true;
+}
+function generationJobShape(value: Record<string, unknown>): boolean {
+  return generationJobStage(value) && generationJobEnums(value);
+}
+function generationJobRefs(value: Record<string, unknown>): boolean {
+  if (value.caseId !== null && (typeof value.caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.caseId))) return false;
+  if (value.error !== null && typeof value.error !== 'string') return false;
+  return generationJobTimestamps(value);
+}
+function generationJobTimestamps(value: Record<string, unknown>): boolean {
+  if (typeof value.progress !== 'object' || value.progress === null || Array.isArray(value.progress)) return false;
+  return typeof value.createdAt === 'string' && typeof value.updatedAt === 'string' &&
+    (value.startedAt === null || typeof value.startedAt === 'string') &&
+    (value.finishedAt === null || typeof value.finishedAt === 'string');
+}
+function generationJobItem(value: unknown): value is GenerationJobDto {
+  if (!dtoRecord(value, 'caseId,contentRating,createdAt,crimeType,duration,error,finishedAt,jobId,progress,stage,startedAt,status,updatedAt')) return false;
+  return generationJobShape(value) && generationJobRefs(value);
+}
+export function isGenerationJobDto(value: unknown): value is GenerationJobDto {
+  return generationJobItem(value);
+}
+export function isGenerationJobListDto(value: unknown): value is GenerationJobListDto {
+  if (!dtoRecord(value, 'items') || !Array.isArray(value.items) || value.items.length > 100) return false;
+  return value.items.every(generationJobItem) && new Set(value.items.map(item => item.jobId)).size === value.items.length;
 }
 
 

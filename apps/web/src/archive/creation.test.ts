@@ -17,7 +17,10 @@ function storage() {
 function api() {
   return { initial: vi.fn<ArchiveApi['initial']>(), me: vi.fn<ArchiveApi['me']>(), connect: vi.fn<ArchiveApi['connect']>(), list: vi.fn<ArchiveApi['list']>(), cases: vi.fn<ArchiveApi['cases']>(), logout: vi.fn<ArchiveApi['logout']>(),
     create: vi.fn<ArchiveApi['create']>().mockResolvedValue(), lookup: vi.fn<ArchiveApi['lookup']>().mockResolvedValue(null),
-    deleteRun: vi.fn<ArchiveApi['deleteRun']>().mockResolvedValue() };
+    deleteRun: vi.fn<ArchiveApi['deleteRun']>().mockResolvedValue(),
+    generationJobs: vi.fn<ArchiveApi['generationJobs']>().mockResolvedValue({ items: [] }),
+    createGenerationJob: vi.fn<ArchiveApi['createGenerationJob']>(),
+    cancelGenerationJob: vi.fn<ArchiveApi['cancelGenerationJob']>() };
 }
 
 describe('T3: creación durable en pestaña sin otra intención', () => {

@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { InitialRun } from './InitialRun';
 import { NewRun } from './NewRun';
+import { GenerationPanel } from './GenerationPanel';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChangeEvent } from 'react';
 import { caseLabel } from '@meridiano/case-schema';
@@ -127,6 +128,7 @@ function Archive() {
       {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
       {state.opened && <InitialRun view={state.opened} close={closeRun} />}
       {state.profile && <NewRun key={state.profile.id} state={state} model={model} />}
+      {state.profile && <GenerationPanel key={state.profile.id + '-generation'} state={state} model={model} />}
       {state.profile && renderArchiveList(state, model, busy, filter, opener, closeRun, deleteTarget, setDeleteTarget)}
       <footer><Link to="/glosario">Glosario y reglas</Link> · Un detective por partida · Las consultas del archivo no avanzan el reloj del caso.</footer>
     </main>

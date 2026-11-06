@@ -1,6 +1,6 @@
 import { EngineStateError } from './state-error.js';
 import { knowsEvidence, revealEvidence } from './fixed-evidence.js';
-import type { CaseDefinition, CaseMechanics, CaseRun, MechanicsSuspect, ScheduledResult } from '@meridiano/case-schema';
+import type { CaseDefinition, CaseMechanics, CaseRun, MechanicsAnalysis, MechanicsQuery, MechanicsSuspect, ScheduledResult } from '@meridiano/case-schema';
 
 /**
  * Mecánica declarativa de los expedientes generados (T4-08). El caso fijo
@@ -90,22 +90,32 @@ export function generatedAnalysis(def: CaseDefinition, run: CaseRun, evidenceId:
   return { ...rule };
 }
 
-/** Madura una evidencia de consulta o análisis de un expediente generado. */
-export function matureGeneratedEvidence(def: CaseDefinition, run: CaseRun, request: ScheduledResult): CaseRun {
+function maturePayload(request: ScheduledResult): { id: string; method: 'analyze' | 'query' } {
   if (typeof request.payload !== 'object' || request.payload === null) throw new EngineStateError('REQUEST_STATE_INVALID');
   const payload = request.payload as Record<string, unknown>;
   if (Object.keys(payload).sort().join(',') !== 'evidenceId,method') throw new EngineStateError('REQUEST_STATE_INVALID');
   const id = payload.evidenceId;
   const method = payload.method;
   if (typeof id !== 'string' || (method !== 'analyze' && method !== 'query')) throw new EngineStateError('REQUEST_STATE_INVALID');
+  return { id, method };
+}
+
+function matureRule(def: CaseDefinition, method: 'analyze' | 'query', id: string): MechanicsAnalysis | MechanicsQuery {
   const mechanics = def.mechanics;
   if (!mechanics) throw new EngineStateError('REQUEST_STATE_INVALID');
   const rule = method === 'analyze'
     ? mechanics.analyses.find(entry => entry.resultEvidenceId === id)
     : mechanics.queries.find(entry => entry.evidenceId === id);
   if (!rule || !def.evidence.some(evidence => evidence.id === id)) throw new EngineStateError('REQUEST_STATE_INVALID');
+  return rule;
+}
+
+/** Madura una evidencia de consulta o análisis de un expediente generado. */
+export function matureGeneratedEvidence(def: CaseDefinition, run: CaseRun, request: ScheduledResult): CaseRun {
+  const { id, method } = maturePayload(request);
+  const rule = matureRule(def, method, id);
   const revealed = revealEvidence(def, run, id, request.dueMinute, method);
-  const reveals = method === 'query' ? (rule as GeneratedQueryRule).reveals ?? [] : [];
+  const reveals = method === 'query' ? (rule as MechanicsQuery).reveals ?? [] : [];
   if (reveals.length === 0) return revealed;
   return { ...revealed, discoveries: [...revealed.discoveries, ...reveals.filter(marker => !revealed.discoveries.includes(marker))] };
 }

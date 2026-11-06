@@ -43,29 +43,20 @@ export interface GeneratorCatalogParams {
 // Validación de parámetros de entrada
 // ============================================================================
 
+function checkEnumParam(params: GenerationParams, key: 'difficulty' | 'explorationMode' | 'duration' | 'surpriseMode', values: readonly string[], errors: string[]): void {
+  const value = params[key];
+  if (!value) { errors.push(`${key} es requerido`); return; }
+  if (!values.includes(value)) errors.push(`${key} debe ser ${values.join(', ')}`);
+}
+
 export function validateGenerationParams(params: GenerationParams): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  if (!params.difficulty) errors.push('difficulty es requerido');
-  if (!['easy', 'normal', 'hard'].includes(params.difficulty)) {
-    errors.push('difficulty debe ser easy, normal o hard');
-  }
-
-  if (!params.explorationMode) errors.push('explorationMode es requerido');
-  if (!['guided', 'free'].includes(params.explorationMode)) {
-    errors.push('explorationMode debe ser guided o free');
-  }
-
-  if (!params.duration) errors.push('duration es requerido');
-  if (!['short', 'medium', 'long'].includes(params.duration)) {
-    errors.push('duration debe ser short, medium o long');
-  }
-
-  if (!params.surpriseMode) errors.push('surpriseMode es requerido');
-  if (!['familiar', 'general', 'sorprende'].includes(params.surpriseMode)) {
-    errors.push('surpriseMode debe ser familiar, general o sorprende');
-  }
+  checkEnumParam(params, 'difficulty', ['easy', 'normal', 'hard'], errors);
+  checkEnumParam(params, 'explorationMode', ['guided', 'free'], errors);
+  checkEnumParam(params, 'duration', ['short', 'medium', 'long'], errors);
+  checkEnumParam(params, 'surpriseMode', ['familiar', 'general', 'sorprende'], errors);
 
   if (params.crimeType && !GENERATABLE_CRIMES.includes(params.crimeType)) {
     errors.push('crimeType no válido');

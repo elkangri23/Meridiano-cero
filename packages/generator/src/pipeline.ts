@@ -15,7 +15,6 @@ import type { CaseDefinition } from '@meridiano/case-schema';
 import type { CaseRun } from '@meridiano/case-schema';
 import {
   DEADLINE_BY_DURATION,
-  GENERATABLE_CRIMES,
   stageOutputSchema,
   assembleDefinition,
   buildStageContext,
@@ -27,6 +26,8 @@ import {
   type ResolvedChoice,
   type SelectedGeography,
 } from './stages.js';
+import { validateGenerationParams } from './validator.js';
+export { validateGenerationParams };
 import { simulateCase, type GoldenPathAction, type SimulationResult } from './simulator.js';
 
 // ============================================================================
@@ -222,21 +223,6 @@ export interface GeneratorService {
 // Utilidades
 // ============================================================================
 
-export function validateGenerationParams(params: GenerationParams): ValidationResult {
-  const errors: string[] = [];
-
-  if (!params.difficulty) errors.push('difficulty es requerido');
-  if (!params.explorationMode) errors.push('explorationMode es requerido');
-  if (!params.duration) errors.push('duration es requerido');
-  if (!params.surpriseMode) errors.push('surpriseMode es requerido');
-  if (params.crimeType && !GENERATABLE_CRIMES.includes(params.crimeType)) errors.push('crimeType no válido');
-  if (params.region && params.region !== 'europa' && params.region !== 'global') errors.push('region sin ciudades verificadas en el catálogo (hoy solo Europa)');
-  if (params.seed !== undefined && (!Number.isInteger(params.seed) || params.seed < 0)) {
-    errors.push('seed debe ser entero no negativo');
-  }
-
-  return { valid: errors.length === 0, errors, warnings: [] };
-}
 
 export function createStageCheckpoint(stage: GenerationStage): StageCheckpoint {
   return {
@@ -306,6 +292,120 @@ async function withStageTimeout<T>(ms: number, run: (signal: AbortSignal) => Pro
   }
 }
 
+/** Una etapa LLM (1, 3, 4 o 7): llama al modelo con su contexto y esquema,
+ * valida la forma de la salida y devuelve el JSON. Sin LLM o con salida
+ * inválida, rechaza con un error claro. */
+async function runLlmStage(
+  stage: 1 | 3 | 4 | 7,
+  draft: CaseDraft,
+  choice: ResolvedChoice,
+  geography: SelectedGeography,
+  config: PipelineConfig,
+  prior: Record<string, unknown>,
+  feedback?: string[],
+): Promise<unknown> {
+  const llm = requireLlm(config);
+  const stageContext = buildStageContext(stage, choice, draft.params, geography, prior, feedback);
+  const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage, context: stageContext, schema: stageOutputSchema(stage), signal }));
+  const validation = validateStageOutput(stage, output, { geography, castIds: castIds(draft) });
+  if (!validation.valid) throw new Error(`Etapa ${stage} inválida: ${validation.errors.join('; ')}`);
+  return output;
+}
+
+/** Etapa 5: ensambla la definición desde las salidas 1, 3 y 4. */
+function assembleStage(draft: CaseDraft, choice: ResolvedChoice, geography: SelectedGeography, config: PipelineConfig): { assembled: boolean; caseId: string } {
+  const premise = stageOutput(draft, 1) as Record<string, unknown>;
+  const npcs = stageOutput(draft, 3) as Record<string, unknown>;
+  const clues = stageOutput(draft, 4) as Record<string, unknown>;
+  if (!premise || !npcs || !clues) throw new Error('Faltan salidas de etapa para ensamblar.');
+  const definition = assembleDefinition({
+    caseId: config.caseId ?? `generado-${choice.crimeType}-${draft.params.seed ?? 0}`,
+    choice,
+    params: draft.params,
+    geography,
+    premise,
+    npcs,
+    clues,
+  });
+  draft.definition = definition;
+  draft.goldenPath = (clues.goldenPath as GoldenPathAction[]);
+  draft.briefing = premiseBriefing(premise);
+  return { assembled: true, caseId: definition.id };
+}
+
+/** Etapa 6 (puerta): validador v1.5 + contenido. */
+function validateStage(draft: CaseDraft, choice: ResolvedChoice): { validated: boolean } {
+  const definition = draft.definition;
+  if (!definition) throw new Error('Sin definición que validar.');
+  const structural = validateCaseDefinition(definition);
+  const contentErrors: string[] = [];
+  validateGeneratedContent(definition as unknown as Record<string, unknown>, choice.contentRating, contentErrors);
+  const errors = [...structural.errors, ...contentErrors];
+  if (errors.length > 0) throw new StageGateError(errors);
+  definition.validationReport = createValidationReport([]);
+  draft.validationReport = {
+    validatorVersion: '1.5.0',
+    timestamp: new Date().toISOString(),
+    stages: [{ stage: 6, name: STAGE_NAMES[6], passed: true, checks: ['estructura', 'referencias', 'mecánica', 'textos', 'contenido'], errors: [], warnings: [] }],
+    overall: 'passed',
+    errors: [],
+    warnings: [],
+  };
+  return { validated: true };
+}
+
+/** Etapa 7 (puerta): revisión semántica independiente por LLM. */
+async function reviewStage(draft: CaseDraft, choice: ResolvedChoice, geography: SelectedGeography, config: PipelineConfig): Promise<{ coherent: boolean }> {
+  if (!config.enableSemanticReview) return { coherent: true };
+  const definition = draft.definition;
+  if (!definition || !draft.goldenPath) throw new Error('Sin definición que revisar.');
+  const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
+  const output = await runLlmStage(7, draft, choice, geography, config, { definition, goldenPath: draft.goldenPath, budgetMinutes });
+  const review = output as { coherent: boolean; issues: string[] };
+  if (!review.coherent) throw new StageGateError(review.issues);
+  return { coherent: true };
+}
+
+/** Etapa 8 (puerta): simulación de la ruta dorada por el motor real. */
+function simulateStage(draft: CaseDraft, config: PipelineConfig): { playable: boolean; minute: number; budgetMinutes: number } {
+  if (!config.enableSimulation) return { playable: true, minute: 0, budgetMinutes: 0 };
+  const definition = draft.definition;
+  if (!definition || !draft.goldenPath) throw new Error('Sin definición que simular.');
+  const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
+  const simulation = simulateCase(definition, draft.goldenPath, budgetMinutes);
+  draft.simulation = simulation;
+  if (!simulation.playable) throw new StageGateError(simulation.errors);
+  return { playable: true, minute: simulation.minute, budgetMinutes };
+}
+
+async function executeLlmStage(stage: 1 | 3 | 4, draft: CaseDraft, choice: ResolvedChoice, geography: SelectedGeography, config: PipelineConfig): Promise<unknown> {
+  switch (stage) {
+    case 1:
+      return runLlmStage(1, draft, choice, geography, config, {});
+    case 3:
+      return runLlmStage(3, draft, choice, geography, config, { premise: stageOutput(draft, 1) });
+    case 4:
+      return runLlmStage(4, draft, choice, geography, config, { premise: stageOutput(draft, 1), npcs: stageOutput(draft, 3) }, draft.repairFeedback);
+  }
+}
+
+function publishStage(draft: CaseDraft): { published: boolean; definitionHash: string } {
+  const definition = draft.definition;
+  if (!definition) throw new Error('Sin definición que publicar.');
+  return { published: false, definitionHash: definition.id };
+}
+
+const LLM_STAGES = new Set<GenerationStage>([1, 3, 4]);
+
+async function executeDeterministicStage(stage: GenerationStage, draft: CaseDraft, choice: ResolvedChoice, geography: SelectedGeography, config: PipelineConfig): Promise<unknown | undefined> {
+  if (stage === 2) return geography;
+  if (stage === 5) return assembleStage(draft, choice, geography, config);
+  if (stage === 6) return validateStage(draft, choice);
+  if (stage === 7) return reviewStage(draft, choice, geography, config);
+  if (stage === 8) return simulateStage(draft, config);
+  return undefined;
+}
+
 async function executeStage(
   stage: GenerationStage,
   draft: CaseDraft,
@@ -314,113 +414,85 @@ async function executeStage(
   const choice = draft.choice;
   const geography = draft.geography;
   if (!choice || !geography) throw new Error('El borrador no tiene delito ni geografía resueltos.');
-  const context = { geography, castIds: castIds(draft) };
-  switch (stage) {
-    case 1: {
-      const llm = requireLlm(config);
-      const stageContext = buildStageContext(1, choice, draft.params, geography, {});
-      const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage: 1, context: stageContext, schema: stageOutputSchema(1), signal }));
-      const validation = validateStageOutput(1, output, context);
-      if (!validation.valid) throw new Error(`Etapa 1 inválida: ${validation.errors.join('; ')}`);
-      return output;
-    }
-    case 2:
-      return geography;
-    case 3: {
-      const llm = requireLlm(config);
-      const prior = { premise: stageOutput(draft, 1) };
-      const stageContext = buildStageContext(3, choice, draft.params, geography, prior);
-      const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage: 3, context: stageContext, schema: stageOutputSchema(3), signal }));
-      const validation = validateStageOutput(3, output, context);
-      if (!validation.valid) throw new Error(`Etapa 3 inválida: ${validation.errors.join('; ')}`);
-      return output;
-    }
-    case 4: {
-      const llm = requireLlm(config);
-      const prior = { premise: stageOutput(draft, 1), npcs: stageOutput(draft, 3) };
-      const stageContext = buildStageContext(4, choice, draft.params, geography, prior, draft.repairFeedback);
-      const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage: 4, context: stageContext, schema: stageOutputSchema(4), signal }));
-      const validation = validateStageOutput(4, output, context);
-      if (!validation.valid) throw new Error(`Etapa 4 inválida: ${validation.errors.join('; ')}`);
-      return output;
-    }
-    case 5: {
-      const premise = stageOutput(draft, 1) as Record<string, unknown>;
-      const npcs = stageOutput(draft, 3) as Record<string, unknown>;
-      const clues = stageOutput(draft, 4) as Record<string, unknown>;
-      if (!premise || !npcs || !clues) throw new Error('Faltan salidas de etapa para ensamblar.');
-      const definition = assembleDefinition({
-        caseId: config.caseId ?? `generado-${choice.crimeType}-${draft.params.seed ?? 0}`,
-        choice,
-        params: draft.params,
-        geography,
-        premise,
-        npcs,
-        clues,
-      });
-      draft.definition = definition;
-      draft.goldenPath = (clues.goldenPath as GoldenPathAction[]);
-      draft.briefing = premiseBriefing(premise);
-      return { assembled: true, caseId: definition.id };
-    }
-    case 6: {
-      const definition = draft.definition;
-      if (!definition) throw new Error('Sin definición que validar.');
-      const structural = validateCaseDefinition(definition);
-      const contentErrors: string[] = [];
-      validateGeneratedContent(definition as unknown as Record<string, unknown>, choice.contentRating, contentErrors);
-      const errors = [...structural.errors, ...contentErrors];
-      if (errors.length > 0) throw new StageGateError(errors);
-      definition.validationReport = createValidationReport([]);
-      draft.validationReport = {
-        validatorVersion: '1.5.0',
-        timestamp: new Date().toISOString(),
-        stages: [{ stage: 6, name: STAGE_NAMES[6], passed: true, checks: ['estructura', 'referencias', 'mecánica', 'textos', 'contenido'], errors: [], warnings: [] }],
-        overall: 'passed',
-        errors: [],
-        warnings: [],
-      };
-      return { validated: true };
-    }
-    case 7: {
-      if (!config.enableSemanticReview) return { skipped: true };
-      const llm = requireLlm(config);
-      const definition = draft.definition;
-      if (!definition || !draft.goldenPath) throw new Error('Sin definición que revisar.');
-      const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
-      const stageContext = buildStageContext(7, choice, draft.params, geography, { definition, goldenPath: draft.goldenPath, budgetMinutes });
-      const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage: 7, context: stageContext, schema: stageOutputSchema(7), signal }));
-      const validation = validateStageOutput(7, output, context);
-      if (!validation.valid) throw new Error(`Etapa 7 inválida: ${validation.errors.join('; ')}`);
-      const review = output as { coherent: boolean; issues: string[] };
-      if (!review.coherent) throw new StageGateError(review.issues);
-      return { coherent: true };
-    }
-    case 8: {
-      if (!config.enableSimulation) return { skipped: true };
-      const definition = draft.definition;
-      if (!definition || !draft.goldenPath) throw new Error('Sin definición que simular.');
-      const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
-      const simulation = simulateCase(definition, draft.goldenPath, budgetMinutes);
-      draft.simulation = simulation;
-      if (!simulation.playable) throw new StageGateError(simulation.errors);
-      return { playable: true, minute: simulation.minute, budgetMinutes };
-    }
-    case 9: {
-      const definition = draft.definition;
-      if (!definition) throw new Error('Sin definición que publicar.');
-      return { published: false, definitionHash: definition.id };
-    }
-    default:
-      return {};
+  if (LLM_STAGES.has(stage)) return executeLlmStage(stage as 1 | 3 | 4, draft, choice, geography, config);
+  const deterministic = await executeDeterministicStage(stage, draft, choice, geography, config);
+  if (deterministic !== undefined) return deterministic;
+  if (stage === 9) return publishStage(draft);
+  return {};
+}
+
+/** Una puerta falló: una reparación rehaciendo la etapa 4 con los errores
+ * como feedback; si ya se reparó, el borrador se rechaza. Devuelve true si
+ * se repara (el bucle vuelve a la etapa 4). */
+async function repairAfterGateFailure(draft: CaseDraft, error: StageGateError, config: PipelineConfig): Promise<boolean> {
+  if (draft.repairUsed) return false;
+  draft.repairUsed = true;
+  draft.repairFeedback = error.errors;
+  delete draft.definition;
+  delete draft.goldenPath;
+  delete draft.simulation;
+  for (let reset = 4; reset <= MAX_STAGE; reset++) {
+    const target = draft.stages[reset - 1];
+    if (!target) continue;
+    target.status = 'pending';
+    target.retryCount = 0;
+    delete target.output;
+    delete target.error;
   }
+  draft.currentStage = 4;
+  draft.updatedAt = new Date().toISOString();
+  await config.checkpointStore.save(draft);
+  return true;
+}
+
+async function beginStage(currentDraft: CaseDraft, stageNum: number, config: PipelineConfig): Promise<CaseDraft['stages'][number] | null> {
+  const checkpoint = currentDraft.stages[stageNum - 1];
+  if (!checkpoint || checkpoint.status === 'completed') return null;
+  checkpoint.status = 'running';
+  checkpoint.startedAt = new Date().toISOString();
+  currentDraft.currentStage = stageNum;
+  currentDraft.updatedAt = new Date().toISOString();
+  await config.checkpointStore.save(currentDraft);
+  return checkpoint;
+}
+
+async function completeStage(currentDraft: CaseDraft, checkpoint: CaseDraft['stages'][number], output: unknown, config: PipelineConfig): Promise<void> {
+  checkpoint.status = 'completed';
+  checkpoint.completedAt = new Date().toISOString();
+  checkpoint.output = output;
+  currentDraft.updatedAt = new Date().toISOString();
+  await config.checkpointStore.save(currentDraft);
+}
+
+/** Un fallo que no es de puerta: reintenta la etapa hasta el tope y, al
+ * agotarlo, rechaza el borrador. Devuelve el rechazo o null si se reintenta. */
+async function retryOrRejectStage(currentDraft: CaseDraft, checkpoint: CaseDraft['stages'][number], stageNum: number, config: PipelineConfig, error: unknown): Promise<GenerationResult | null> {
+  checkpoint.retryCount++;
+  const err = error instanceof Error ? error.message : String(error);
+  if (checkpoint.retryCount >= config.maxRetriesPerStage) {
+    checkpoint.status = 'failed';
+    checkpoint.error = err;
+    return rejectDraft(currentDraft, config, `Etapa ${stageNum} falló tras ${checkpoint.retryCount} intentos: ${err}`);
+  }
+  checkpoint.status = 'pending';
+  checkpoint.error = err;
+  currentDraft.updatedAt = new Date().toISOString();
+  await config.checkpointStore.save(currentDraft);
+  return null;
+}
+
+async function rejectDraft(draft: CaseDraft, config: PipelineConfig, error: string): Promise<GenerationResult> {
+  draft.status = 'rejected';
+  draft.error = error;
+  await config.checkpointStore.save(draft);
+  return { draft, success: false, error };
 }
 
 export async function runPipeline(
   draft: CaseDraft,
   config: PipelineConfig,
 ): Promise<GenerationResult> {
-  let currentDraft = { ...draft };
+  const currentDraft = { ...draft };
   // Delito/contenido y geografía se resuelven antes de la primera etapa y se
   // guardan en el borrador para que el worker pueda retomarlo.
   if (!currentDraft.choice) currentDraft.choice = resolveGenerationChoice(currentDraft.params);
@@ -432,73 +504,25 @@ export async function runPipeline(
 
   for (let stageNum = currentDraft.currentStage; stageNum <= MAX_STAGE; stageNum++) {
     const stage = stageNum as GenerationStage;
-    const checkpoint = currentDraft.stages[stageNum - 1];
+    const checkpoint = await beginStage(currentDraft, stageNum, config);
     if (!checkpoint) continue;
-    if (checkpoint.status === 'completed') continue;
-
-    checkpoint.status = 'running';
-    checkpoint.startedAt = new Date().toISOString();
-    currentDraft.currentStage = stageNum;
-    currentDraft.updatedAt = new Date().toISOString();
-
-    await config.checkpointStore.save(currentDraft);
 
     try {
       const output = await executeStage(stage, currentDraft, config);
-
-      checkpoint.status = 'completed';
-      checkpoint.completedAt = new Date().toISOString();
-      checkpoint.output = output;
-      currentDraft.updatedAt = new Date().toISOString();
-      await config.checkpointStore.save(currentDraft);
+      await completeStage(currentDraft, checkpoint, output, config);
     } catch (error) {
       if (error instanceof StageGateError) {
-        // Una puerta falló: una reparación rehaciendo la etapa 4 con los
-        // errores como feedback; si ya se reparó, el borrador se rechaza.
-        if (!currentDraft.repairUsed) {
-          currentDraft.repairUsed = true;
-          currentDraft.repairFeedback = error.errors;
-          delete currentDraft.definition;
-          delete currentDraft.goldenPath;
-          delete currentDraft.simulation;
-          for (let reset = 4; reset <= MAX_STAGE; reset++) {
-            const target = currentDraft.stages[reset - 1];
-            if (!target) continue;
-            target.status = 'pending';
-            target.retryCount = 0;
-            delete target.output;
-            delete target.error;
-          }
-          currentDraft.currentStage = 4;
-          currentDraft.updatedAt = new Date().toISOString();
-          await config.checkpointStore.save(currentDraft);
+        if (await repairAfterGateFailure(currentDraft, error, config)) {
           stageNum = 3;
           continue;
         }
         checkpoint.status = 'failed';
         checkpoint.error = error.message;
-        currentDraft.status = 'rejected';
-        currentDraft.error = `Puerta fallida tras la reparación: ${error.errors.join('; ')}`;
-        await config.checkpointStore.save(currentDraft);
-        return { draft: currentDraft, success: false, error: currentDraft.error };
+        return rejectDraft(currentDraft, config, `Puerta fallida tras la reparación: ${error.errors.join('; ')}`);
       }
 
-      checkpoint.retryCount++;
-      const err = error instanceof Error ? error.message : String(error);
-
-      if (checkpoint.retryCount >= config.maxRetriesPerStage) {
-        checkpoint.status = 'failed';
-        checkpoint.error = err;
-        currentDraft.status = 'rejected';
-        currentDraft.error = `Etapa ${stageNum} falló tras ${checkpoint.retryCount} intentos: ${err}`;
-        await config.checkpointStore.save(currentDraft);
-        return { draft: currentDraft, success: false, error: currentDraft.error };
-      }
-
-      checkpoint.status = 'pending';
-      checkpoint.error = err;
-      currentDraft.updatedAt = new Date().toISOString();
-      await config.checkpointStore.save(currentDraft);
+      const rejected = await retryOrRejectStage(currentDraft, checkpoint, stageNum, config, error);
+      if (rejected) return rejected;
 
       // Reintentar la misma etapa
       stageNum--;
@@ -508,10 +532,7 @@ export async function runPipeline(
 
   // Pipeline completado
   if (!currentDraft.definition) {
-    currentDraft.status = 'rejected';
-    currentDraft.error = 'Pipeline completado pero no se generó definición';
-    await config.checkpointStore.save(currentDraft);
-    return { draft: currentDraft, success: false, error: currentDraft.error };
+    return rejectDraft(currentDraft, config, 'Pipeline completado pero no se generó definición');
   }
 
   currentDraft.status = 'validated';

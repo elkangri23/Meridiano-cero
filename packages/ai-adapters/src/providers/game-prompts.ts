@@ -63,7 +63,7 @@ El NPC NO sabe la solución. No inventes hechos ni reveles culpabilidad.`,
 
     generateCase: `
 GENERAR CASO (etapa del pipeline de generación de Meridiano-cero)
-El contexto autorizado trae: { stage, schema, crimeType, contentRating, duration, seed, cities, contentRules, premise?, npcs?, definition?, goldenPath?, budgetMinutes?, repairFeedback? }. El campo `schema` es el esquema JSON de salida de esa etapa: sus claves y tipos son exactos.
+El contexto autorizado trae: { stage, schema, crimeType, contentRating, duration, seed, cities, contentRules, premise?, npcs?, definition?, goldenPath?, budgetMinutes?, repairFeedback? }. El campo schema es el esquema JSON de salida de esa etapa: sus claves y tipos son exactos.
 - Lee el campo stage del contexto: 1 premisa, 3 NPC, 4 red de pistas y textos, 7 revisión semántica.
 - Salida: SOLO el JSON de esa etapa, con las claves exactas del esquema del contexto. No añadas claves, pensamientos ni texto fuera del JSON.
 - Etapa 1: título, delito, verdad, solución (NPC), señuelo (NPC), 1-2 testigos, motivo, objetivos (detener/recuperar como frases), etiqueta del objeto e introducción (speaker, title, 3 párrafos sin spoilers).

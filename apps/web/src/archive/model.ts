@@ -1,5 +1,5 @@
-import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary } from '@meridiano/contracts';
-import type { ArchiveApi, CreationParams, Filter } from './client';
+import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary, GenerationJobDto } from '@meridiano/contracts';
+import type { ArchiveApi, CreationParams, Filter, GenerationJobParams } from './client';
 import { ArchiveError } from './client';
 import { browserIntents, createRunCoordinator } from './creation';
 import type { CreationView, IntentStorage, CreationOutcome, Difficulty } from './creation';
@@ -10,12 +10,13 @@ type Phase = 'loading' | 'signed_out' | 'ready' | 'error' | 'logout_failed';
 export interface ArchiveState {
   phase: Phase; profile: SessionDto['profile'] | null; page: RunListDto | null;
   cases: CaseSummary[]; creation: CreationView;
+  jobs: GenerationJobDto[];
   opened: PlayerViewDto | null; openingRunId: string | null;
   filter: Filter; cursor: string | null; previous: readonly (string | null)[]; notice: string;
   connectionStatus: ConnectionStatus;
   lastError: string | null;
 }
-const blank = (): ArchiveState => ({ phase: 'loading', profile: null, page: null, opened: null, openingRunId: null, cases: [], creation: { phase: 'idle', caseId: null, runId: null }, filter: 'all', cursor: null, previous: [], notice: 'Consultando el archivo…', connectionStatus: 'unknown', lastError: null });
+const blank = (): ArchiveState => ({ phase: 'loading', profile: null, page: null, opened: null, openingRunId: null, cases: [], creation: { phase: 'idle', caseId: null, runId: null }, jobs: [], filter: 'all', cursor: null, previous: [], notice: 'Consultando el archivo…', connectionStatus: 'unknown', lastError: null });
 type Ticket = { signal: AbortSignal; current: () => boolean };
 
 export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = browserIntents) {
@@ -57,11 +58,11 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
   }
   
   async function page(ticket: Ticket, identity: SessionDto, filter: Filter, cursor: string | null, previous: readonly (string | null)[]) {
-    const [result, catalog] = await Promise.all([api.list(filter, cursor, ticket.signal), api.cases(ticket.signal)]);
+    const [result, catalog, jobs] = await Promise.all([api.list(filter, cursor, ticket.signal), api.cases(ticket.signal), api.generationJobs(ticket.signal)]);
     if (!ticket.current()) return;
     if (result.profileId !== identity.profile.id) throw new ArchiveError('invalid');
     session = identity;
-    set({ phase: 'ready', profile: identity.profile, page: result, opened: null, openingRunId: null, cases: catalog.items, creation: creator.view(identity.profile.id), filter, cursor, previous,
+    set({ phase: 'ready', profile: identity.profile, page: result, opened: null, openingRunId: null, cases: catalog.items, creation: creator.view(identity.profile.id), jobs: jobs.items, filter, cursor, previous,
       notice: result.items.length ? 'Archivo actualizado.' : 'No hay partidas en este filtro.',
       connectionStatus: 'online',
       lastError: null });
@@ -171,6 +172,43 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
       if (ticket.current()) set({ ...state, notice: 'No se pudo borrar la partida. Actualiza el archivo para comprobarlo.' });
     }
   }
+  // Generación de casos (T4-08): crear un job, refrescar su estado y
+  // cancelarlo. Al terminar un job, el catálogo se recarga para que el
+  // expediente nuevo aparezca en el formulario de nueva partida.
+  async function refreshJobs() {
+    if (disposed || !session || state.phase !== 'ready') return;
+    const ticket = begin();
+    try {
+      const [jobs, catalog] = await Promise.all([api.generationJobs(ticket.signal), api.cases(ticket.signal)]);
+      if (!ticket.current()) return;
+      set({ ...state, jobs: jobs.items, cases: catalog.items });
+    } catch { /* el panel reintenta en su siguiente tick; no se rompe el archivo */ }
+  }
+  async function createGeneration(params: GenerationJobParams) {
+    if (disposed || !session || state.phase !== 'ready') return;
+    const identity = session; const ticket = begin();
+    set({ ...state, notice: 'Pidiendo la generación del caso…' });
+    try {
+      const job = await api.createGenerationJob(params, identity, ticket.signal);
+      if (!ticket.current()) return;
+      set({ ...state, jobs: [job, ...state.jobs], notice: 'Generación en cola. El caso aparecerá en el catálogo cuando esté validado.' });
+    } catch (error) {
+      if (!ticket.current()) return;
+      const detail = error instanceof ArchiveError ? error.detail : undefined;
+      set({ ...state, notice: detail ?? 'No se pudo pedir la generación. Reinténtalo más tarde.' });
+    }
+  }
+  async function cancelGeneration(jobId: string) {
+    if (disposed || !session || state.phase !== 'ready') return;
+    const identity = session; const ticket = begin();
+    try {
+      const job = await api.cancelGenerationJob(jobId, identity, ticket.signal);
+      if (!ticket.current()) return;
+      set({ ...state, jobs: state.jobs.map(item => item.jobId === job.jobId ? job : item), notice: 'Generación cancelada.' });
+    } catch {
+      if (ticket.current()) set({ ...state, notice: 'No se pudo cancelar la generación. Actualiza el archivo para comprobarlo.' });
+    }
+  }
   return {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
@@ -190,6 +228,7 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
       set({ ...state, creation: { phase: 'idle', caseId: null, runId: null }, notice: 'Referencia de creación descartada. Puedes crear una partida nueva.' });
     },
     deleteRun,
+    refreshJobs, createGeneration, cancelGeneration,
     filter: (value: Filter) => navigate(value, null, []),
     next: () => state.page?.nextCursor ? navigate(state.filter, state.page.nextCursor, [...state.previous, state.cursor]) : Promise.resolve(),
     back: () => state.previous.length ? navigate(state.filter, state.previous.at(-1) ?? null, state.previous.slice(0, -1)) : Promise.resolve(),

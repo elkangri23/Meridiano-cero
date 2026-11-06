@@ -97,6 +97,40 @@ describe('T3: frontera HTTP del archivo', () => {
 
 });
 
+describe('T4-08: frontera HTTP de generación', () => {
+  const job = { jobId: id, status: 'queued', stage: 0, crimeType: 'fraude', contentRating: 'familiar', duration: 'short', caseId: null, error: null, progress: {}, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', startedAt: null, finishedAt: null };
+  it('lista de jobs valida el contrato y no acepta estado interno', async () => {
+    const fetcher = respond({ items: [job] });
+    expect(await archiveApi.generationJobs(signal())).toEqual({ items: [job] });
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/generation/jobs');
+    respond({ items: [{ ...job, draft: 'SYNTHETIC_PRIVATE' }] });
+    await expect(archiveApi.generationJobs(signal())).rejects.toEqual(new ArchiveError('invalid'));
+  });
+  it('crear job envía cuerpo mínimo con CSRF y devuelve 201', async () => {
+    const fetcher = respond(job, 201);
+    expect(await archiveApi.createGenerationJob({ crimeType: 'fraude', contentRating: 'familiar', duration: 'short' }, session, signal())).toEqual(job);
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/generation/jobs');
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken }, body: JSON.stringify({ crimeType: 'fraude', contentRating: 'familiar', duration: 'short' }) });
+  });
+  it('crear job sin delito no inventa ninguno (el servidor sortea)', async () => {
+    const fetcher = respond(job, 201);
+    await archiveApi.createGenerationJob({ contentRating: 'familiar', duration: 'medium' }, session, signal());
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ body: JSON.stringify({ contentRating: 'familiar', duration: 'medium' }) });
+  });
+  it('el límite 429 conserva el motivo del servidor', async () => {
+    respond({ error: { code: 'GENERATION_LIMIT', message: 'Ya tienes una generación en curso.' } }, 429);
+    await expect(archiveApi.createGenerationJob({ crimeType: 'fraude' }, session, signal()))
+      .rejects.toEqual(new ArchiveError('unavailable', 'Ya tienes una generación en curso.'));
+  });
+  it('cancelar job usa el id en la ruta y devuelve el job actualizado', async () => {
+    const cancelled = { ...job, status: 'cancelled', finishedAt: '2026-01-01T00:01:00.000Z' };
+    const fetcher = respond(cancelled);
+    expect(await archiveApi.cancelGenerationJob(id, session, signal())).toEqual(cancelled);
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/generation/jobs/' + id + '/cancel');
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-csrf-token': session.csrfToken } });
+  });
+});
+
 describe('T3: lectura de partida sin aceptar replay ni contrato ajeno', () => {
   it('consulta GET del ID elegido y conserva las garantías del transporte', async () => {
     const fetcher = respond(initialView);

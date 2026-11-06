@@ -62,7 +62,8 @@ describe('simulateCase (T4-08)', () => {
     // El fixture es correcto; aquí se comprueba la puerta (c) con un caso
     // roto: si la mecánica no declara al sospechoso solución, no es jugable.
     const broken = structuredClone(generadoFraudeDefinition);
-    broken.mechanics!.suspects = [];
+    if (!broken.mechanics) throw new Error('El fixture debe traer mecánica.');
+    broken.mechanics.suspects = [];
     const result = simulateCase(broken, GOLDEN_PATH, 1440);
     expect(result.playable).toBe(false);
   });

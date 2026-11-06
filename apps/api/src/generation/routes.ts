@@ -37,28 +37,49 @@ function toDto(row: GenerationJobRow): GenerationJobDto {
   };
 }
 
+function parseCrime(value: unknown): CrimeType {
+  if (value === undefined) return 'aleatorio';
+  if (typeof value !== 'string' || !(GENERATABLE_CRIMES as readonly string[]).includes(value)) {
+    throw new RunStoreError('VALIDATION_ERROR', 'Delito no generable.');
+  }
+  return value as CrimeType;
+}
+
+function parseGenerationRating(value: unknown, crimeType: CrimeType): ContentRating {
+  const contentRating = value === undefined ? 'familiar' : value;
+  if (contentRating !== 'familiar' && contentRating !== 'general') throw new RunStoreError('VALIDATION_ERROR', 'Contenido no válido.');
+  if (!crimeAllowedForRating(crimeType, contentRating as ContentRating)) {
+    throw new RunStoreError('VALIDATION_ERROR', 'Ese delito solo se puede generar en General.');
+  }
+  return contentRating as ContentRating;
+}
+
+function parseDuration(value: unknown): 'short' | 'medium' | 'long' {
+  const duration = value === undefined ? 'medium' : value;
+  if (duration !== 'short' && duration !== 'medium' && duration !== 'long') throw new RunStoreError('VALIDATION_ERROR', 'Duración no válida.');
+  return duration;
+}
+
+function parseSeed(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || (value as number) < 0) throw new RunStoreError('VALIDATION_ERROR', 'Semilla no válida.');
+  return value as number;
+}
+
 function createBody(value: unknown): { crimeType: CrimeType; contentRating: ContentRating; duration: 'short' | 'medium' | 'long'; seed?: number } {
   if (!isRecord(value)) throw new RunStoreError('INVALID_REQUEST');
   const allowed = new Set(['crimeType', 'contentRating', 'duration', 'seed']);
   if (!Object.keys(value).every(key => allowed.has(key))) throw new RunStoreError('INVALID_REQUEST');
-  const crimeType = value.crimeType === undefined ? undefined : value.crimeType;
-  const contentRating = value.contentRating === undefined ? 'familiar' : value.contentRating;
-  const duration = value.duration === undefined ? 'medium' : value.duration;
-  if (crimeType !== undefined && (typeof crimeType !== 'string' || !(GENERATABLE_CRIMES as readonly string[]).includes(crimeType))) {
-    throw new RunStoreError('VALIDATION_ERROR', 'Delito no generable.');
-  }
-  if (contentRating !== 'familiar' && contentRating !== 'general') throw new RunStoreError('VALIDATION_ERROR', 'Contenido no válido.');
-  if (crimeType !== undefined && !crimeAllowedForRating(crimeType as CrimeType, contentRating as ContentRating)) {
-    throw new RunStoreError('VALIDATION_ERROR', 'Ese delito solo se puede generar en General.');
-  }
-  if (duration !== 'short' && duration !== 'medium' && duration !== 'long') throw new RunStoreError('VALIDATION_ERROR', 'Duración no válida.');
-  if (value.seed !== undefined && (!Number.isInteger(value.seed) || (value.seed as number) < 0)) throw new RunStoreError('VALIDATION_ERROR', 'Semilla no válida.');
+  const crimeType = parseCrime(value.crimeType);
+  const contentRating = parseGenerationRating(value.contentRating, crimeType);
+  const duration = parseDuration(value.duration);
+  const seed = parseSeed(value.seed);
   return {
     // Sin delito elegido, el pipeline sortea entre los 12 (SORPRÉNDEME).
-    crimeType: (crimeType ?? 'aleatorio') as CrimeType,
-    contentRating: contentRating as ContentRating,
-    duration: duration as 'short' | 'medium' | 'long',
-    ...(value.seed !== undefined ? { seed: value.seed as number } : {}),
+    crimeType,
+    contentRating,
+    duration,
+    ...(seed !== undefined ? { seed } : {}),
   };
 }
 

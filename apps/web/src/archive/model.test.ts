@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { RunListDto, SessionDto } from '@meridiano/contracts';
 import { createArchiveModel } from './model';
 import type { ArchiveApi } from './client';
+import { ArchiveError } from './client';
 
 const id = '11111111-1111-4111-8111-111111111111';
 const runId = '22222222-2222-4222-8222-222222222222';
@@ -12,6 +13,9 @@ function api() {
   return { initial: vi.fn<ArchiveApi['initial']>(), cases: vi.fn<ArchiveApi['cases']>().mockResolvedValue({ items: [], nextCursor: null }),
     create: vi.fn<ArchiveApi['create']>().mockResolvedValue(), lookup: vi.fn<ArchiveApi['lookup']>().mockResolvedValue(null),
     deleteRun: vi.fn<ArchiveApi['deleteRun']>().mockResolvedValue(),
+    generationJobs: vi.fn<ArchiveApi['generationJobs']>().mockResolvedValue({ items: [] }),
+    createGenerationJob: vi.fn<ArchiveApi['createGenerationJob']>(),
+    cancelGenerationJob: vi.fn<ArchiveApi['cancelGenerationJob']>(),
     me: vi.fn<ArchiveApi['me']>().mockResolvedValue(identity), connect: vi.fn<ArchiveApi['connect']>().mockResolvedValue(identity),
     list: vi.fn<ArchiveApi['list']>().mockResolvedValue(page), logout: vi.fn<ArchiveApi['logout']>().mockResolvedValue() };
 }
@@ -122,6 +126,40 @@ describe('T3: archivo, cuenta y respuestas tardías', () => {
     expect(transport.create).not.toHaveBeenCalled();
   });
 
+});
+
+describe('T4-08: generación de casos en el archivo', () => {
+  const job = { jobId: id, status: 'queued' as const, stage: 0, crimeType: 'fraude' as const, contentRating: 'familiar' as const, duration: 'short' as const, caseId: null, error: null, progress: {}, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', startedAt: null, finishedAt: null };
+  it('crear una generación la añade al estado y conserva el motivo del servidor si falla', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    transport.createGenerationJob.mockResolvedValue(job);
+    await model.createGeneration({ crimeType: 'fraude', contentRating: 'familiar', duration: 'short' });
+    expect(transport.createGenerationJob).toHaveBeenCalledTimes(1);
+    expect(model.getSnapshot().jobs).toEqual([job]);
+    expect(model.getSnapshot().notice).toContain('en cola');
+    transport.createGenerationJob.mockRejectedValueOnce(new ArchiveError('unavailable', 'Ya tienes una generación en curso.'));
+    await model.createGeneration({ crimeType: 'robo' });
+    expect(model.getSnapshot().notice).toBe('Ya tienes una generación en curso.');
+  });
+  it('cancelar una generación actualiza su estado sin recargar el archivo', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    transport.createGenerationJob.mockResolvedValue(job);
+    await model.createGeneration({ crimeType: 'fraude' });
+    transport.cancelGenerationJob.mockResolvedValue({ ...job, status: 'cancelled', finishedAt: '2026-01-01T00:01:00.000Z' });
+    await model.cancelGeneration(id);
+    expect(model.getSnapshot().jobs[0]?.status).toBe('cancelled');
+    expect(model.getSnapshot().notice).toBe('Generación cancelada.');
+    expect(transport.list).toHaveBeenCalledTimes(1);
+  });
+  it('refrescar jobs recarga también el catálogo (el expediente nuevo aparece)', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    const done = { ...job, status: 'done' as const, caseId: 'generado-fraude-1', stage: 9 };
+    transport.generationJobs.mockResolvedValue({ items: [done] });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true }], nextCursor: null });
+    await model.refreshJobs();
+    expect(model.getSnapshot().jobs).toEqual([done]);
+    expect(model.getSnapshot().cases.map(item => item.caseId)).toContain('generado-fraude-1');
+  });
 });
 
 describe('T3: abrir ficha propia y descartar lecturas tardías', () => {

@@ -8,18 +8,7 @@ import { check, identifier, integer, isRecord, records, strings, text, type Data
 import { validateEntities, type EntityGroups } from './validation-entities.js';
 import { validateReferences, validateEvidenceGraph, validateStart } from './validation-references.js';
 
-function metadata(d: DataRecord, errors: string[]) {
-  check(identifier(d.id), 'id', errors);
-  check(d.schemaVersion === 1, 'schemaVersion soportada', errors);
-  check(d.engineCompatibility === 1, 'engineCompatibility soportada', errors);
-  check(integer(d.contentVersion, 1), 'contentVersion', errors);
-  check(typeof d.seed === 'number' && Number.isSafeInteger(d.seed), 'seed', errors);
-  check(typeof d.contentMode === 'string' && ['fixed', 'generated'].includes(d.contentMode), 'contentMode', errors);
-  check(typeof d.difficulty === 'string' && ['easy', 'normal', 'hard'].includes(d.difficulty), 'difficulty', errors);
-  check(typeof d.explorationMode === 'string' && ['guided', 'free'].includes(d.explorationMode), 'explorationMode', errors);
-  check(text(d.catalogVersion), 'catalogVersion', errors);
-  check(integer(d.deadlineMinutes, 1), 'deadlineMinutes', errors);
-  check(text(d.solution), 'solution', errors);
+function generatedMetadata(d: DataRecord, errors: string[]): void {
   // Metadatos opcionales de los expedientes generados (T4-08): si están,
   // tienen que tener forma. La intro es lo que ve el jugador al empezar.
   if (d.briefing !== undefined) {
@@ -38,6 +27,21 @@ function metadata(d: DataRecord, errors: string[]) {
       check(d.catalogMeta.contentRating === 'familiar' || d.catalogMeta.contentRating === 'general', 'catalogMeta.contentRating', errors);
     }
   }
+}
+
+function metadata(d: DataRecord, errors: string[]) {
+  check(identifier(d.id), 'id', errors);
+  check(d.schemaVersion === 1, 'schemaVersion soportada', errors);
+  check(d.engineCompatibility === 1, 'engineCompatibility soportada', errors);
+  check(integer(d.contentVersion, 1), 'contentVersion', errors);
+  check(typeof d.seed === 'number' && Number.isSafeInteger(d.seed), 'seed', errors);
+  check(typeof d.contentMode === 'string' && ['fixed', 'generated'].includes(d.contentMode), 'contentMode', errors);
+  check(typeof d.difficulty === 'string' && ['easy', 'normal', 'hard'].includes(d.difficulty), 'difficulty', errors);
+  check(typeof d.explorationMode === 'string' && ['guided', 'free'].includes(d.explorationMode), 'explorationMode', errors);
+  check(text(d.catalogVersion), 'catalogVersion', errors);
+  check(integer(d.deadlineMinutes, 1), 'deadlineMinutes', errors);
+  check(text(d.solution), 'solution', errors);
+  generatedMetadata(d, errors);
 }
 
 function collections(d: DataRecord, errors: string[]): EntityGroups {

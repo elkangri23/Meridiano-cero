@@ -435,68 +435,51 @@ function resolveCommunication(def: CaseDefinition, run: CaseRun, action: Action)
   return submitCommunication(def, run, action.params);
 }
 
-function detentionAuthorized(run: CaseRun, suspect: NonNullable<ReturnType<typeof fixedSuspect>>, params: Record<string, unknown>): boolean {
+function detentionAuthorized(run: CaseRun, suspect: { id: string; cityId: string; locationId: string }, params: Record<string, unknown>): boolean {
   const known = run.discoveries.includes('identity:' + suspect.id) && run.discoveries.includes('location:' + suspect.id);
   const present = run.position.cityId === suspect.cityId && run.position.locationId === suspect.locationId;
   const warrant = 'warrant:' + suspect.id;
   return known && present && params.warrantId === warrant && run.warrants.includes(warrant);
 }
 
+function applyDetention(run: CaseRun, suspectId: string): ActionResult {
+  return { status: 'applied', run: { ...run, version: run.version + 1, detentions: [...run.detentions, suspectId] },
+    events: [makeEvent(run.minute, 'detain', { suspectId })] };
+}
+
 function resolveDetention(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  if (!isFixedCase(def)) {
-    // Expediente generado (T4-08): misma autorización que el caso fijo.
-    const suspect = typeof action.params.suspectId === 'string' ? generatedSuspect(def, action.params.suspectId) : undefined;
-    if (!suspect || action.params.mode !== 'interactive' || action.params.locationId !== suspect.locationId) {
-      return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
-    }
-    const known = run.discoveries.includes('identity:' + suspect.id) && run.discoveries.includes('location:' + suspect.id);
-    const present = run.position.cityId === suspect.cityId && run.position.locationId === suspect.locationId;
-    const warrant = 'warrant:' + suspect.id;
-    if (!known || !present || action.params.warrantId !== warrant || !run.warrants.includes(warrant)) {
-      return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
-    }
-    if (run.detentions.includes(suspect.id)) return { status: 'impossible', run, events: [], reason: 'Detención ya realizada.' };
-    return { status: 'applied', run: { ...run, version: run.version + 1, detentions: [...run.detentions, suspect.id] },
-      events: [makeEvent(run.minute, 'detain', { suspectId: suspect.id })] };
-  }
-  const suspect = typeof action.params.suspectId === 'string' ? fixedSuspect(action.params.suspectId) : undefined;
-  if (!suspect || action.params.mode !== 'interactive' || action.params.locationId !== suspect.locationId) {
-    return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
-  }
-  if (!detentionAuthorized(run, suspect, action.params)) {
-    return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
-  }
-  if (run.detentions.includes(suspect.id)) return { status: 'impossible', run, events: [], reason: 'Detención ya realizada.' };
-  return { status: 'applied', run: { ...run, version: run.version + 1, detentions: [...run.detentions, suspect.id] },
-    events: [makeEvent(run.minute, 'detain', { suspectId: suspect.id })] };
+  const refuse = (reason: string): ActionResult => ({ status: 'impossible', run, events: [], reason });
+  const suspectId = typeof action.params.suspectId === 'string' ? action.params.suspectId : undefined;
+  const suspect = suspectId === undefined ? undefined : (isFixedCase(def) ? fixedSuspect(suspectId) : generatedSuspect(def, suspectId));
+  if (!suspect || action.params.mode !== 'interactive' || action.params.locationId !== suspect.locationId) return refuse('Intervención no disponible.');
+  if (!detentionAuthorized(run, suspect, action.params)) return refuse('Intervención no disponible.');
+  if (run.detentions.includes(suspect.id)) return refuse('Detención ya realizada.');
+  return applyDetention(run, suspect.id);
+}
+
+interface RecoveryTarget { objectId: string; cityId: string; locationId: string; evidenceId: string; requiresAccessWarrant: boolean }
+
+function recoveryTarget(def: CaseDefinition): RecoveryTarget | undefined {
+  if (isFixedCase(def)) return { objectId: ORIGINAL_OBJECT, cityId: 'lisboa', locationId: 'LIS-ALM', evidenceId: 'EV-11', requiresAccessWarrant: true };
+  const recovery = def.mechanics?.recovery;
+  if (!recovery) return undefined;
+  return { objectId: recovery.objectId, cityId: recovery.cityId, locationId: recovery.locationId, evidenceId: recovery.evidenceId, requiresAccessWarrant: recovery.requiresAccessWarrant };
 }
 
 function resolveRecovery(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  if (!isFixedCase(def)) {
-    // Expediente generado (T4-08): misma recuperación que el caso fijo.
-    const recovery = def.mechanics?.recovery;
-    const irregular = run.discoveries.includes('forced-entry');
-    const access = run.warrants.includes('warrant:access') || irregular;
-    if (!recovery || action.params.objectId !== recovery.objectId || run.position.cityId !== recovery.cityId ||
-        run.position.locationId !== recovery.locationId || (recovery.requiresAccessWarrant && !access)) {
-      return { status: 'impossible', run, events: [], reason: 'Recuperación no disponible.' };
-    }
-    if (run.recoveredObjects.includes(recovery.objectId)) return { status: 'impossible', run, events: [], reason: 'Objeto ya recuperado.' };
-    const revealed = revealEvidence(def, run, recovery.evidenceId, run.minute, 'recover');
-    return { status: 'applied', run: { ...revealed, version: run.version + 1, recoveredObjects: [...run.recoveredObjects, recovery.objectId],
-      inventory: [...run.inventory, recovery.evidenceId], admissibility: { ...revealed.admissibility, [recovery.evidenceId]: !irregular } },
-      events: [makeEvent(run.minute, 'recover', { objectId: recovery.objectId, irregular })] };
-  }
+  const refuse = (reason: string): ActionResult => ({ status: 'impossible', run, events: [], reason });
   const irregular = run.discoveries.includes('forced-entry');
   const access = run.warrants.includes('warrant:access') || irregular;
-  if (!isFixedCase(def) || action.params.objectId !== ORIGINAL_OBJECT || run.position.cityId !== 'lisboa' || run.position.locationId !== 'LIS-ALM' || !access) {
-    return { status: 'impossible', run, events: [], reason: 'Recuperación no disponible.' };
+  const target = recoveryTarget(def);
+  if (!target || action.params.objectId !== target.objectId || run.position.cityId !== target.cityId ||
+      run.position.locationId !== target.locationId || (target.requiresAccessWarrant && !access)) {
+    return refuse('Recuperación no disponible.');
   }
-  if (run.recoveredObjects.includes(ORIGINAL_OBJECT)) return { status: 'impossible', run, events: [], reason: 'Objeto ya recuperado.' };
-  const revealed = revealEvidence(def, run, 'EV-11', run.minute, 'recover');
-  return { status: 'applied', run: { ...revealed, version: run.version + 1, recoveredObjects: [...run.recoveredObjects, ORIGINAL_OBJECT],
-    inventory: [...run.inventory, 'EV-11'], admissibility: { ...revealed.admissibility, 'EV-11': !irregular } },
-    events: [makeEvent(run.minute, 'recover', { objectId: ORIGINAL_OBJECT, irregular })] };
+  if (run.recoveredObjects.includes(target.objectId)) return refuse('Objeto ya recuperado.');
+  const revealed = revealEvidence(def, run, target.evidenceId, run.minute, 'recover');
+  return { status: 'applied', run: { ...revealed, version: run.version + 1, recoveredObjects: [...run.recoveredObjects, target.objectId],
+    inventory: [...run.inventory, target.evidenceId], admissibility: { ...revealed.admissibility, [target.evidenceId]: !irregular } },
+    events: [makeEvent(run.minute, 'recover', { objectId: target.objectId, irregular })] };
 }
 
 function finishParams(action: Action): boolean {

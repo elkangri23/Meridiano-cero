@@ -54,20 +54,24 @@ function detentionAvailable(def: CaseDefinition, run: CaseRun, suspectId: string
   return known && present && run.warrants.includes('warrant:' + suspect.id) && !run.detentions.includes(suspect.id);
 }
 
+function inspectElementOffers(def: CaseDefinition, run: CaseRun, locationId: string): ActionOffer[] {
+  const offers: ActionOffer[] = [];
+  for (const element of [...listInspectableElements(locationId), ...listGeneratedInspectableElements(def, locationId)]) {
+    const evidenceId = inspectedEvidence(locationId, element) ?? def.mechanics?.inspectables.find(entry => entry.locationId === locationId && entry.elementId === element)?.evidenceId;
+    if (!evidenceId || knowsEvidence(run, evidenceId)) continue;
+    offers.push({ id: `inspect:${locationId}:${element}`, label: `Inspeccionar ${generatedInspectLabel(def, locationId, element) ?? elementLabel[element] ?? element}`,
+      action: { type: 'inspect', params: { targetId: locationId, elementId: element } } });
+  }
+  return offers;
+}
+
 function inspectOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const location = def.locations.find(item => item.id === run.position.locationId);
   if (!location) return [];
   const offers: ActionOffer[] = [{ id: `inspect:${location.id}`, label: `Inspeccionar ${location.name}`,
     action: { type: 'inspect', params: { targetId: location.id } } }];
   if (!run.discoveries.includes(location.id)) return offers;
-  for (const element of [...listInspectableElements(location.id), ...listGeneratedInspectableElements(def, location.id)]) {
-    const evidenceId = inspectedEvidence(location.id, element) ?? def.mechanics?.inspectables.find(entry => entry.locationId === location.id && entry.elementId === element)?.evidenceId;
-    if (evidenceId && !knowsEvidence(run, evidenceId)) {
-      offers.push({ id: `inspect:${location.id}:${element}`, label: `Inspeccionar ${generatedInspectLabel(def, location.id, element) ?? elementLabel[element] ?? element}`,
-        action: { type: 'inspect', params: { targetId: location.id, elementId: element } } });
-    }
-  }
-  return offers;
+  return [...offers, ...inspectElementOffers(def, run, location.id)];
 }
 
 function collectOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
@@ -77,23 +81,33 @@ function collectOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
       action: { type: 'collect', params: { evidenceId: evidence.id } } }));
 }
 
+function luciaBoxOffer(run: CaseRun, npc: CaseDefinition['npcs'][number]): ActionOffer | null {
+  if (npc.id !== 'lucia' || !npc.knowledge.includes('tomas-moved-box') ||
+      (run.npcRelations.lucia ?? 0) <= 0 || knowsEvidence(run, 'EV-09')) return null;
+  return { id: 'talk:lucia:caja', label: 'Preguntar a Lucía por la caja',
+    action: { type: 'talk', params: { npcId: 'lucia', topicId: 'caja' } } };
+}
+
+function generatedTalkOffers(def: CaseDefinition, run: CaseRun, npc: CaseDefinition['npcs'][number]): ActionOffer[] {
+  const offers: ActionOffer[] = [];
+  for (const entry of def.mechanics?.talkEvidence.filter(item => item.npcId === npc.id) ?? []) {
+    if (knowsEvidence(run, entry.evidenceId)) continue;
+    if (entry.requiresRelation && (run.npcRelations[npc.id] ?? 0) <= 0) continue;
+    offers.push({ id: `talk:${npc.id}:${entry.topicId}`, label: entry.label,
+      action: { type: 'talk', params: { npcId: npc.id, topicId: entry.topicId } } });
+  }
+  return offers;
+}
+
 function talkOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const offers: ActionOffer[] = [];
   for (const npc of def.npcs.filter(item => item.cityId === run.position.cityId)) {
     offers.push({ id: `talk:${npc.id}:identidad`, label: `Hablar con ${npc.name} sobre su identidad`,
       action: { type: 'talk', params: { npcId: npc.id, topicId: 'identidad' } } });
-    if (npc.id === 'lucia' && npc.knowledge.includes('tomas-moved-box') &&
-        (run.npcRelations.lucia ?? 0) > 0 && !knowsEvidence(run, 'EV-09')) {
-      offers.push({ id: 'talk:lucia:caja', label: 'Preguntar a Lucía por la caja',
-        action: { type: 'talk', params: { npcId: 'lucia', topicId: 'caja' } } });
-    }
+    const lucia = luciaBoxOffer(run, npc);
+    if (lucia) offers.push(lucia);
     // Expedientes generados (T4-08): temas declarados en la mecánica.
-    for (const entry of def.mechanics?.talkEvidence.filter(item => item.npcId === npc.id) ?? []) {
-      if (knowsEvidence(run, entry.evidenceId)) continue;
-      if (entry.requiresRelation && (run.npcRelations[npc.id] ?? 0) <= 0) continue;
-      offers.push({ id: `talk:${npc.id}:${entry.topicId}`, label: entry.label,
-        action: { type: 'talk', params: { npcId: npc.id, topicId: entry.topicId } } });
-    }
+    offers.push(...generatedTalkOffers(def, run, npc));
   }
   return offers;
 }
@@ -167,15 +181,17 @@ function detainOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
       action: { type: 'detain', params: { suspectId, warrantId: 'warrant:' + suspectId, locationId: def.mechanics?.suspects.find(suspect => suspect.id === suspectId)?.locationId ?? fixedSuspect(suspectId)?.locationId ?? '', mode: 'interactive' } } }));
 }
 
+function generatedRecoverOffer(def: CaseDefinition, run: CaseRun, access: boolean): ActionOffer[] {
+  const recovery = def.mechanics?.recovery;
+  if (!recovery || run.position.cityId !== recovery.cityId || run.position.locationId !== recovery.locationId ||
+      (recovery.requiresAccessWarrant && !access) || run.recoveredObjects.includes(recovery.objectId)) return [];
+  return [{ id: `recover:${recovery.objectId}`, label: recovery.label,
+    action: { type: 'recover', params: { objectId: recovery.objectId } } }];
+}
+
 function recoverOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const access = run.warrants.includes('warrant:access') || run.discoveries.includes('forced-entry');
-  if (isGeneratedCase(def)) {
-    const recovery = def.mechanics?.recovery;
-    if (!recovery || run.position.cityId !== recovery.cityId || run.position.locationId !== recovery.locationId ||
-        (recovery.requiresAccessWarrant && !access) || run.recoveredObjects.includes(recovery.objectId)) return [];
-    return [{ id: `recover:${recovery.objectId}`, label: recovery.label,
-      action: { type: 'recover', params: { objectId: recovery.objectId } } }];
-  }
+  if (isGeneratedCase(def)) return generatedRecoverOffer(def, run, access);
   if (!isFixedCase(def) || run.position.cityId !== 'lisboa' || run.position.locationId !== 'LIS-ALM' ||
       !access || run.recoveredObjects.includes(ORIGINAL_OBJECT)) return [];
   return [{ id: 'recover:astrolabio-original', label: 'Recuperar el astrolabio original',

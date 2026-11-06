@@ -237,6 +237,23 @@ function checkKeys(output: Record<string, unknown>, required: string[], errors: 
   for (const key of required) if (!Object.hasOwn(output, key)) errors.push(`Falta la clave ${key}.`);
 }
 
+function checkCastMember(member: unknown, cityIds: Set<string>, ids: Set<string>, errors: string[]): void {
+  if (!isRecord(member)) { errors.push('Un miembro del reparto no es un objeto.'); return; }
+  if (typeof member.id !== 'string' || !NPC_ID.test(member.id)) errors.push(`id de NPC inválido: ${String(member.id)}.`);
+  if (ids.has(String(member.id))) errors.push(`id de NPC duplicado: ${String(member.id)}.`);
+  ids.add(String(member.id));
+  if (!isNonEmptyString(member.name)) errors.push(`NPC ${String(member.id)} sin nombre.`);
+  if (!isNonEmptyString(member.role)) errors.push(`NPC ${String(member.id)} sin rol.`);
+  if (typeof member.cityId !== 'string' || !cityIds.has(member.cityId)) errors.push(`NPC ${String(member.id)} en ciudad desconocida.`);
+}
+
+function checkPremiseBriefing(output: Record<string, unknown>, errors: string[]): void {
+  if (!isRecord(output.objectives) || !isNonEmptyString(output.objectives.detain) || !isNonEmptyString(output.objectives.recover)) errors.push('objectives debe tener detain y recover como frases.');
+  if (!isRecord(output.briefing) || !isNonEmptyString(output.briefing.speaker) || !isNonEmptyString(output.briefing.title) ||
+      !Array.isArray(output.briefing.paragraphs) || output.briefing.paragraphs.length !== 3 ||
+      !output.briefing.paragraphs.every(isNonEmptyString)) errors.push('briefing debe tener speaker, title y 3 párrafos.');
+}
+
 function validatePremise(output: unknown, cities: SelectedGeography['cities'], errors: string[]): void {
   if (!isRecord(output)) { errors.push('La premisa debe ser un objeto.'); return; }
   checkKeys(output, ['title', 'crimeLabel', 'truth', 'solution', 'decoy', 'witnesses', 'motive', 'objectives', 'objectLabel', 'briefing'], errors);
@@ -245,20 +262,22 @@ function validatePremise(output: unknown, cities: SelectedGeography['cities'], e
   const cityIds = new Set(cities.map(city => city.id));
   const cast = [output.solution, output.decoy, ...(Array.isArray(output.witnesses) ? output.witnesses : [])];
   const ids = new Set<string>();
-  for (const member of cast) {
-    if (!isRecord(member)) { errors.push('Un miembro del reparto no es un objeto.'); continue; }
-    if (typeof member.id !== 'string' || !NPC_ID.test(member.id)) errors.push(`id de NPC inválido: ${String(member.id)}.`);
-    if (ids.has(String(member.id))) errors.push(`id de NPC duplicado: ${String(member.id)}.`);
-    ids.add(String(member.id));
-    if (!isNonEmptyString(member.name)) errors.push(`NPC ${String(member.id)} sin nombre.`);
-    if (!isNonEmptyString(member.role)) errors.push(`NPC ${String(member.id)} sin rol.`);
-    if (typeof member.cityId !== 'string' || !cityIds.has(member.cityId)) errors.push(`NPC ${String(member.id)} en ciudad desconocida.`);
-  }
+  for (const member of cast) checkCastMember(member, cityIds, ids, errors);
   if (!Array.isArray(output.witnesses) || output.witnesses.length < 1 || output.witnesses.length > 2) errors.push('witnesses debe tener 1 o 2 testigos.');
-  if (!isRecord(output.objectives) || !isNonEmptyString(output.objectives.detain) || !isNonEmptyString(output.objectives.recover)) errors.push('objectives debe tener detain y recover como frases.');
-  if (!isRecord(output.briefing) || !isNonEmptyString(output.briefing.speaker) || !isNonEmptyString(output.briefing.title) ||
-      !Array.isArray(output.briefing.paragraphs) || output.briefing.paragraphs.length !== 3 ||
-      !output.briefing.paragraphs.every(isNonEmptyString)) errors.push('briefing debe tener speaker, title y 3 párrafos.');
+  checkPremiseBriefing(output, errors);
+}
+
+function checkNpcKnowledge(npc: Record<string, unknown>, errors: string[]): void {
+  if (!Array.isArray(npc.knowledge) || npc.knowledge.length === 0 || !npc.knowledge.every((token: unknown) => typeof token === 'string' && FACT_ID.test(token))) errors.push(`NPC ${String(npc.id)} con conocimiento inválido.`);
+  if (typeof npc.cooperation !== 'number' || npc.cooperation < 0 || npc.cooperation > 10) errors.push(`NPC ${String(npc.id)} con cooperación fuera de 0-10.`);
+}
+
+function checkNpc(npc: unknown, castIds: string[], ids: Set<string>, errors: string[]): void {
+  if (!isRecord(npc)) { errors.push('Un NPC no es un objeto.'); return; }
+  if (typeof npc.id !== 'string' || !castIds.includes(npc.id)) errors.push(`NPC fuera del reparto: ${String(npc.id)}.`);
+  ids.add(String(npc.id));
+  if (!isNonEmptyString(npc.persona)) errors.push(`NPC ${String(npc.id)} sin persona.`);
+  checkNpcKnowledge(npc, errors);
 }
 
 function validateNpcs(output: unknown, castIds: string[], errors: string[]): void {
@@ -266,14 +285,7 @@ function validateNpcs(output: unknown, castIds: string[], errors: string[]): voi
   checkKeys(output, ['npcs', 'timeline'], errors);
   if (!Array.isArray(output.npcs)) { errors.push('npcs debe ser una lista.'); return; }
   const ids = new Set<string>();
-  for (const npc of output.npcs) {
-    if (!isRecord(npc)) { errors.push('Un NPC no es un objeto.'); continue; }
-    if (typeof npc.id !== 'string' || !castIds.includes(npc.id)) errors.push(`NPC fuera del reparto: ${String(npc.id)}.`);
-    ids.add(String(npc.id));
-    if (!isNonEmptyString(npc.persona)) errors.push(`NPC ${String(npc.id)} sin persona.`);
-    if (!Array.isArray(npc.knowledge) || npc.knowledge.length === 0 || !npc.knowledge.every((token: unknown) => typeof token === 'string' && FACT_ID.test(token))) errors.push(`NPC ${String(npc.id)} con conocimiento inválido.`);
-    if (typeof npc.cooperation !== 'number' || npc.cooperation < 0 || npc.cooperation > 10) errors.push(`NPC ${String(npc.id)} con cooperación fuera de 0-10.`);
-  }
+  for (const npc of output.npcs) checkNpc(npc, castIds, ids, errors);
   for (const id of castIds) if (!ids.has(id)) errors.push(`Falta el NPC ${id} del reparto.`);
   if (!Array.isArray(output.timeline) || output.timeline.length < 2 || !output.timeline.every(isNonEmptyString)) errors.push('timeline debe tener al menos 2 hitos.');
 }
@@ -283,20 +295,23 @@ function validateNpcs(output: unknown, castIds: string[], errors: string[]): voi
  * registro, registro, testimonio, registro, objeto. */
 export const EVIDENCE_SLOT_TYPES = ['observation', 'object', 'analysis', 'record', 'record', 'object', 'record', 'record', 'testimony', 'record', 'object'] as const;
 
-function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], errors: string[]): void {
-  if (!isRecord(output)) { errors.push('La red de pistas debe ser un objeto.'); return; }
-  checkKeys(output, ['locations', 'evidence', 'mechanics', 'texts', 'goldenPath'], errors);
-  const cityIds = new Set(geography.cities.map(city => city.id));
-  if (!Array.isArray(output.locations) || output.locations.length !== 3) { errors.push('locations debe tener exactamente 3 lugares (uno por ciudad).'); return; }
+function checkClueLocation(location: unknown, cityIds: Set<string>, locationIds: Set<string>, errors: string[]): void {
+  if (!isRecord(location)) { errors.push('Un lugar no es un objeto.'); return; }
+  if (typeof location.id !== 'string' || !LOCATION_ID.test(location.id)) errors.push(`id de lugar inválido: ${String(location.id)}.`);
+  locationIds.add(String(location.id));
+  if (typeof location.cityId !== 'string' || !cityIds.has(location.cityId)) errors.push(`Lugar ${String(location.id)} en ciudad desconocida.`);
+  if (!isNonEmptyString(location.name) || !isNonEmptyString(location.description)) errors.push(`Lugar ${String(location.id)} sin nombre o descripción.`);
+}
+
+function checkClueLocations(output: Record<string, unknown>, cityIds: Set<string>, errors: string[]): Set<string> | null {
+  if (!Array.isArray(output.locations) || output.locations.length !== 3) { errors.push('locations debe tener exactamente 3 lugares (uno por ciudad).'); return null; }
   const locationIds = new Set<string>();
-  for (const location of output.locations) {
-    if (!isRecord(location)) { errors.push('Un lugar no es un objeto.'); continue; }
-    if (typeof location.id !== 'string' || !LOCATION_ID.test(location.id)) errors.push(`id de lugar inválido: ${String(location.id)}.`);
-    locationIds.add(String(location.id));
-    if (typeof location.cityId !== 'string' || !cityIds.has(location.cityId)) errors.push(`Lugar ${String(location.id)} en ciudad desconocida.`);
-    if (!isNonEmptyString(location.name) || !isNonEmptyString(location.description)) errors.push(`Lugar ${String(location.id)} sin nombre o descripción.`);
-  }
+  for (const location of output.locations) checkClueLocation(location, cityIds, locationIds, errors);
   if (new Set([...output.locations].map((location: unknown) => isRecord(location) ? location.cityId : '')).size !== 3) errors.push('Cada ciudad debe tener exactamente un lugar.');
+  return locationIds;
+}
+
+function checkClueEvidence(output: Record<string, unknown>, locationIds: Set<string>, cityIds: Set<string>, errors: string[]): void {
   if (!Array.isArray(output.evidence) || output.evidence.length !== 11) { errors.push('evidence debe tener exactamente 11 evidencias (EV-01..EV-11).'); return; }
   output.evidence.forEach((evidence: unknown, index: number) => {
     if (!isRecord(evidence)) { errors.push(`Evidencia ${index + 1} no es un objeto.`); return; }
@@ -306,30 +321,60 @@ function validateClues(output: unknown, geography: SelectedGeography, castIds: s
     if (typeof evidence.origin !== 'string' || (!locationIds.has(evidence.origin) && !cityIds.has(evidence.origin))) errors.push(`La evidencia ${expectedId} tiene origen desconocido.`);
     if (!Array.isArray(evidence.relations) || !evidence.relations.every((id: unknown) => typeof id === 'string' && EVIDENCE_ID.test(id))) errors.push(`La evidencia ${expectedId} tiene relaciones inválidas.`);
   });
+}
+
+const MECHANIC_COUNTS: Array<{ key: string; count: number; message: string }> = [
+  { key: 'inspectables', count: 3, message: 'mechanics.inspectables debe tener 3 entradas (sala + 2 elementos).' },
+  { key: 'queries', count: 5, message: 'mechanics.queries debe tener 5 consultas.' },
+  { key: 'analyses', count: 1, message: 'mechanics.analyses debe tener 1 análisis.' },
+  { key: 'talkEvidence', count: 1, message: 'mechanics.talkEvidence debe tener 1 tema.' },
+];
+
+function checkClueMechanics(output: Record<string, unknown>, errors: string[]): void {
   if (!isRecord(output.mechanics)) { errors.push('mechanics debe ser un objeto.'); return; }
   const mechanics = output.mechanics;
-  if (!Array.isArray(mechanics.inspectables) || mechanics.inspectables.length !== 3) errors.push('mechanics.inspectables debe tener 3 entradas (sala + 2 elementos).');
-  if (!Array.isArray(mechanics.queries) || mechanics.queries.length !== 5) errors.push('mechanics.queries debe tener 5 consultas.');
-  if (!Array.isArray(mechanics.analyses) || mechanics.analyses.length !== 1) errors.push('mechanics.analyses debe tener 1 análisis.');
-  if (!Array.isArray(mechanics.talkEvidence) || mechanics.talkEvidence.length !== 1) errors.push('mechanics.talkEvidence debe tener 1 tema.');
+  for (const entry of MECHANIC_COUNTS) {
+    if (!Array.isArray(mechanics[entry.key]) || (mechanics[entry.key] as unknown[]).length !== entry.count) errors.push(entry.message);
+  }
   if (!Array.isArray(mechanics.suspects) || mechanics.suspects.length < 1 || mechanics.suspects.length > 2) errors.push('mechanics.suspects debe tener 1 o 2 sospechosos.');
   if (!isRecord(mechanics.recovery)) errors.push('mechanics.recovery debe ser un objeto.');
+}
+
+function checkClueTexts(output: Record<string, unknown>, castIds: string[], errors: string[]): void {
   if (!isRecord(output.texts)) { errors.push('texts debe ser un objeto.'); return; }
   const texts = output.texts;
   if (!isRecord(texts.evidence) || Object.keys(texts.evidence).length !== 11) errors.push('texts.evidence debe tener 11 textos.');
   if (!isRecord(texts.greetings)) errors.push('texts.greetings debe ser un objeto.');
   for (const id of castIds) if (!isRecord(texts.greetings) || !isNonEmptyString((texts.greetings as Record<string, unknown>)[id])) errors.push(`Falta el saludo de ${id}.`);
-  if (!Array.isArray(output.goldenPath) || output.goldenPath.length < 10 || output.goldenPath.length > 40) errors.push('goldenPath debe tener entre 10 y 40 acciones.');
-  if (Array.isArray(output.goldenPath)) {
-    for (const action of output.goldenPath) {
-      if (!isRecord(action) || !isNonEmptyString(action.type) || !isRecord(action.params)) errors.push('Una acción de goldenPath no tiene type/params.');
-    }
-    const types = output.goldenPath.map((action: unknown) => isRecord(action) ? action.type : '');
-    if (!types.includes('detain')) errors.push('goldenPath debe incluir una detención.');
-    if (!types.includes('recover')) errors.push('goldenPath debe incluir una recuperación.');
-    const last = output.goldenPath[output.goldenPath.length - 1];
-    if (!isRecord(last) || last.type !== 'finish') errors.push('goldenPath debe terminar con el cierre del caso.');
+}
+
+function checkGoldenActions(output: Record<string, unknown>, errors: string[]): string[] {
+  if (!Array.isArray(output.goldenPath)) return [];
+  for (const action of output.goldenPath) {
+    if (!isRecord(action) || !isNonEmptyString(action.type) || !isRecord(action.params)) errors.push('Una acción de goldenPath no tiene type/params.');
   }
+  return output.goldenPath.map((action: unknown) => isRecord(action) && typeof action.type === 'string' ? action.type : '');
+}
+
+function checkGoldenPath(output: Record<string, unknown>, errors: string[]): void {
+  if (!Array.isArray(output.goldenPath) || output.goldenPath.length < 10 || output.goldenPath.length > 40) errors.push('goldenPath debe tener entre 10 y 40 acciones.');
+  if (!Array.isArray(output.goldenPath)) return;
+  const types = checkGoldenActions(output, errors);
+  if (!types.includes('detain')) errors.push('goldenPath debe incluir una detención.');
+  if (!types.includes('recover')) errors.push('goldenPath debe incluir una recuperación.');
+  const last = output.goldenPath[output.goldenPath.length - 1];
+  if (!isRecord(last) || last.type !== 'finish') errors.push('goldenPath debe terminar con el cierre del caso.');
+}
+
+function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], errors: string[]): void {
+  if (!isRecord(output)) { errors.push('La red de pistas debe ser un objeto.'); return; }
+  checkKeys(output, ['locations', 'evidence', 'mechanics', 'texts', 'goldenPath'], errors);
+  const cityIds = new Set(geography.cities.map(city => city.id));
+  const locationIds = checkClueLocations(output, cityIds, errors);
+  if (locationIds) checkClueEvidence(output, locationIds, cityIds, errors);
+  checkClueMechanics(output, errors);
+  checkClueTexts(output, castIds, errors);
+  checkGoldenPath(output, errors);
 }
 
 function validateReview(output: unknown, errors: string[]): void {

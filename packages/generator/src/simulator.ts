@@ -55,37 +55,45 @@ interface GoldenPathOutcome {
   objectivesAchieved: string[];
 }
 
+function applyGoldenStep(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, index: number): { run: CaseRun; error: string | null } {
+  const result = apply(definition, run, action);
+  if (result.status !== 'applied' && result.status !== 'case_closed') {
+    return { run, error: `Paso ${index + 1} (${action.type}) no se pudo aplicar: ${result.reason ?? result.status}.` };
+  }
+  return { run: result.run, error: null };
+}
+
+function checkGoldenOutcome(definition: CaseDefinition, run: CaseRun): string | null {
+  if (run.status !== 'closed' || !run.finalReport) return 'La ruta dorada no cierra el caso.';
+  if (run.finalReport.result !== 'complete') return `La ruta dorada termina en ${run.finalReport.result}, no en completado.`;
+  const missing = definition.objectives.map(objective => objective.id).filter(id => !run.finalReport?.objectivesAchieved.includes(id));
+  if (missing.length > 0) return `Objetivos sin lograr: ${missing.join(', ')}.`;
+  return null;
+}
+
 function checkGoldenPath(definition: CaseDefinition, goldenPath: GoldenPathAction[], budgetMinutes: number): GoldenPathOutcome {
   const fail = (detail: string, minute = 0): GoldenPathOutcome => ({ check: { name: 'golden-path', passed: false, detail }, minute, result: null, objectivesAchieved: [] });
   let run = freshRun(definition);
   for (let index = 0; index < goldenPath.length; index++) {
     const action = goldenPath[index];
     if (!action) continue;
-    const result = apply(definition, run, action);
-    if (result.status !== 'applied' && result.status !== 'case_closed') {
-      return fail(`Paso ${index + 1} (${action.type}) no se pudo aplicar: ${result.reason ?? result.status}.`, run.minute);
-    }
-    run = result.run;
+    const step = applyGoldenStep(definition, run, action, index);
+    if (step.error) return fail(step.error, run.minute);
+    run = step.run;
     if (run.status === 'closed') break;
   }
-  if (run.status !== 'closed' || !run.finalReport) {
-    return fail('La ruta dorada no cierra el caso.', run.minute);
-  }
-  if (run.finalReport.result !== 'complete') {
-    return fail(`La ruta dorada termina en ${run.finalReport.result}, no en completado.`, run.minute);
-  }
-  const missing = definition.objectives.map(objective => objective.id).filter(id => !run.finalReport?.objectivesAchieved.includes(id));
-  if (missing.length > 0) {
-    return fail(`Objetivos sin lograr: ${missing.join(', ')}.`, run.minute);
-  }
+  const outcomeError = checkGoldenOutcome(definition, run);
+  if (outcomeError) return fail(outcomeError, run.minute);
+  const report = run.finalReport;
+  if (!report) return fail('La ruta dorada no cierra el caso.', run.minute);
   if (run.minute > budgetMinutes) {
     return fail(`La ruta dorada tarda ${run.minute} min, por encima del presupuesto de ${budgetMinutes} min.`, run.minute);
   }
   return {
     check: { name: 'golden-path', passed: true, detail: `Ruta dorada completa en ${run.minute} min (presupuesto ${budgetMinutes} min).` },
     minute: run.minute,
-    result: run.finalReport.result,
-    objectivesAchieved: [...run.finalReport.objectivesAchieved],
+    result: report.result,
+    objectivesAchieved: [...report.objectivesAchieved],
   };
 }
 

@@ -38,17 +38,14 @@ function useCrimeChoice(playableCrimes: CrimeType[]) {
       setResolvedCrime(next);
     }
   }
-  function surpriseChoice() {
-    const pick = randomOf(playableCrimes);
-    if (pick) { setCrime('aleatorio'); setResolvedCrime(pick); }
-    setSurprised(true);
-  }
+  function markSurprised() { setSurprised(true); }
   function resetChoice() { setCrime('robo'); setResolvedCrime('robo'); setSurprised(false); }
-  return { crime, resolvedCrime, surprised, chooseCrime, surpriseChoice, resetChoice };
+  return { crime, resolvedCrime, surprised, chooseCrime, markSurprised, resetChoice };
 }
 function CreationContent({ state, model }: Props) {
   const [content, setContent] = useState<ContentRating>('familiar');
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
+  const [caseId, setCaseId] = useState<string | null>(null);
   const navigate = useNavigate();
   const previousPhase = useRef(state.creation.phase);
   const busy = state.phase === 'loading';
@@ -57,11 +54,30 @@ function CreationContent({ state, model }: Props) {
   const playableCrimes = GDD_CRIME_TYPES.filter(item => item !== 'aleatorio' && state.cases.some(entry => entry.canStart && entry.crimeType === item));
   const choice = useCrimeChoice(playableCrimes);
   const { crime, resolvedCrime, surprised } = choice;
-  const selectedCase = state.cases.find(item => item.canStart && item.crimeType === resolvedCrime);
+  // Expedientes del delito y contenido elegidos; si hay varios, se elige.
+  const matchingCases = state.cases.filter(item => item.canStart && item.crimeType === resolvedCrime && item.contentRating === content);
+  const selectedCase = matchingCases.find(item => item.caseId === caseId) ?? matchingCases[0];
+  const hasGeneral = state.cases.some(item => item.canStart && item.crimeType === resolvedCrime && item.contentRating === 'general');
+  function chooseContent(next: ContentRating) {
+    setContent(next);
+    setCaseId(null);
+  }
+  function chooseCrimeAndReset(next: CrimeType) {
+    choice.chooseCrime(next);
+    setCaseId(null);
+  }
   function surprise() {
-    choice.surpriseChoice();
+    // SORPRÉNDEME sortea entre TODO lo disponible, incluidos los generados:
+    // un expediente concreto (delito + contenido), no solo un delito.
+    const available = state.cases.filter(item => item.canStart);
+    const pick = randomOf(available);
+    if (pick) {
+      choice.chooseCrime(pick.crimeType);
+      choice.markSurprised();
+      setContent(pick.contentRating);
+      setCaseId(pick.caseId);
+    }
     setDifficulty(randomOf(difficulties) ?? 'normal');
-    setContent('familiar');
   }
   // Al confirmarse una creación nueva, se abre su pantalla de juego. Al volver
   // al archivo después, la creación ya no está en transición y no se navega sola.
@@ -71,13 +87,14 @@ function CreationContent({ state, model }: Props) {
     openCreatedRun(previous, state.creation.phase, state.creation.runId, navigate);
   }, [state.creation.phase, state.creation.runId, navigate]);
   function submit(event: FormEvent) { event.preventDefault(); if (selectedCase) void model.createCase(selectedCase.caseId, difficulty, { crimeType: resolvedCrime, contentRating: content }); }
-  if (state.creation.phase !== 'idle') return <CreationPhaseView state={state} model={model} busy={busy} onPrepareAnother={() => { choice.resetChoice(); setContent('familiar'); setDifficulty('normal'); model.prepareCreation(); }} />;
+  if (state.creation.phase !== 'idle') return <CreationPhaseView state={state} model={model} busy={busy} onPrepareAnother={() => { choice.resetChoice(); setContent('familiar'); setDifficulty('normal'); setCaseId(null); model.prepareCreation(); }} />;
   return <form onSubmit={submit}>
-    <CrimeField playableCrimes={playableCrimes} crime={crime} resolvedCrime={resolvedCrime} busy={busy} surprised={surprised} selectedCase={selectedCase} onChoose={choice.chooseCrime} onSurprise={surprise} />
-    <ContentField content={content} busy={busy} onChange={setContent} />
-    {selectedCase && <p>Expediente: {selectedCase.title} — {caseLabel(selectedCase.crimeType, selectedCase.contentRating)}. Otros delitos llegarán cuando la generación de casos esté conectada a la partida.</p>}
-    {!selectedCase && state.cases.length > 0 && <p>Todavía no hay expedientes validados de este delito.</p>}
     <DifficultyField busy={busy} difficulty={difficulty} selectedCase={selectedCase} onChange={setDifficulty} />
+    <CrimeField playableCrimes={playableCrimes} crime={crime} resolvedCrime={resolvedCrime} busy={busy} surprised={surprised} selectedCase={selectedCase} onChoose={chooseCrimeAndReset} onSurprise={surprise} />
+    <ContentField content={content} busy={busy} hasGeneral={hasGeneral} onChange={chooseContent} />
+    {matchingCases.length > 1 && <CaseField cases={matchingCases} selectedCase={selectedCase} busy={busy} onChange={setCaseId} />}
+    {selectedCase && <p>Expediente: {selectedCase.title} — {caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.</p>}
+    {!selectedCase && state.cases.length > 0 && <p>Todavía no hay expedientes validados de este delito y contenido.</p>}
     <button type="submit" disabled={busy || !selectedCase}>Empezar partida</button>{state.cases.length === 0 && <p>No hay expedientes disponibles.</p>}
   </form>;
 }
@@ -98,14 +115,18 @@ function CrimeField({ playableCrimes, crime, resolvedCrime, busy, surprised, sel
     const playable = item === 'aleatorio' ? playableCrimes.length > 0 : playableCrimes.includes(item);
     return <label key={item}><input type="radio" name="crime" value={item} checked={crime === item} disabled={!playable} onChange={() => onChoose(item)} /> {CRIME_TYPE_LABELS[item]}{item === 'aleatorio' && crime === 'aleatorio' && resolvedCrime ? ` → ${CRIME_TYPE_LABELS[resolvedCrime]}` : ''}{!playable ? ' · Sin expedientes validados todavía' : ''}</label>;
   })}</fieldset>
-  <p><button type="button" disabled={busy || playableCrimes.length === 0} onClick={onSurprise}>SORPRÉNDEME</button> Aleatoriza delito y dificultad entre lo disponible.{surprised && selectedCase ? ` Ha elegido: ${caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.` : ''}</p></>;
+  <p><button type="button" disabled={busy || playableCrimes.length === 0} onClick={onSurprise}>SORPRÉNDEME</button> Aleatoriza expediente y dificultad entre todo lo disponible, incluidos los casos generados.{surprised && selectedCase ? ` Ha elegido: ${caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.` : ''}</p></>;
 }
-type ContentFieldProps = { content: ContentRating; busy: boolean; onChange: (next: ContentRating) => void };
-function ContentField({ content, busy, onChange }: ContentFieldProps) {
+type ContentFieldProps = { content: ContentRating; busy: boolean; hasGeneral: boolean; onChange: (next: ContentRating) => void };
+function ContentField({ content, busy, hasGeneral, onChange }: ContentFieldProps) {
   return <fieldset disabled={busy}><legend>Contenido</legend>
     <label><input type="radio" name="content" value="familiar" checked={content === 'familiar'} onChange={() => onChange('familiar')} /> Familiar — sin asesinatos ni temas perturbadores.</label>
-    <label><input type="radio" name="content" value="general" checked={content === 'general'} disabled onChange={() => onChange('general')} /> General · Sin expedientes validados todavía — el único expediente disponible es apto para Familiar.</label>
+    <label><input type="radio" name="content" value="general" checked={content === 'general'} disabled={!hasGeneral} onChange={() => onChange('general')} /> General{hasGeneral ? ' — temas serios permitidos, sin detalle explícito ni gore.' : ' · Sin expedientes validados todavía — el único expediente disponible es apto para Familiar.'}</label>
   </fieldset>;
+}
+type CaseFieldProps = { cases: { caseId: string; title: string; crimeType: CrimeType; contentRating: ContentRating }[]; selectedCase: { caseId: string } | undefined; busy: boolean; onChange: (caseId: string) => void };
+function CaseField({ cases, selectedCase, busy, onChange }: CaseFieldProps) {
+  return <fieldset disabled={busy}><legend>Expediente</legend>{cases.map(item => <label key={item.caseId}><input type="radio" name="case" value={item.caseId} checked={selectedCase?.caseId === item.caseId} onChange={() => onChange(item.caseId)} /> {item.title} — {caseLabel(item.crimeType, item.contentRating)}</label>)}</fieldset>;
 }
 function PendingCreation({ state, model }: Props) {
   const busy = state.phase === 'loading';
