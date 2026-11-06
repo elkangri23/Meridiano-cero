@@ -123,4 +123,38 @@ describe('Generación de casos (T4-08)', () => {
     await owner.pool.query('DELETE FROM sessions WHERE profile_id=$1', [player2.id]);
     await owner.pool.query('DELETE FROM profiles WHERE id=$1', [player2.id]);
   });
+  it('un job sin delito (Sorpréndeme) no falla por parámetros: sortea el delito', async () => {
+    // La UI omite crimeType cuando se elige «Sorpréndeme» y la ruta guarda
+    // 'aleatorio' como modo de selección (SPEC-007 §1: no es un delito).
+    // El worker debe traducirlo a «sin delito» para que el pipeline
+    // sortee entre los 12; si el centinela llegara al pipeline, el job
+    // fallaría con «Parámetros inválidos: crimeType no válido».
+    const player3 = { id: randomUUID(), token: randomBytes(32).toString('base64url'), csrf: randomBytes(32).toString('base64url') };
+    const headers3 = { cookie: 'meridiano_session=' + player3.token, origin: config.origin, 'x-csrf-token': player3.csrf };
+    await owner.pool.query('INSERT INTO profiles(id,local_key,display_name) VALUES ($1,$2,$3)', [player3.id, 'generation-synthetic-' + player3.id, 'Detective sintético 3']);
+    await owner.pool.query("INSERT INTO sessions(token_hash,profile_id,csrf_token,expires_at) VALUES ($1,$2,$3,now()+interval '8 hours')", [tokenDigest(player3.token), player3.id, player3.csrf]);
+    const created = await app.inject({ method: 'POST', url: '/api/v1/generation/jobs', headers: headers3, payload: { contentRating: 'familiar', duration: 'short' } });
+    expect(created.statusCode).toBe(201);
+    const jobId = created.json().jobId as string;
+    expect(created.json().crimeType).toBe('aleatorio');
+    worker ??= startGenerationWorker(database, config);
+    let status = '';
+    let error: string | null = null;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const current = await app.inject({ method: 'GET', url: `/api/v1/generation/jobs/${jobId}`, headers: headers3 });
+      status = current.json().status as string;
+      error = current.json().error as string | null;
+      if (status === 'failed' || status === 'done') break;
+    }
+    // El mock no implementa generateCase: el job debe fallar por el
+    // proveedor, no por los parámetros (sin el arreglo, fallaba en
+    // createDraft con «Parámetros inválidos: crimeType no válido»).
+    expect(status).toBe('failed');
+    expect(error).toBeTruthy();
+    expect(error).not.toMatch(/Parámetros inválidos/);
+    await owner.pool.query('DELETE FROM generation_jobs WHERE owner_id=$1', [player3.id]);
+    await owner.pool.query('DELETE FROM sessions WHERE profile_id=$1', [player3.id]);
+    await owner.pool.query('DELETE FROM profiles WHERE id=$1', [player3.id]);
+  });
 });

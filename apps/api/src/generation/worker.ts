@@ -73,7 +73,10 @@ export function startGenerationWorker(database: Database, config: AppConfig): Ge
         caseId: `generado-${job.id.slice(0, 8)}`,
       });
       const params: GenerationParams = {
-        crimeType: job.crimeType as Exclude<GenerationParams['crimeType'], undefined>,
+        // 'aleatorio' es modo de selección, no un delito (SPEC-007 §1):
+        // se omite para que el pipeline sortee entre los 12. Si llegara
+        // como delito, el validador lo rechazaría con «crimeType no válido».
+        ...(job.crimeType !== 'aleatorio' ? { crimeType: job.crimeType as Exclude<GenerationParams['crimeType'], undefined> } : {}),
         difficulty: 'normal',
         explorationMode: 'guided',
         duration: job.duration as GenerationParams['duration'],
