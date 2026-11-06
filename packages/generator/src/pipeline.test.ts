@@ -750,6 +750,43 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/es el esquema JSON, no los datos/);
   });
 
+  it('reintenta la etapa 4 cuando el análisis EV-03 usa EV-02 como origen', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4aCalls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          contexts.push(context as Record<string, unknown>);
+          if ((context as Record<string, unknown>).part === 'b') return outputs.cluesRules;
+          stage4aCalls++;
+          if (stage4aCalls === 1) {
+            // Como el modelo real en el smoke: EV-03 (análisis) con origen
+            // EV-02 (su entrada) en vez del lugar donde se analiza.
+            const broken = structuredClone(outputs.cluesWorld);
+            const analysis = broken.evidence.find(item => item.id === 'EV-03');
+            if (analysis) analysis.origin = 'EV-02';
+            return broken;
+          }
+          return outputs.cluesWorld;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4aCalls).toBe(2);
+    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/origen desconocido: EV-02/);
+  });
+
   it('reintenta la etapa 4 cuando la ruta dorada empieza viajando a la ciudad de inicio', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
