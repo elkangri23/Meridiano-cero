@@ -242,7 +242,7 @@ function checkKeys(output: Record<string, unknown>, required: string[], errors: 
 
 function checkCastMember(member: unknown, cityIds: Set<string>, ids: Set<string>, errors: string[]): void {
   if (!isRecord(member)) { errors.push('Un miembro del reparto no es un objeto.'); return; }
-  if (typeof member.id !== 'string' || !NPC_ID.test(member.id)) errors.push(`id de NPC inválido: ${String(member.id)}.`);
+  if (typeof member.id !== 'string' || !NPC_ID.test(member.id)) errors.push(`id de NPC inválido: ${String(member.id)} (minúsculas con guiones, sin guiones bajos ni marcadores tipo suspect_01).`);
   if (ids.has(String(member.id))) errors.push(`id de NPC duplicado: ${String(member.id)}.`);
   ids.add(String(member.id));
   if (!isNonEmptyString(member.name)) errors.push(`NPC ${String(member.id)} sin nombre.`);

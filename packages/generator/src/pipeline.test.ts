@@ -225,6 +225,44 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(stage4Calls).toBe(2);
   });
 
+  it('reintenta la etapa 1 con el error como feedback cuando los ids vienen como suspect_01', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage1Calls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) {
+          stage1Calls++;
+          contexts.push(context as Record<string, unknown>);
+          if (stage1Calls === 1) {
+            // Como el modelo real en el smoke: ids con guion bajo.
+            const broken = structuredClone(outputs.premise);
+            broken.solution = { ...broken.solution, id: 'suspect_01' };
+            broken.decoy = { ...broken.decoy, id: 'suspect_02' };
+            const witness = broken.witnesses[0];
+            if (!witness) throw new Error('Sin testigos en la premisa simulada.');
+            broken.witnesses = [{ ...witness, id: 'witness_01' }];
+            return broken;
+          }
+          return outputs.premise;
+        }
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) return outputs.clues;
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage1Calls).toBe(2);
+    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/id de NPC inválido: suspect_01/);
+  });
+
   it('reintenta la etapa 3 con el error como feedback cuando el conocimiento viene en frase', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
