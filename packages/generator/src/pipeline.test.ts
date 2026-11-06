@@ -754,9 +754,21 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
     // Como el modelo real en el smoke: BIBLIOTECA tiene 10 letras, fuera
-    // del límite antiguo de 3-8; el motor no exige ids cortos.
-    outputs.cluesWorld.locations[0].id = 'MAL-BIBLIOTECA';
-    const llm = fakeLlm(outputs);
+    // del límite antiguo de 3-8; el motor no exige ids cortos. El id
+    // cambia en TODAS las referencias (lugares, orígenes de evidencias,
+    // ruta dorada) para que la salida siga siendo coherente.
+    const first = outputs.cluesWorld.locations[0];
+    if (!first) throw new Error('Sin lugares en la salida simulada.');
+    const renamed = JSON.parse(JSON.stringify(outputs).replaceAll(first.id, 'MAL-BIBLIOTECA')) as typeof outputs;
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return renamed.premise;
+        if (stage === 3) return renamed.npcs;
+        if (stage === 4) return stage4Output(renamed, context as Record<string, unknown>);
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
     const config = configWith(llm);
     const service = createGeneratorService(config);
     const draft = await service.createDraft(PARAMS);
