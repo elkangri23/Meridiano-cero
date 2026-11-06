@@ -750,6 +750,42 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/es el esquema JSON, no los datos/);
   });
 
+  it('reintenta la etapa 4 cuando la orden no incluye evidencia de acceso para la recuperación', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4bCalls = 0;
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
+            // Como el modelo real en el smoke: la orden usa la
+            // combinación ['EV-03', 'EV-04'] (válida para detener) pero
+            // ninguna de sus accessEvidenceIds (EV-05, EV-08), así que la
+            // recuperación se rechaza por falta de warrant:access.
+            const broken = structuredClone(outputs.cluesRules);
+            const warrant = broken.goldenPath.find(action => action.type === 'request_warrant');
+            if (!warrant) throw new Error('Sin request_warrant en la salida simulada.');
+            (warrant.params as Record<string, unknown>).evidenceIds = ['EV-03', 'EV-04'];
+            return broken;
+          }
+          return outputs.cluesRules;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4bCalls).toBe(2);
+  });
+
   it('reintenta la etapa 4 cuando la ruta dorada consulta antes de su requisito', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
