@@ -48,6 +48,33 @@ export async function countJobsToday(orm: Orm, ownerId: string): Promise<number>
   return Number(rows[0]?.n ?? 0);
 }
 
+/** `claimJob` usa SQL crudo (`RETURNING *`): las claves vienen en
+ * snake_case de la BD, no en camelCase de drizzle. Sin este mapa, el worker
+ * leía `job.contentRating` como `undefined` y el pipeline rechazaba los
+ * parámetros («surpriseMode es requerido») aunque el job estuviera bien. */
+function mapJobRow(row: Record<string, unknown>): GenerationJobRow {
+  return {
+    id: row.id as string,
+    ownerId: row.owner_id as string,
+    status: row.status as JobStatus,
+    crimeType: row.crime_type as string,
+    contentRating: row.content_rating as string,
+    duration: row.duration as string,
+    seed: row.seed as number | null,
+    stage: row.stage as number,
+    progress: row.progress as Record<string, unknown>,
+    draft: row.draft as Record<string, unknown> | null,
+    caseId: row.case_id as string | null,
+    error: row.error as string | null,
+    leaseOwner: row.lease_owner as string | null,
+    leaseExpiresAt: row.lease_expires_at as Date | null,
+    createdAt: row.created_at as Date,
+    updatedAt: row.updated_at as Date,
+    startedAt: row.started_at as Date | null,
+    finishedAt: row.finished_at as Date | null,
+  };
+}
+
 /** Reclama el job en cola más antiguo (o uno en curso con el lease
  * caducado). Devuelve null si no hay trabajo o si otro worker lo reclamó. */
 export async function claimJob(orm: Orm, workerId: string): Promise<GenerationJobRow | null> {
@@ -61,8 +88,8 @@ export async function claimJob(orm: Orm, workerId: string): Promise<GenerationJo
          OR (status = 'running' AND lease_expires_at < now())
       ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED
     ) RETURNING *`);
-  const row = (rows as unknown as { rows: GenerationJobRow[] }).rows?.[0];
-  return row ?? null;
+  const raw = (rows as unknown as { rows: Array<Record<string, unknown>> }).rows?.[0];
+  return raw ? mapJobRow(raw) : null;
 }
 
 export async function updateJobProgress(orm: Orm, jobId: string, stage: number, progress: Record<string, unknown>, draft?: Record<string, unknown>): Promise<void> {

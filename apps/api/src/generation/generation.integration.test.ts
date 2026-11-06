@@ -112,9 +112,13 @@ describe('Generación de casos (T4-08)', () => {
       if (status === 'failed' || status === 'done') break;
     }
     // El mock no implementa generateCase: el job debe fallar con motivo,
-    // no quedarse en cola ni en curso para siempre.
+    // no quedarse en cola ni en curso para siempre. El motivo debe hablar
+    // del proveedor, no de los parámetros: un bug de mapeo del job (fila
+    // cruda en snake_case) hizo fallar aquí con «surpriseMode es requerido»
+    // aunque el job estuviera bien creado; ese motivo ya no es aceptable.
     expect(status).toBe('failed');
     expect(error).toBeTruthy();
+    expect(error).not.toMatch(/surpriseMode|Parámetros inválidos/);
     await owner.pool.query('DELETE FROM generation_jobs WHERE owner_id=$1', [player2.id]);
     await owner.pool.query('DELETE FROM sessions WHERE profile_id=$1', [player2.id]);
     await owner.pool.query('DELETE FROM profiles WHERE id=$1', [player2.id]);
