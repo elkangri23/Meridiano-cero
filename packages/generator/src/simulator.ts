@@ -58,7 +58,11 @@ interface GoldenPathOutcome {
 function applyGoldenStep(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, index: number): { run: CaseRun; error: string | null } {
   const result = apply(definition, run, action);
   if (result.status !== 'applied' && result.status !== 'case_closed') {
-    return { run, error: `Paso ${index + 1} (${action.type}) no se pudo aplicar: ${result.reason ?? result.status}.` };
+    // Los parámetros en el mensaje: sin ellos el modelo no sabe QUÉ
+    // evidencia o consulta falló («Evidencia no disponible» a secas no
+    // dice cuál ni por qué).
+    const params = action.params && Object.keys(action.params).length > 0 ? ` ${JSON.stringify(action.params)}` : '';
+    return { run, error: `Paso ${index + 1} (${action.type}${params}) no se pudo aplicar: ${result.reason ?? result.status}.` };
   }
   return { run: result.run, error: null };
 }

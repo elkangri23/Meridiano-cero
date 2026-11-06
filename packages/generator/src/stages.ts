@@ -649,7 +649,78 @@ function validateClueRules(output: unknown, world: unknown, geography: SelectedG
   // para validar recogidas y referencias.
   const merged = isRecord(world) ? { ...world, ...output } : output;
   checkClueMechanics(merged, errors);
+  checkEvidenceObtainable(merged, errors);
   checkGoldenPath(merged, geography.cities[0]?.id ?? '', errors);
+}
+
+// Cada evidencia (salvo EV-11, el objeto de la recuperación, que se obtiene
+// al recuperar) debe poder obtenerse por su vía: observación y objeto por
+// inspeccionar, registro por consulta, análisis por analyze y testimonio por
+// hablar. Sin esta comprobación el modelo declara objetos sin inspeccionable
+// que los conceda y la ruta dorada falla al recogerlos («Evidencia no
+// disponible») sin que el mensaje diga por qué.
+function checkEvidenceObtainable(output: Record<string, unknown>, errors: string[]): void {
+  if (!Array.isArray(output.evidence)) return;
+  const mechanics = output.mechanics;
+  if (!isRecord(mechanics)) return;
+  const granted: GrantedSets = {
+    inspect: grantedEvidenceIds(mechanics.inspectables),
+    query: grantedEvidenceIds(mechanics.queries),
+    analysis: grantedAnalysisResults(mechanics.analyses),
+    talk: grantedEvidenceIds(mechanics.talkEvidence),
+  };
+  for (const evidence of output.evidence) {
+    if (!isRecord(evidence) || typeof evidence.id !== 'string' || typeof evidence.type !== 'string') continue;
+    if (evidence.id === 'EV-11') continue;
+    const source = evidenceSource(evidence.id, evidence.type, granted);
+    if (!source.granted) errors.push(`La evidencia ${evidence.id} (${evidence.type}) no se puede obtener: ${source.reason}.`);
+  }
+}
+
+function grantedAnalysisResults(entries: unknown): Set<string> {
+  const ids = new Set<string>();
+  if (!Array.isArray(entries)) return ids;
+  for (const analysis of entries) {
+    if (isRecord(analysis) && typeof analysis.resultEvidenceId === 'string') ids.add(analysis.resultEvidenceId);
+  }
+  return ids;
+}
+
+function grantedEvidenceIds(entries: unknown): Set<string> {
+  const ids = new Set<string>();
+  if (!Array.isArray(entries)) return ids;
+  for (const entry of entries) {
+    if (isRecord(entry) && typeof entry.evidenceId === 'string') ids.add(entry.evidenceId);
+  }
+  return ids;
+}
+
+type GrantedSets = { inspect: Set<string>; query: Set<string>; analysis: Set<string>; talk: Set<string> };
+
+// Vía por la que se obtiene una evidencia según su tipo, y si la mecánica
+// la concede.
+function evidenceSource(id: string, type: string, granted: GrantedSets): { granted: boolean; reason: string } {
+  if (type === 'observation' || type === 'object') {
+    return granted.inspect.has(id)
+      ? { granted: true, reason: '' }
+      : { granted: false, reason: 'ningún inspeccionable la concede (hay que inspeccionar el lugar o el elemento que la revela)' };
+  }
+  if (type === 'record') {
+    return granted.query.has(id)
+      ? { granted: true, reason: '' }
+      : { granted: false, reason: 'ninguna consulta la concede' };
+  }
+  if (type === 'analysis') {
+    return granted.analysis.has(id)
+      ? { granted: true, reason: '' }
+      : { granted: false, reason: 'ningún análisis la produce' };
+  }
+  if (type === 'testimony') {
+    return granted.talk.has(id)
+      ? { granted: true, reason: '' }
+      : { granted: false, reason: 'ningún tema de conversación la concede' };
+  }
+  return { granted: false, reason: 'tipo de evidencia desconocido' };
 }
 
 function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {

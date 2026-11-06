@@ -679,6 +679,45 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/solo se recogen evidencias de tipo object/);
   });
 
+  it('reintenta la etapa 4 cuando una evidencia no tiene vía para obtenerse', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4bCalls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          contexts.push(context as Record<string, unknown>);
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
+            // Como el modelo real en el smoke: EV-02 es un objeto sin
+            // inspeccionable que lo conceda; la ruta lo recoge y el motor
+            // responde «Evidencia no disponible».
+            const broken = structuredClone(outputs.cluesRules);
+            const inspectables = broken.mechanics.inspectables as Array<Record<string, unknown>>;
+            const drawer = inspectables.find(entry => entry.evidenceId === 'EV-02');
+            if (drawer) drawer.evidenceId = 'EV-01';
+            return broken;
+          }
+          return outputs.cluesRules;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4bCalls).toBe(2);
+    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/EV-02.*no se puede obtener/);
+  });
+
   it('reintenta la etapa 4 cuando la ruta dorada empieza viajando a la ciudad de inicio', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
