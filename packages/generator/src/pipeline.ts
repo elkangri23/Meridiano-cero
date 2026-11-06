@@ -3,12 +3,13 @@
 //
 // Antes (T4-01) era un esqueleto: executeStage devolvía salidas simuladas y
 // runPipeline siempre rechazaba al final. Ahora cada etapa hace su trabajo
-// de verdad: 5 llamadas LLM como máximo (premisa, NPC, red de pistas,
-// revisión semántica y una reparación opcional de la red de pistas) y el
-// resto determinista (geografía, ensamblaje, validación v1.5, simulación por
-// el motor real, publicación). La puerta es dura: un borrador que no valida
-// o no se juega se repara una vez y, si sigue sin pasar, se rechaza con
-// motivo. Ningún expediente entra en el catálogo sin pasar la puerta.
+// de verdad: 6 llamadas LLM como máximo (premisa, NPC, red de pistas en dos
+// llamadas —mundo y reglas—, revisión semántica y una reparación opcional
+// de la red de pistas) y el resto determinista (geografía, ensamblaje,
+// validación v1.5, simulación por el motor real, publicación). La puerta es
+// dura: un borrador que no valida o no se juega se repara una vez y, si
+// sigue sin pasar, se rechaza con motivo. Ningún expediente entra en el
+// catálogo sin pasar la puerta.
 
 import { createValidationReport, validateCaseDefinition, validateGeneratedContent } from '@meridiano/case-schema';
 import type { CaseDefinition } from '@meridiano/case-schema';
@@ -22,6 +23,7 @@ import {
   resolveGenerationChoice,
   selectGeography,
   validateStageOutput,
+  validateStagePart,
   type GeneratableCrime,
   type ResolvedChoice,
   type SelectedGeography,
@@ -326,13 +328,38 @@ async function runLlmStage(
   config: PipelineConfig,
   prior: Record<string, unknown>,
   feedback?: string[],
+  part?: 'a' | 'b',
 ): Promise<unknown> {
   const llm = requireLlm(config);
-  const stageContext = buildStageContext(stage, choice, draft.params, geography, prior, feedback);
-  const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage, context: stageContext, schema: stageOutputSchema(stage), signal }));
-  const validation = validateStageOutput(stage, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft) });
+  const stageContext = buildStageContext(stage, choice, draft.params, geography, prior, feedback, part);
+  const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage, context: stageContext, schema: stageOutputSchema(stage, part), signal }));
+  const validation = part
+    ? validateStagePart(part, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft), world: prior.world })
+    : validateStageOutput(stage, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft) });
   if (!validation.valid) throw new StageOutputError(`Etapa ${stage} inválida: ${validation.errors.join('; ')}`, output);
   return output;
+}
+
+// La etapa 4 es la salida más grande del pipeline (3 lugares, 11
+// evidencias, mecánica completa, textos y ruta dorada) y el modelo fallaba
+// cada vez en un detalle distinto sin que los reintentos convergieran.
+// Se genera en dos llamadas: 4a (mundo: lugares, evidencias y textos) y
+// 4b (reglas: mecánica y ruta dorada, con los ids exactos de 4a en el
+// contexto). Sigue siendo una sola etapa (9 en total) para el job y la UI.
+async function runSplitStage4(
+  draft: CaseDraft,
+  choice: ResolvedChoice,
+  geography: SelectedGeography,
+  config: PipelineConfig,
+  feedback?: string[],
+): Promise<Record<string, unknown>> {
+  const prior = { premise: stageOutput(draft, 1), npcs: stageOutput(draft, 3) };
+  const world = await runLlmStage(4, draft, choice, geography, config, prior, feedback, 'a');
+  const rules = await runLlmStage(4, draft, choice, geography, config, { ...prior, world }, feedback, 'b');
+  const merged = { ...(world as Record<string, unknown>), ...(rules as Record<string, unknown>) };
+  const validation = validateStageOutput(4, merged, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft) });
+  if (!validation.valid) throw new StageOutputError(`Etapa 4 inválida: ${validation.errors.join('; ')}`, merged);
+  return merged;
 }
 
 /** Etapa 5: ensambla la definición desde las salidas 1, 3 y 4. */
@@ -408,7 +435,7 @@ async function executeLlmStage(stage: 1 | 3 | 4, draft: CaseDraft, choice: Resol
     case 3:
       return runLlmStage(3, draft, choice, geography, config, { premise: stageOutput(draft, 1) }, feedback);
     case 4:
-      return runLlmStage(4, draft, choice, geography, config, { premise: stageOutput(draft, 1), npcs: stageOutput(draft, 3) }, [...(draft.repairFeedback ?? []), ...(feedback ?? [])]);
+      return runSplitStage4(draft, choice, geography, config, [...(draft.repairFeedback ?? []), ...(feedback ?? [])]);
   }
 }
 

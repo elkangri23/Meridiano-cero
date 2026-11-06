@@ -146,6 +146,7 @@ export function buildStageContext(
   geography: SelectedGeography,
   prior: Record<string, unknown>,
   feedback?: string[],
+  part?: 'a' | 'b',
 ): StageContext {
   const base: StageContext = {
     stage,
@@ -161,9 +162,21 @@ export function buildStageContext(
   };
   if (stage === 1) return base;
   if (stage === 3) return { ...base, premise: prior.premise };
-  if (stage === 4) return { ...base, premise: prior.premise, npcs: prior.npcs };
+  if (stage === 4) return stage4Context(base, prior, part);
   if (stage === 7) return { ...base, definition: prior.definition, goldenPath: prior.goldenPath, budgetMinutes: prior.budgetMinutes };
   return base;
+}
+
+// La etapa 4 se genera en dos llamadas (4a mundo, 4b reglas): la segunda
+// trae los ids exactos de lugares y evidencias de la primera, así que la
+// mecánica y la ruta dorada no tienen que adivinarlos.
+function stage4Context(base: StageContext, prior: Record<string, unknown>, part?: 'a' | 'b'): StageContext {
+  if (part === 'a') return { ...base, part, premise: prior.premise, npcs: prior.npcs };
+  if (part === 'b') {
+    const world = prior.world as Record<string, unknown> | undefined;
+    return { ...base, part, premise: prior.premise, npcs: prior.npcs, locations: world?.locations, evidence: world?.evidence };
+  }
+  return { ...base, premise: prior.premise, npcs: prior.npcs };
 }
 
 // ── Esquemas de salida por etapa ─────────────────────────────────────────────
@@ -193,33 +206,17 @@ export const STAGE_OUTPUT_SCHEMAS: Record<number, Record<string, unknown>> = {
       timeline: { type: 'array', minItems: 2, maxItems: 8 },
     },
   },
+  // Etapa 4a (mundo: lugares, evidencias y textos). La mecánica y la ruta
+  // dorada van en una segunda llamada (STAGE_4B_SCHEMA): en una sola salida
+  // el modelo fallaba cada vez en un detalle distinto (un id de lugar de 7
+  // letras, consultas sin `requires`…) y los reintentos no convergían.
   4: {
     type: 'object',
-    required: ['locations', 'evidence', 'mechanics', 'texts', 'goldenPath'],
+    required: ['locations', 'evidence', 'texts'],
     properties: {
-      // Los nombres de campo son EXACTOS: la mecánica solo referencia ids
-      // definidos en esta misma salida (lugares, EV-01..EV-11, NPC de la
-      // etapa 1). Un id inventado en la mecánica no existe y el borrador
-      // se rechaza. Las consultas usan `id` (kebab-case, p. ej.
-      // registro-mercantil), NO `queryId`; los sospechosos usan `id` con
-      // el id del NPC, NO `suspectId`; las evidencias concedidas usan
-      // `evidenceId`, NO `grantsEvidenceId`.
       locations: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', required: ['id', 'name', 'cityId', 'description'] } },
       evidence: { type: 'array', minItems: 11, maxItems: 11, items: { type: 'object', required: ['id', 'type', 'origin', 'relations'] } },
-      mechanics: {
-        type: 'object',
-        required: ['inspectables', 'queries', 'analyses', 'talkEvidence', 'suspects', 'recovery'],
-        properties: {
-          inspectables: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', required: ['locationId', 'elementId', 'label', 'evidenceId'] } },
-          queries: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', required: ['id', 'label', 'cityId', 'locationId', 'evidenceId', 'requires', 'delayMinutes'] } },
-          analyses: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['inputEvidenceId', 'resultEvidenceId', 'delayMinutes'] } },
-          talkEvidence: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['npcId', 'topicId', 'label', 'evidenceId'] } },
-          suspects: { type: 'array', minItems: 1, maxItems: 2, items: { type: 'object', required: ['id', 'cityId', 'locationId', 'knownFromEvidence', 'warrantCombinations'] } },
-          recovery: { type: 'object', required: ['objectId', 'label', 'cityId', 'locationId', 'evidenceId', 'requiresAccessWarrant'] },
-        },
-      },
       texts: { type: 'object', required: ['evidence', 'knowledge', 'greetings'] },
-      goldenPath: { type: 'array', minItems: 10, maxItems: 40 },
     },
   },
   7: {
@@ -233,11 +230,39 @@ export const STAGE_OUTPUT_SCHEMAS: Record<number, Record<string, unknown>> = {
 };
 
 /** Esquema JSON de la salida de una etapa LLM (falla si la etapa no tiene). */
-export function stageOutputSchema(stage: GenerationStage): Record<string, unknown> {
+export function stageOutputSchema(stage: GenerationStage, part?: 'a' | 'b'): Record<string, unknown> {
+  if (stage === 4 && part === 'b') return STAGE_4B_SCHEMA;
   const schema = STAGE_OUTPUT_SCHEMAS[stage];
   if (!schema) throw new Error(`La etapa ${stage} no tiene esquema de salida.`);
   return schema;
 }
+
+// Etapa 4b (reglas: mecánica y ruta dorada). Los nombres de campo son
+// EXACTOS: la mecánica solo referencia ids definidos en la salida 4a
+// (lugares, EV-01..EV-11) y en la etapa 1 (NPC). Un id inventado en la
+// mecánica no existe y el borrador se rechaza. Las consultas usan `id`
+// (kebab-case, p. ej. registro-mercantil), NO `queryId`; los sospechosos
+// usan `id` con el id del NPC, NO `suspectId`; las evidencias concedidas
+// usan `evidenceId`, NO `grantsEvidenceId`.
+export const STAGE_4B_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  required: ['mechanics', 'goldenPath'],
+  properties: {
+    mechanics: {
+      type: 'object',
+      required: ['inspectables', 'queries', 'analyses', 'talkEvidence', 'suspects', 'recovery'],
+      properties: {
+        inspectables: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', required: ['locationId', 'elementId', 'label', 'evidenceId'] } },
+        queries: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', required: ['id', 'label', 'cityId', 'locationId', 'evidenceId', 'requires', 'delayMinutes'] } },
+        analyses: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['inputEvidenceId', 'resultEvidenceId', 'delayMinutes'] } },
+        talkEvidence: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['npcId', 'topicId', 'label', 'evidenceId'] } },
+        suspects: { type: 'array', minItems: 1, maxItems: 2, items: { type: 'object', required: ['id', 'cityId', 'locationId', 'knownFromEvidence', 'warrantCombinations'] } },
+        recovery: { type: 'object', required: ['objectId', 'label', 'cityId', 'locationId', 'evidenceId', 'requiresAccessWarrant'] },
+      },
+    },
+    goldenPath: { type: 'array', minItems: 10, maxItems: 40 },
+  },
+};
 
 // ── Validación de salidas de etapa (forma, no fondo) ─────────────────────────
 
@@ -549,15 +574,40 @@ function checkGoldenCollects(output: Record<string, unknown>, errors: string[]):
   });
 }
 
-function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {
+function validateClueWorld(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {
   if (!isRecord(output)) { errors.push('La red de pistas debe ser un objeto.'); return; }
-  checkKeys(output, ['locations', 'evidence', 'mechanics', 'texts', 'goldenPath'], errors);
+  checkKeys(output, ['locations', 'evidence', 'texts'], errors);
   const cityIds = new Set(geography.cities.map(city => city.id));
   const locationIds = checkClueLocations(output, cityIds, errors);
   if (locationIds) checkClueEvidence(output, locationIds, cityIds, errors);
-  checkClueMechanics(output, errors);
   checkClueTexts(output, castIds, knowledgeIds, errors);
-  checkGoldenPath(output, geography.cities[0]?.id ?? '', errors);
+}
+
+function validateClueRules(output: unknown, world: unknown, geography: SelectedGeography, errors: string[]): void {
+  if (!isRecord(output)) { errors.push('La red de pistas debe ser un objeto.'); return; }
+  checkKeys(output, ['mechanics', 'goldenPath'], errors);
+  // Las comprobaciones de la mecánica leen las evidencias del mundo (4a)
+  // para validar recogidas y referencias.
+  const merged = isRecord(world) ? { ...world, ...output } : output;
+  checkClueMechanics(merged, errors);
+  checkGoldenPath(merged, geography.cities[0]?.id ?? '', errors);
+}
+
+function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {
+  validateClueWorld(output, geography, castIds, knowledgeIds, errors);
+  validateClueRules(output, output, geography, errors);
+}
+
+/** Valida una de las dos mitades de la etapa 4 (a = mundo, b = reglas). */
+export function validateStagePart(
+  part: 'a' | 'b',
+  output: unknown,
+  context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[]; world?: unknown },
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (part === 'a') validateClueWorld(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors);
+  else validateClueRules(output, context.world, context.geography, errors);
+  return { valid: errors.length === 0, errors };
 }
 
 function validateReview(output: unknown, errors: string[]): void {

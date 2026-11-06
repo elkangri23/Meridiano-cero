@@ -42,7 +42,7 @@ function fakeOutputs(geography: SelectedGeography) {
     ],
     timeline: ['Carmen revisa las facturas por la mañana.', 'El contrato sale hacia el almacén por la tarde.'],
   };
-  const clues = {
+  const cluesWorld = {
     locations: [
       { id: locStart, cityId: start.id, name: 'Oficina de contratación', description: 'Oficina de contratación de la empresa' },
       { id: locSecond, cityId: second.id, name: 'Archivo de facturación', description: 'Archivo de facturación de la empresa' },
@@ -61,27 +61,6 @@ function fakeOutputs(geography: SelectedGeography) {
       { id: 'EV-10', type: 'record', origin: start.id, relations: [] },
       { id: 'EV-11', type: 'object', origin: locThird, relations: [] },
     ],
-    mechanics: {
-      inspectables: [
-        { locationId: locStart, elementId: '', label: 'Inspeccionar la oficina', evidenceId: 'EV-01', reveals: [second.id] },
-        { locationId: locStart, elementId: 'cajon', label: 'el cajón del escritorio', evidenceId: 'EV-02' },
-        { locationId: locStart, elementId: 'archivador', label: 'el archivador', evidenceId: 'EV-06' },
-      ],
-      queries: [
-        { id: 'accesos-jorge', label: 'Consultar los accesos de Jorge', cityId: start.id, locationId: locStart, evidenceId: 'EV-10', requires: [], delayMinutes: 30 },
-        { id: 'registro-facturas', label: 'Consultar el registro de facturas', cityId: second.id, locationId: locSecond, evidenceId: 'EV-04', requires: ['EV-03'], delayMinutes: 30 },
-        { id: 'registro-envios', label: 'Consultar el registro de envíos', cityId: second.id, locationId: locSecond, evidenceId: 'EV-05', requires: [], delayMinutes: 30, reveals: ['location:carmen'] },
-        { id: 'firma-contrato', label: 'Consultar la firma del contrato', cityId: second.id, locationId: locSecond, evidenceId: 'EV-07', requires: ['EV-06'], delayMinutes: 30 },
-        { id: 'custodia-contrato', label: 'Consultar la custodia del contrato', cityId: third.id, locationId: locThird, evidenceId: 'EV-08', requires: ['EV-05', 'EV-07'], delayMinutes: 30 },
-      ],
-      analyses: [{ inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90 }],
-      talkEvidence: [{ npcId: 'jorge', topicId: 'facturas', label: 'Preguntar a Jorge por las facturas', evidenceId: 'EV-09', requiresRelation: true }],
-      suspects: [
-        { id: 'carmen', cityId: third.id, locationId: locThird, knownFromEvidence: ['EV-04', 'EV-05', 'EV-07', 'EV-08'],
-          warrantCombinations: [['EV-03', 'EV-04'], ['EV-06', 'EV-07', 'EV-08']], accessEvidenceIds: ['EV-05', 'EV-08'] },
-      ],
-      recovery: { objectId: 'contrato-original', label: 'Recuperar el contrato original', cityId: third.id, locationId: locThird, evidenceId: 'EV-11', requiresAccessWarrant: true },
-    },
     texts: {
       evidence: {
         'EV-01': 'La oficina muestra señales de una revisión apresurada de facturas.',
@@ -107,6 +86,29 @@ function fakeOutputs(geography: SelectedGeography) {
         carmen: 'Soy Carmen, directora financiera. Puedo confirmar mi identidad, pero no voy a declarar sobre el fraude.',
       },
       refusals: { carmen: 'No voy a declarar sobre el fraude.' },
+    },
+  };
+  const cluesRules = {
+    mechanics: {
+      inspectables: [
+        { locationId: locStart, elementId: '', label: 'Inspeccionar la oficina', evidenceId: 'EV-01', reveals: [second.id] },
+        { locationId: locStart, elementId: 'cajon', label: 'el cajón del escritorio', evidenceId: 'EV-02' },
+        { locationId: locStart, elementId: 'archivador', label: 'el archivador', evidenceId: 'EV-06' },
+      ],
+      queries: [
+        { id: 'accesos-jorge', label: 'Consultar los accesos de Jorge', cityId: start.id, locationId: locStart, evidenceId: 'EV-10', requires: [], delayMinutes: 30 },
+        { id: 'registro-facturas', label: 'Consultar el registro de facturas', cityId: second.id, locationId: locSecond, evidenceId: 'EV-04', requires: ['EV-03'], delayMinutes: 30 },
+        { id: 'registro-envios', label: 'Consultar el registro de envíos', cityId: second.id, locationId: locSecond, evidenceId: 'EV-05', requires: [], delayMinutes: 30, reveals: ['location:carmen'] },
+        { id: 'firma-contrato', label: 'Consultar la firma del contrato', cityId: second.id, locationId: locSecond, evidenceId: 'EV-07', requires: ['EV-06'], delayMinutes: 30 },
+        { id: 'custodia-contrato', label: 'Consultar la custodia del contrato', cityId: third.id, locationId: locThird, evidenceId: 'EV-08', requires: ['EV-05', 'EV-07'], delayMinutes: 30 },
+      ],
+      analyses: [{ inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90 }],
+      talkEvidence: [{ npcId: 'jorge', topicId: 'facturas', label: 'Preguntar a Jorge por las facturas', evidenceId: 'EV-09', requiresRelation: true }],
+      suspects: [
+        { id: 'carmen', cityId: third.id, locationId: locThird, knownFromEvidence: ['EV-04', 'EV-05', 'EV-07', 'EV-08'],
+          warrantCombinations: [['EV-03', 'EV-04'], ['EV-06', 'EV-07', 'EV-08']], accessEvidenceIds: ['EV-05', 'EV-08'] },
+      ],
+      recovery: { objectId: 'contrato-original', label: 'Recuperar el contrato original', cityId: third.id, locationId: locThird, evidenceId: 'EV-11', requiresAccessWarrant: true },
     },
     goldenPath: [
       { type: 'inspect', params: { targetId: locStart } },
@@ -137,7 +139,57 @@ function fakeOutputs(geography: SelectedGeography) {
       { type: 'finish', params: {} },
     ],
   };
-  return { premise, npcs, clues };
+  const clues = { ...cluesWorld, ...cluesRules };
+  return { premise, npcs, clues, cluesWorld, cluesRules };
+}
+
+// La etapa 4 se genera en dos llamadas: 4a (mundo) y 4b (reglas).
+function stage4Output(outputs: ReturnType<typeof fakeOutputs>, context: Record<string, unknown>): unknown {
+  return context.part === 'b' ? outputs.cluesRules : outputs.cluesWorld;
+}
+
+// Premisa con los ids como los devolvió el modelo real en el smoke
+// (suspect_01, suspect_02, witness_01: guion bajo en vez de guiones).
+function brokenPremiseIds(outputs: ReturnType<typeof fakeOutputs>): unknown {
+  const broken = structuredClone(outputs.premise);
+  broken.solution = { ...broken.solution, id: 'suspect_01' };
+  broken.decoy = { ...broken.decoy, id: 'suspect_02' };
+  const witness = broken.witnesses[0];
+  if (!witness) throw new Error('Sin testigos en la premisa simulada.');
+  broken.witnesses = [{ ...witness, id: 'witness_01' }];
+  return broken;
+}
+
+// Mecánica con los nombres de campo inventados del modelo real en el smoke
+// (queryId en vez de id, suspectId en vez de id, grantsEvidenceId en vez de
+// evidenceId, inspectables sin locationId).
+function brokenMechanicFieldNames(outputs: ReturnType<typeof fakeOutputs>): unknown {
+  const broken = structuredClone(outputs.cluesRules);
+  const inspectables = broken.mechanics.inspectables as Array<Record<string, unknown>>;
+  for (const entry of inspectables) {
+    delete entry.locationId;
+    entry.grantsEvidenceId = entry.evidenceId;
+    delete entry.evidenceId;
+  }
+  const queries = broken.mechanics.queries as Array<Record<string, unknown>>;
+  for (const entry of queries) {
+    entry.queryId = entry.id;
+    delete entry.id;
+    entry.grantsEvidenceId = entry.evidenceId;
+    delete entry.evidenceId;
+  }
+  const suspects = broken.mechanics.suspects as Array<Record<string, unknown>>;
+  for (const entry of suspects) {
+    entry.suspectId = entry.id;
+    delete entry.id;
+  }
+  const talk = broken.mechanics.talkEvidence as Array<Record<string, unknown>>;
+  const first = talk[0];
+  if (first) {
+    first.grantsEvidenceId = first.evidenceId;
+    delete first.evidenceId;
+  }
+  return broken;
 }
 
 const PARAMS: GenerationParams = {
@@ -168,10 +220,10 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
     const llm: StageLlm = {
-      async generate({ stage }) {
+      async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
-        if (stage === 4) return outputs.clues;
+        if (stage === 4) return stage4Output(outputs, context as Record<string, unknown>);
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
       },
@@ -194,22 +246,23 @@ describe('pipeline con LLM simulado (T4-08)', () => {
   it('repara la etapa 4 cuando la simulación falla y luego valida', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
-    let stage4Calls = 0;
+    let stage4bCalls = 0;
     const llm: StageLlm = {
-      async generate({ stage }) {
+      async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
-          if (stage4Calls === 1) {
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
             // Primera red de pistas: la orden se pide con evidencias que no
             // autorizan nada; la simulación la rechaza y el pipeline repara.
-            const broken = structuredClone(outputs.clues);
+            const broken = structuredClone(outputs.cluesRules);
             const warrant = broken.goldenPath.find(action => action.type === 'request_warrant');
             if (warrant) warrant.params = { suspectId: 'carmen', evidenceIds: ['EV-01', 'EV-02'] };
             return broken;
           }
-          return outputs.clues;
+          return outputs.cluesRules;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -222,7 +275,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(result.success).toBe(true);
     expect(result.draft.repairUsed).toBe(true);
     expect(result.draft.repairFeedback?.length).toBeGreaterThan(0);
-    expect(stage4Calls).toBe(2);
+    expect(stage4bCalls).toBe(2);
   });
 
   it('reintenta la etapa 1 con el error como feedback cuando los ids vienen como suspect_01', async () => {
@@ -235,20 +288,11 @@ describe('pipeline con LLM simulado (T4-08)', () => {
         if (stage === 1) {
           stage1Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage1Calls === 1) {
-            // Como el modelo real en el smoke: ids con guion bajo.
-            const broken = structuredClone(outputs.premise);
-            broken.solution = { ...broken.solution, id: 'suspect_01' };
-            broken.decoy = { ...broken.decoy, id: 'suspect_02' };
-            const witness = broken.witnesses[0];
-            if (!witness) throw new Error('Sin testigos en la premisa simulada.');
-            broken.witnesses = [{ ...witness, id: 'witness_01' }];
-            return broken;
-          }
+          if (stage1Calls === 1) return brokenPremiseIds(outputs);
           return outputs.premise;
         }
         if (stage === 3) return outputs.npcs;
-        if (stage === 4) return outputs.clues;
+        if (stage === 4) return stage4Output(outputs, context as Record<string, unknown>);
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
       },
@@ -266,47 +310,18 @@ describe('pipeline con LLM simulado (T4-08)', () => {
   it('reintenta la etapa 4 con el error como feedback cuando la mecánica usa nombres de campo inventados', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
-    let stage4Calls = 0;
+    let stage4bCalls = 0;
     const contexts: Array<Record<string, unknown>> = [];
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage4Calls === 1) {
-            // Como el modelo real en el smoke: queryId en vez de id,
-            // suspectId en vez de id, grantsEvidenceId en vez de evidenceId
-            // e inspectables sin locationId.
-            const broken = structuredClone(outputs.clues);
-            const inspectables = broken.mechanics.inspectables as Array<Record<string, unknown>>;
-            for (const entry of inspectables) {
-              delete entry.locationId;
-              entry.grantsEvidenceId = entry.evidenceId;
-              delete entry.evidenceId;
-            }
-            const queries = broken.mechanics.queries as Array<Record<string, unknown>>;
-            for (const entry of queries) {
-              entry.queryId = entry.id;
-              delete entry.id;
-              entry.grantsEvidenceId = entry.evidenceId;
-              delete entry.evidenceId;
-            }
-            const suspects = broken.mechanics.suspects as Array<Record<string, unknown>>;
-            for (const entry of suspects) {
-              entry.suspectId = entry.id;
-              delete entry.id;
-            }
-            const talk = broken.mechanics.talkEvidence as Array<Record<string, unknown>>;
-            const first = talk[0];
-            if (first) {
-              first.grantsEvidenceId = first.evidenceId;
-              delete first.evidenceId;
-            }
-            return broken;
-          }
-          return outputs.clues;
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) return brokenMechanicFieldNames(outputs);
+          return outputs.cluesRules;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -317,32 +332,33 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(stage4Calls).toBe(2);
-    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(stage4bCalls).toBe(2);
+    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/mechanics\.queries\[0\] debe tener id/);
   });
 
   it('reintenta la etapa 4 con el error como feedback cuando los lugares vienen en minúsculas', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
-    let stage4Calls = 0;
+    let stage4aCalls = 0;
     const contexts: Array<Record<string, unknown>> = [];
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage4Calls === 1) {
+          if ((context as Record<string, unknown>).part === 'b') return outputs.cluesRules;
+          stage4aCalls++;
+          if (stage4aCalls === 1) {
             // Como el modelo real en el smoke: ids de lugar en minúsculas.
-            const broken = structuredClone(outputs.clues);
+            const broken = structuredClone(outputs.cluesWorld);
             for (const location of broken.locations) {
               location.id = location.id.toLowerCase();
             }
             return broken;
           }
-          return outputs.clues;
+          return outputs.cluesWorld;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -353,7 +369,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(stage4Calls).toBe(2);
+    expect(stage4aCalls).toBe(2);
     const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/id de lugar inválido/);
   });
@@ -361,20 +377,21 @@ describe('pipeline con LLM simulado (T4-08)', () => {
   it('reintenta la etapa 4 con el error como feedback cuando las relaciones forman un ciclo', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
-    let stage4Calls = 0;
+    let stage4aCalls = 0;
     const contexts: Array<Record<string, unknown>> = [];
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage4Calls === 1) {
+          if ((context as Record<string, unknown>).part === 'b') return outputs.cluesRules;
+          stage4aCalls++;
+          if (stage4aCalls === 1) {
             // Como el modelo real en el smoke: enlaces en ambos sentidos
             // (EV-01 depende de EV-02 y EV-02 de EV-01): el grafo no se
             // puede resolver.
-            const broken = structuredClone(outputs.clues);
+            const broken = structuredClone(outputs.cluesWorld);
             const first = broken.evidence[0];
             const second = broken.evidence[1];
             if (first && second) {
@@ -383,7 +400,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
             }
             return broken;
           }
-          return outputs.clues;
+          return outputs.cluesWorld;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -394,7 +411,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(stage4Calls).toBe(2);
+    expect(stage4aCalls).toBe(2);
     const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/solo puede depender de evidencias anteriores/);
   });
@@ -402,19 +419,20 @@ describe('pipeline con LLM simulado (T4-08)', () => {
   it('reintenta la etapa 4 cuando la ruta dorada usa cityId/queryId y los ids llevan acentos', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
-    let stage4Calls = 0;
+    let stage4bCalls = 0;
     const contexts: Array<Record<string, unknown>> = [];
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage4Calls === 1) {
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
             // Como el modelo real en el smoke: ids con acentos, viajes con
             // cityId en vez de toCityId y consultas con queryId.
-            const broken = structuredClone(outputs.clues);
+            const broken = structuredClone(outputs.cluesRules);
             const inspectables = broken.mechanics.inspectables as Array<Record<string, unknown>>;
             const second = inspectables[1];
             if (second) second.elementId = 'cajón';
@@ -425,7 +443,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
             if (query) (query as { params: Record<string, unknown> }).params = { queryId: 'registro-facturas' };
             return broken;
           }
-          return outputs.clues;
+          return outputs.cluesRules;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -436,32 +454,33 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(stage4Calls).toBe(2);
-    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(stage4bCalls).toBe(2);
+    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/toCityId|sin acentos/);
   });
 
   it('reintenta la etapa 4 cuando un testimonio usa el personaje como origen', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
-    let stage4Calls = 0;
+    let stage4aCalls = 0;
     const contexts: Array<Record<string, unknown>> = [];
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage4Calls === 1) {
+          if ((context as Record<string, unknown>).part === 'b') return outputs.cluesRules;
+          stage4aCalls++;
+          if (stage4aCalls === 1) {
             // Como el modelo real en el smoke: el testimonio EV-09 con el
             // id del testigo como origen en vez de un lugar o ciudad.
-            const broken = structuredClone(outputs.clues);
+            const broken = structuredClone(outputs.cluesWorld);
             const testimony = broken.evidence.find(item => item.id === 'EV-09');
             if (testimony) testimony.origin = 'pablo';
             return broken;
           }
-          return outputs.clues;
+          return outputs.cluesWorld;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -472,7 +491,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(stage4Calls).toBe(2);
+    expect(stage4aCalls).toBe(2);
     const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/origen desconocido: pablo/);
   });
@@ -480,24 +499,25 @@ describe('pipeline con LLM simulado (T4-08)', () => {
   it('reintenta la etapa 4 cuando falta un texto de conocimiento de la etapa 3', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
-    let stage4Calls = 0;
+    let stage4aCalls = 0;
     const contexts: Array<Record<string, unknown>> = [];
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage4Calls === 1) {
+          if ((context as Record<string, unknown>).part === 'b') return outputs.cluesRules;
+          stage4aCalls++;
+          if (stage4aCalls === 1) {
             // Como el modelo real en el smoke: texts.knowledge sin el texto
             // de uno de los ids declarados en la etapa 3.
-            const broken = structuredClone(outputs.clues);
+            const broken = structuredClone(outputs.cluesWorld);
             const knowledge = broken.texts.knowledge as Record<string, string>;
             delete knowledge['jorge-vio-facturas'];
             return broken;
           }
-          return outputs.clues;
+          return outputs.cluesWorld;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -508,7 +528,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(stage4Calls).toBe(2);
+    expect(stage4aCalls).toBe(2);
     const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/Falta el texto de conocimiento de jorge-vio-facturas/);
   });
@@ -533,7 +553,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
           }
           return outputs.npcs;
         }
-        if (stage === 4) return outputs.clues;
+        if (stage === 4) return stage4Output(outputs, context as Record<string, unknown>);
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
       },
@@ -551,24 +571,25 @@ describe('pipeline con LLM simulado (T4-08)', () => {
   it('reintenta la etapa 4 cuando la ruta dorada recoge una observación', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
-    let stage4Calls = 0;
+    let stage4bCalls = 0;
     const contexts: Array<Record<string, unknown>> = [];
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage4Calls === 1) {
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
             // Como el modelo real en el smoke: collect de EV-01, que es una
             // observación y no se puede recoger.
-            const broken = structuredClone(outputs.clues);
+            const broken = structuredClone(outputs.cluesRules);
             const collect = broken.goldenPath.find(action => action.type === 'collect');
             if (collect) collect.params = { evidenceId: 'EV-01' };
             return broken;
           }
-          return outputs.clues;
+          return outputs.cluesRules;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -579,8 +600,8 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(stage4Calls).toBe(2);
-    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(stage4bCalls).toBe(2);
+    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/solo se recogen evidencias de tipo object/);
   });
 
@@ -589,23 +610,24 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const outputs = fakeOutputs(geography);
     const startCity = geography.cities[0];
     if (!startCity) throw new Error('Sin ciudad de inicio.');
-    let stage4Calls = 0;
+    let stage4bCalls = 0;
     const contexts: Array<Record<string, unknown>> = [];
     const llm: StageLlm = {
       async generate({ stage, context }) {
         if (stage === 1) return outputs.premise;
         if (stage === 3) return outputs.npcs;
         if (stage === 4) {
-          stage4Calls++;
           contexts.push(context as Record<string, unknown>);
-          if (stage4Calls === 1) {
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
             // Como el modelo real en el smoke: la ruta empieza con un viaje
             // a la ciudad donde ya se está (no hay ruta a sí misma).
-            const broken = structuredClone(outputs.clues);
+            const broken = structuredClone(outputs.cluesRules);
             broken.goldenPath.unshift({ type: 'travel', params: { toCityId: startCity.id } });
             return broken;
           }
-          return outputs.clues;
+          return outputs.cluesRules;
         }
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
@@ -616,8 +638,8 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    expect(stage4Calls).toBe(2);
-    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(stage4bCalls).toBe(2);
+    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/viaja a .* la ciudad actual/);
   });
 
@@ -643,7 +665,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
           }
           return outputs.npcs;
         }
-        if (stage === 4) return outputs.clues;
+        if (stage === 4) return stage4Output(outputs, context as Record<string, unknown>);
         if (stage === 7) return { coherent: true, issues: [] };
         throw new Error(`Etapa inesperada: ${stage}`);
       },
