@@ -563,11 +563,23 @@ async function completeStage(currentDraft: CaseDraft, checkpoint: CaseDraft['sta
   await config.checkpointStore.save(currentDraft);
 }
 
+/** Mensaje de error con su causa, cuando la trae (el adaptador de IA
+ * aplasta los errores del proveedor a 'unavailable'; sin la causa el job
+ * no dice si fue un timeout, un 500 o un corte de conexión). */
+function errorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause instanceof Error && cause.message && cause.message !== error.message) {
+    return `${error.message} (${cause.message})`;
+  }
+  return error.message;
+}
+
 /** Un fallo que no es de puerta: reintenta la etapa hasta el tope y, al
  * agotarlo, rechaza el borrador. Devuelve el rechazo o null si se reintenta. */
 async function retryOrRejectStage(currentDraft: CaseDraft, checkpoint: CaseDraft['stages'][number], stageNum: number, config: PipelineConfig, error: unknown): Promise<GenerationResult | null> {
   checkpoint.retryCount++;
-  const err = error instanceof Error ? error.message : String(error);
+  const err = errorMessage(error);
   // La última tentativa inválida queda en el checkpoint: sin ella no se
   // puede saber qué inventó el modelo cuando la etapa falla tras 3 intentos.
   if (error instanceof StageOutputError) checkpoint.output = error.invalidOutput;
@@ -595,7 +607,7 @@ async function handleGateFailure(currentDraft: CaseDraft, checkpoint: CaseDraft[
 /** Un fallo que no es de puerta: guarda el mensaje como feedback para el
  * siguiente intento y reintenta (o rechaza al agotar los intentos). */
 async function handleRetryFailure(currentDraft: CaseDraft, checkpoint: CaseDraft['stages'][number], stageNum: number, config: PipelineConfig, error: unknown): Promise<{ feedback: string[]; result: GenerationResult | null }> {
-  const feedback = [error instanceof Error ? error.message : String(error)];
+  const feedback = [errorMessage(error)];
   const result = await retryOrRejectStage(currentDraft, checkpoint, stageNum, config, error);
   return { feedback, result };
 }

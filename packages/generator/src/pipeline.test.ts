@@ -868,6 +868,25 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/timeline/);
   });
 
+  it('conserva la causa del proveedor cuando la etapa falla por el modelo', async () => {
+    const llm: StageLlm = {
+      async generate({ stage }) {
+        if (stage === 1) {
+          // Como el adaptador de IA real: el error llega como 'unavailable'
+          // con la causa original (timeout, 500, corte) adjunta.
+          throw new Error('unavailable', { cause: new Error('fetch failed') });
+        }
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/unavailable \(fetch failed\)/);
+  });
+
   it('rechaza el borrador cuando la etapa 4 nunca es válida', async () => {
     const llm: StageLlm = {
       async generate({ stage }) {

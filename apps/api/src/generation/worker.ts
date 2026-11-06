@@ -27,6 +27,15 @@ function progressOf(draft: CaseDraft): Record<string, unknown> {
   };
 }
 
+/** Mensaje de error con su causa, cuando la trae (el adaptador de IA
+ * aplasta los errores del proveedor a 'unavailable'; sin la causa el job
+ * no dice si fue un timeout, un 500 o un corte de conexión). */
+function jobErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return 'Error desconocido.';
+  const cause = error.cause instanceof Error ? error.cause.message : undefined;
+  return cause && cause !== error.message ? `${error.message} (${cause})` : error.message;
+}
+
 export function startGenerationWorker(database: Database, config: AppConfig): GenerationWorker {
   const workerId = randomUUID();
   let stopped = false;
@@ -81,7 +90,7 @@ export function startGenerationWorker(database: Database, config: AppConfig): Ge
         await finishJob(database.orm, job.id, 'failed', { error: result.error ?? 'La generación no produjo un expediente válido.' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Error desconocido.';
+      const message = jobErrorMessage(error);
       if (message === 'JOB_CANCELLED') {
         // El usuario ya lo canceló: la fila ya está en 'cancelled'.
         return;

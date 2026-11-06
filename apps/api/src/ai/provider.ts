@@ -2,7 +2,7 @@ export type AiOperation = 'interpretAction' | 'narrateResult' | 'converse' | 'ge
 export type AiErrorCode = 'unavailable' | 'timeout' | 'cancelled' | 'invalid_response' | 'budget_exceeded';
 export class AiError extends Error {
   readonly code: AiErrorCode;
-  constructor(code: AiErrorCode) { super(code); this.code = code; }
+  constructor(code: AiErrorCode, options?: { cause?: unknown }) { super(code, options); this.code = code; }
 }
 export interface AiRequest {
   operation: AiOperation;

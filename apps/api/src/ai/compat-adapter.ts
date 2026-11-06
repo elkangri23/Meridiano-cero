@@ -9,10 +9,15 @@ import type { AIProvider } from '@meridiano/ai-adapters';
 
 function mapAdapterError(error: unknown): AiError {
   if (error instanceof AiError) return error;
-  if (error instanceof Error && error.message === 'CANCELLED') return new AiError('cancelled');
-  if (error instanceof Error && error.message === 'INVALID_OUTPUT') return new AiError('invalid_response');
-  if (error instanceof Error && error.message === 'MODEL_UNAVAILABLE') return new AiError('unavailable');
-  return new AiError('unavailable');
+  // La causa se conserva: sin ella todos los fallos del proveedor llegan
+  // como 'unavailable' y no se sabe si fue un timeout, un 500 o un corte
+  // de conexión. Los mensajes del adaptador nunca incluyen cuerpos del
+  // proveedor ni credenciales, así que la causa es segura para el log y
+  // para el error del job de generación.
+  if (error instanceof Error && error.message === 'CANCELLED') return new AiError('cancelled', { cause: error });
+  if (error instanceof Error && error.message === 'INVALID_OUTPUT') return new AiError('invalid_response', { cause: error });
+  if (error instanceof Error && error.message === 'MODEL_UNAVAILABLE') return new AiError('unavailable', { cause: error });
+  return new AiError('unavailable', { cause: error });
 }
 
 export function createCompatibleProvider(
