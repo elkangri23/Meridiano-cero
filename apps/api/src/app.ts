@@ -25,7 +25,14 @@ function runStoreErrorMessage(error: RunStoreError): string {
 }
 
 export function createApp(options?: { config: AppConfig; database: Database; state?: RuntimeState; telemetry?: Telemetry; mailer?: Mailer | null }) {
-  const app: FastifyInstance = Fastify({ logger: false, requestTimeout: 30_000, connectionTimeout: 30_000,
+  const app: FastifyInstance = Fastify({ logger: false, requestTimeout: 65_000, connectionTimeout: 65_000,
+    // Plazos alineados de fuera a dentro con la IA: el proveedor admite
+    // 60 s (AI_TIMEOUT_MS / timeoutMs por defecto), así que el servidor
+    // debe dejarlo terminar (65 s) para que la respuesta del modelo o el
+    // respaldo del director salgan; con 30 s una conversación lenta moría
+    // aquí (el socket se cerraba sin respuesta y nginx devolvía 502) aunque
+    // el cliente esperase más. Encima: nginx proxy_read_timeout 70 s en
+    // /api/ y el cliente espera 75 s al conversar.
     // En producción la API solo escucha en 127.0.0.1 detrás de nginx: se
     // confía solo en el primer salto (nginx) para que request.ip sea la IP
     // real del cliente (los límites por IP del registro usan ese valor).
