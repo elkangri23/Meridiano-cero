@@ -100,7 +100,7 @@ function CreationContent({ state, model }: Props) {
 }
 type DifficultyFieldProps = { busy: boolean; difficulty: Difficulty; selectedCase: { deadlineMinutes: number } | undefined; onChange: (next: Difficulty) => void };
 function DifficultyField({ busy, difficulty, selectedCase, onChange }: DifficultyFieldProps) {
-  return <fieldset disabled={busy}><legend>Dificultad</legend>{difficultyOptions.map(option => <label key={option.id}><input type="radio" name="difficulty" value={option.id} checked={difficulty === option.id} onChange={() => onChange(option.id)} /> {option.label}{selectedCase ? ` · plazo ${hours(deadlineMinutesForDifficulty(selectedCase.deadlineMinutes, option.id))}` : ''} — {option.note}</label>)}</fieldset>;
+  return <fieldset disabled={busy} className="difficulty-field"><legend>Dificultad</legend><div className="difficulty-options">{difficultyOptions.map(option => <label key={option.id}><input type="radio" name="difficulty" value={option.id} checked={difficulty === option.id} onChange={() => onChange(option.id)} /> <span><strong>{option.label}{selectedCase ? ` · plazo ${hours(deadlineMinutesForDifficulty(selectedCase.deadlineMinutes, option.id))}` : ''}</strong> — {option.note}</span></label>)}</div></fieldset>;
 }
 type PhaseViewProps = Props & { busy: boolean; onPrepareAnother: () => void };
 function CreationPhaseView({ state, model, busy, onPrepareAnother }: PhaseViewProps) {
