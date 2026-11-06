@@ -218,8 +218,11 @@ function diagnoseRecover(definition: CaseDefinition, run: CaseRun, action: Golde
     if (pending) {
       return `${step}: la orden se pidió en el paso ${requestIndex + 1} pero aún no ha madurado (vence en el minuto ${pending.dueMinute} y estás en el minuto ${run.minute}). Espera ${pending.dueMinute - run.minute} min más con wait antes de recuperar.`;
     }
+    if (accessIds.length === 0) {
+      return `${step}: el sospechoso no declara ninguna evidencia de acceso (accessEvidenceIds vacío en la mecánica): sin ella el motor nunca concede warrant:access y la recuperación es imposible. Declara al menos una evidencia de acceso en el sospechoso y úsala en la request_warrant.`;
+    }
     if (!evidenceIds.some(id => accessIds.includes(id))) {
-      return `${step}: la orden pedida en el paso ${requestIndex + 1} usa evidenceIds [${evidenceIds.join(', ')}] y ninguna es una evidencia de acceso (${accessIds.join(', ') || 'sin declarar'}). Incluye una evidencia de acceso en la request_warrant para que al madurar se conceda warrant:access.`;
+      return `${step}: la orden pedida en el paso ${requestIndex + 1} usa evidenceIds [${evidenceIds.join(', ')}] y ninguna es una evidencia de acceso (${accessIds.join(', ')}). Incluye una evidencia de acceso en la request_warrant para que al madurar se conceda warrant:access.`;
     }
     return `${step}: la orden pedida en el paso ${requestIndex + 1} se denegó al madurar o no cubre una combinación válida: revisa que use una combinación completa de warrantCombinations del sospechoso (${JSON.stringify(suspect?.warrantCombinations ?? [])}) con evidencias conocidas y admisibles.`;
   }

@@ -406,7 +406,7 @@ const MECHANIC_FIELDS: Array<{ key: string; fields: Array<[string, 'nonempty' | 
   { key: 'queries', fields: [['id', 'nonempty'], ['label', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['evidenceId', 'nonempty'], ['requires', 'array'], ['delayMinutes', 'number']] },
   { key: 'analyses', fields: [['inputEvidenceId', 'nonempty'], ['resultEvidenceId', 'nonempty'], ['delayMinutes', 'number']] },
   { key: 'talkEvidence', fields: [['npcId', 'nonempty'], ['topicId', 'nonempty'], ['label', 'nonempty'], ['evidenceId', 'nonempty']] },
-  { key: 'suspects', fields: [['id', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['knownFromEvidence', 'array'], ['warrantCombinations', 'array']] },
+  { key: 'suspects', fields: [['id', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['knownFromEvidence', 'array'], ['warrantCombinations', 'array'], ['accessEvidenceIds', 'array']] },
 ];
 
 const KEBAB_ID = /^[a-z][a-z0-9-]{0,63}$/;
@@ -479,6 +479,14 @@ function checkClueMechanics(output: Record<string, unknown>, errors: string[]): 
   if (!Array.isArray(mechanics.suspects) || mechanics.suspects.length < 1 || mechanics.suspects.length > 2) errors.push('mechanics.suspects debe tener 1 o 2 sospechosos.');
   if (!isRecord(mechanics.recovery)) errors.push('mechanics.recovery debe ser un objeto.');
   checkMechanicFields(mechanics, errors);
+  // Sin evidencia de acceso declarada, la recuperación con orden de acceso
+  // es imposible para cualquier sospechoso: el motor nunca concede
+  // warrant:access. El campo era opcional y el modelo lo omitía.
+  if (isRecord(mechanics.recovery) && mechanics.recovery.requiresAccessWarrant === true) {
+    const suspects = Array.isArray(mechanics.suspects) ? mechanics.suspects : [];
+    const withAccess = suspects.some(entry => isRecord(entry) && Array.isArray(entry.accessEvidenceIds) && entry.accessEvidenceIds.length > 0);
+    if (!withAccess) errors.push('mechanics.suspects debe declarar accessEvidenceIds no vacío en al menos un sospechoso: recovery exige warrant:access y sin él la recuperación es imposible.');
+  }
 }
 
 function checkClueKnowledgeTexts(texts: Record<string, unknown>, knowledgeIds: string[], errors: string[]): void {

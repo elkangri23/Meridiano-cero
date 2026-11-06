@@ -156,3 +156,19 @@ describe('diagnoseGoldenPathFailure (evidencia pendiente)', () => {
     expect(diagnosis).toContain('90 min');
   });
 });
+
+describe('diagnoseGoldenPathFailure (recuperación sin acceso declarado)', () => {
+  it('explica una recuperación cuando el sospechoso no declara evidencia de acceso', () => {
+    const definition = structuredClone(generadoFraudeDefinition);
+    const suspect = definition.mechanics?.suspects.find(entry => entry.id === 'carmen');
+    if (!suspect) throw new Error('Sin sospechosa en el fixture.');
+    suspect.accessEvidenceIds = [];
+    const path = GOLDEN_PATH.map(action =>
+      action.type === 'request_warrant'
+        ? { ...action, params: { ...action.params, evidenceIds: ['EV-06', 'EV-07', 'EV-08'] } }
+        : action,
+    );
+    const diagnosis = diagnoseGoldenPathFailure(definition, path, 1440);
+    expect(diagnosis).toContain('accessEvidenceIds vacío');
+  });
+});

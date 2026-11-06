@@ -99,6 +99,9 @@ export interface CaseDraft {
   /** Una sola reparación de la etapa 4 por borrador. */
   repairUsed?: boolean;
   repairFeedback?: string[];
+  /** Mundo válido de la etapa 4a reutilizado entre reintentos: si solo
+   * fallan las reglas (4b), no se regenera el mundo entero. */
+  stage4World?: Record<string, unknown>;
 }
 
 export interface StageCheckpoint {
@@ -346,6 +349,18 @@ async function runLlmStage(
 // Se genera en dos llamadas: 4a (mundo: lugares, evidencias y textos) y
 // 4b (reglas: mecánica y ruta dorada, con los ids exactos de 4a en el
 // contexto). Sigue siendo una sola etapa (9 en total) para el job y la UI.
+//
+// Un reintento NO regenera el mundo entero: si la mitad 4a ya es válida,
+// se reutiliza y solo se rehace 4b con el feedback. Regenerar ambas en
+// cada intento era un sorteo nuevo que introducía fallos distintos
+// (textos incompletos, otra ruta con errores de ciudad) y agotaba los 3
+// intentos sin converger. Solo cuando el fallo es del mundo (o mixto)
+// se descarta y se regenera entero.
+function isStage4bError(error: string): boolean {
+  return error.startsWith('mechanics.') || error.startsWith('goldenPath')
+    || error.includes('no se puede obtener') || error.includes('ruta dorada');
+}
+
 async function runSplitStage4(
   draft: CaseDraft,
   choice: ResolvedChoice,
@@ -354,12 +369,20 @@ async function runSplitStage4(
   feedback?: string[],
 ): Promise<Record<string, unknown>> {
   const prior = { premise: stageOutput(draft, 1), npcs: stageOutput(draft, 3) };
-  const world = await runLlmStage(4, draft, choice, geography, config, prior, feedback, 'a');
+  const world = draft.stage4World
+    ?? await runLlmStage(4, draft, choice, geography, config, prior, feedback, 'a');
+  draft.stage4World = world as Record<string, unknown>;
   const rules = await runLlmStage(4, draft, choice, geography, config, { ...prior, world }, feedback, 'b');
   const merged = { ...(world as Record<string, unknown>), ...(rules as Record<string, unknown>) };
   const validation = validateStageOutput(4, merged, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft) });
-  if (!validation.valid) throw new StageOutputError(`Etapa 4 inválida: ${validation.errors.join('; ')}`, merged);
+  if (!validation.valid) {
+    // El mundo sigue siendo válido: el reintento solo rehace 4b.
+    if (!validation.errors.every(isStage4bError)) delete draft.stage4World;
+    throw new StageOutputError(`Etapa 4 inválida: ${validation.errors.join('; ')}`, merged);
+  }
+  // La jugabilidad es de 4b: el mundo se conserva para el reintento.
   checkGoldenPathPlayable(merged, prior, draft, choice, geography, config);
+  delete draft.stage4World;
   return merged;
 }
 

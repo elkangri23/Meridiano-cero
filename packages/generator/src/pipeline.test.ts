@@ -312,7 +312,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(result.success).toBe(true);
     expect(result.draft.repairUsed).not.toBe(true);
     expect(stage4bCalls).toBe(2);
-    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/no se puede jugar/);
   });
 
@@ -407,7 +407,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
     expect(stage4bCalls).toBe(2);
-    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/mechanics\.queries\[0\] debe tener id/);
   });
 
@@ -529,7 +529,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
     expect(stage4bCalls).toBe(2);
-    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/toCityId|sin acentos/);
   });
 
@@ -675,7 +675,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
     expect(stage4bCalls).toBe(2);
-    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/solo se recogen evidencias de tipo object/);
   });
 
@@ -714,7 +714,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
     expect(stage4bCalls).toBe(2);
-    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/EV-02.*no se puede obtener/);
   });
 
@@ -990,7 +990,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
     expect(stage4bCalls).toBe(2);
-    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/viaja a .* la ciudad actual/);
   });
 
@@ -1032,7 +1032,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
     expect(stage4bCalls).toBe(2);
-    const secondFeedback = contexts[3]?.repairFeedback as string[] | undefined;
+    const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
     expect(secondFeedback?.join(' ')).toMatch(/cada acción ocurre en la ciudad donde estás/);
   });
 
@@ -1191,5 +1191,101 @@ describe('validación de la etapa 4 (delayMinutes)', () => {
     const clues = { ...outputs.cluesWorld, ...outputs.cluesRules };
     const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
     expect(result.valid).toBe(true);
+  });
+});
+
+describe('reparación de la etapa 4 por mitades', () => {
+  it('reutiliza el mundo 4a cuando solo fallan las reglas 4b', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4aCalls = 0;
+    let stage4bCalls = 0;
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          if ((context as Record<string, unknown>).part === 'a') {
+            stage4aCalls++;
+            return outputs.cluesWorld;
+          }
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
+            // Ruta con la consulta de la segunda ciudad al principio, sin
+            // haber viajado: falla la validación de la ruta, no el mundo.
+            const broken = structuredClone(outputs.cluesRules);
+            const queryIndex = broken.goldenPath.findIndex(
+              action => action.type === 'query' && (action.params as Record<string, unknown>).topicId === 'registro-facturas',
+            );
+            if (queryIndex < 0) throw new Error('Sin consulta registro-facturas en la salida simulada.');
+            const [query] = broken.goldenPath.splice(queryIndex, 1);
+            if (!query) throw new Error('Sin consulta registro-facturas en la salida simulada.');
+            broken.goldenPath.splice(1, 0, query);
+            return broken;
+          }
+          return outputs.cluesRules;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4aCalls).toBe(1);
+    expect(stage4bCalls).toBe(2);
+  });
+
+  it('regenera el mundo cuando falla la mitad 4a', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4aCalls = 0;
+    let stage4bCalls = 0;
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          if ((context as Record<string, unknown>).part === 'a') {
+            stage4aCalls++;
+            if (stage4aCalls === 1) {
+              // Mundo con un texto de evidencia de menos: falla 4a y no se
+              // llega a llamar a 4b en ese intento.
+              const broken = structuredClone(outputs.cluesWorld);
+              const texts = broken.texts as { evidence: Record<string, string> };
+              delete texts.evidence['EV-11'];
+              return broken;
+            }
+            return outputs.cluesWorld;
+          }
+          stage4bCalls++;
+          return outputs.cluesRules;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4aCalls).toBe(2);
+    expect(stage4bCalls).toBe(1);
+  });
+});
+
+describe('validación de la etapa 4 (accessEvidenceIds)', () => {
+  it('rechaza un sospechoso sin accessEvidenceIds cuando la recuperación exige acceso', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = { ...outputs.cluesWorld, ...structuredClone(outputs.cluesRules) };
+    const mechanics = clues.mechanics as { suspects: Array<Record<string, unknown>> };
+    delete mechanics.suspects[0]!.accessEvidenceIds;
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('accessEvidenceIds'))).toBe(true);
   });
 });
