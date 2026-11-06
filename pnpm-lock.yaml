@@ -205,6 +205,9 @@ importers:
       '@meridiano/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@meridiano/generator':
+        specifier: workspace:*
+        version: link:../../packages/generator
       argon2:
         specifier: ^0.45.2
         version: 0.45.2
