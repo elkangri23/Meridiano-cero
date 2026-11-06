@@ -17,7 +17,7 @@ describe('Evaluación reproducible sin confundir fallback con calidad del modelo
     expect(result.passed).toBe(true);
     expect(result.results).toHaveLength(17);
     const resumed = calls.find(call => call.requestId === 'evaluation-memory-resumed');
-    expect(resumed?.context.memory).toEqual({ treatment: 'respectful', turns: [{ act: 'state', factIds: ['receipt'] }] });
+    expect(resumed?.context.memory).toEqual({ treatment: 'respectful', turns: [{ act: 'state', factIds: ['receipt'], you: '¿Qué consta sobre la recepción?', npc: 'La recepción de la caja fue registrada.' }] });
     const revoked = calls.find(call => call.requestId === 'evaluation-memory-revoked');
     expect(revoked?.context.facts).toEqual([]);
     expect(JSON.stringify(revoked?.context.memory)).not.toContain('receipt');

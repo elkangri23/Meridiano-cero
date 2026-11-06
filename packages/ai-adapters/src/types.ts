@@ -135,6 +135,11 @@ export interface InterpretActionOutput {
 export interface ConverseOutput {
   act: string;
   factIds: string[];
+  /** Respuesta del NPC en su voz (1-3 frases). Solo `acknowledge` la usa
+   * como texto visible: es charla o desvío no probatorio. Para `state` el
+   * servidor muestra los textos factuales autorizados; para `decline` y
+   * `silence`, sus líneas fijas. */
+  text: string;
 }
 
 export interface NarrateResultOutput {

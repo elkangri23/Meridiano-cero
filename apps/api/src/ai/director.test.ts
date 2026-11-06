@@ -76,7 +76,7 @@ describe('Narración factual y fallos posteriores a la ejecución', () => {
 describe('Conocimiento y memoria NPC', () => {
   it('envía solo hechos conocidos y revelables y guarda solo selección autorizada', async () => {
     let captured: AiRequest | undefined;
-    const service = createDirector(createMockProvider(request => { captured = request; return { act: 'state', factIds: ['receipt'] }; }));
+    const service = createDirector(createMockProvider(request => { captured = request; return { act: 'state', factIds: ['receipt'], text: '' }; }));
     const input = conversation();
     const memory = remember(input.memory, ['hidden', 'receipt'], 'state');
     const result = await service.converse({ ...input, memory, facts: [...facts, { id: 'hidden', text: 'PRIVATE_SENTINEL' }] }, options);
@@ -85,11 +85,11 @@ describe('Conocimiento y memoria NPC', () => {
     expect(prompt).not.toContain('hidden');
     expect(prompt).not.toContain('La caja está');
     expect(result.narrative.text).toBe('La recepción fue registrada.');
-    expect(result.memory.turns.at(-1)).toEqual({ act: 'state', factIds: ['receipt'] });
+    expect(result.memory.turns.at(-1)).toEqual({ act: 'state', factIds: ['receipt'], you: '¿Qué consta en recepción?', npc: 'La recepción fue registrada.' });
     expect(input.memory.turns).toEqual([]);
   });
   it('no revela hechos cuando el expediente solo permite negativa', async () => {
-    const result = await director({ act: 'state', factIds: ['receipt'] }).converse({
+    const result = await director({ act: 'state', factIds: ['receipt'], text: '' }).converse({
       ...conversation(), allowedActs: ['decline'],
     }, options);
     expect(result.narrative).toMatchObject({ act: 'decline', factIds: [], source: 'fallback' });
@@ -124,17 +124,17 @@ describe('Inés Valera responde desde lo que sabe y solo se niega a declarar', (
       memory: emptyMemory('run-a', 'ines'), allowedActs: ['state', 'acknowledge', 'decline', 'silence'] as const };
   }
   it('una pregunta de identidad se responde con su hecho', async () => {
-    const result = await director({ act: 'state', factIds: ['truth'] })
+    const result = await director({ act: 'state', factIds: ['truth'], text: '' })
       .converse(inesConversation('¿Cómo te llamas?'), options);
     expect(result.narrative).toMatchObject({ act: 'state', source: 'model', factIds: ['truth'] });
     expect(result.narrative.text).toBe('Soy Inés Valera, restauradora contratada para el traslado del astrolabio.');
   });
   it('una negativa del modelo sobre el robo se dice en personaje, no con la genérica', async () => {
-    const result = await director({ act: 'decline', factIds: [] })
+    const result = await director({ act: 'decline', factIds: [], text: '' })
       .converse(inesConversation('¿Robaste tú el astrolabio?'), options);
     expect(result.narrative).toMatchObject({ act: 'decline', source: 'model', factIds: [] });
     expect(result.narrative.text).toBe('No voy a declarar sobre el robo.');
-    expect(result.memory.turns.at(-1)).toEqual({ act: 'decline', factIds: [] });
+    expect(result.memory.turns.at(-1)).toEqual({ act: 'decline', factIds: [], you: '¿Robaste tú el astrolabio?', npc: 'No voy a declarar sobre el robo.' });
   });
   it('una negativa del respaldo también se dice en personaje', async () => {
     const service = createDirector(createMockProvider(() => { throw new AiError('unavailable'); }));
@@ -143,7 +143,7 @@ describe('Inés Valera responde desde lo que sabe y solo se niega a declarar', (
     expect(result.narrative.text).toBe('No voy a declarar sobre el robo.');
   });
   it('sin negativa propia, la negativa sigue siendo la genérica', async () => {
-    const result = await director({ act: 'decline', factIds: [] }).converse(conversation(), options);
+    const result = await director({ act: 'decline', factIds: [], text: '' }).converse(conversation(), options);
     expect(result.narrative).toMatchObject({ act: 'decline', source: 'model' });
     expect(result.narrative.text).toBe('No puedo responder a esa consulta.');
   });
@@ -173,7 +173,7 @@ describe('Permisos de conversación y cancelación tardía', () => {
     const result = await service.converse({ ...conversation(), allowedActs: ['silence'] }, options);
     expect(result.narrative).toMatchObject({ act: 'silence', factIds: [], source: 'fallback' });
     expect(result.narrative.text).toBe('El interlocutor guarda silencio.');
-    expect(result.memory.turns.at(-1)).toEqual({ act: 'silence', factIds: [] });
+    expect(result.memory.turns.at(-1)).toEqual({ act: 'silence', factIds: [], you: '¿Qué consta en recepción?', npc: 'El interlocutor guarda silencio.' });
   });
   it('no inventa un acto ni un turno cuando no existen hechos para una afirmación', async () => {
     const service = createDirector(createMockProvider(() => { throw new AiError('unavailable'); }));
@@ -182,11 +182,10 @@ describe('Permisos de conversación y cancelación tardía', () => {
     expect(result.narrative).toMatchObject({ act: null, factIds: [], source: 'fallback' });
     expect(result.memory).toBe(input.memory);
   });
-  it('solo reconoce la consulta si no se permite declarar hechos ni negarse', async () => {
-    const result = await director({ act: 'state', factIds: ['receipt'] }).converse({
+  it('sin acto válido no escribe diálogo: el respaldo de acknowledge es error operativo', async () => {
+    await expect(director({ act: 'state', factIds: ['receipt'], text: '' }).converse({
       ...conversation(), allowedActs: ['acknowledge'],
-    }, options);
-    expect(result.narrative).toMatchObject({ act: 'acknowledge', factIds: [], source: 'fallback' });
+    }, options)).rejects.toThrow('invalid_response');
   });
   it('rechaza un conjunto vacío de actos antes de contactar al modelo', async () => {
     const service = createDirector(createMockProvider(() => { throw new Error('No contactar'); }));
@@ -224,15 +223,15 @@ describe('Permisos de conversación y cancelación tardía', () => {
   });
   it('restaura la memoria, conserva trato y retira hechos cuyo permiso ha cambiado', async () => {
     const initial = { ...emptyMemory('run-a', 'clerk'), treatment: 'hostile' as const };
-    const first = await director({ act: 'state', factIds: ['receipt'] }).converse({ ...conversation(), memory: initial }, options);
+    const first = await director({ act: 'state', factIds: ['receipt'], text: '' }).converse({ ...conversation(), memory: initial }, options);
     const memory = restoreMemory(JSON.parse(JSON.stringify(first.memory)), 'run-a', 'clerk');
     let captured: AiRequest | undefined;
-    const service = createDirector(createMockProvider(request => { captured = request; return { act: 'silence', factIds: [] }; }));
+    const service = createDirector(createMockProvider(request => { captured = request; return { act: 'silence', factIds: [], text: '' }; }));
     const second = await service.converse({
       ...conversation(), text: '¿Recuerdas lo que dijiste?', memory,
       npc: { ...npc, revealableFactIds: [] }, allowedActs: ['silence'],
     }, options);
-    expect(captured?.context.memory).toEqual({ treatment: 'hostile', turns: [{ act: 'state', factIds: [] }] });
+    expect(captured?.context.memory).toEqual({ treatment: 'hostile', turns: [{ act: 'state', factIds: [], you: '¿Qué consta en recepción?', npc: 'La recepción fue registrada.' }] });
     expect(captured?.context.facts).toEqual([]);
     expect(second.memory.treatment).toBe('hostile');
     expect(second.memory.turns).toHaveLength(2);
@@ -249,5 +248,43 @@ describe('Cancelación y error simultáneos', () => {
     const result = await service.converse(input, { ...options, signal: controller.signal });
     expect(result.narrative).toMatchObject({ act: null, factIds: [], reason: 'cancelled' });
     expect(result.memory).toBe(input.memory);
+  });
+});
+
+describe('Conversación natural: la charla la escribe el modelo, lo probatorio lo dice el servidor', () => {
+  it('acknowledge devuelve el texto del modelo, no la frase fija', async () => {
+    const result = await director({ act: 'acknowledge', factIds: [], text: 'Buenos días, hoy hace sol.' }).converse({
+      ...conversation(), text: '¿Qué día hace hoy?', facts: [], allowedActs: ['acknowledge'],
+    }, options);
+    expect(result.narrative).toMatchObject({ act: 'acknowledge', source: 'model', factIds: [] });
+    expect(result.narrative.text).toBe('Buenos días, hoy hace sol.');
+    expect(result.memory.turns.at(-1)).toEqual({ act: 'acknowledge', factIds: [], you: '¿Qué día hace hoy?', npc: 'Buenos días, hoy hace sol.' });
+  });
+  it('state muestra los textos factuales autorizados, nunca texto libre del modelo', async () => {
+    const result = await director({ act: 'state', factIds: ['receipt'], text: 'El culpable es X, lo vi yo.' }).converse(conversation(), options);
+    expect(result.narrative).toMatchObject({ act: 'state', source: 'model', factIds: ['receipt'] });
+    expect(result.narrative.text).toBe('La recepción fue registrada.');
+  });
+  it('acknowledge sin texto es salida inválida y no escribe diálogo', async () => {
+    await expect(director({ act: 'acknowledge', factIds: [], text: '' }).converse({
+      ...conversation(), text: '¿Qué día hace hoy?', facts: [], allowedActs: ['acknowledge'],
+    }, options)).rejects.toThrow('invalid_response');
+  });
+  it('acepta memoria vieja (solo acto e ids) y la normaliza con textos vacíos', async () => {
+    const old = { ...emptyMemory('run-a', 'clerk'), turns: [{ factIds: ['receipt'], act: 'state' as const }] };
+    const restored = restoreMemory(JSON.parse(JSON.stringify(old)), 'run-a', 'clerk');
+    expect(restored.turns).toEqual([{ factIds: ['receipt'], act: 'state', you: '', npc: '' }]);
+    const result = await director({ act: 'acknowledge', factIds: [], text: 'Hace sol.' }).converse({
+      ...conversation(), text: '¿Qué día hace hoy?', memory: restored, facts: [], allowedActs: ['acknowledge'],
+    }, options);
+    expect(result.narrative.text).toBe('Hace sol.');
+  });
+  it('el segundo turno ve lo ya dicho y no repite el hecho', async () => {
+    let captured: AiRequest | undefined;
+    const service = createDirector(createMockProvider(request => { captured = request; return { act: 'acknowledge', factIds: [], text: 'Hoy hace sol, sí.' }; }));
+    const first = await director({ act: 'state', factIds: ['receipt'], text: '' }).converse(conversation(), options);
+    await service.converse({ ...conversation(), text: '¿Qué día hace hoy?', memory: first.memory, facts: [], allowedActs: ['acknowledge'] }, options);
+    const memory = (captured?.context as { memory?: { turns?: Array<{ act?: string; factIds?: string[]; you?: string; npc?: string }> } }).memory;
+    expect(memory?.turns?.at(-1)).toEqual({ act: 'state', factIds: [], you: '¿Qué consta en recepción?', npc: 'La recepción fue registrada.' });
   });
 });

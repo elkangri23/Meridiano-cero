@@ -80,16 +80,18 @@ describe('conversación con NPC por ruta', () => {
     expect(asJson(response.json()).error).toBeDefined();
   });
 
-  it('un NPC sin listas de hechos no rompe: responde sin declarar nada', async () => {
+  it('un NPC sin listas de hechos no rompe: sin acto válido hay error operativo, no diálogo inventado', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/ai/converse',
       headers,
       payload: { runId, text: '¿qué hiciste con la caja?', npc: { id: 'tomas', name: 'Tomás Ríos', persona: 'Transportista' }, facts, memory: emptyMemory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'], requestId: randomUUID() },
     });
-    expect(response.statusCode).toBe(200);
-    const body = asJson(response.json());
-    expect(asJson(body.narrative).text).toBe('He registrado tu consulta.');
+    // El mock devuelve un acto inválido y no hay hechos para declarar: el
+    // respaldo de `acknowledge` ya no es la frase fija «He registrado tu
+    // consulta.» sino un error operativo (CONVERSACIONES.md).
+    expect(response.statusCode).toBe(500);
+    expect(asJson(response.json()).error).toBeDefined();
   });
 
   // Inés Valera (sospechosa, restauradora): su único hecho conocido es
@@ -126,7 +128,7 @@ describe('conversación con NPC por ruta', () => {
     expect(asJson(asJson(second.json()).narrative).text).toContain('restauradora');
   });
 
-  it('Inés sin listas de hechos tampoco rompe: responde sin declarar nada', async () => {
+  it('Inés sin listas de hechos tampoco rompe: sin acto válido hay error operativo, no diálogo inventado', async () => {
     const inesFacts = [{ id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' }];
     const inesMemory = { schemaVersion: 1, runId, npcId: 'ines', treatment: 'neutral', turns: [] };
     const response = await app.inject({
@@ -135,7 +137,7 @@ describe('conversación con NPC por ruta', () => {
       headers,
       payload: { runId, text: 'hola, no quieres decir nada?', npc: { id: 'ines', name: 'Inés Valera', persona: 'Sospechosa' }, facts: inesFacts, memory: inesMemory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'], requestId: randomUUID() },
     });
-    expect(response.statusCode).toBe(200);
-    expect(asJson(asJson(response.json()).narrative).text).toBe('He registrado tu consulta.');
+    expect(response.statusCode).toBe(500);
+    expect(asJson(response.json()).error).toBeDefined();
   });
 });

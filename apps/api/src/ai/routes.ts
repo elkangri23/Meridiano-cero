@@ -4,7 +4,7 @@ import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
 import { createAuthorizer } from './authorize.ts';
 import { createDirector } from './director.ts';
-import { interpretationSchema, factualSchema } from './schemas.ts';
+import { interpretationSchema, factualSchema, converseSchema } from './schemas.ts';
 import type { AiRequest } from './provider.ts';
 import { RunStoreError } from '../game/runs.ts';
 import type { PublicFact, PublicScene, NpcContext, ConversationMemory, SpeechAct, ActionOffer } from './context.ts';
@@ -112,7 +112,7 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
     return {
       operation: 'converse',
       requestId,
-      schema: factualSchema,
+      schema: converseSchema,
       context: {
         runId,
         text,

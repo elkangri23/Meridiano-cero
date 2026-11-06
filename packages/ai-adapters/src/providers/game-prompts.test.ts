@@ -4,7 +4,7 @@
 // un solo hecho conocido): cualquier pregunta que el hecho no respondía
 // salía como «No puedo responder a esa consulta.».
 import { describe, expect, it } from 'vitest';
-import { buildGameFunctionPrompt } from './game-prompts.js';
+import { buildGameFunctionPrompt, validateGameOutput } from './game-prompts.js';
 
 describe('prompt de conversación', () => {
   const prompt = buildGameFunctionPrompt('converse');
@@ -28,5 +28,29 @@ describe('prompt de conversación', () => {
   it('sobre identidad, tarea y lo visto el NPC responde, nunca se niega', () => {
     expect(prompt).toMatch(/identidad, su tarea y lo que vio.*responde con los hechos autorizados/s);
     expect(prompt).toMatch(/nunca se niega a eso/s);
+  });
+});
+
+describe('validación de salida de conversación', () => {
+  it('acepta acknowledge con texto en personaje', () => {
+    expect(() => validateGameOutput('converse', { act: 'acknowledge', factIds: [], text: 'Buenos días, hoy hace sol.' })).not.toThrow();
+  });
+  it('acepta state sin texto (el servidor muestra los textos factuales)', () => {
+    expect(() => validateGameOutput('converse', { act: 'state', factIds: ['truth'], text: '' })).not.toThrow();
+  });
+  it('rechaza acknowledge sin texto, acto desconocido, campo extra y texto desmesurado', () => {
+    for (const bad of [
+      { act: 'acknowledge', factIds: [], text: '' },
+      { act: 'acknowledge', factIds: [], text: '   ' },
+      { act: 'inform', factIds: [], text: 'Hola.' },
+      { act: 'acknowledge', factIds: [] },
+      { act: 'acknowledge', factIds: [], text: 'x'.repeat(601) },
+      { act: 'acknowledge', factIds: [], text: 'Hola.', extra: true },
+      { act: 'acknowledge', factIds: ['a', 'a'], text: 'Hola.' },
+    ]) expect(() => validateGameOutput('converse', bad)).toThrow('INVALID_OUTPUT');
+  });
+  it('narrateResult sigue sin aceptar texto libre', () => {
+    expect(() => validateGameOutput('narrateResult', { act: 'state', factIds: ['x'], text: 'prosa' })).toThrow('INVALID_OUTPUT');
+    expect(() => validateGameOutput('narrateResult', { act: 'state', factIds: ['x'] })).not.toThrow();
   });
 });

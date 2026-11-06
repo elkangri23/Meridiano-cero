@@ -2,7 +2,7 @@ import { AiError, exactKeys, record } from './provider.ts';
 import type { AiProvider, AiErrorCode } from './provider.ts';
 import type { ActionOffer, ConversationMemory, NpcContext, PublicFact, PublicScene, SpeechAct } from './context.ts';
 import { memoryForContext, permittedNpcFacts, remember, restoreMemory, speechActs } from './context.ts';
-import { factualSchema, interpretationSchema } from './schemas.ts';
+import { converseSchema, factualSchema, interpretationSchema, MAX_CONVERSE_TEXT_LENGTH } from './schemas.ts';
 
 export interface CallOptions { requestId: string; signal?: AbortSignal }
 export type Interpretation =
@@ -37,6 +37,25 @@ function factSelection(value: unknown, facts: readonly PublicFact[], acts: reado
   if (value.factIds.some(id => !facts.some(fact => fact.id === id))) return null;
   if ((act === 'state') !== (value.factIds.length > 0)) return null;
   return { act, factIds: [...value.factIds] };
+}
+/** Selección de conversación libre: como factSelection más el texto
+ * escrito por el modelo. El texto solo se muestra cuando el acto es
+ * `acknowledge` (charla o desvío no probatorio, GDD §7: el LLM expresa
+ * conversaciones). Para `state` el servidor muestra los textos factuales
+ * autorizados y para `decline`/`silence` sus líneas fijas: el contrato no
+ * acepta texto probatorio libre (CONVERSACIONES.md), así que el texto del
+ * modelo en esos actos se ignora y solo se acota su longitud. Un
+ * `acknowledge` sin texto no es una respuesta. */
+function converseSelection(value: unknown, facts: readonly PublicFact[], acts: readonly SpeechAct[]) {
+  if (!record(value) || !exactKeys(value, ['act', 'factIds', 'text'])) return null;
+  if (typeof value.text !== 'string' || value.text.length > MAX_CONVERSE_TEXT_LENGTH) return null;
+  if (!strings(value.factIds, 16)) return null;
+  const act = acts.find(item => item === value.act);
+  if (!act || new Set(value.factIds).size !== value.factIds.length) return null;
+  if (value.factIds.some(id => !facts.some(fact => fact.id === id))) return null;
+  if ((act === 'state') !== (value.factIds.length > 0)) return null;
+  if (act === 'acknowledge' && value.text.trim().length === 0) return null;
+  return { act, factIds: [...value.factIds], text: value.text };
 }
 function render(facts: readonly PublicFact[], ids: readonly string[], act: SpeechAct): string {
   if (act === 'acknowledge') return 'He registrado tu consulta.';
@@ -99,17 +118,34 @@ export function createDirector(provider: AiProvider) {
     validateFacts(facts);
     try {
       ensureActive(options.signal);
-      const response = await provider.request({ ...options, operation, schema: factualSchema,
+      const schema = operation === 'converse' ? converseSchema : factualSchema;
+      const response = await provider.request({ ...options, operation, schema,
         context: { ...context, facts: facts.map(fact => ({ id: fact.id, text: fact.text })), allowedActs: [...acts] } });
       ensureActive(options.signal);
-      const selection = factSelection(response.payload, facts, acts);
+      if (operation === 'narrateResult') {
+        const selection = factSelection(response.payload, facts, acts);
+        if (!selection) throw new AiError('invalid_response');
+        // Confirmed result narration must include every event; the model cannot suppress consequences.
+        if (selection.factIds.length !== facts.length) throw new AiError('invalid_response');
+        return { ...selection, text: render(facts, selection.factIds, selection.act), source: 'model' };
+      }
+      const selection = converseSelection(response.payload, facts, acts);
       if (!selection) throw new AiError('invalid_response');
-      // Confirmed result narration must include every event; the model cannot suppress consequences.
-      if (operation === 'narrateResult' && selection.factIds.length !== facts.length) throw new AiError('invalid_response');
-      return { ...selection, text: render(facts, selection.factIds, selection.act), source: 'model' };
+      // Solo `acknowledge` muestra texto del modelo (charla o desvío no
+      // probatorio); `state` muestra los textos factuales autorizados.
+      const text = selection.act === 'acknowledge'
+        ? selection.text : render(facts, selection.factIds, selection.act);
+      return { act: selection.act, factIds: selection.factIds, text, source: 'model' };
     } catch (error) {
       const reason = errorCode(error, options.signal);
-      return factualFallback(facts, acts, reason, operation);
+      const fallback = factualFallback(facts, acts, reason, operation);
+      // Sin acto válido no se escribe diálogo (CONVERSACIONES.md): el
+      // respaldo de `acknowledge` era la frase fija «He registrado tu
+      // consulta.»; en conversación libre eso es un error operativo y la
+      // web enseña «La IA no responde». El resto de respaldos (declarar
+      // los hechos, negativa, silencio) siguen siendo texto autorizado.
+      if (operation === 'converse' && fallback.act === 'acknowledge') throw new AiError(reason);
+      return fallback;
     }
   }
   async function narrateResult(facts: readonly PublicFact[], options: CallOptions): Promise<Narrative> {
@@ -138,7 +174,7 @@ export function createDirector(provider: AiProvider) {
     const rendered = narrative.act === 'decline' && input.npc.refusal
       ? { ...narrative, text: input.npc.refusal } : narrative;
     const memory = rendered.act === null ? input.memory :
-      remember(restored, rendered.factIds, rendered.act);
+      remember(restored, rendered.factIds, rendered.act, input.text, rendered.text);
     return { narrative: rendered, memory };
   }
   return { interpretAction, narrateResult, converse };
