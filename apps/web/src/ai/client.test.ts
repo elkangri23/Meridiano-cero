@@ -48,7 +48,7 @@ describe('plazos del cliente de IA', () => {
     await aiApi.narrate([{ id: 'EV-01', text: 'La caja está a la vista.' }], signal(), auth);
     respond(narrativeBody);
     await aiApi.converse(inesInput, signal(), auth);
-    expect(spy.mock.calls.map(call => call[0])).toEqual([15000, 45000, 55000]);
+    expect(spy.mock.calls.map(call => call[0])).toEqual([15000, 45000, 75000]);
   });
 
   it('conversar con Inés sobrevive a una respuesta lenta del modelo (9 s reales)', async () => {

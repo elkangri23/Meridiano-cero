@@ -74,7 +74,7 @@ interface RequestOptions {
  * único de 8 s abortaba cada intento antes de que el servidor contestara:
  * preguntar a Inés fallaba siempre que el modelo tardaba más de 8 s, con
  * «La IA no responde», aunque el servidor acababa respondiendo. */
-const AI_TIMEOUTS = { interpret: 15000, narrate: 45000, converse: 55000 } as const;
+const AI_TIMEOUTS = { interpret: 15000, narrate: 45000, converse: 75000 } as const;
 
 async function requestWithRetry(
   path: string,
