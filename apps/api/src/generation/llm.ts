@@ -7,6 +7,7 @@
 import { randomUUID } from 'node:crypto';
 import type { StageLlm } from '@meridiano/generator';
 import { record, type AiProvider } from '../ai/provider.ts';
+import { GENERATION_LIMITS } from './limits.ts';
 
 export function createStageLlm(provider: AiProvider): StageLlm {
   return {
@@ -16,6 +17,7 @@ export function createStageLlm(provider: AiProvider): StageLlm {
         requestId: randomUUID(),
         schema,
         context: { stage, schema, ...context },
+        timeoutMs: GENERATION_LIMITS.stageTimeoutMs,
         ...(signal ? { signal } : {}),
       });
       if (!record(response.payload)) throw new Error('La generación devolvió una salida no válida.');

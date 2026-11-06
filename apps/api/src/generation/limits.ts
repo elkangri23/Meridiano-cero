@@ -19,4 +19,11 @@ export const GENERATION_LIMITS = {
   leaseMinutes: 10,
   /** Cada cuánto mira el worker si hay trabajo pendiente. */
   pollIntervalMs: 5000,
+  /** Plazo por llamada al modelo en una etapa de generación. La etapa 4
+   * (red de pistas) devuelve el JSON más grande del pipeline y el modelo
+   * del administrador tarda más de 60 s en generarlo; 240 s cubre esa
+   * salida sin tocar la cadena de plazos de juego (60/65/70/75 s), que
+   * solo se aplica a las peticiones HTTP de partida. El job sigue acotado
+   * por la pared de 30 min y por los 3 intentos por etapa. */
+  stageTimeoutMs: 240_000,
 } as const;

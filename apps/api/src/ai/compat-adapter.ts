@@ -34,7 +34,7 @@ export function createCompatibleProvider(
           function: input.operation as never,
           schemaVersion: 1,
           authorizedContext: input.context,
-          limits: { timeoutMs, maxRetries: 1 },
+          limits: { timeoutMs: input.timeoutMs ?? timeoutMs, maxRetries: 1 },
           cancellationSignal: input.signal ?? new AbortController().signal,
           requestId: input.requestId,
         });

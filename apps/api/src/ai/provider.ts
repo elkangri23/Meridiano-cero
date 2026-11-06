@@ -10,6 +10,10 @@ export interface AiRequest {
   schema: Record<string, unknown>;
   context: Record<string, unknown>;
   signal?: AbortSignal;
+  /** Plazo propio de esta llamada (ms). Sin él, 60 s. La generación de
+   * casos usa uno mayor: su etapa 4 devuelve un JSON mucho más grande que
+   * una interpretación o una conversación de partida. */
+  timeoutMs?: number;
 }
 export interface AiResponse {
   payload: unknown;

@@ -56,7 +56,7 @@ export function startGenerationWorker(database: Database, config: AppConfig): Ge
       const llm = createStageLlm(buildAdminProvider(config));
       const service = createGeneratorService({
         maxRetriesPerStage: GENERATION_LIMITS.maxAttemptsPerStage,
-        stageTimeoutMs: 60_000,
+        stageTimeoutMs: GENERATION_LIMITS.stageTimeoutMs,
         enableSemanticReview: true,
         enableSimulation: true,
         checkpointStore: store,
