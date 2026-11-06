@@ -750,6 +750,41 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/es el esquema JSON, no los datos/);
   });
 
+  it('reintenta la etapa 4 cuando la ruta dorada detiene sin identificar antes al sospechoso', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4bCalls = 0;
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
+            // Como el modelo real en el smoke: la ruta detiene a Carmen sin
+            // haber hablado con ella de 'identidad', así que el motor
+            // rechaza la detención con 'Intervención no disponible'.
+            const broken = structuredClone(outputs.cluesRules);
+            broken.goldenPath = broken.goldenPath.filter(
+              action => !(action.type === 'talk' && (action.params as Record<string, unknown>).npcId === 'carmen' && (action.params as Record<string, unknown>).topicId === 'identidad'),
+            );
+            return broken;
+          }
+          return outputs.cluesRules;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4bCalls).toBe(2);
+  });
+
   it('acepta ids de lugar largos y naturales como MAL-BIBLIOTECA', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
