@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createInMemoryCheckpointStore } from './checkpoint.js';
 import { createGeneratorService, runPipeline, type GenerationParams, type PipelineConfig, type StageLlm } from './pipeline.js';
-import { selectGeography, stageOutputSchema, type SelectedGeography } from './stages.js';
+import { selectGeography, stageOutputSchema, validateStageOutput, type SelectedGeography } from './stages.js';
 
 // Doble del modelo: construye las salidas de etapa a partir del contexto que
 // recibe (las ciudades elegidas), con el mismo esqueleto que el fixture del
@@ -1125,5 +1125,23 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Sin proveedor de generación/);
+  });
+});
+
+describe('validación de la etapa 1 (título del expediente)', () => {
+  it('rechaza un título que empieza por «Expediente:» (la interfaz lo duplicaría)', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const bad = { ...outputs.premise, title: 'Expediente: cuaderno desaparecido' };
+    const result = validateStageOutput(1, bad, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('Expediente'))).toBe(true);
+  });
+
+  it('acepta un título con el formato «Caso: …»', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const result = validateStageOutput(1, outputs.premise, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(true);
   });
 });

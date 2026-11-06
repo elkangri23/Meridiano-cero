@@ -17,6 +17,20 @@ export interface ArchiveState {
   lastError: string | null;
 }
 const blank = (): ArchiveState => ({ phase: 'loading', profile: null, page: null, opened: null, openingRunId: null, cases: [], creation: { phase: 'idle', caseId: null, runId: null }, jobs: [], filter: 'all', cursor: null, previous: [], notice: 'Consultando el archivo…', connectionStatus: 'unknown', lastError: null });
+
+/** Aviso al terminar un job de generación: sustituye el «Generación en
+ * cola» que se puso al crearlo. Sin título conocido, el aviso no promete
+ * un expediente concreto. */
+function jobFinishedNotice(job: GenerationJobDto, cases: CaseSummary[]): string {
+  if (job.status === 'done') {
+    const title = job.caseId ? cases.find(item => item.caseId === job.caseId)?.title : null;
+    return title
+      ? `Expediente listo: ${title}. Ya está en el catálogo: elígelo arriba en «Nueva partida».`
+      : 'Expediente listo. Ya está en el catálogo: elígelo arriba en «Nueva partida».';
+  }
+  if (job.status === 'failed') return job.error ? `La generación falló: ${job.error}` : 'La generación falló. Los borradores inválidos se rechazan, no se ofrecen.';
+  return 'Generación cancelada.';
+}
 type Ticket = { signal: AbortSignal; current: () => boolean };
 
 export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = browserIntents) {
@@ -174,14 +188,19 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
   }
   // Generación de casos (T4-08): crear un job, refrescar su estado y
   // cancelarlo. Al terminar un job, el catálogo se recarga para que el
-  // expediente nuevo aparezca en el formulario de nueva partida.
+  // expediente nuevo aparezca en el formulario de nueva partida, y el
+  // aviso «Generación en cola» se sustituye por el resultado: antes se
+  // quedaba fijo aunque el job ya hubiera terminado.
   async function refreshJobs() {
     if (disposed || !session || state.phase !== 'ready') return;
     const ticket = begin();
     try {
       const [jobs, catalog] = await Promise.all([api.generationJobs(ticket.signal), api.cases(ticket.signal)]);
       if (!ticket.current()) return;
-      set({ ...state, jobs: jobs.items, cases: catalog.items });
+      const finished = jobs.items.find(job => (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') &&
+        state.jobs.some(previous => previous.jobId === job.jobId && (previous.status === 'queued' || previous.status === 'running')));
+      const notice = finished ? jobFinishedNotice(finished, catalog.items) : state.notice;
+      set({ ...state, jobs: jobs.items, cases: catalog.items, notice });
     } catch { /* el panel reintenta en su siguiente tick; no se rompe el archivo */ }
   }
   async function createGeneration(params: GenerationJobParams) {

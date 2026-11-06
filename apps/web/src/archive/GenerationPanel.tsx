@@ -4,6 +4,7 @@ import { CRIME_TYPE_LABELS, GDD_CRIME_TYPES } from '@meridiano/case-schema';
 import type { ContentRating, CrimeType, GenerationJobDto } from '@meridiano/contracts';
 import type { ArchiveState } from './model';
 import type { createArchiveModel } from './model';
+import { displayCaseTitle } from './case-title';
 
 type Props = { state: ArchiveState; model: ReturnType<typeof createArchiveModel> };
 
@@ -32,7 +33,7 @@ function JobItem({ job, caseTitle, busy, onCancel }: { job: GenerationJobDto; ca
     <p>{CRIME_TYPE_LABELS[job.crimeType]} · {job.contentRating === 'familiar' ? 'Familiar' : 'General'} · {DURATION_LABELS[job.duration]} — {STATUS_LABELS[job.status]}
       {active && ` · Etapa ${progress.done}/${progress.total}${progress.current ? ` · ${progress.current}` : ''}`}
     </p>
-    {job.status === 'done' && <p>Expediente listo{caseTitle ? `: ${caseTitle}` : ''}. Ya está en el catálogo: elígelo arriba en «Nueva partida».</p>}
+    {job.status === 'done' && <p>Expediente listo{caseTitle ? `: ${displayCaseTitle(caseTitle)}` : ''}. Ya está en el catálogo: elígelo arriba en «Nueva partida».</p>}
     {job.status === 'failed' && <p>No se pudo generar el caso{job.error ? `: ${job.error}` : '.'} Los borradores inválidos se rechazan, no se ofrecen.</p>}
     {active && <button type="button" disabled={busy} onClick={() => onCancel(job.jobId)}>Cancelar</button>}
   </li>;

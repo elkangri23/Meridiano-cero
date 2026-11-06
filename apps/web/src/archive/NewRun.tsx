@@ -5,6 +5,7 @@ import { deadlineMinutesForDifficulty, GDD_CRIME_TYPES, CRIME_TYPE_LABELS, caseL
 import type { ContentRating, CrimeType } from '@meridiano/case-schema';
 import type { ArchiveState, createArchiveModel } from './model';
 import type { Difficulty } from './creation';
+import { displayCaseTitle } from './case-title';
 
 type Props = { state: ArchiveState; model: ReturnType<typeof createArchiveModel> };
 const difficultyOptions: { id: Difficulty; label: string; note: string }[] = [
@@ -93,7 +94,7 @@ function CreationContent({ state, model }: Props) {
     <CrimeField playableCrimes={playableCrimes} crime={crime} resolvedCrime={resolvedCrime} busy={busy} surprised={surprised} selectedCase={selectedCase} onChoose={chooseCrimeAndReset} onSurprise={surprise} />
     <ContentField content={content} busy={busy} hasGeneral={hasGeneral} onChange={chooseContent} />
     {matchingCases.length > 1 && <CaseField cases={matchingCases} selectedCase={selectedCase} busy={busy} onChange={setCaseId} />}
-    {selectedCase && <p>Expediente: {selectedCase.title} — {caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.</p>}
+    {selectedCase && <p>Expediente: {displayCaseTitle(selectedCase.title)} — {caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.</p>}
     {!selectedCase && state.cases.length > 0 && <p>Todavía no hay expedientes validados de este delito y contenido.</p>}
     <button type="submit" disabled={busy || !selectedCase}>Empezar partida</button>{state.cases.length === 0 && <p>No hay expedientes disponibles.</p>}
   </form>;
@@ -126,7 +127,7 @@ function ContentField({ content, busy, hasGeneral, onChange }: ContentFieldProps
 }
 type CaseFieldProps = { cases: { caseId: string; title: string; crimeType: CrimeType; contentRating: ContentRating }[]; selectedCase: { caseId: string } | undefined; busy: boolean; onChange: (caseId: string) => void };
 function CaseField({ cases, selectedCase, busy, onChange }: CaseFieldProps) {
-  return <fieldset disabled={busy}><legend>Expediente</legend>{cases.map(item => <label key={item.caseId}><input type="radio" name="case" value={item.caseId} checked={selectedCase?.caseId === item.caseId} onChange={() => onChange(item.caseId)} /> {item.title} — {caseLabel(item.crimeType, item.contentRating)}</label>)}</fieldset>;
+  return <fieldset disabled={busy}><legend>Expediente</legend>{cases.map(item => <label key={item.caseId}><input type="radio" name="case" value={item.caseId} checked={selectedCase?.caseId === item.caseId} onChange={() => onChange(item.caseId)} /> {displayCaseTitle(item.title)} — {caseLabel(item.crimeType, item.contentRating)}</label>)}</fieldset>;
 }
 function PendingCreation({ state, model }: Props) {
   const busy = state.phase === 'loading';

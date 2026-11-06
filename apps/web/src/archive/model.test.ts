@@ -160,6 +160,30 @@ describe('T4-08: generación de casos en el archivo', () => {
     expect(model.getSnapshot().jobs).toEqual([done]);
     expect(model.getSnapshot().cases.map(item => item.caseId)).toContain('generado-fraude-1');
   });
+  it('al terminar un job, el aviso «en cola» se sustituye por el resultado', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    transport.createGenerationJob.mockResolvedValue(job);
+    await model.createGeneration({ crimeType: 'fraude', contentRating: 'familiar', duration: 'short' });
+    expect(model.getSnapshot().notice).toContain('en cola');
+    const done = { ...job, status: 'done' as const, caseId: 'generado-fraude-1', stage: 9 };
+    transport.generationJobs.mockResolvedValue({ items: [done] });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true }], nextCursor: null });
+    await model.refreshJobs();
+    expect(model.getSnapshot().notice).toContain('Expediente listo: Caso sintético generado');
+    expect(model.getSnapshot().notice).not.toContain('en cola');
+    // Sin transición (el job ya estaba terminado), el aviso no se toca.
+    await model.refreshJobs();
+    expect(model.getSnapshot().notice).toContain('Expediente listo');
+  });
+  it('al fallar un job, el aviso dice el motivo en vez de quedarse en cola', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    transport.createGenerationJob.mockResolvedValue(job);
+    await model.createGeneration({ crimeType: 'fraude', contentRating: 'familiar', duration: 'short' });
+    const failed = { ...job, status: 'failed' as const, error: 'Etapa 4 inválida: la ruta dorada no se puede jugar.' };
+    transport.generationJobs.mockResolvedValue({ items: [failed] });
+    await model.refreshJobs();
+    expect(model.getSnapshot().notice).toContain('La generación falló: Etapa 4 inválida');
+  });
 });
 
 describe('T3: abrir ficha propia y descartar lecturas tardías', () => {

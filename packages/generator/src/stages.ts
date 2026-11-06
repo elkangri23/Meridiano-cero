@@ -304,6 +304,10 @@ function validatePremise(output: unknown, cities: SelectedGeography['cities'], e
   if (!isRecord(output)) { errors.push('La premisa debe ser un objeto.'); return; }
   checkKeys(output, ['title', 'crimeLabel', 'truth', 'solution', 'decoy', 'witnesses', 'motive', 'objectives', 'objectLabel', 'briefing'], errors);
   if (!isNonEmptyString(output.title)) errors.push('title vacío.');
+  // El título es el nombre del caso («Caso: …»): si empieza por
+  // «Expediente:», la interfaz lo duplica al mostrarlo («Expediente:
+  // Expediente: …»).
+  if (isNonEmptyString(output.title) && /^expediente:/i.test(output.title.trim())) errors.push('El título no debe empezar por «Expediente:» (la interfaz ya lo añade al mostrarlo).');
   if (!isNonEmptyString(output.truth)) errors.push('truth vacío.');
   const cityIds = new Set(cities.map(city => city.id));
   const cast = [output.solution, output.decoy, ...(Array.isArray(output.witnesses) ? output.witnesses : [])];
