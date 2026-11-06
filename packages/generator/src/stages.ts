@@ -439,12 +439,20 @@ function checkClueMechanics(output: Record<string, unknown>, errors: string[]): 
   checkMechanicFields(mechanics, errors);
 }
 
-function checkClueTexts(output: Record<string, unknown>, castIds: string[], errors: string[]): void {
+function checkClueKnowledgeTexts(texts: Record<string, unknown>, knowledgeIds: string[], errors: string[]): void {
+  if (!isRecord(texts.knowledge)) { errors.push('texts.knowledge debe ser un objeto.'); return; }
+  for (const id of knowledgeIds) {
+    if (!isNonEmptyString((texts.knowledge as Record<string, unknown>)[id])) errors.push(`Falta el texto de conocimiento de ${id} (uno por cada id de knowledge de la etapa 3).`);
+  }
+}
+
+function checkClueTexts(output: Record<string, unknown>, castIds: string[], knowledgeIds: string[], errors: string[]): void {
   if (!isRecord(output.texts)) { errors.push('texts debe ser un objeto.'); return; }
   const texts = output.texts;
   if (!isRecord(texts.evidence) || Object.keys(texts.evidence).length !== 11) errors.push('texts.evidence debe tener 11 textos.');
   if (!isRecord(texts.greetings)) errors.push('texts.greetings debe ser un objeto.');
   for (const id of castIds) if (!isRecord(texts.greetings) || !isNonEmptyString((texts.greetings as Record<string, unknown>)[id])) errors.push(`Falta el saludo de ${id}.`);
+  checkClueKnowledgeTexts(texts, knowledgeIds, errors);
 }
 
 // Parámetros obligatorios (cadenas no vacías) de cada tipo de acción de
@@ -501,14 +509,14 @@ function checkGoldenPath(output: Record<string, unknown>, errors: string[]): voi
   if (!isRecord(last) || last.type !== 'finish') errors.push('goldenPath debe terminar con el cierre del caso.');
 }
 
-function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], errors: string[]): void {
+function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {
   if (!isRecord(output)) { errors.push('La red de pistas debe ser un objeto.'); return; }
   checkKeys(output, ['locations', 'evidence', 'mechanics', 'texts', 'goldenPath'], errors);
   const cityIds = new Set(geography.cities.map(city => city.id));
   const locationIds = checkClueLocations(output, cityIds, errors);
   if (locationIds) checkClueEvidence(output, locationIds, cityIds, errors);
   checkClueMechanics(output, errors);
-  checkClueTexts(output, castIds, errors);
+  checkClueTexts(output, castIds, knowledgeIds, errors);
   checkGoldenPath(output, errors);
 }
 
@@ -522,11 +530,11 @@ function validateReview(output: unknown, errors: string[]): void {
 /** Valida la forma de la salida del modelo para una etapa LLM. El fondo
  * (coherencia, referencias cruzadas, jugabilidad) lo comprueban el
  * validador v1.5 y el simulador en las etapas 6 y 8. */
-export function validateStageOutput(stage: GenerationStage, output: unknown, context: { geography: SelectedGeography; castIds: string[] }): { valid: boolean; errors: string[] } {
+export function validateStageOutput(stage: GenerationStage, output: unknown, context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[] }): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (stage === 1) validatePremise(output, context.geography.cities, errors);
   else if (stage === 3) validateNpcs(output, context.castIds, errors);
-  else if (stage === 4) validateClues(output, context.geography, context.castIds, errors);
+  else if (stage === 4) validateClues(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors);
   else if (stage === 7) validateReview(output, errors);
   return { valid: errors.length === 0, errors };
 }

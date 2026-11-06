@@ -282,6 +282,18 @@ function castIds(draft: CaseDraft): string[] {
   return cast.map(member => (member as Record<string, unknown>).id).filter((id): id is string => typeof id === 'string');
 }
 
+function knowledgeIds(draft: CaseDraft): string[] {
+  const npcs = stageOutput(draft, 3) as Record<string, unknown> | undefined;
+  if (!npcs || !Array.isArray(npcs.npcs)) return [];
+  const ids: string[] = [];
+  for (const npc of npcs.npcs as Array<Record<string, unknown>>) {
+    if (Array.isArray(npc.knowledge)) {
+      for (const id of npc.knowledge) if (typeof id === 'string' && !ids.includes(id)) ids.push(id);
+    }
+  }
+  return ids;
+}
+
 function requireLlm(config: PipelineConfig): StageLlm {
   if (!config.llm) throw new Error('Sin proveedor de generación: las etapas LLM no pueden ejecutarse.');
   return config.llm;
@@ -318,7 +330,7 @@ async function runLlmStage(
   const llm = requireLlm(config);
   const stageContext = buildStageContext(stage, choice, draft.params, geography, prior, feedback);
   const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage, context: stageContext, schema: stageOutputSchema(stage), signal }));
-  const validation = validateStageOutput(stage, output, { geography, castIds: castIds(draft) });
+  const validation = validateStageOutput(stage, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft) });
   if (!validation.valid) throw new StageOutputError(`Etapa ${stage} inválida: ${validation.errors.join('; ')}`, output);
   return output;
 }
