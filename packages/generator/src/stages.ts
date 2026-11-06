@@ -334,6 +334,19 @@ function checkClueLocations(output: Record<string, unknown>, cityIds: Set<string
   return locationIds;
 }
 
+function checkEvidenceRelations(evidence: Record<string, unknown>, expectedId: string, errors: string[]): void {
+  if (!Array.isArray(evidence.relations) || !evidence.relations.every((id: unknown) => typeof id === 'string' && EVIDENCE_ID.test(id))) {
+    errors.push(`La evidencia ${expectedId} tiene relaciones inválidas.`);
+    return;
+  }
+  // relations son requisitos previos: solo evidencias anteriores (número
+  // menor). Un enlace en ambos sentidos o hacia adelante crea un ciclo y
+  // el grafo no se puede resolver.
+  for (const id of evidence.relations) {
+    if (typeof id === 'string' && id >= expectedId) errors.push(`La evidencia ${expectedId} solo puede depender de evidencias anteriores (${id} no es anterior).`);
+  }
+}
+
 function checkClueEvidence(output: Record<string, unknown>, locationIds: Set<string>, cityIds: Set<string>, errors: string[]): void {
   if (!Array.isArray(output.evidence) || output.evidence.length !== 11) { errors.push('evidence debe tener exactamente 11 evidencias (EV-01..EV-11).'); return; }
   output.evidence.forEach((evidence: unknown, index: number) => {
@@ -342,7 +355,7 @@ function checkClueEvidence(output: Record<string, unknown>, locationIds: Set<str
     if (evidence.id !== expectedId) errors.push(`La evidencia ${index + 1} debe ser ${expectedId}.`);
     if (evidence.type !== EVIDENCE_SLOT_TYPES[index]) errors.push(`La evidencia ${expectedId} debe ser de tipo ${EVIDENCE_SLOT_TYPES[index]}.`);
     if (typeof evidence.origin !== 'string' || (!locationIds.has(evidence.origin) && !cityIds.has(evidence.origin))) errors.push(`La evidencia ${expectedId} tiene origen desconocido.`);
-    if (!Array.isArray(evidence.relations) || !evidence.relations.every((id: unknown) => typeof id === 'string' && EVIDENCE_ID.test(id))) errors.push(`La evidencia ${expectedId} tiene relaciones inválidas.`);
+    checkEvidenceRelations(evidence, expectedId, errors);
   });
 }
 
