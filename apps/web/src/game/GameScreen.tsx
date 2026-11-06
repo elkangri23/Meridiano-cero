@@ -6,6 +6,7 @@ import { aiApi, AiError } from '../ai/client';
 import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
 import type { AiConnection, ConnectionsResponse, ConnectionTestResult, ProviderCatalogEntry } from '../ai/connections';
 import { gameApi, GameError } from './client';
+import { needsConfirmationDialog } from './action-confirmation';
 import { SceneArt } from './scene-art';
 import { groupOffers } from './scene-offers';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
@@ -359,6 +360,23 @@ function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDt
         onClick={event => onOffer(finishOffer, event.currentTarget)}>{finishOffer.label}</button></p>}
     </div>}
   </>;
+}
+
+/** Objetivos siempre visibles (lote 2 de jugabilidad): el panel vive en el
+ * flujo principal, entre la barra de herramientas y la escena, para que el
+ * jugador vea en todo momento qué tiene que conseguir y qué lleva logrado.
+ * Los objetivos y su estado vienen de la vista del servidor (la misma
+ * evaluación que el informe final, pero en vivo); las frases son las del
+ * expediente, sin spoilers más allá de lo que ellas mismas dicen. */
+function ObjectivesSection({ view }: { view: PlayerViewDto }) {
+  return <section className="game-objectives" aria-labelledby="objectives-heading" data-testid="objectives-panel">
+    <p className="game-overline" id="objectives-heading">Objetivos</p>
+    <ul>{view.objectives.map(objective =>
+      <li key={objective.id} data-testid={`objective-${objective.id}`} data-achieved={objective.achieved}>
+        <span aria-hidden="true">{objective.achieved ? '✓' : '○'}</span> {objective.description}
+      </li>)}
+    </ul>
+  </section>;
 }
 
 /** Escena (lote 1 de jugabilidad): el arte es propio de cada localización
@@ -1333,26 +1351,11 @@ export function GameScreen() {
     }
   }
 
-  async function startPreview(offer: PublicActionOffer, trigger: HTMLElement | null) {
-    if (!runId || !identity || !view || busyOffer) return;
-    lastTriggerRef.current = trigger;
-    setBusyOffer(offer.id);
-    setNotice(`Preparando: ${offer.label}…`);
-    const controller = new AbortController();
-    try {
-      const response = await gameApi.preview(runId, offer.action, identity, controller.signal);
-      setOrderPhase(previewOutcome(response, offer, crypto.randomUUID()));
-    } catch (error) {
-      setOrderPhase({ kind: 'error', message: errorMessage(error) });
-      handleActionError(error);
-    } finally {
-      setBusyOffer(null);
-    }
-  }
-
-  async function confirmPreview() {
-    if (orderPhase.kind !== 'preview' || !runId || !identity || !view) return;
-    const { offer, key } = orderPhase;
+  /** Confirma una acción con su clave de idempotencia y su revisión
+   * esperada (la misma llamada que el diálogo de confirmación, con o sin
+   * diálogo previo). */
+  async function commitOffer(offer: PublicActionOffer, key: string) {
+    if (!runId || !identity || !view) return;
     setOrderPhase({ kind: 'committing', offer, key });
     const controller = new AbortController();
     try {
@@ -1368,6 +1371,36 @@ export function GameScreen() {
         handleActionError(error);
       }
     }
+  }
+
+  async function startPreview(offer: PublicActionOffer, trigger: HTMLElement | null) {
+    if (!runId || !identity || !view || busyOffer) return;
+    lastTriggerRef.current = trigger;
+    setBusyOffer(offer.id);
+    setNotice(`Preparando: ${offer.label}…`);
+    const controller = new AbortController();
+    try {
+      const response = await gameApi.preview(runId, offer.action, identity, controller.signal);
+      const phase = previewOutcome(response, offer, crypto.randomUUID());
+      // Un clic para lo barato y reversible (lote 2): si la acción no pide
+      // diálogo, se confirma en el mismo clic, sin mostrarlo. Lo costoso o
+      // irreversible sigue enseñando el diálogo, como antes.
+      if (phase.kind === 'preview' && !needsConfirmationDialog(response, offer)) {
+        await commitOffer(offer, phase.key);
+        return;
+      }
+      setOrderPhase(phase);
+    } catch (error) {
+      setOrderPhase({ kind: 'error', message: errorMessage(error) });
+      handleActionError(error);
+    } finally {
+      setBusyOffer(null);
+    }
+  }
+
+  async function confirmPreview() {
+    if (orderPhase.kind !== 'preview' || !runId || !identity || !view) return;
+    await commitOffer(orderPhase.offer, orderPhase.key);
   }
 
   async function recoverCommit() {
@@ -1411,7 +1444,7 @@ export function GameScreen() {
         setNotice('La interpretación no corresponde a ninguna acción disponible.');
         return;
       }
-      setNotice(`Interpretado como: ${offer.label}. Revisa y confirma.`);
+      setNotice(`Interpretado como: ${offer.label}.`);
       await startPreview(offer, orderInputRef.current);
     } catch (error) {
       setOrderPhase({ kind: 'error', message: errorMessage(error) });
@@ -1527,6 +1560,7 @@ export function GameScreen() {
       <button type="button" onClick={() => void refresh()}>Actualizar vista</button>
     </div>
 
+    <ObjectivesSection view={view} />
     <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
     <ConsoleSection log={log} orderHistory={orderHistory} />
     <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}

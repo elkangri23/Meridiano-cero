@@ -82,6 +82,10 @@ export interface InitialPlayerViewDto {
   batch: null;
   finalReport: null;
   officialResult: null;
+  /** Objetivos del expediente con su estado en vivo (pendiente/logrado) al
+   * empezar la partida: todos pendientes. La descripción es la del
+   * expediente; un objetivo sin condición conocida queda siempre pendiente. */
+  objectives: Array<{ id: string; description: string; achieved: boolean }>;
   /** Delito y contenido del expediente (GDD §3/§14). */
   caseMeta: { crimeType: CrimeType; contentRating: ContentRating };
   saveCapabilities: { manualLimit: 10; manualCount: 0; canSave: false; canLoad: false };
@@ -231,9 +235,9 @@ function initialHeader(value: Record<string, unknown>): boolean {
 }
 /** Solo GET inicial: no acepta replay de creación, progreso o campos privados adicionales. */
 export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerViewDto {
-  if (!dtoRecord(value, 'batch,branchId,caseMeta,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
+  if (!dtoRecord(value, 'batch,branchId,caseMeta,cities,clock,conversation,detentions,dossier,finalReport,locations,objectives,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
   if (!initialHeader(value) || !publicCaseMeta(value.caseMeta)) return false;
-  return initialClock(value.clock) && initialCapabilities(value) && initialEmptyCollections(value) && initialGeography(value);
+  return initialClock(value.clock) && initialCapabilities(value) && initialEmptyCollections(value) && initialGeography(value) && publicObjectives(value.objectives);
 }
 
 /** Vista general del jugador (Fase A): proyección completa de una partida en
@@ -271,6 +275,10 @@ export interface PlayerViewDto {
     }>;
   };
   finalReport: FinalReport | null;
+  /** Objetivos del expediente con su estado en vivo (pendiente/logrado) en
+   * esta revisión, según el estado del motor. La descripción es la del
+   * expediente; un objetivo sin condición conocida queda siempre pendiente. */
+  objectives: Array<{ id: string; description: string; achieved: boolean }>;
   officialResult: null;
   /** Acciones intentables desde el estado actual (motor). La UI las ofrece como
    * botones y las envía a interpret; el motor valida cada una al confirmarla. */
@@ -442,6 +450,14 @@ export function isPublicActionOffer(value: unknown): value is PublicActionOffer 
   const record = value as Record<string, unknown>;
   return offerIdentity(record) && offerAction(record);
 }
+function publicObjective(value: unknown): value is PlayerViewDto['objectives'][number] {
+  if (!dtoRecord(value, 'achieved,description,id')) return false;
+  return boundedString(value.id, 128) && boundedString(value.description, 200) && typeof value.achieved === 'boolean';
+}
+function publicObjectives(value: unknown): value is PlayerViewDto['objectives'] {
+  return Array.isArray(value) && value.length <= 64 && value.every(publicObjective) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
 function publicOffers(value: unknown): value is PublicActionOffer[] {
   return Array.isArray(value) && value.length <= 64 && value.every(isPublicActionOffer) &&
     new Set(value.map(item => item.id)).size === value.length;
@@ -450,6 +466,7 @@ function generalCollections(value: Record<string, unknown>): boolean {
   if (!publicObjects(value.objects) || !publicRequests(value.pendingRequests)) return false;
   if (!stringList(value.dossier, 1000, 128) || !stringList(value.conversation, 1000, 16000)) return false;
   if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
+  if (!publicObjectives(value.objectives)) return false;
   return publicOffers(value.offers);
 }
 function generalReports(value: Record<string, unknown>): boolean {
@@ -483,7 +500,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,dossier,finalReport,locations,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,dossier,finalReport,locations,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;

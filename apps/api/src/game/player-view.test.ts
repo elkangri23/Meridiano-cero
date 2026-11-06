@@ -2,9 +2,23 @@
 // legible, nunca un ID crudo ni el genérico «La investigación avanza.» cuando
 // se sabe qué pasó.
 import { describe, expect, it } from 'vitest';
-import { astrolabioDefinition } from '@meridiano/engine';
+import { hashDefinition } from '@meridiano/case-schema/server';
+import { isPlayerViewDto } from '@meridiano/contracts';
+import { astrolabioDefinition, createInitialRun, ENGINE_VERSION } from '@meridiano/engine';
 import type { EngineEvent } from '@meridiano/engine';
-import { projectEvents } from './player-view.ts';
+import type { StoredRun } from './runs.ts';
+import { playerViewDto, projectEvents } from './player-view.ts';
+
+function fullRun(overrides: Record<string, unknown> = {}) {
+  const base = createInitialRun(astrolabioDefinition, 'owner-1', '22222222-2222-4222-8222-222222222222',
+    hashDefinition(astrolabioDefinition));
+  const stored: StoredRun = {
+    id: base.id, ownerId: 'owner-1', definitionId: base.definitionId, definitionHash: base.definitionHash,
+    engineVersion: ENGINE_VERSION, revision: 1, branchId: '33333333-3333-4333-8333-333333333333',
+    status: 'active', difficulty: 'easy', deadlineMinutes: 5760, engineState: base,
+  };
+  return { ...base, ...stored, ...overrides };
+}
 
 function summaries(events: Array<{ type: string; payload?: Record<string, unknown> }>): string[] {
   const engineEvents: EngineEvent[] = events.map((event, index) => ({
@@ -58,5 +72,28 @@ describe('resúmenes de eventos de la consola', () => {
     for (const summary of all) {
       expect(summary).not.toMatch(/EV-\d\d|travel:|warrant:|request_warrant|La investigación avanza/);
     }
+  });
+});
+
+describe('objetivos en vivo de la vista del jugador', () => {
+  it('al empezar, los dos objetivos están pendientes y la vista valida el contrato', () => {
+    const view = playerViewDto(astrolabioDefinition, fullRun(), 0);
+    expect(view.objectives).toEqual([
+      { id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: false },
+      { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false },
+    ]);
+    expect(isPlayerViewDto(view)).toBe(true);
+  });
+
+  it('detener a Inés y recuperar el astrolabio marcan los objetivos como logrados', () => {
+    const view = playerViewDto(astrolabioDefinition,
+      fullRun({ detentions: ['ines'], recoveredObjects: ['astrolabio-original'] }), 0);
+    expect(view.objectives).toEqual([
+      { id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: true },
+      { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: true },
+    ]);
+    // Detener a otro no logra nada.
+    const wrong = playerViewDto(astrolabioDefinition, fullRun({ detentions: ['tomas'] }), 0);
+    expect(wrong.objectives.every(objective => !objective.achieved)).toBe(true);
   });
 });

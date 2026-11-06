@@ -14,13 +14,21 @@ async function openGameScreen(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('0 min');
 }
 
-/** Pulsa una oferta, confirma el diálogo de preview y espera el reloj en `minute`. */
+/** Pulsa una oferta y espera el reloj en `minute`. Las acciones costosas o
+ * irreversibles (viajar, detener, recuperar, pedir orden, cerrar) enseñan
+ * el diálogo de confirmación; las baratas (inspeccionar, hablar, recoger,
+ * consultar, analizar, esperar) se ejecutan en el mismo clic (lote 2). */
 async function playOffer(page: Page, testId: string, minute: number) {
+  const needsDialog = /offer-(travel|detain|recover|request_warrant|finish)/.test(testId);
   await page.getByTestId(testId).click();
-  await expect(page.getByTestId('preview-dialog')).toBeVisible();
-  await page.getByTestId('preview-confirm').click();
-  await expect(page.getByTestId('preview-dialog')).toBeHidden();
+  if (needsDialog) {
+    await expect(page.getByTestId('preview-dialog')).toBeVisible();
+    await page.getByTestId('preview-confirm').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+  }
   await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
+  // Sin diálogo para lo barato: el reloj avanza sin pedir confirmación.
+  if (!needsDialog) await expect(page.getByTestId('preview-dialog')).toBeHidden();
 }
 
 /** Viaja desde la ventana del mapa: abre Mapa, pulsa Viajar, confirma y cierra la ventana. */
@@ -38,6 +46,13 @@ async function travelTo(page: Page, cityId: string, minute: number) {
 test.describe('E2E T3-05 - Pantalla de juego', () => {
   test('Ruta A completa (455 min): inspeccionar, recoger, analizar, viajar, consultar, orden, detener, recuperar y cerrar', async ({ page }) => {
     await openGameScreen(page);
+    // Objetivos siempre visibles (lote 2): los dos pendientes al empezar.
+    const objectives = page.getByTestId('objectives-panel');
+    await expect(objectives).toBeVisible();
+    await expect(objectives).toContainText('Detener a Inés con orden válida');
+    await expect(objectives).toContainText('Recuperar el astrolabio original');
+    await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'false');
+    await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'false');
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);
     await playOffer(page, 'offer-collect:EV-02', 30);
@@ -52,6 +67,9 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await playOffer(page, 'offer-talk:ines:identidad', 420);
     await playOffer(page, 'offer-detain:ines', 435);
     await playOffer(page, 'offer-recover:astrolabio-original', 455);
+    // Al detener y recuperar, el panel marca los dos objetivos como logrados.
+    await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'true');
+    await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'true');
     await playOffer(page, 'offer-finish', 455);
     await expect(page.getByTestId('clock')).toContainText('Cerrada');
     // Partida cerrada: Guardados explica por qué no se puede guardar ni cargar.
@@ -130,24 +148,28 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('clock')).toContainText('Cerrada');
   });
 
-  test('Teclado: Enter en una oferta, Escape cierra el diálogo y Ctrl+Enter envía la orden en texto libre', async ({ page }) => {
+  test('Teclado: Enter en una oferta ejecuta en un clic, Escape cierra el diálogo y Ctrl+Enter envía la orden en texto libre', async ({ page }) => {
     await openGameScreen(page);
-    // Tab/Enter: enfocar la primera oferta y confirmar con Enter.
-    await page.getByTestId('offer-inspect:MAD-SALA').focus();
-    await expect(page.getByTestId('offer-inspect:MAD-SALA')).toBeFocused();
-    await page.keyboard.press('Enter');
-    await expect(page.getByTestId('preview-dialog')).toBeVisible();
-    // Escape cancela el diálogo y devuelve el foco a la oferta.
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('preview-dialog')).toBeHidden();
-    await expect(page.getByTestId('offer-inspect:MAD-SALA')).toBeFocused();
     // Ctrl+Enter en la orden en texto libre: el mock interpreta la primera oferta.
+    // Inspeccionar es barato (lote 2): se ejecuta en el mismo clic, sin diálogo.
     await page.getByTestId('order-input').fill('inspecciona la sala con cuidado');
     await page.keyboard.press('Control+Enter');
-    await expect(page.getByTestId('preview-dialog')).toBeVisible();
-    await expect(page.getByTestId('preview-dialog')).toContainText('Inspeccionar');
-    await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('clock')).toContainText('10 min');
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    // Tab/Enter: enfocar una oferta barata y ejecutar con Enter, sin diálogo.
+    await page.getByTestId('offer-inspect:MAD-SALA:cerradura').focus();
+    await expect(page.getByTestId('offer-inspect:MAD-SALA:cerradura')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('clock')).toContainText('30 min');
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    // Enter en un viaje (caro) abre el diálogo; Escape lo cancela y devuelve
+    // el foco a la oferta.
+    await page.getByTestId('offer-travel:paris').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('preview-dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('offer-travel:paris')).toBeFocused();
   });
 
   test('Feedback visible: hablar abre el chat con respuesta e inspeccionar muestra el hallazgo', async ({ page }) => {
@@ -191,11 +213,10 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('scene-art')).toHaveAttribute('data-location', 'MAD-SALA');
     // Inspeccionar: el reloj de arena se ve de verdad, en la cabecera y en
     // la escena (arreglo: antes era un icono de 18 px de una sola pasada).
+    // Inspeccionar es barato (lote 2): un clic, sin diálogo de confirmación.
     await page.getByTestId('offer-inspect:MAD-SALA').click();
-    await expect(page.getByTestId('preview-dialog')).toBeVisible();
-    await page.getByTestId('preview-confirm').click();
-    await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(page.getByTestId('clock')).toContainText('10 min');
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(page.getByTestId('hourglass')).toBeVisible();
     await expect(page.getByTestId('hourglass')).toContainText('+10 min');
     await expect(page.getByTestId('hourglass-scene')).toBeVisible();
@@ -220,6 +241,37 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     // En París, la escena muestra a Émile y el archivo.
     await expect(page.locator('.game-scene')).toContainText('Émile · Archivo de conservación');
     await expect(page.getByTestId('offer-inspect:PAR-ARCH')).toBeVisible();
+  });
+
+  test('Jugabilidad lote 2: objetivos visibles y un clic para lo barato, diálogo para viajar', async ({ page }) => {
+    await openGameScreen(page);
+    // Objetivos siempre visibles, los dos pendientes al empezar.
+    const objectives = page.getByTestId('objectives-panel');
+    await expect(objectives).toBeVisible();
+    await expect(objectives).toContainText('Detener a Inés con orden válida');
+    await expect(objectives).toContainText('Recuperar el astrolabio original');
+    await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'false');
+    await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'false');
+    // Inspeccionar es barato: un clic, sin diálogo, y el reloj avanza.
+    await page.getByTestId('offer-inspect:MAD-SALA').click();
+    await expect(page.getByTestId('clock')).toContainText('10 min');
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    // Hablar también va en un clic y abre la conversación.
+    await page.getByTestId('offer-talk:tomas:identidad').click();
+    await expect(page.getByTestId('chat-turns')).toBeVisible();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await page.keyboard.press('Escape');
+    // Viajar es caro (180 min): sigue pidiendo confirmación.
+    await page.getByTestId('offer-travel:paris').click();
+    await expect(page.getByTestId('preview-dialog')).toBeVisible();
+    await expect(page.getByTestId('preview-dialog')).toContainText('Viaje a París');
+    await page.getByTestId('preview-confirm').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('clock')).toContainText('190 min');
+    // El panel sigue visible en la otra ciudad, con los objetivos pendientes.
+    await expect(objectives).toBeVisible();
+    await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'false');
+    await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'false');
   });
 
   // Los dos tests de Ajustes comparten el perfil local de desarrollo y el
