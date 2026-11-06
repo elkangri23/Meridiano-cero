@@ -376,6 +376,28 @@ const MECHANIC_FIELDS: Array<{ key: string; fields: Array<[string, 'nonempty' | 
   { key: 'suspects', fields: [['id', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['knownFromEvidence', 'array'], ['warrantCombinations', 'array']] },
 ];
 
+const KEBAB_ID = /^[a-z][a-z0-9-]{0,63}$/;
+
+// Ids de la mecánica que deben ser kebab-case ASCII (sin acentos ni
+// espacios): el validador v1.5 solo exige ASCII, pero la convención del
+// motor es minúsculas con guiones y el modelo inventa acentos si no se
+// le exige aquí.
+const MECHANIC_ID_FIELDS: Array<{ key: string; field: string }> = [
+  { key: 'inspectables', field: 'elementId' },
+  { key: 'queries', field: 'id' },
+  { key: 'talkEvidence', field: 'topicId' },
+  { key: 'suspects', field: 'id' },
+];
+
+function checkMechanicId(group: { key: string }, entry: Record<string, unknown>, index: number, errors: string[]): void {
+  const idField = MECHANIC_ID_FIELDS.find(item => item.key === group.key)?.field;
+  if (!idField) return;
+  const value = entry[idField];
+  // elementId vacío significa la sala misma: solo se exige el patrón
+  // cuando hay un elemento concreto.
+  if (typeof value === 'string' && value !== '' && !KEBAB_ID.test(value)) errors.push(`mechanics.${group.key}[${index}] ${idField} inválido: ${value} (minúsculas con guiones, sin acentos).`);
+}
+
 function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[]): void {
   for (const group of MECHANIC_FIELDS) {
     const entries = mechanics[group.key];
@@ -391,6 +413,7 @@ function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[
           : typeof value === 'boolean';
         if (!ok) errors.push(`mechanics.${group.key}[${index}] debe tener ${field} (${kind}).`);
       }
+      checkMechanicId(group, entry, index, errors);
     });
   }
   const recovery = mechanics.recovery;
@@ -401,6 +424,7 @@ function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[
       const ok = kind === 'nonempty' ? isNonEmptyString(value) : typeof value === 'boolean';
       if (!ok) errors.push(`mechanics.recovery debe tener ${field} (${kind}).`);
     }
+    if (typeof recovery.objectId === 'string' && !KEBAB_ID.test(recovery.objectId)) errors.push(`mechanics.recovery objectId inválido: ${recovery.objectId} (minúsculas con guiones, sin acentos).`);
   }
 }
 
@@ -423,10 +447,46 @@ function checkClueTexts(output: Record<string, unknown>, castIds: string[], erro
   for (const id of castIds) if (!isRecord(texts.greetings) || !isNonEmptyString((texts.greetings as Record<string, unknown>)[id])) errors.push(`Falta el saludo de ${id}.`);
 }
 
+// Parámetros obligatorios (cadenas no vacías) de cada tipo de acción de
+// la ruta dorada, según el motor: viajar usa toCityId (no cityId),
+// consultar usa topicId (no queryId), inspeccionar exige targetId.
+const GOLDEN_PARAM_STRINGS: Array<{ type: string; fields: string[] }> = [
+  { type: 'travel', fields: ['toCityId'] },
+  { type: 'query', fields: ['topicId'] },
+  { type: 'inspect', fields: ['targetId'] },
+  { type: 'collect', fields: ['evidenceId'] },
+  { type: 'analyze', fields: ['evidenceId'] },
+  { type: 'talk', fields: ['npcId', 'topicId'] },
+  { type: 'detain', fields: ['suspectId', 'warrantId'] },
+  { type: 'recover', fields: ['objectId'] },
+];
+
+function checkGoldenSpecialParams(action: Record<string, unknown>, index: number, errors: string[]): void {
+  if (!isRecord(action.params) || typeof action.type !== 'string') return;
+  if (action.type === 'request_warrant') {
+    if (!isNonEmptyString(action.params.suspectId) || !Array.isArray(action.params.evidenceIds)) errors.push(`goldenPath[${index}] (request_warrant) debe tener suspectId y evidenceIds.`);
+  }
+  if (action.type === 'wait' && typeof action.params.minutes !== 'number') errors.push(`goldenPath[${index}] (wait) debe tener minutes.`);
+}
+
+function checkGoldenActionParams(action: Record<string, unknown>, index: number, errors: string[]): void {
+  if (!isRecord(action.params) || typeof action.type !== 'string') return;
+  const spec = GOLDEN_PARAM_STRINGS.find(item => item.type === action.type);
+  if (spec) {
+    for (const field of spec.fields) {
+      if (!isNonEmptyString(action.params[field])) errors.push(`goldenPath[${index}] (${action.type}) debe tener ${field}.`);
+    }
+  }
+  checkGoldenSpecialParams(action, index, errors);
+}
+
 function checkGoldenActions(output: Record<string, unknown>, errors: string[]): string[] {
   if (!Array.isArray(output.goldenPath)) return [];
   for (const action of output.goldenPath) {
     if (!isRecord(action) || !isNonEmptyString(action.type) || !isRecord(action.params)) errors.push('Una acción de goldenPath no tiene type/params.');
+  }
+  for (const [index, action] of (output.goldenPath as unknown[]).entries()) {
+    if (isRecord(action)) checkGoldenActionParams(action, index, errors);
   }
   return output.goldenPath.map((action: unknown) => isRecord(action) && typeof action.type === 'string' ? action.type : '');
 }

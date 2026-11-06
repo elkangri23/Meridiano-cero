@@ -399,6 +399,48 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(secondFeedback?.join(' ')).toMatch(/solo puede depender de evidencias anteriores/);
   });
 
+  it('reintenta la etapa 4 cuando la ruta dorada usa cityId/queryId y los ids llevan acentos', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4Calls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          stage4Calls++;
+          contexts.push(context as Record<string, unknown>);
+          if (stage4Calls === 1) {
+            // Como el modelo real en el smoke: ids con acentos, viajes con
+            // cityId en vez de toCityId y consultas con queryId.
+            const broken = structuredClone(outputs.clues);
+            const inspectables = broken.mechanics.inspectables as Array<Record<string, unknown>>;
+            const second = inspectables[1];
+            if (second) second.elementId = 'cajón';
+            broken.mechanics.recovery.objectId = 'maletín';
+            const travel = broken.goldenPath.find(action => action.type === 'travel');
+            if (travel) (travel as { params: Record<string, unknown> }).params = { cityId: 'barcelona', locationId: 'BAR-ARCH' };
+            const query = broken.goldenPath.find(action => action.type === 'query');
+            if (query) (query as { params: Record<string, unknown> }).params = { queryId: 'registro-facturas' };
+            return broken;
+          }
+          return outputs.clues;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4Calls).toBe(2);
+    const secondFeedback = contexts[1]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/toCityId|sin acentos/);
+  });
+
   it('reintenta la etapa 3 con el error como feedback cuando el conocimiento viene en frase', async () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
