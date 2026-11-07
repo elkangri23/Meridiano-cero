@@ -218,4 +218,74 @@ describe('Intercambio de expedientes (T4-05 expuesto)', () => {
     expect(limitedResponse.statusCode).toBe(429);
     expect(limitedResponse.json().error.code).toBe('GENERATION_LIMIT');
   });
+
+  // Orden de validación al importar (hallazgo de la verificación en
+  // navegador 2026-11-07): un fichero manipulado con el id de un caso ya
+  // propio se tomó por alreadyExisted. El fichero de esa verificación solo
+  // alteraba `exportedAt` — fuera de la definición que cubre el checksum —,
+  // así que alreadyExisted era la respuesta correcta; pero el escenario
+  // real (definición manipulada, mismo id propio, checksum sin recalcular)
+  // debe ser 400, porque la validación (checksum, v1.5) va antes que la
+  // deduplicación. Estos tests fijan ese orden en los cuatro casos.
+  it('importar el fichero válido de un caso propio devuelve alreadyExisted', async () => {
+    const response = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(player), payload: seedFile });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().alreadyExisted).toBe(true);
+    expect(response.json().caseId).toBe(seedCaseId);
+  });
+
+  it('importar el fichero propio con la definición manipulada es 400 sin registrar nada', async () => {
+    const before = await owner.pool.query('SELECT count(*)::text AS n FROM generated_cases WHERE created_by=$1', [player.id]);
+    const tampered = structuredClone(seedExport.export) as unknown as Record<string, unknown>;
+    (tampered.definition as Record<string, unknown>).solution = 'solución manipulada';
+    const response = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(player), payload: JSON.stringify(tampered) });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+    expect(response.json().error.message).toContain('Checksum no coincide');
+    const after = await owner.pool.query('SELECT count(*)::text AS n FROM generated_cases WHERE created_by=$1', [player.id]);
+    expect(Number(after.rows[0]?.n ?? 0)).toBe(Number(before.rows[0]?.n ?? 0));
+  });
+
+  it('importar con id nuevo y checksum roto también es 400 sin registrar nada', async () => {
+    const freshId = 'generado-prueba-nuevo-' + randomBytes(3).toString('hex');
+    const tampered = structuredClone(seedExport.export) as unknown as Record<string, unknown>;
+    const definition = tampered.definition as Record<string, unknown>;
+    definition.id = freshId;
+    definition.solution = 'solución manipulada';
+    const response = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(player), payload: JSON.stringify(tampered) });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+    const rows = await owner.pool.query('SELECT count(*)::text AS n FROM generated_cases WHERE case_id=$1', [freshId]);
+    expect(Number(rows.rows[0]?.n ?? 0)).toBe(0);
+  });
+
+  it('importar el fichero propio con el checksum corrupto es 400 aunque la definición sea la misma', async () => {
+    // Este es el test que de verdad discrimina el orden: la definición es
+    // idéntica a la almacenada (la deduplicación la daría por duplicada),
+    // pero el campo checksum del fichero está corrupto. Con la validación
+    // antes que la deduplicación es 400; con la deduplicación antes, el
+    // fichero saldría como alreadyExisted sin comprobar el checksum.
+    const corrupted = structuredClone(seedExport.export) as unknown as Record<string, unknown>;
+    corrupted.checksum = '00000000';
+    const response = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(player), payload: JSON.stringify(corrupted) });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('VALIDATION_ERROR');
+    expect(response.json().error.message).toContain('Checksum no coincide');
+  });
+
+  it('importar un fichero válido con id nuevo crea el caso con ese id', async () => {
+    const freshId = 'generado-prueba-nuevo-' + randomBytes(3).toString('hex');
+    const definition = clonedDefinition(freshId);
+    // El contenido debe diferir del expediente semilla salvo el id: si
+    // solo cambiara el id, la deduplicación por huella lo tomaría por la
+    // misma copia ya importada (el caso semilla lleva jobId null).
+    (definition.briefing as Record<string, unknown>).title = 'Expediente nuevo con id nuevo';
+    const file = createExport(definition, { difficulty: 'normal', duration: 'medium', region: 'europa', seed: definition.seed as number, catalogVersion: definition.catalogVersion as string });
+    if (!file.success || !file.export) throw new Error('No se pudo construir el fichero de prueba: ' + file.errors.join(' '));
+    const response = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(player), payload: JSON.stringify(file.export) });
+    expect(response.statusCode).toBe(201);
+    expect(response.json().alreadyExisted).toBe(false);
+    expect(response.json().caseId).toBe(freshId);
+    expect(response.json().canStart).toBe(true);
+  });
 });
