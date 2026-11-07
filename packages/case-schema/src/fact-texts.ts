@@ -187,27 +187,25 @@ export interface KnowledgeContentAnchors {
   names: Set<string>;
 }
 
-export function knowledgeContentAnchors(world: KnowledgeContentWorld): KnowledgeContentAnchors {
-  const sources: string[] = [];
-  for (const location of world.locations ?? []) {
-    if (location.name) sources.push(location.name);
-    if (location.description) sources.push(location.description);
-  }
-  for (const city of world.cities ?? []) if (city.name) sources.push(city.name);
-  for (const npc of world.npcs ?? []) {
-    if (npc.name) sources.push(npc.name);
-    if (npc.persona) sources.push(npc.persona);
-  }
-  for (const text of world.evidenceTexts ?? []) sources.push(text);
-  for (const text of world.greetings ?? []) sources.push(text);
-  for (const text of world.briefing ?? []) sources.push(text);
-  for (const text of world.labels ?? []) sources.push(text);
-  const bigrams = new Set<string>();
-  for (const source of sources) for (const bigram of knowledgeContentBigrams(source)) bigrams.add(bigram);
+function anchorSources(world: KnowledgeContentWorld): string[] {
+  const locations = (world.locations ?? []).flatMap(location => [location.name, location.description]);
+  const cities = (world.cities ?? []).map(city => city.name);
+  const npcs = (world.npcs ?? []).flatMap(npc => [npc.name, npc.persona]);
+  return [...locations, ...cities, ...npcs, ...(world.evidenceTexts ?? []), ...(world.greetings ?? []), ...(world.briefing ?? []), ...(world.labels ?? [])]
+    .filter((source): source is string => typeof source === 'string');
+}
+
+function anchorNames(world: KnowledgeContentWorld, includeNpcs: boolean): Set<string> {
   const names = new Set<string>();
   for (const city of world.cities ?? []) if (city.name) names.add(stripAccents(city.name.toLowerCase()));
-  for (const npc of world.npcs ?? []) if (npc.name) names.add(stripAccents(npc.name.toLowerCase()));
-  return { bigrams, names };
+  if (includeNpcs) for (const npc of world.npcs ?? []) if (npc.name) names.add(stripAccents(npc.name.toLowerCase()));
+  return names;
+}
+
+export function knowledgeContentAnchors(world: KnowledgeContentWorld, includeNpcNames = true): KnowledgeContentAnchors {
+  const bigrams = new Set<string>();
+  for (const source of anchorSources(world)) for (const bigram of knowledgeContentBigrams(source)) bigrams.add(bigram);
+  return { bigrams, names: anchorNames(world, includeNpcNames) };
 }
 
 export function hasKnowledgeContent(text: string, anchors: KnowledgeContentAnchors): boolean {

@@ -1369,7 +1369,9 @@ describe('validación del expediente completo (textos de conocimiento decibles)'
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    const definition = result.definition!;
+    const definition = result.definition;
+    expect(definition).toBeDefined();
+    if (!definition) return;
     expect(validateCaseDefinition(definition).valid).toBe(true);
     const paraphrase = structuredClone(definition) as unknown as Record<string, unknown>;
     const texts = paraphrase.texts as { knowledge: Record<string, string> };

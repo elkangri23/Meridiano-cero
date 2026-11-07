@@ -133,6 +133,14 @@ function checkEvidenceTexts(value: DataRecord, evidenceIds: Set<string>, errors:
   for (const id of evidenceIds) check(text((value.evidence as DataRecord)[id]), `texts.evidence falta el texto de ${id}`, errors);
 }
 
+// Contenido real (tercera vuelta, 2026-11-07): el texto debe nombrar al
+// menos un elemento concreto del mundo del caso; si solo nombra el tema,
+// el modelo solo puede parafrasearlo y nunca da información.
+function checkKnowledgeContent(id: string, entry: string, anchors: KnowledgeContentAnchors | undefined, errors: string[]): void {
+  if (!anchors || isKnowledgeLabelText(entry) || hasKnowledgeContent(entry, anchors)) return;
+  errors.push(`texts.knowledge ${id} no nombra ningún elemento concreto del mundo del caso (lugar, objeto, procedimiento o suceso de las evidencias)`);
+}
+
 function checkKnowledgeTexts(value: DataRecord, groups: EntityGroups, errors: string[], anchors?: KnowledgeContentAnchors): void {
   if (!isRecord(value.knowledge)) { errors.push('texts.knowledge: objeto obligatorio.'); return; }
   for (const id of Object.keys(value.knowledge)) check(typeof id === 'string' && id.length > 0, 'texts.knowledge clave inválida', errors);
@@ -141,12 +149,7 @@ function checkKnowledgeTexts(value: DataRecord, groups: EntityGroups, errors: st
     if (typeof entry === 'string' && isKnowledgeLabelText(entry)) {
       errors.push(`texts.knowledge ${id} es una etiqueta de tema, no una frase que diría el personaje`);
     }
-    // Contenido real (tercera vuelta, 2026-11-07): el texto debe nombrar al
-    // menos un elemento concreto del mundo del caso; si solo nombra el tema,
-    // el modelo solo puede parafrasearlo y nunca da información.
-    if (anchors && typeof entry === 'string' && !isKnowledgeLabelText(entry) && !hasKnowledgeContent(entry, anchors)) {
-      errors.push(`texts.knowledge ${id} no nombra ningún elemento concreto del mundo del caso (lugar, objeto, procedimiento o suceso de las evidencias)`);
-    }
+    if (typeof entry === 'string') checkKnowledgeContent(id, entry, anchors, errors);
   }
   for (const npc of groups.npcs) {
     for (const token of stringList(npc.knowledge)) check(text((value.knowledge as DataRecord)[token]), `texts.knowledge falta el texto de ${token}`, errors);
@@ -166,26 +169,44 @@ function checkGreetingTexts(value: DataRecord, npcIds: Set<string>, errors: stri
   }
 }
 
+function stringValues(value: unknown): string[] {
+  return isRecord(value) ? Object.values(value).filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
+function briefingParagraphs(def: DataRecord): string[] {
+  if (!isRecord(def.briefing) || !Array.isArray(def.briefing.paragraphs)) return [];
+  return def.briefing.paragraphs.filter((entry): entry is string => typeof entry === 'string');
+}
+
+function recoveryLabel(def: DataRecord): string[] {
+  if (!isRecord(def.mechanics) || !isRecord(def.mechanics.recovery)) return [];
+  return typeof def.mechanics.recovery.label === 'string' ? [def.mechanics.recovery.label] : [];
+}
+
+function contentAnchorsFor(def: DataRecord, groups: EntityGroups, value: DataRecord): KnowledgeContentAnchors {
+  return knowledgeContentAnchors({
+    locations: groups.locations.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined, description: typeof entry.description === 'string' ? entry.description : undefined })),
+    cities: groups.cities.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined })),
+    npcs: groups.npcs.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined, persona: typeof entry.persona === 'string' ? entry.persona : undefined })),
+    evidenceTexts: stringValues(value.evidence),
+    greetings: stringValues(value.greetings),
+    briefing: briefingParagraphs(def),
+    labels: [
+      ...recordList(isRecord(def.mechanics) ? def.mechanics.inspectables : undefined).map(entry => entry.label),
+      ...recordList(isRecord(def.mechanics) ? def.mechanics.queries : undefined).map(entry => entry.label),
+      ...recordList(isRecord(def.mechanics) ? def.mechanics.talkEvidence : undefined).map(entry => entry.label),
+      ...recoveryLabel(def),
+    ].filter((entry): entry is string => typeof entry === 'string'),
+  });
+}
+
 function texts(def: DataRecord, groups: EntityGroups, errors: string[]): void {
   const value = def.texts;
   if (!isRecord(value)) { errors.push('texts: objeto obligatorio en un expediente generado.'); return; }
   const evidenceIds = new Set(groups.evidence.map(entry => String(entry.id)));
   const npcIds = new Set(groups.npcs.map(entry => String(entry.id)));
   checkEvidenceTexts(value, evidenceIds, errors);
-  checkKnowledgeTexts(value, groups, errors, knowledgeContentAnchors({
-    locations: groups.locations.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined, description: typeof entry.description === 'string' ? entry.description : undefined })),
-    cities: groups.cities.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined })),
-    npcs: groups.npcs.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined, persona: typeof entry.persona === 'string' ? entry.persona : undefined })),
-    evidenceTexts: isRecord(value.evidence) ? Object.values(value.evidence).filter((entry): entry is string => typeof entry === 'string') : [],
-    greetings: isRecord(value.greetings) ? Object.values(value.greetings).filter((entry): entry is string => typeof entry === 'string') : [],
-    briefing: isRecord(def.briefing) && Array.isArray(def.briefing.paragraphs) ? def.briefing.paragraphs.filter((entry): entry is string => typeof entry === 'string') : [],
-    labels: [
-      ...recordList(isRecord(def.mechanics) ? def.mechanics.inspectables : undefined).map(entry => entry.label),
-      ...recordList(isRecord(def.mechanics) ? def.mechanics.queries : undefined).map(entry => entry.label),
-      ...recordList(isRecord(def.mechanics) ? def.mechanics.talkEvidence : undefined).map(entry => entry.label),
-      ...(isRecord(def.mechanics) && isRecord(def.mechanics.recovery) && typeof def.mechanics.recovery.label === 'string' ? [def.mechanics.recovery.label] : []),
-    ].filter((entry): entry is string => typeof entry === 'string'),
-  }));
+  checkKnowledgeTexts(value, groups, errors, contentAnchorsFor(def, groups, value));
   checkGreetingTexts(value, npcIds, errors);
 }
 

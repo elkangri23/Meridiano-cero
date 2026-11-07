@@ -506,6 +506,17 @@ function checkClueKnowledgeTexts(texts: Record<string, unknown>, knowledgeIds: s
   }
 }
 
+function clueContentAnchors(output: Record<string, unknown>, geography?: SelectedGeography): KnowledgeContentAnchors {
+  const texts = output.texts as Record<string, unknown>;
+  const locations = Array.isArray(output.locations) ? output.locations.filter(isRecord) : [];
+  return knowledgeContentAnchors({
+    locations: locations.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined, description: typeof entry.description === 'string' ? entry.description : undefined })),
+    cities: (geography?.cities ?? []).map(city => ({ name: city.name })),
+    evidenceTexts: isRecord(texts.evidence) ? Object.values(texts.evidence).filter((entry): entry is string => typeof entry === 'string') : [],
+    greetings: isRecord(texts.greetings) ? Object.values(texts.greetings).filter((entry): entry is string => typeof entry === 'string') : [],
+  });
+}
+
 function checkClueTexts(output: Record<string, unknown>, castIds: string[], knowledgeIds: string[], errors: string[], geography?: SelectedGeography): void {
   if (!isRecord(output.texts)) { errors.push('texts debe ser un objeto.'); return; }
   const texts = output.texts;
@@ -516,13 +527,7 @@ function checkClueTexts(output: Record<string, unknown>, castIds: string[], know
   // mecánica de 4b aún no existe aquí, así que la puerta de la etapa 4a usa
   // este subconjunto; el validador v1.5, con el expediente completo, exige
   // lo mismo con todas las anclas.
-  const locations = Array.isArray(output.locations) ? output.locations.filter(isRecord) : [];
-  checkClueKnowledgeTexts(texts, knowledgeIds, errors, knowledgeContentAnchors({
-    locations: locations.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined, description: typeof entry.description === 'string' ? entry.description : undefined })),
-    cities: (geography?.cities ?? []).map(city => ({ name: city.name })),
-    evidenceTexts: isRecord(texts.evidence) ? Object.values(texts.evidence).filter((entry): entry is string => typeof entry === 'string') : [],
-    greetings: isRecord(texts.greetings) ? Object.values(texts.greetings).filter((entry): entry is string => typeof entry === 'string') : [],
-  }));
+  checkClueKnowledgeTexts(texts, knowledgeIds, errors, clueContentAnchors(output, geography));
 }
 
 // Parámetros obligatorios (cadenas no vacías) de cada tipo de acción de
