@@ -242,7 +242,7 @@ T2-01 sigue en curso por referencias de conocimientos/solución, vocabulario dec
 
 Facts exige IDs únicos y knowledge apunta a ellos sin duplicados. Solución general referencia NPC existente. El original conserva excepción explícita de tokens/aliases históricos, compartiendo perfil de sospechosos entre validador y motor, sin reinterpretar nombres o reescribir hash. Nuevas intenciones inválidas no crean filas; replay previo autorizado conservado. Validador 1.3.0, motor v12 sin cambio semántico. [Pruebas y límites](../quality/T2-referencias-conocimiento.md).
 
-T2-01 sigue abierto por condiciones de conocimiento/conversación, reglas/payloads declarativos y solvencia. La compatibilidad legada no equivale a validar todo ese modelo ni habilita API/UI/guardados o generador.
+T2-01 sigue abierto por condiciones de conocimiento/conversación, reglas/payloads declarativos y solvencia. Nota 2026-11-07 (vuelta 3 de conversación natural, main `884aea3`): la condición de conocimiento tiene ahora puerta exigible — la etapa 4a y el validador v1.5 exigen que cada texto de conocimiento nombre un elemento concreto del mundo del caso — y los 96 textos de los 11 casos generados se reescribieron con ese criterio; T2-01 sigue abierto por el resto de condiciones. La compatibilidad legada no equivale a validar todo ese modelo ni habilita API/UI/guardados o generador.
 
 ## Continuación T2: permiso de testimonio v13
 
