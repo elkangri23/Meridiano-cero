@@ -101,6 +101,34 @@ export interface MisconductRecord {
   seenBy: string[];
 }
 
+/** Miembros del equipo recurrente A.C.M.E. (GDD §8). Nombres provisionales
+ * del GDD; las funciones son las del expediente, no un catálogo por caso. */
+export type TeamMemberId = 'margaret' | 'richter' | 'elena' | 'david' | 'clara';
+
+export interface TeamMember {
+  id: TeamMemberId;
+  name: string;
+  role: string;
+}
+
+/** Servicios que el motor registra como petición al equipo (GDD §8).
+ * `coordinate` no es un servicio del motor: coordinar una detención es la
+ * acción `detain` que ya existe y la ventana del equipo solo la enseña a
+ * través de David. */
+export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'routes' | 'organize';
+
+/** Una petición al equipo A.C.M.E. (GDD §8): quién, qué servicio, sobre
+ * qué (solo `explain`, con el id del análisis completado) y cuándo. El
+ * registro nunca se borra; el dossier lo enseña y la ventana del equipo
+ * muestra el historial. El texto libre de la pregunta nunca vive aquí. */
+export interface TeamRecord {
+  id: string;
+  memberId: TeamMemberId;
+  serviceId: TeamServiceId;
+  targetId?: string;
+  minute: number;
+}
+
 /**
  * Mecánica declarativa de un expediente generado (T4-08). El motor del caso
  * fijo tiene esta misma mecánica hardcodeada en `fixed-evidence.ts`,
@@ -274,6 +302,9 @@ export interface CaseRun {
    * las partidas anteriores no lo traen y se comportan como si estuviera
    * vacío. */
   misconduct?: MisconductRecord[];
+  /** Peticiones al equipo A.C.M.E. (GDD §8). Opcional: las partidas
+   * anteriores no lo traen y se comportan como si estuviera vacío. */
+  teamRequests?: TeamRecord[];
   pendingRequests: ScheduledResult[];
   warrants: string[];
   detentions: string[];

@@ -71,6 +71,21 @@ describe('textos legibles del caso fijo', () => {
     expect(conversationRecordText('algo-raro', lookup.npcName)).toBe('algo-raro');
   });
 
+  it('los registros de petición al equipo se leen como frases, nunca como claves crudas', () => {
+    expect(conversationRecordText('team:margaret:briefing@0', lookup.npcName))
+      .toBe('Preguntaste a Margaret Sullivan sobre el encargo (min 0).');
+    expect(conversationRecordText('team:richter:explain:EV-03@120', lookup.npcName))
+      .toBe('Pediste a Dr. Samuel Richter que te explicara el análisis EV-03 (min 120).');
+    expect(conversationRecordText('team:elena:lookup@30', lookup.npcName))
+      .toBe('Consultaste a Elena Vázquez en inteligencia (min 30).');
+    expect(conversationRecordText('team:david:routes@60', lookup.npcName))
+      .toBe('Preguntaste a David Nakamura por las rutas de viaje (min 60).');
+    expect(conversationRecordText('team:clara:organize@90', lookup.npcName))
+      .toBe('Pediste a Clara Beaumont que organizara el expediente (min 90).');
+    expect(conversationRecordText('team:desconocido:briefing@0', lookup.npcName))
+      .toBe('team:desconocido:briefing@0');
+  });
+
   it('los marcadores de conducta irregular se leen como frases, nunca como claves crudas', () => {
     expect(discoveryText('forced-entry', lookup)).toBe('Acceso forzado: entraste sin permiso ni orden de acceso.');
     expect(discoveryText('warning', lookup)).toContain('Advertencia de A.C.M.E.');

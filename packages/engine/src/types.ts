@@ -13,6 +13,7 @@ export type ActionType =
   | 'detain'
   | 'recover'
   | 'irregular'
+  | 'team'
   | 'finish'
   | 'batch'
   | 'batch_decision';

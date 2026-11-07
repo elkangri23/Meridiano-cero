@@ -2,7 +2,7 @@
 // públicos a partir de la definición del caso y el estado del motor.
 // No serializa nunca EngineEvent.payload ni CaseRun internos.
 import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
-import { evidenceText, REMOTE_CHANNEL_LABELS } from '@meridiano/case-schema';
+import { evidenceText, REMOTE_CHANNEL_LABELS, teamMember } from '@meridiano/case-schema';
 import { isPublicBatchStep, type CommunicationRecordDto, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
 import { availableOffers, completeFinalReport, ENGINE_VERSION, liveObjectives, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
@@ -121,6 +121,9 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     // Acciones irregulares (GDD §14): ausentes en partidas anteriores;
     // se enseñan vacías hasta el primer acto.
     misconduct: [...(run.misconduct ?? [])],
+    // Peticiones al equipo A.C.M.E. (GDD §8): ausentes en partidas
+    // anteriores al equipo; se enseñan vacías hasta la primera petición.
+    team: [...(run.teamRequests ?? [])],
     // Datos de charla libre de cada personaje del expediente: sin ellos la
     // web solo conocía el catálogo fijo y un NPC generado llegaba al
     // director sin hechos ni persona.
@@ -263,6 +266,21 @@ const eventSummaries: Record<string, EventNamer> = {
     return `${kindLabel} ${target}.` + (seen ? ' Te han visto.' : ' Nadie te ha visto.');
   },
   case_withdrawn: () => 'A.C.M.E. ha retirado el caso por tu conducta.',
+  team: (_definition, payload) => {
+    // Petición al equipo (GDD §8): quién y qué servicio, sin el texto
+    // libre de la pregunta (T2). Solo nombres que el jugador ya conoce.
+    const member = teamMember(String(payload.memberId ?? ''));
+    const name = member?.name ?? String(payload.memberId ?? '');
+    const service = String(payload.serviceId ?? '');
+    const what: Record<string, string> = {
+      briefing: 'sobre el encargo',
+      explain: 'que te explicara un análisis',
+      lookup: 'en inteligencia',
+      routes: 'por las rutas de viaje',
+      organize: 'que organizara el expediente',
+    };
+    return `Pediste ayuda a ${name}${what[service] ? ' ' + what[service] : ''}.`;
+  },
   recover: () => 'Objeto original recuperado.',
   finish: () => 'La investigación ha concluido.',
   batch_paused: () => 'Lote en pausa: un paso no se pudo aplicar.',

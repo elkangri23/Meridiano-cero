@@ -21,4 +21,5 @@ export { createBackupConfig, runFullBackup, runIncrementalBackup, restoreBackup,
 export { validateMechanics } from './validation-mechanics.js';
 export { FORENSIC_TYPES, FORENSIC_TYPE_LABELS, isForensicType, forensicTypeForEvidenceType, forensicTypeForAnalysis, type ForensicType } from './forensics.js';
 export { ARREST_TYPES, ARREST_COORDINATION_MINUTES, arrestTypeOf, arrestTypeForCaseId, isArrestType, type ArrestType } from './arrest.js';
+export { TEAM_MEMBERS, TEAM_MEMBER_IDS, TEAM_SERVICES, teamMember, isTeamMemberId, isTeamServiceId, isTeamRecord } from './team.js';
 export { FAMILY_FORBIDDEN_TERMS, validateGeneratedContent } from './validation-content.js';

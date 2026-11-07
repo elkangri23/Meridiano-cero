@@ -11,6 +11,7 @@
 // opcional y, cuando está presente, lo usan en vez del catálogo fijo. Sin
 // él, el comportamiento es el de siempre (caso fijo).
 import { RECURRENT_NPCS, REMOTE_CHANNEL_LABELS } from './npc-catalog.js';
+import { teamMember } from './team.js';
 import type { CaseTexts } from './types.js';
 
 /** Hecho revelado por cada evidencia (SPEC-003, tabla de evidencias). */
@@ -373,6 +374,36 @@ function irregularRecordText(
     : `Suplantaste a alguien hablando con ${name} (min ${minute}).`;
 }
 
+/** Frase legible para un registro de petición al equipo A.C.M.E.
+ * (`team:<miembro>:<servicio>[:<objetivo>]@<minuto>`, GDD §8). Sin
+ * nombre conocido se devuelve el registro tal cual: nunca se oculta. */
+function teamRecordText(record: string): string | null {
+  const match = /^team:([a-z]+):([a-z]+)(?::([A-Za-z0-9._:-]+))?@(\d+)$/.exec(record);
+  if (!match) return null;
+  const member = teamMember(match[1] ?? '');
+  const service = match[2] ?? '';
+  const target = match[3] ?? '';
+  const minute = match[4] ?? '';
+  if (!member) return record;
+  const serviceText: Record<string, string> = {
+    briefing: 'Preguntaste a',
+    explain: 'Pediste a',
+    lookup: 'Consultaste a',
+    routes: 'Preguntaste a',
+    organize: 'Pediste a',
+  };
+  const what: Record<string, string> = {
+    briefing: 'sobre el encargo',
+    explain: target ? `que te explicara el análisis ${target}` : 'que te explicara un análisis',
+    lookup: 'en inteligencia',
+    routes: 'por las rutas de viaje',
+    organize: 'que organizara el expediente',
+  };
+  const verb = serviceText[service] ?? 'Pediste a';
+  const object = what[service] ?? '';
+  return object ? `${verb} ${member.name} ${object} (min ${minute}).` : `${verb} ${member.name} (min ${minute}).`;
+}
+
 export function conversationRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined, locationName?: (id: string) => string | undefined): string {
   const talk = talkRecordText(record, npcName);
   if (talk !== null) return talk;
@@ -382,6 +413,8 @@ export function conversationRecordText(record: string, npcName: (id: string) => 
   if (received) return `Respuesta recibida (min ${received[1]}).`;
   const irregular = irregularRecordText(record, npcName, locationName);
   if (irregular !== null) return irregular;
+  const team = teamRecordText(record);
+  if (team !== null) return team;
   const warning = /^warning:([A-Za-z0-9._:-]+)@(\d+)$/.exec(record);
   if (warning) return `Advertencia de A.C.M.E. (min ${warning[2]}): te han visto en una acción irregular.`;
   return record;

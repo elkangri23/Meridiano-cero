@@ -442,6 +442,18 @@ export interface MisconductRecordDto {
   seenBy: string[];
 }
 
+/** Una petición al equipo A.C.M.E. (GDD §8): quién, qué servicio, sobre
+ * qué (solo `explain`, con el id del análisis completado) y cuándo. Es el
+ * historial que enseña la ventana del equipo. El texto libre de la
+ * pregunta no viaja aquí (T2): solo el servicio, el objetivo y el minuto. */
+export interface TeamRecordDto {
+  id: string;
+  memberId: string;
+  serviceId: string;
+  targetId?: string;
+  minute: number;
+}
+
 export interface NpcChatEntry {
   id: string;
   name: string;
@@ -487,6 +499,11 @@ export interface PlayerViewDto {
    * La web las enseña en el dossier (registro de conversación) y el
    * informe final las lista con su descuento en la puntuación. */
   misconduct: MisconductRecordDto[];
+  /** Peticiones al equipo A.C.M.E. (GDD §8), en orden. La web las enseña
+   * en la ventana del equipo junto con sus miembros y servicios; el
+   * dossier lleva el registro `team:…` de cada una. Ausente en partidas
+   * anteriores al equipo: se enseña vacío hasta la primera petición. */
+  team: TeamRecordDto[];
   /** Datos de conversación de cada personaje del expediente (ver
    * NpcChatEntry): la charla libre los usa para construir la petición
    * converse. Sin esta lista, la web solo conocía el catálogo fijo. */
@@ -855,6 +872,20 @@ function publicMisconduct(value: unknown): value is MisconductRecordDto[] {
   return Array.isArray(value) && value.length <= 64 && value.every(publicMisconductRecord) &&
     new Set(value.map(item => item.id)).size === value.length;
 }
+function publicTeamRecord(value: unknown): value is TeamRecordDto {
+  if (!isPlainRecord(value)) return false;
+  const keys = Object.keys(value).sort().join(',');
+  if (keys !== 'id,memberId,minute,serviceId' && keys !== 'id,memberId,minute,serviceId,targetId') return false;
+  if (!boundedString(value.id, 128)) return false;
+  if (value.targetId !== undefined && !boundedString(value.targetId, 128)) return false;
+  if (!['margaret', 'richter', 'elena', 'david', 'clara'].includes(value.memberId as string)) return false;
+  if (!['briefing', 'explain', 'lookup', 'routes', 'organize'].includes(value.serviceId as string)) return false;
+  return nonNegativeInteger(value.minute);
+}
+function publicTeam(value: unknown): value is TeamRecordDto[] {
+  return Array.isArray(value) && value.length <= 100 && value.every(publicTeamRecord) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
 function generalChatCollections(value: Record<string, unknown>): boolean {
   if (!publicNpcChat(value.npcChat)) return false;
   if (!publicCommunications(value.communications)) return false;
@@ -867,6 +898,7 @@ function generalCollections(value: Record<string, unknown>): boolean {
   if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
   if (!stringList(value.analysisResults, 100, 128)) return false;
   if (!publicMisconduct(value.misconduct)) return false;
+  if (!publicTeam(value.team)) return false;
   if (!publicObjectives(value.objectives)) return false;
   return generalChatCollections(value);
 }
@@ -902,7 +934,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'analysisResults,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,misconduct,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'analysisResults,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,misconduct,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,team,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;

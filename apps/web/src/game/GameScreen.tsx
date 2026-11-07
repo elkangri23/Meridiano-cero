@@ -15,6 +15,8 @@ import { chatFacts, chatGreeting, chatNpcName, chatPersona, chatRefusal, chatRol
 import { SceneArt } from './scene-art';
 import { groupOffers } from './scene-offers';
 import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
+import { briefingAnswer, ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, explainAnswer, organizeAnswer, routesAnswer, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_LABELS, teamRequestText } from './team';
+import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
@@ -37,7 +39,7 @@ type ScreenPhase = 'loading' | 'ready' | 'signed_out' | 'not_found' | 'error';
 type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
 
 const windowLabels: Record<WindowId, string> = {
-  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio', comms: 'Central de comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia',
+  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio', comms: 'Central de comunicaciones', team: 'Equipo A.C.M.E.', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia',
 };
 const channelLabels: Record<string, string> = { call: 'Llamada', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Correo', fax: 'Fax' };
 const requestTypeLabels: Record<string, string> = { analysis: 'Análisis', query: 'Consulta', request: 'Solicitud' };
@@ -965,6 +967,78 @@ function CommsContent({ view, contacts, recipient, channel, documentId, text, bu
   </div>;
 }
 
+/** Un turno del equipo: quién lo dice (tú o el miembro) y qué se dijo.
+ * La respuesta es un resumen de la vista: nunca indica si se va bien,
+ * ni señala al culpable ni sugiere la siguiente pista. */
+export type TeamTurn = { memberId: TeamMemberId; from: 'you' | 'team'; text: string };
+
+function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, detainOffers, onAnalysis, onService, onOffer, onDraft, onSendElena }: {
+  view: PlayerViewDto; turns: TeamTurn[]; draft: string; busy: boolean; elenaBusy: boolean; error: string; analysisId: string;
+  detainOffers: PublicActionOffer[];
+  onAnalysis: (value: string) => void;
+  onService: (memberId: TeamMemberId, serviceId: TeamServiceId, targetId: string | undefined, trigger: HTMLElement | null) => void;
+  onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
+  onDraft: (value: string) => void; onSendElena: (event: FormEvent) => void;
+}) {
+  const memberName = (id: string) => TEAM_MEMBERS.find(member => member.id === id)?.name ?? id;
+  const serviceLabel = (id: string) => (TEAM_SERVICE_LABELS as Record<string, string>)[id] ?? id;
+  return <div>
+    <h4>Miembros</h4>
+    <ul className="game-destination-list">{TEAM_MEMBERS.map(member => <li key={member.id}>
+      <span><strong>{member.name}</strong><small>{member.role} · {member.blurb}</small></span>
+      <span>
+        {member.id === 'margaret' && <button type="button" data-testid="team-briefing" disabled={busy}
+          onClick={event => onService('margaret', 'briefing', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.briefing}</button>}
+        {member.id === 'clara' && <button type="button" data-testid="team-organize" disabled={busy}
+          onClick={event => onService('clara', 'organize', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.organize}</button>}
+        {member.id === 'david' && <button type="button" data-testid="team-routes" disabled={busy}
+          onClick={event => onService('david', 'routes', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.routes}</button>}
+      </span>
+    </li>)}</ul>
+    <h4>Dr. Samuel Richter — explicar un análisis</h4>
+    {view.analysisResults.length === 0
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin análisis completados todavía. Richter solo explica análisis ya terminados.</p></div>
+      : <p><label>Análisis <select data-testid="team-analysis" value={analysisId}
+        onChange={event => onAnalysis(event.target.value)}>
+        {view.analysisResults.map(id => <option key={id} value={id}>{view.evidenceTexts[id] ?? id}</option>)}
+      </select></label>
+      <span> <button type="button" data-testid="team-explain" disabled={busy || !analysisId}
+        onClick={event => onService('richter', 'explain', analysisId, event.currentTarget)}>{TEAM_SERVICE_LABELS.explain}</button></span></p>}
+    <h4>Elena Vázquez — consulta de inteligencia</h4>
+    <form onSubmit={onSendElena} className="game-chat-form">
+      <input type="text" data-testid="team-elena-input" value={draft} disabled={elenaBusy} maxLength={4000}
+        placeholder="Pregunta por lo investigado: un sospechoso, una prueba, un lugar…" aria-label="Pregunta para Elena Vázquez"
+        onChange={event => onDraft(event.target.value)} />
+      <button type="submit" data-testid="team-elena-send" disabled={!draft.trim() || elenaBusy}>{elenaBusy ? 'Consultando…' : 'Preguntar'}</button>
+    </form>
+    {error && <p className="game-error" role="alert">{error}</p>}
+    <h4>David Nakamura — coordinar una detención</h4>
+    {detainOffers.length === 0
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin detenciones que coordinar: hacen falta una orden válida y la ubicación conocida del sospechoso.</p></div>
+      : <ul className="game-destination-list">{detainOffers.map(offer => <li key={offer.id}>
+        <span><strong>{offer.label}</strong><small>{offer.detail}</small></span>
+        <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={busy}
+          onClick={event => onOffer(offer, event.currentTarget)}>Coordinar</button></span>
+      </li>)}</ul>}
+    <h4>Conversación con el equipo</h4>
+    {turns.length === 0
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Pide ayuda a un miembro y su respuesta quedará aquí.</p></div>
+      : <ol className="game-chat-turns" data-testid="team-turns" aria-live="polite">
+        {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
+          <span className="game-chat-speaker">{turn.from === 'you' ? 'Tú' : memberName(turn.memberId)}</span>
+          <span>{turn.text}</span>
+        </li>)}
+      </ol>}
+    <h4>Peticiones registradas</h4>
+    {view.team.length === 0
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin peticiones al equipo todavía.</p></div>
+      : <ul className="game-destination-list" data-testid="team-history">{view.team.map(record =>
+        <li key={record.id}><span><strong>{memberName(record.memberId)} · {serviceLabel(record.serviceId)}</strong>
+          <small>Minuto {record.minute}{record.targetId ? ` · ${view.evidenceTexts[record.targetId] ?? record.targetId}` : ''}</small></span></li>)}</ul>}
+    <p className="game-panel-note">Pedir ayuda al equipo no consume tiempo: el reloj solo avanza con las gestiones que ya existen (un análisis, coordinar una detención, enviar un documento). El equipo nunca indica si vas bien, ni señala al culpable ni sugiere la siguiente pista.</p>
+  </div>;
+}
+
 function SaveList({ saves, atLimit, closed, onLoad, onDelete, onReplace }: {
   saves: SaveListDto | null; atLimit: boolean; closed: boolean;
   onLoad: (save: SaveListItem) => void; onDelete: (save: SaveListItem) => void; onReplace: (save: SaveListItem) => void;
@@ -1430,6 +1504,15 @@ export function GameScreen() {
   const [intelDraft, setIntelDraft] = useState('');
   const [intelBusy, setIntelBusy] = useState(false);
   const [intelError, setIntelError] = useState('');
+  // Equipo A.C.M.E. (GDD §8): misma forma que la terminal (turnos en esta
+  // pestaña por partida), con su propia memoria de conversación para Elena.
+  // Pedir ayuda no cuesta tiempo; la petición queda registrada en el motor.
+  const [teamTurns, setTeamTurns] = useState<TeamTurn[]>([]);
+  const [teamElenaMemory, setTeamElenaMemory] = useState<unknown>(null);
+  const [teamDraft, setTeamDraft] = useState('');
+  const [teamElenaBusy, setTeamElenaBusy] = useState(false);
+  const [teamError, setTeamError] = useState('');
+  const [teamAnalysisId, setTeamAnalysisId] = useState('');
   // Lote 1 de jugabilidad: reloj de arena y animación de viaje (ver hook).
   const timeFeedback = useTimeFeedback();
 
@@ -1746,6 +1829,116 @@ export function GameScreen() {
     }
   }
 
+  /** Turnos del equipo en esta pestaña por partida, con la memoria de
+   * conversación de Elena (misma forma que `saveChat`, con el miembro). */
+  function loadStoredTeam(key: string): { turns: TeamTurn[]; memory: unknown } | null {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(key) ?? 'null') as { turns: TeamTurn[]; memory: unknown } | null;
+      return stored && Array.isArray(stored.turns) ? stored : null;
+    } catch { return null; }
+  }
+
+  function saveTeam(key: string, turns: TeamTurn[], memory: unknown) {
+    try { sessionStorage.setItem(key, JSON.stringify({ turns, memory })); } catch { /* sin almacenamiento */ }
+  }
+
+  /** Abre el equipo: recupera sus turnos de esta pestaña o lo inicia con
+   * el saludo de Margaret. */
+  function openTeam(opener: HTMLElement | null) {
+    if (!runId) return;
+    const key = `meridiano:team:${runId}`;
+    const stored = loadStoredTeam(key);
+    if (stored) {
+      setTeamTurns(stored.turns);
+      setTeamElenaMemory(stored.memory ?? null);
+    } else {
+      const turns: TeamTurn[] = [{ memberId: 'margaret', from: 'team', text: TEAM_GREETING }];
+      const memory = { schemaVersion: 1, runId, npcId: ELENA_ID, treatment: 'neutral', turns: [] };
+      setTeamTurns(turns);
+      setTeamElenaMemory(memory);
+      saveTeam(key, turns, memory);
+    }
+    const firstAnalysis = view?.analysisResults[0];
+    if (firstAnalysis) setTeamAnalysisId(firstAnalysis);
+    setTeamError('');
+    windows.open('team', opener);
+  }
+
+  /** Pide un servicio determinista al equipo: la respuesta se calcula
+   * desde la vista (resumen de lo que ya consta) y la petición queda
+   * registrada en el motor con una acción `team` gratuita. */
+  function requestTeamService(memberId: TeamMemberId, serviceId: TeamServiceId, targetId: string | undefined, trigger: HTMLElement | null) {
+    if (!runId || !view) return;
+    const answer = serviceId === 'briefing' ? briefingAnswer(view)
+      : serviceId === 'explain' && targetId ? explainAnswer(view, targetId)
+      : serviceId === 'routes' ? routesAnswer(view)
+      : serviceId === 'organize' ? organizeAnswer(view) : '';
+    if (!answer) return;
+    const name = TEAM_MEMBERS.find(member => member.id === memberId)?.name ?? memberId;
+    const offer: PublicActionOffer = { id: `team:${memberId}:${serviceId}${targetId ? `:${targetId}` : ''}`,
+      label: `${TEAM_SERVICE_LABELS[serviceId]} con ${name}`,
+      action: { type: 'team', params: { memberId, serviceId, ...(targetId ? { targetId } : {}) } } };
+    const key = `meridiano:team:${runId}`;
+    const turns: TeamTurn[] = [...teamTurns,
+      { memberId, from: 'you', text: teamRequestText(serviceId, targetId) },
+      { memberId, from: 'team', text: answer }];
+    setTeamTurns(turns);
+    saveTeam(key, turns, teamElenaMemory);
+    void startPreview(offer, trigger);
+  }
+
+  /** Pregunta a Elena: la misma consulta determinista que la terminal,
+   * con su persona; la consulta queda registrada en el motor (sin el
+   * texto libre). Sin hecho que respalde la respuesta, lo dice sin
+   * llamar al modelo. */
+  async function sendElenaMessage(event: FormEvent) {
+    event.preventDefault();
+    const text = teamDraft.trim();
+    if (!text || !runId || !identity || !view || teamElenaBusy) return;
+    const turns: TeamTurn[] = [...teamTurns, { memberId: 'elena', from: 'you', text }];
+    setTeamTurns(turns);
+    setTeamDraft('');
+    setTeamElenaBusy(true);
+    setTeamError('');
+    const key = `meridiano:team:${runId}`;
+    const memory = teamElenaMemory ?? { schemaVersion: 1, runId, npcId: ELENA_ID, treatment: 'neutral', turns: [] };
+    const offer: PublicActionOffer = { id: 'team:elena:lookup', label: 'Consulta de inteligencia con Elena Vázquez',
+      action: { type: 'team', params: { memberId: 'elena', serviceId: 'lookup', question: text } } };
+    void startPreview(offer, null);
+    const facts = buildIntelFacts({
+      dossier: view.dossier,
+      objectives: view.objectives,
+      briefing: view.briefing,
+      heard: heardIntelFacts(),
+      textForDiscovery: id => discoveryText(id, lookupFromView(view), textsFromView(view)),
+    });
+    const selected = selectIntelFacts(text, facts);
+    if (selected.length === 0) {
+      const next: TeamTurn[] = [...turns, { memberId: 'elena', from: 'team', text: ELENA_REFUSAL }];
+      setTeamTurns(next);
+      setTeamElenaMemory(memory);
+      saveTeam(key, next, memory);
+      setTeamElenaBusy(false);
+      return;
+    }
+    const controller = new AbortController();
+    try {
+      const factIds = selected.map(fact => fact.id);
+      const result = await aiApi.converse({ runId, text,
+        npc: { id: ELENA_ID, name: ELENA_NAME, persona: ELENA_PERSONA, knownFactIds: factIds, revealableFactIds: factIds, refusal: ELENA_REFUSAL },
+        facts: selected, memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
+      controller.signal, { csrfToken: identity.csrfToken });
+      const next: TeamTurn[] = [...turns, { memberId: 'elena', from: 'team', text: result.narrative.text }];
+      setTeamTurns(next);
+      setTeamElenaMemory(result.memory);
+      saveTeam(key, next, result.memory);
+    } catch {
+      setTeamError('Elena no responde. Tu pregunta queda registrada; inténtalo de nuevo.');
+    } finally {
+      setTeamElenaBusy(false);
+    }
+  }
+
   /** Confirma una acción con su clave de idempotencia y su revisión
    * esperada (la misma llamada que el diálogo de confirmación, con o sin
    * diálogo previo). */
@@ -1981,7 +2174,7 @@ export function GameScreen() {
       {resumeAvailable(view) && <button type="button" onClick={() => setResumeOpen(true)}>Resumen</button>}
       {(Object.keys(windowLabels) as WindowId[]).map(id => (
         <button key={id} type="button" aria-pressed={windows.windows[id].open}
-          onClick={event => windows.open(id, event.currentTarget)}>{windowLabels[id]}</button>
+          onClick={event => { if (id === 'team') openTeam(event.currentTarget); else windows.open(id, event.currentTarget); }}>{windowLabels[id]}</button>
       ))}
       <button type="button" onClick={windows.resetLayout}>Restablecer distribución</button>
       <button type="button" onClick={() => void refresh()}>Actualizar vista</button>
@@ -2015,6 +2208,12 @@ export function GameScreen() {
       <CommsContent view={view} contacts={contacts} recipient={commRecipient} channel={commChannel} documentId={commDocument}
         text={commText} busy={busy} onRecipient={handleCommRecipient} onChannel={setCommChannel} onDocument={setCommDocument}
         onText={setCommText} onSend={sendCommunication} onAskReply={askAboutCommunication} />
+    </GameWindow>
+    <GameWindow id="team" title="Equipo A.C.M.E." state={windows.windows.team} {...windowProps}>
+      <TeamContent view={view} turns={teamTurns} draft={teamDraft} busy={busy} elenaBusy={teamElenaBusy} error={teamError}
+        analysisId={teamAnalysisId} detainOffers={view.offers.filter(offer => offer.action.type === 'detain')}
+        onAnalysis={setTeamAnalysisId} onService={(memberId, serviceId, targetId, trigger) => requestTeamService(memberId, serviceId, targetId, trigger)}
+        onOffer={(offer, trigger) => void startPreview(offer, trigger)} onDraft={setTeamDraft} onSendElena={event => void sendElenaMessage(event)} />
     </GameWindow>
     <GameWindow id="saves" title="Guardados" state={windows.windows.saves} {...windowProps}>
       <SavesContent view={view} saves={saves} savePhase={savePhase} saveName={saveName} replaceTarget={replaceTarget} loadTarget={loadTarget}

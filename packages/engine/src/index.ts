@@ -1,5 +1,6 @@
 import { submitCommunication, matureCommunication } from './communications.js';
 import { submitIrregular, irregularPreview } from './irregular.js';
+import { submitTeam } from './team.js';
 import { detentionPlan } from './arrest.js';
 import { startBatch, decideBatch } from './batch.js';
 import { materialMinutes, confirmation } from './timed-action.js';
@@ -462,6 +463,9 @@ function resolveWait(def: CaseDefinition, run: CaseRun, action: Action): ActionR
   return { status: 'applied', run: newRun, events };
 }
 
+function resolveTeam(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  return submitTeam(def, run, action.params);
+}
 function resolveCommunication(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
   return submitCommunication(def, run, action.params);
 }
@@ -538,7 +542,7 @@ const handlers: Readonly<Record<Action['type'], Handler>> = Object.freeze({
   request_warrant: (def, run, action) => requestWarrant(def, run, action.params),
   batch: resolveBatch, batch_decision: resolveBatchDecision, wait: resolveWait,
   communicate: resolveCommunication, detain: resolveDetention, recover: resolveRecovery, finish: resolveFinish,
-  irregular: resolveIrregular,
+  irregular: resolveIrregular, team: resolveTeam,
 });
 
 // ── Confirmación de acciones con coste ─────────────────────────────────────────
