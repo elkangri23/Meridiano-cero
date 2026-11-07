@@ -19,7 +19,10 @@ describe('integridad del expediente antes de persistirlo', () => {
     expect(hashDefinition(reordered)).not.toBe(hashDefinition(astrolabioDefinition));
   });
   it('conserva byte a byte el hash anterior a separar integridad del motor', () => {
-    const expected = '4dc888c2bf4e2e3b5bbecda1876353552cf5c79989f5cfd92571c146d9db505f';
+    // El hash cambió una sola vez al añadir `arrestType: 'automatic'` al
+    // expediente fijo (GDD §12): la huella sigue siendo estable a partir
+    // de aquí y cualquier cambio posterior debe actualizarla a conciencia.
+    const expected = '6ea8db16cdf0143e2141b66be49789aa431b23c57bbfb370ee6673a3226b562f';
     const digest = hashDefinition(astrolabioDefinition);
     expect(digest).toBe(expected);
     const run = createInitialRun(astrolabioDefinition, 'synthetic', 'synthetic', digest);

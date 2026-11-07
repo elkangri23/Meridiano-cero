@@ -1,15 +1,17 @@
 import { submitCommunication, matureCommunication } from './communications.js';
 import { submitIrregular, irregularPreview } from './irregular.js';
+import { detentionPlan } from './arrest.js';
 import { startBatch, decideBatch } from './batch.js';
 import { materialMinutes, confirmation } from './timed-action.js';
 import { appendRequest, pendingEvidence } from './requests.js';
-import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
+import { isFixedCase, ORIGINAL_OBJECT } from './fixed-case.js';
 import { revealInspection, canCollect, revealTalk, queryRule, matureEvidence, revealEvidence, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
-import { generatedAnalysis, generatedQueryRule, generatedSuspect, matureGeneratedEvidence, revealGeneratedInspection, revealGeneratedTalk } from './generated-mechanics.js';
+import { generatedAnalysis, generatedQueryRule, matureGeneratedEvidence, revealGeneratedInspection, revealGeneratedTalk } from './generated-mechanics.js';
 import { requestWarrant, matureSelectedWarrant } from './warrants.js';
 export { canIssueWarrant, knownSuspect } from './warrants.js';
 export { knowsEvidence } from './fixed-evidence.js';
 export { misconductFactsForNpc } from './irregular.js';
+export { arrestFactsForNpc } from './arrest.js';
 export { availableOffers } from './offers.js';
 export { liveObjectives, completeFinalReport, scoreForReport, SCORE_MAX, buildFinalReport } from './final-report.js';
 export type { ActionOffer } from './offers.js';
@@ -119,6 +121,23 @@ function previewAction(def: CaseDefinition, run: CaseRun, action: Action): Actio
     const preview = irregularPreview(def, run, action);
     if (!preview) return { status: 'impossible', run, events: [], reason: 'Acción irregular no disponible.' };
     return { status: 'confirmation_required', run, events: [], preview };
+  }
+  // La detención siempre pide confirmación (irreversible) y su
+  // descripción dice de qué modo es: en persona o coordinada con las
+  // autoridades (GDD §12). Sin plan válido, es imposible, con el mismo
+  // motivo que al confirmar.
+  if (action.type === 'detain') {
+    const suspectId = typeof action.params.suspectId === 'string' ? action.params.suspectId : undefined;
+    const plan = suspectId === undefined ? undefined : detentionPlan(def, run, suspectId, action.params.mode, action.params);
+    if (!plan?.ok) return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
+    const name = def.npcs.find(npc => npc.id === plan.suspect.id)?.name ?? plan.suspect.id;
+    const minutes = plan.minutes;
+    return { status: 'confirmation_required', run, events: [], preview: {
+      actionType: 'detain', estimatedMinutes: minutes, estimatedEndTime: run.minute + minutes,
+      description: action.params.mode === 'automatic'
+        ? `Coordinar la detención de ${name} con las autoridades (orden válida, ubicación conocida): ${minutes} minutos estimados. Las autoridades actúan; una detención errónea deja el resultado en «incorrecto».`
+        : `Detener a ${name} en persona (orden válida, ubicación conocida): ${minutes} minutos estimados. Una detención errónea deja el resultado en «incorrecto».`,
+    } };
   }
   const result = resolvePreview(def, run, action);
   requireTransitionVersion(run, result.run);
@@ -445,26 +464,19 @@ function resolveIrregular(def: CaseDefinition, run: CaseRun, action: Action): Ac
   return submitIrregular(def, run, action.params);
 }
 
-function detentionAuthorized(run: CaseRun, suspect: { id: string; cityId: string; locationId: string }, params: Record<string, unknown>): boolean {
-  const known = run.discoveries.includes('identity:' + suspect.id) && run.discoveries.includes('location:' + suspect.id);
-  const present = run.position.cityId === suspect.cityId && run.position.locationId === suspect.locationId;
-  const warrant = 'warrant:' + suspect.id;
-  return known && present && params.warrantId === warrant && run.warrants.includes(warrant);
-}
-
-function applyDetention(run: CaseRun, suspectId: string): ActionResult {
+function applyDetention(run: CaseRun, suspectId: string, mode: unknown): ActionResult {
   return { status: 'applied', run: { ...run, version: run.version + 1, detentions: [...run.detentions, suspectId] },
-    events: [makeEvent(run.minute, 'detain', { suspectId })] };
+    events: [makeEvent(run.minute, 'detain', { suspectId, mode: mode === 'automatic' ? 'automatic' : 'interactive' })] };
 }
 
 function resolveDetention(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
   const refuse = (reason: string): ActionResult => ({ status: 'impossible', run, events: [], reason });
   const suspectId = typeof action.params.suspectId === 'string' ? action.params.suspectId : undefined;
-  const suspect = suspectId === undefined ? undefined : (isFixedCase(def) ? fixedSuspect(suspectId) : generatedSuspect(def, suspectId));
-  if (!suspect || action.params.mode !== 'interactive' || action.params.locationId !== suspect.locationId) return refuse('Intervención no disponible.');
-  if (!detentionAuthorized(run, suspect, action.params)) return refuse('Intervención no disponible.');
-  if (run.detentions.includes(suspect.id)) return refuse('Detención ya realizada.');
-  return applyDetention(run, suspect.id);
+  if (suspectId === undefined) return refuse('Intervención no disponible.');
+  if (run.detentions.includes(suspectId)) return refuse('Detención ya realizada.');
+  const plan = detentionPlan(def, run, suspectId, action.params.mode, action.params);
+  if (!plan.ok) return refuse('Intervención no disponible.');
+  return applyDetention(run, plan.suspect.id, action.params.mode);
 }
 
 interface RecoveryTarget { objectId: string; cityId: string; locationId: string; evidenceId: string; requiresAccessWarrant: boolean }

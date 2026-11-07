@@ -69,12 +69,12 @@ describe('T2: confirmación, coste material y plazo', () => {
     const run = { ...initial(), position: { cityId: 'lisboa', locationId: 'LIS-ALM' },
       discoveries: ['identity:ines', 'location:ines'], warrants: ['warrant:ines', 'warrant:access'] };
     const action: Action = type === 'detain'
-      ? { type, params: { suspectId: 'ines', locationId: 'LIS-ALM', warrantId: 'warrant:ines', mode: 'interactive' } }
+      ? { type, params: { suspectId: 'ines', locationId: 'LIS-ALM', warrantId: 'warrant:ines', mode: 'automatic' } }
       : { type, params: { objectId: 'astrolabio-original' } };
     expect(resolveAction(def, run, action)).toMatchObject({ status: 'confirmation_required', run, events: [] });
     const result = confirmAction(def, run, action);
     expect(result.status).toBe('applied');
-    expect(result.run.minute).toBe(type === 'detain' ? 15 : 20);
+    expect(result.run.minute).toBe(type === 'detain' ? 30 : 20);
     const expired = confirmAction(def, { ...run, minute: def.deadlineMinutes - 1 }, action);
     expect(expired.status).toBe('case_closed');
     expect(expired.run.detentions).toEqual([]);

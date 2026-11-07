@@ -44,8 +44,10 @@ function order(s: Scenario, suspectId: string, evidenceIds: string[]) {
 }
 function detain(s: Scenario, suspectId: 'ines' | 'tomas') {
   s.step('talk', { npcId: suspectId, topicId: 'identidad' });
+  // El caso fijo es automático (GDD §12): la detención se coordina con
+  // las autoridades y no exige presencia en la ciudad del sospechoso.
   s.step('detain', { suspectId, warrantId: 'warrant:' + suspectId,
-    locationId: suspectId === 'ines' ? 'LIS-ALM' : 'MAD-SALA', mode: 'interactive' });
+    locationId: suspectId === 'ines' ? 'LIS-ALM' : 'MAD-SALA', mode: 'automatic' });
 }
 function finishOriginal(s: Scenario) {
   detain(s, 'ines');
@@ -108,7 +110,7 @@ function routeWithBatches(def: CaseDefinition, route: 'A' | 'B') {
   ] });
   s.step('batch', { steps: [
     { type: 'talk', params: { npcId: 'ines', topicId: 'identidad' } },
-    { type: 'detain', params: { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'interactive' } },
+    { type: 'detain', params: { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'automatic' } },
     { type: 'recover', params: { objectId: 'astrolabio-original' } },
     { type: 'finish', params: {} },
   ] });
@@ -121,7 +123,7 @@ describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
       evidence: astrolabioDefinition.evidence.filter(evidence => !['EV-06', 'EV-07', 'EV-08'].includes(evidence.id)) };
     const run = routeA(def);
     expect(run.finalReport?.result).toBe('complete');
-    expect(run.minute).toBe(seed === 14194 ? 545 : 455);
+    expect(run.minute).toBe(seed === 14194 ? 560 : 470);
     for (const id of ['EV-06', 'EV-07', 'EV-08']) expect([...run.discoveries, ...run.inventory]).not.toContain(id);
     expect(run.evidenceRecords?.['EV-03']).toMatchObject({ revealedMinute: 120, method: 'analyze', origin: 'MAD-SALA' });
     expect(run.position).toEqual({ cityId: 'lisboa', locationId: 'LIS-ALM' });
@@ -131,7 +133,7 @@ describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
       evidence: astrolabioDefinition.evidence.filter(evidence => !['EV-02', 'EV-03', 'EV-04', 'EV-05'].includes(evidence.id)) };
     const run = routeB(def);
     expect(run.finalReport?.result).toBe('complete');
-    expect(run.minute).toBe(seed === 14194 ? 575 : 485);
+    expect(run.minute).toBe(seed === 14194 ? 590 : 500);
     for (const id of ['EV-02', 'EV-03', 'EV-04', 'EV-05']) expect([...run.discoveries, ...run.inventory]).not.toContain(id);
     expect(run.evidenceRecords?.['EV-07']?.method).toBe('query');
   });
@@ -215,7 +217,7 @@ describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
   it('no detiene sin confirmar identidad ni recupera por adivinar un objeto', () => {
     const s = scenario(); prepareA(s); order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
     s.step('travel', { toCityId: 'lisboa' });
-    expect(s.attempt('detain', { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'interactive' }).status).toBe('impossible');
+    expect(s.attempt('detain', { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'automatic' }).status).toBe('impossible');
     expect(s.attempt('recover', { objectId: 'another-object' }).status).toBe('impossible');
     detain(s, 'ines');
     expect(s.step('finish', {}).run.finalReport?.result).toBe('partial');
@@ -251,7 +253,7 @@ describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
     expect(result.run.recoveredObjects).toEqual([]);
     expect(result.run.discoveries).not.toContain('EV-11');
   });
-  it.each([{ route: 'A' as const, minutes: 545 }, { route: 'B' as const, minutes: 575 }])('ruta $route sigue abierta con Lucía sin cooperación y ambos retrasos máximos', ({ route, minutes }) => {
+  it.each([{ route: 'A' as const, minutes: 560 }, { route: 'B' as const, minutes: 590 }])('ruta $route sigue abierta con Lucía sin cooperación y ambos retrasos máximos', ({ route, minutes }) => {
     const def = { ...astrolabioDefinition, seed: 14194,
       npcs: astrolabioDefinition.npcs.map(npc => npc.id === 'lucia' ? { ...npc, cooperation: 0 } : npc) };
     const s = scenario(def);
@@ -270,7 +272,7 @@ describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
     expect(s.read().discoveries).not.toContain('EV-09');
     prepareRoute(s, route); finishOriginal(s);
     expect(s.read().finalReport?.result).toBe('complete');
-    expect(s.read().minute).toBe(route === 'A' ? 545 : 575);
+    expect(s.read().minute).toBe(route === 'A' ? 560 : 590);
     expect(s.read().discoveries).not.toContain('EV-09');
   });
 

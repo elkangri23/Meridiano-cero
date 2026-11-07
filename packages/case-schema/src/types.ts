@@ -180,6 +180,12 @@ export interface CaseMechanics {
   recovery: MechanicsRecovery;
 }
 
+/** Tipo de detención del expediente (GDD §12): `automatic` la coordinan
+ * las autoridades con la orden válida y la ubicación conocida, sin que el
+ * detective viaje a detener en persona; `interactive` es la intervención
+ * en persona. El tipo se fija al generar el caso. */
+export type ArrestType = 'automatic' | 'interactive';
+
 /**
  * Textos narrativos de un expediente generado (T4-08). El caso fijo los
  * tiene hardcodeados en `fact-texts.ts`; los generados los traen aquí.
@@ -217,6 +223,10 @@ export interface CaseDefinition {
   travelDurations: TravelDuration[];
   scheduledResults: ScheduledResult[];
   validationReport: ValidationReport;
+  /** Tipo de detención del expediente (GDD §12). Opcional: sin él, la
+   * detención es interactiva (expedientes generados antes de esta entrega).
+   * El caso fijo lo declara; los generados lo fijan al ensamblar. */
+  arrestType?: ArrestType;
   /** Mecánica ejecutable (solo expedientes generados; el caso fijo usa su
    * vía propia). Ausente en el astrolabio: su hash no cambia. */
   mechanics?: CaseMechanics;

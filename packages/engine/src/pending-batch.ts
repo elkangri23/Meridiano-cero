@@ -32,7 +32,10 @@ const supportedTypes = new Set([...Object.keys(fields), 'wait', 'request_warrant
 
 function detentionParams(params: Data): boolean {
   if (Object.keys(params).sort().join(',') !== 'locationId,mode,suspectId,warrantId') return false;
-  return params.mode === 'interactive' && ['suspectId', 'warrantId', 'locationId'].every(key => id(params[key]));
+  // Ambos modos de detención (GDD §12): en persona o coordinada con las
+  // autoridades. Cualquier otro valor se rechaza sin efectos.
+  return (params.mode === 'interactive' || params.mode === 'automatic') &&
+    ['suspectId', 'warrantId', 'locationId'].every(key => id(params[key]));
 }
 
 function waitParams(params: Data): boolean {

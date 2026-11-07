@@ -1,10 +1,11 @@
 import type { CaseDefinition, CaseRun, NPC } from '@meridiano/case-schema';
-import { FORENSIC_TYPE_LABELS, forensicTypeForAnalysis } from '@meridiano/case-schema';
+import { ARREST_COORDINATION_MINUTES, arrestTypeOf, FORENSIC_TYPE_LABELS, forensicTypeForAnalysis } from '@meridiano/case-schema';
 import type { Action } from './types.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
 import { knowsEvidence, canCollect, queryRule, inspectedEvidence, listQueryIds, listInspectableElements, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
 import { canIssueWarrant, knownSuspect } from './warrants.js';
 import { irregularPlan, hasUnrevealedTalkFacts } from './irregular.js';
+import { detentionPlan } from './arrest.js';
 import { generatedAnalysis, generatedDetentionAvailable, generatedInspectLabel, generatedQueryRule, isGeneratedCase, listGeneratedInspectableElements } from './generated-mechanics.js';
 
 /**
@@ -48,14 +49,13 @@ function warrantPending(run: CaseRun, suspectId: string): boolean {
   });
 }
 
+/** Espejo de `detentionPlan` (arrest.ts): conocido, con orden y sin
+ * detener; presencia exacta solo en el modo interactivo. La automática
+ * se coordina desde cualquier ciudad, con la orden válida y la ubicación
+ * conocida. */
 function detentionAvailable(def: CaseDefinition, run: CaseRun, suspectId: string): boolean {
   if (!isFixedCase(def)) return generatedDetentionAvailable(def, run, suspectId);
-  const suspect = fixedSuspect(suspectId);
-  if (!suspect || !isFixedCase(def)) return false;
-  // Espejo de detentionAuthorized (index.ts): conocido, presente, con orden y sin detener.
-  const known = run.discoveries.includes('identity:' + suspect.id) && run.discoveries.includes('location:' + suspect.id);
-  const present = run.position.cityId === suspect.cityId && run.position.locationId === suspect.locationId;
-  return known && present && run.warrants.includes('warrant:' + suspect.id) && !run.detentions.includes(suspect.id);
+  return detentionPlan(def, run, suspectId, arrestTypeOf(def)).ok;
 }
 
 function inspectElementOffers(def: CaseDefinition, run: CaseRun, locationId: string): ActionOffer[] {
@@ -185,11 +185,22 @@ function warrantOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
       action: { type: 'request_warrant', params: { suspectId, evidenceIds: knownEvidenceIds } } }));
 }
 
+/** Oferta de detención: en persona en los casos interactivos, coordinada
+ * con las autoridades en los automáticos (GDD §12). El modo es el del
+ * expediente; la oferta solo aparece cuando el plan es viable. */
 function detainOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
+  const automatic = arrestTypeOf(def) === 'automatic';
   return suspectIds(def)
     .filter(suspectId => detentionAvailable(def, run, suspectId))
-    .map((suspectId): ActionOffer => ({ id: `detain:${suspectId}`, label: `Detener a ${npcName(def, suspectId)}`,
-      action: { type: 'detain', params: { suspectId, warrantId: 'warrant:' + suspectId, locationId: def.mechanics?.suspects.find(suspect => suspect.id === suspectId)?.locationId ?? fixedSuspect(suspectId)?.locationId ?? '', mode: 'interactive' } } }));
+    .map((suspectId): ActionOffer => {
+      const locationId = def.mechanics?.suspects.find(suspect => suspect.id === suspectId)?.locationId ?? fixedSuspect(suspectId)?.locationId ?? '';
+      return automatic
+        ? { id: `detain:${suspectId}`, label: `Coordinar la detención de ${npcName(def, suspectId)} con las autoridades`,
+          detail: `${ARREST_COORDINATION_MINUTES} min · orden válida · actúan las autoridades`,
+          action: { type: 'detain', params: { suspectId, warrantId: 'warrant:' + suspectId, locationId, mode: 'automatic' } } }
+        : { id: `detain:${suspectId}`, label: `Detener a ${npcName(def, suspectId)}`,
+          action: { type: 'detain', params: { suspectId, warrantId: 'warrant:' + suspectId, locationId, mode: 'interactive' } } };
+    });
 }
 
 function generatedRecoverOffer(def: CaseDefinition, run: CaseRun, access: boolean): ActionOffer[] {

@@ -3,8 +3,9 @@ import type { EntityGroups } from './validation-entities.js';
 
 const rootFields = 'catalogVersion,cities,contentMode,contentVersion,deadlineMinutes,difficulty,engineCompatibility,evidence,explorationMode,facts,id,locations,npcs,objectives,rules,scheduledResults,schemaVersion,seed,solution,travelDurations,validationReport';
 /** Campos opcionales de la raíz (T4-08): solo los traen los expedientes
- * generados; el caso fijo no los tiene y su hash no cambia. */
-const rootOptionalFields = 'briefing,catalogMeta,mechanics,texts';
+ * generados; el caso fijo no los tiene y su hash no cambia. `arrestType`
+ * es la excepción: el caso fijo lo declara (GDD §12) y su hash cambia. */
+const rootOptionalFields = 'arrestType,briefing,catalogMeta,mechanics,texts';
 const entityFields: Readonly<Record<keyof EntityGroups, string>> = {
   cities: 'country,id,name',
   locations: 'accessible,cityId,description,id,name',
@@ -37,6 +38,11 @@ function fieldsWithOptional(value: DataRecord, required: string, optional: strin
 /** No permite declarar políticas o efectos que el consumidor ignoraría. */
 export function validateShape(def: DataRecord, groups: EntityGroups, errors: string[]): void {
   check(fieldsWithOptional(def, rootFields, rootOptionalFields), 'definition campos no soportados o ausentes', errors);
+  // El tipo de detención, si se declara, solo admite los dos modos del
+  // GDD §12: automático (coordinado con autoridades) o interactivo.
+  if (def.arrestType !== undefined) {
+    check(def.arrestType === 'automatic' || def.arrestType === 'interactive', 'arrestType debe ser automatic o interactive', errors);
+  }
   for (const name of Object.keys(entityFields) as Array<keyof EntityGroups>) {
     for (const entry of groups[name]) {
       check(fieldsWithOptional(entry, entityFields[name], entityOptionalFields[name] ?? ''), name + ' campos no soportados o ausentes', errors);

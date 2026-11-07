@@ -1,12 +1,15 @@
 import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
-import { DOCUMENT_SEND_MINUTES, IRREGULAR_MINUTES } from '@meridiano/case-schema';
+import { ARREST_COORDINATION_MINUTES, DOCUMENT_SEND_MINUTES, IRREGULAR_MINUTES } from '@meridiano/case-schema';
 import type { Action, ActionResult } from './types.js';
 import { isFixedCase } from './fixed-case.js';
+import { DETENTION_INTERACTIVE_MINUTES } from './arrest.js';
 import { inspectedEvidence, knowsEvidence } from './fixed-evidence.js';
 import { generatedInspectEvidence } from './generated-mechanics.js';
 
 function inspectMinutes(run: CaseRun, action: Action, resolve: (targetId: string, element: string | undefined) => string | undefined): number {
-  if (action.type === 'detain') return 15;
+  // Detener en persona cuesta 15 min (SPEC-003); coordinar la detención
+  // con las autoridades, 30 min como un trámite (GDD §12).
+  if (action.type === 'detain') return action.params.mode === 'automatic' ? ARREST_COORDINATION_MINUTES : DETENTION_INTERACTIVE_MINUTES;
   if (action.type === 'recover') return 20;
   if (action.type !== 'inspect') return 0;
   const element = typeof action.params.elementId === 'string' ? action.params.elementId : undefined;

@@ -12,6 +12,9 @@ export const astrolabioDefinition: CaseDefinition = {
   catalogVersion: '1.0',
   deadlineMinutes: 2880,
   solution: 'ines-valera',
+  /** Tipo de detención del caso fijo (GDD §12): automática, coordinada con
+   * las autoridades; el jugador no viaja a detener en persona. */
+  arrestType: 'automatic',
   objectives: [
     { id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: false },
     { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false },

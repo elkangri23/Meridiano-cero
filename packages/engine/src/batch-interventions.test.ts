@@ -4,7 +4,7 @@ import { createInitialRun, resolveAction, confirmAction, EngineStateError } from
 import { astrolabioDefinition as def } from './fixtures/case-astrolabio.js';
 import type { Action } from './types.js';
 
-const detain: Action = { type: 'detain', params: { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'interactive' } };
+const detain: Action = { type: 'detain', params: { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'automatic' } };
 const recover: Action = { type: 'recover', params: { objectId: 'astrolabio-original' } };
 const proceed: Action = { type: 'batch_decision', params: { decision: 'continue_independent' } };
 function batch(steps: Action[], dependencies?: number[][]): Action {
@@ -20,14 +20,14 @@ function ready() {
 describe('T2: intervenciones en secuencias v9', () => {
   it('preview no altera estado ni desvela resultados y confirma costes individuales', () => {
     const run = ready(); const before = structuredClone(run); const action = batch([detain, recover]);
-    expect(resolveAction(def, run, action)).toMatchObject({ status: 'confirmation_required', run: before, events: [], preview: { estimatedMinutes: 35 } });
+    expect(resolveAction(def, run, action)).toMatchObject({ status: 'confirmation_required', run: before, events: [], preview: { estimatedMinutes: 50 } });
     expect(run).toEqual(before);
     const result = confirmAction(def, run, action);
     expect(result.status).toBe('applied');
-    expect(result.run.minute).toBe(35);
+    expect(result.run.minute).toBe(50);
     expect(result.run.detentions).toEqual(['ines']);
     expect(result.run.recoveredObjects).toEqual(['astrolabio-original']);
-    expect(result.run.evidenceRecords?.['EV-11']?.revealedMinute).toBe(35);
+    expect(result.run.evidenceRecords?.['EV-11']?.revealedMinute).toBe(50);
     expect(result.run.status).toBe('active');
     expect(result.events.map(event => event.type)).toEqual(['detain', 'recover', 'batch_completed']);
     const first = confirmAction(def, before, detain);
@@ -49,11 +49,11 @@ describe('T2: intervenciones en secuencias v9', () => {
     const run = ready();
     const paused = confirmAction(def, run, batch([detain, detain, recover], [[], [], []]));
     expect(paused.status).toBe('batch_paused');
-    expect(paused.run.minute).toBe(15);
+    expect(paused.run.minute).toBe(30);
     const saved = JSON.parse(JSON.stringify(paused.run)) as typeof run;
     expect(resolveAction(def, saved, proceed)).toMatchObject({ status: 'confirmation_required', run: saved, events: [], preview: { estimatedMinutes: 20 } });
     const result = confirmAction(def, saved, proceed);
-    expect(result.run.minute).toBe(35);
+    expect(result.run.minute).toBe(50);
     expect(result.run.detentions).toEqual(['ines']);
     expect(result.events.some(event => event.type === 'detain')).toBe(false);
     expect(result.events.filter(event => event.type === 'recover')).toHaveLength(1);
@@ -84,10 +84,12 @@ describe('T2: intervenciones en secuencias v9', () => {
     const run = { ...ready(), warrants: ['warrant:ines'] };
     const result = confirmAction(def, run, batch([detain, recover]));
     expect(result.status).toBe('batch_paused');
-    expect(result.run.minute).toBe(15);
+    expect(result.run.minute).toBe(30);
     expect(result.run.recoveredObjects).toEqual([]);
+    // La detención automática se coordina desde cualquier ciudad: detener
+    // desde Madrid funciona aunque la recuperación siga exigiendo presencia.
     const elsewhere = { ...ready(), position: { cityId: 'madrid', locationId: 'MAD-SALA' } };
-    expect(confirmAction(def, elsewhere, batch([detain])).run.detentions).toEqual([]);
+    expect(confirmAction(def, elsewhere, batch([detain])).run.detentions).toEqual(['ines']);
   });
   it('no ejecuta snapshots v8 con semántica v9', () => {
     const run = { ...ready(), engineVersion: 8 };

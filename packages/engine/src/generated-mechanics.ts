@@ -1,4 +1,6 @@
 import { EngineStateError } from './state-error.js';
+import { arrestTypeOf } from '@meridiano/case-schema';
+import { detentionPlan } from './arrest.js';
 import { knowsEvidence, revealEvidence } from './fixed-evidence.js';
 import type { CaseDefinition, CaseMechanics, CaseRun, MechanicsAnalysis, MechanicsQuery, MechanicsSuspect, ScheduledResult } from '@meridiano/case-schema';
 
@@ -163,12 +165,8 @@ export function generatedCanIssueWarrant(def: CaseDefinition, run: CaseRun, susp
   return suspect.warrantCombinations.some(has);
 }
 
-/** Espejo de `detentionAuthorized` (index.ts): conocido, presente, con orden
- * y sin detener. */
+/** Espejo de `detentionPlan` (arrest.ts): conocido, con orden y sin
+ * detener; presencia exacta solo en el modo interactivo. */
 export function generatedDetentionAvailable(def: CaseDefinition, run: CaseRun, suspectId: string): boolean {
-  const suspect = generatedSuspect(def, suspectId);
-  if (!suspect) return false;
-  const known = run.discoveries.includes('identity:' + suspect.id) && run.discoveries.includes('location:' + suspect.id);
-  const present = run.position.cityId === suspect.cityId && run.position.locationId === suspect.locationId;
-  return known && present && run.warrants.includes('warrant:' + suspect.id) && !run.detentions.includes(suspect.id);
+  return detentionPlan(def, run, suspectId, arrestTypeOf(def)).ok;
 }
