@@ -271,6 +271,20 @@ describe('simulateCase con ruta alternativa (GDD §4/§18)', () => {
     expect(result.diagnosis).toContain('EV-06');
   });
 
+  it('el diagnóstico de una alternativa dependiente nombra las evidencias seguras', () => {
+    const cosmetic = [
+      ...GOLDEN_PATH.slice(0, 20),
+      { type: 'wait', params: { minutes: 10 } },
+      ...GOLDEN_PATH.slice(20),
+    ];
+    const result = simulateCase(generadoFraudeDefinition, GOLDEN_PATH, 1440, cosmetic);
+    expect(result.diagnosis).toContain('candidatas para la combinación de la ruta alternativa');
+    // La cadena documental (EV-06/07/08) se obtiene sin la técnica.
+    expect(result.diagnosis).toContain('EV-06');
+    expect(result.diagnosis).toContain('EV-07');
+    expect(result.diagnosis).toContain('EV-08');
+  });
+
   it('rechaza una alternativa por encima del presupuesto', () => {
     const slow = [
       ...ALTERNATIVE_PATH.slice(0, 7),

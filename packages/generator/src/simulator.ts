@@ -660,6 +660,16 @@ function checkRouteIndependence(definition: CaseDefinition, ownLabel: 'dorada' |
   return { name: checkName, passed: false, detail: `La ruta ${ownLabel} necesita ${blocked.join(', ')}, que son evidencias de la ruta ${otherLabel}: cada ruta debe completarse solo con su propia cadena.` };
 }
 
+/** Evidencias que podrían formar la combinación de una ruta: obtenibles
+ * sin la cadena de la otra ruta. EV-01 (la observación inicial, común a
+ * todas las rutas) y EV-11 (el objeto de la recuperación) no cuentan. */
+function obtainableCandidates(definition: CaseDefinition, otherEvidence: string[]): string[] {
+  return definition.evidence
+    .map(entry => entry.id)
+    .filter(id => id !== 'EV-01' && id !== 'EV-11' && !otherEvidence.includes(id))
+    .filter(id => obtainableWithout(definition, id, new Set(otherEvidence)));
+}
+
 /** Diagnóstico de la simulación con dos rutas: primero la dorada, luego
  * la alternativa y, si ambas se juegan, la independencia entre ellas. */
 function diagnoseSimulation(definition: CaseDefinition, goldenPath: GoldenPathAction[], alternativePath: GoldenPathAction[] | undefined, budgetMinutes: number): string | null {
@@ -678,7 +688,14 @@ function diagnoseSimulation(definition: CaseDefinition, goldenPath: GoldenPathAc
     for (const [own, other, ownLabel, otherLabel] of pairs) {
       const blocked = own.filter(id => !obtainableWithout(definition, id, new Set(other)));
       if (blocked.length > 0) {
-        return `La ruta ${ownLabel} no es independiente de la ${otherLabel}: ${blocked.join(', ')} solo se obtiene con evidencias de la ruta ${otherLabel} (${other.join(', ')}). Cada ruta debe completarse solo con su propia cadena de evidencias: cambia la combinación de la orden o el requisito de la consulta que ata las dos cadenas.`;
+        // La reparación de 4b no puede arreglar la red: decirle al modelo
+        // qué evidencias SÍ valen para la otra combinación, o que no hay
+        // ninguna y el problema está en la red de pistas (etapa 4a).
+        const candidates = obtainableCandidates(definition, other);
+        const candidatesText = candidates.length > 0
+          ? `Evidencias que SÍ se pueden obtener sin la cadena ${otherLabel} (candidatas para la combinación de la ruta ${ownLabel}): ${candidates.join(', ')}.`
+          : `Ninguna evidencia fuera de la cadena ${otherLabel} se puede obtener sin ella: la red de pistas no admite dos rutas; cambia la combinación o el requisito que ata las dos cadenas.`;
+        return `La ruta ${ownLabel} no es independiente de la ${otherLabel}: ${blocked.join(', ')} solo se obtiene con evidencias de la ruta ${otherLabel} (${other.join(', ')}). Cada ruta debe completarse solo con su propia cadena de evidencias: cambia la combinación de la orden o el requisito de la consulta que ata las dos cadenas. ${candidatesText}`;
       }
     }
   }
