@@ -557,6 +557,16 @@ export function obtainableWithout(definition: CaseDefinition, evidenceId: string
   return obtainableWithoutVisited(definition, evidenceId, forbidden, new Set<string>());
 }
 
+function obtainableRecord(definition: CaseDefinition, evidenceId: string, forbidden: ReadonlySet<string>, visiting: Set<string>): boolean {
+  const queries = definition.mechanics?.queries.filter(entry => entry.evidenceId === evidenceId) ?? [];
+  return queries.some(query => query.requires.length === 0 || query.requires.some(id => obtainableWithoutVisited(definition, id, forbidden, visiting)));
+}
+
+function obtainableAnalysis(definition: CaseDefinition, evidenceId: string, forbidden: ReadonlySet<string>, visiting: Set<string>): boolean {
+  const analysis = definition.mechanics?.analyses.find(entry => entry.resultEvidenceId === evidenceId);
+  return analysis !== undefined && obtainableWithoutVisited(definition, analysis.inputEvidenceId, forbidden, visiting);
+}
+
 function obtainableWithoutVisited(definition: CaseDefinition, evidenceId: string, forbidden: ReadonlySet<string>, visiting: Set<string>): boolean {
   if (forbidden.has(evidenceId)) return false;
   if (visiting.has(evidenceId)) return false;
@@ -569,14 +579,10 @@ function obtainableWithoutVisited(definition: CaseDefinition, evidenceId: string
       case 'observation':
       case 'object':
         return mechanics.inspectables.some(entry => entry.evidenceId === evidenceId);
-      case 'record': {
-        const queries = mechanics.queries.filter(entry => entry.evidenceId === evidenceId);
-        return queries.some(query => query.requires.length === 0 || query.requires.some(id => obtainableWithoutVisited(definition, id, forbidden, visiting)));
-      }
-      case 'analysis': {
-        const analysis = mechanics.analyses.find(entry => entry.resultEvidenceId === evidenceId);
-        return analysis !== undefined && obtainableWithoutVisited(definition, analysis.inputEvidenceId, forbidden, visiting);
-      }
+      case 'record':
+        return obtainableRecord(definition, evidenceId, forbidden, visiting);
+      case 'analysis':
+        return obtainableAnalysis(definition, evidenceId, forbidden, visiting);
       case 'testimony':
         return mechanics.talkEvidence.some(entry => entry.evidenceId === evidenceId);
       default:
@@ -594,6 +600,21 @@ export interface WarrantRouteAnalysis {
   independentPairs: Array<{ first: number; second: number }>;
   /** Por qué no hay par válido (vacío cuando lo hay). */
   reasons: string[];
+}
+
+/** ¿Forman dos combinaciones un par de rutas válido? Disjuntas y cada una
+ * obtenible sin las evidencias de la otra. Devuelve los motivos cuando no. */
+function analyzeCombinationPair(definition: CaseDefinition, firstCombo: string[], secondCombo: string[], first: number, second: number): string[] {
+  const shared = firstCombo.filter(id => secondCombo.includes(id));
+  if (shared.length > 0) {
+    return [`Las combinaciones ${first + 1} y ${second + 1} comparten ${shared.join(', ')}: cada ruta necesita su propia cadena de evidencias.`];
+  }
+  const reasons: string[] = [];
+  const blockedFirst = firstCombo.filter(id => !obtainableWithout(definition, id, new Set(secondCombo)));
+  const blockedSecond = secondCombo.filter(id => !obtainableWithout(definition, id, new Set(firstCombo)));
+  if (blockedFirst.length > 0) reasons.push(`La combinación ${first + 1} necesita ${blockedFirst.join(', ')}, que solo se obtiene con evidencias de la combinación ${second + 1}.`);
+  if (blockedSecond.length > 0) reasons.push(`La combinación ${second + 1} necesita ${blockedSecond.join(', ')}, que solo se obtiene con evidencias de la combinación ${first + 1}.`);
+  return reasons;
 }
 
 /** ¿La mecánica del expediente admite dos rutas? El sospechoso solución
@@ -617,21 +638,9 @@ export function analyzeWarrantRoutes(definition: CaseDefinition): WarrantRouteAn
   const independentPairs: Array<{ first: number; second: number }> = [];
   for (let first = 0; first < combinations.length; first++) {
     for (let second = first + 1; second < combinations.length; second++) {
-      const firstCombo = combinations[first] ?? [];
-      const secondCombo = combinations[second] ?? [];
-      const shared = firstCombo.filter(id => secondCombo.includes(id));
-      if (shared.length > 0) {
-        reasons.push(`Las combinaciones ${first + 1} y ${second + 1} comparten ${shared.join(', ')}: cada ruta necesita su propia cadena de evidencias.`);
-        continue;
-      }
-      const blockedFirst = firstCombo.filter(id => !obtainableWithout(definition, id, new Set(secondCombo)));
-      const blockedSecond = secondCombo.filter(id => !obtainableWithout(definition, id, new Set(firstCombo)));
-      if (blockedFirst.length === 0 && blockedSecond.length === 0) {
-        independentPairs.push({ first, second });
-      } else {
-        if (blockedFirst.length > 0) reasons.push(`La combinación ${first + 1} necesita ${blockedFirst.join(', ')}, que solo se obtiene con evidencias de la combinación ${second + 1}.`);
-        if (blockedSecond.length > 0) reasons.push(`La combinación ${second + 1} necesita ${blockedSecond.join(', ')}, que solo se obtiene con evidencias de la combinación ${first + 1}.`);
-      }
+      const pairReasons = analyzeCombinationPair(definition, combinations[first] ?? [], combinations[second] ?? [], first, second);
+      if (pairReasons.length === 0) independentPairs.push({ first, second });
+      else reasons.push(...pairReasons);
     }
   }
   return { solutionId: solution.id, combinations, independentPairs, reasons };
