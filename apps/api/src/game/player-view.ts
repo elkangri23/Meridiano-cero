@@ -110,6 +110,14 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
       const text = evidenceText(evidence.id, definition.texts);
       return text ? [[evidence.id, text]] : [];
     })),
+    // Evidencias reveladas por un análisis del laboratorio, en orden de
+    // revelación: el motor registra el método en `evidenceRecords`, así
+    // que el laboratorio enseña el resultado sin re-derivar la regla y sin
+    // tocar el dossier (que lleva el hallazgo como `EV-xx`).
+    analysisResults: Object.entries(run.evidenceRecords ?? {})
+      .filter(([, record]) => record.method === 'analyze')
+      .sort(([, a], [, b]) => a.revealedMinute - b.revealedMinute)
+      .map(([id]) => id),
     pendingRequests: run.pendingRequests.map(request => {
       const payload = (request.payload ?? {}) as Record<string, unknown>;
       const method = payload.method;

@@ -20,6 +20,13 @@ function definition(rules: Array<{ inputEvidenceId: string; resultEvidenceId: st
   } as unknown as CaseDefinition;
 }
 
+/** Primer (y único) análisis de un fixture: sin él el test no tiene sentido. */
+function firstAnalysis(def: CaseDefinition) {
+  const analysis = def.mechanics?.analyses[0];
+  if (!analysis) throw new Error('el fixture no tiene análisis');
+  return analysis;
+}
+
 describe('tipos forenses', () => {
   it('los seis tipos del GDD §11 son canónicos', () => {
     expect([...FORENSIC_TYPES]).toEqual(['huellas', 'documentos', 'fotografias', 'audio', 'muestras', 'materiales']);
@@ -38,23 +45,23 @@ describe('tipos forenses', () => {
 
   it('el tipo declarado en la mecánica manda sobre la derivación', () => {
     const def = definition([{ inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90, forensicType: 'huellas' }]);
-    expect(forensicTypeForAnalysis(def, def.mechanics!.analyses[0]!)).toBe('huellas');
+    expect(forensicTypeForAnalysis(def, firstAnalysis(def))).toBe('huellas');
   });
 
   it('sin tipo declarado deriva del tipo de la evidencia de entrada', () => {
     const def = definition([{ inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90 }]);
-    expect(forensicTypeForAnalysis(def, def.mechanics!.analyses[0]!)).toBe('materiales');
+    expect(forensicTypeForAnalysis(def, firstAnalysis(def))).toBe('materiales');
     const record = definition([{ inputEvidenceId: 'EV-04', resultEvidenceId: 'EV-03', delayMinutes: 90 }]);
-    expect(forensicTypeForAnalysis(record, record.mechanics!.analyses[0]!)).toBe('documentos');
+    expect(forensicTypeForAnalysis(record, firstAnalysis(record))).toBe('documentos');
   });
 
   it('un tipo declarado no canónico se ignora y se deriva', () => {
     const def = definition([{ inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90, forensicType: 'adn' }]);
-    expect(forensicTypeForAnalysis(def, def.mechanics!.analyses[0]!)).toBe('materiales');
+    expect(forensicTypeForAnalysis(def, firstAnalysis(def))).toBe('materiales');
   });
 
   it('sin evidencia de entrada conocida usa materiales como respaldo', () => {
     const def = definition([{ inputEvidenceId: 'EV-99', resultEvidenceId: 'EV-03', delayMinutes: 90 }]);
-    expect(forensicTypeForAnalysis(def, def.mechanics!.analyses[0]!)).toBe('materiales');
+    expect(forensicTypeForAnalysis(def, firstAnalysis(def))).toBe('materiales');
   });
 });

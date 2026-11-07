@@ -50,23 +50,25 @@ test.describe('E2E laboratorio forense + terminal de inteligencia', () => {
     await openLab(page);
     // El laboratorio enseña el tipo, la prueba con su frase y la nota de procedimiento.
     const lab = page.getByRole('dialog', { name: 'Laboratorio y comunicaciones' });
-    await expect(lab).toContainText('Análisis de huellas');
+    await expect(lab).toContainText('Huellas y marcas');
     await expect(lab).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
     await expect(lab).toContainText('la ausencia de registro no demuestra inocencia');
-    // 90 min ≥ 60: pide diálogo de confirmación; pedirlo no avanza el reloj.
+    // Pedir el análisis no avanza el reloj (los 90 min son la espera del
+    // resultado, no el coste de la acción): va con un clic, sin diálogo.
     await page.getByTestId('offer-analyze:EV-02').click();
-    await expect(page.getByTestId('preview-dialog')).toBeVisible();
-    await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(page.getByTestId('clock')).toContainText('30 min');
     await expect(lab).toContainText('En curso: responde en el minuto 120');
     await page.keyboard.press('Escape');
-    // Tres esperas de 30 min maduran el análisis en el minuto 120.
+    // Tres esperas de 30 min maduran el análisis en el minuto 120. Al
+    // descubrirse el resultado, la oferta desaparece de la escena y el
+    // laboratorio se abre desde la barra de herramientas.
     for (const minute of [60, 90, 120]) {
       await page.getByTestId('offer-wait:30').click();
       await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
     }
-    await openLab(page);
+    await page.click('button:has-text("Laboratorio y comunicaciones")');
+    await expect(page.getByRole('dialog', { name: 'Laboratorio y comunicaciones' })).toBeVisible();
     await expect(lab).toContainText('Resultado: La huella técnica es compatible con una herramienta de la serie HV-17. No acusa a nadie por sí sola.');
     await page.keyboard.press('Escape');
     // El dossier enseña el resultado con su frase, no con el ID crudo.

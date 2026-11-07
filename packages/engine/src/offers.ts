@@ -1,7 +1,8 @@
 import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
+import { FORENSIC_TYPE_LABELS, forensicTypeForAnalysis } from '@meridiano/case-schema';
 import type { Action } from './types.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
-import { knowsEvidence, canCollect, queryRule, inspectedEvidence, listQueryIds, listInspectableElements } from './fixed-evidence.js';
+import { knowsEvidence, canCollect, queryRule, inspectedEvidence, listQueryIds, listInspectableElements, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
 import { canIssueWarrant, knownSuspect } from './warrants.js';
 import { generatedAnalysis, generatedDetentionAvailable, generatedInspectLabel, generatedQueryRule, isGeneratedCase, listGeneratedInspectableElements } from './generated-mechanics.js';
 
@@ -18,6 +19,8 @@ export interface ActionOffer {
   id: string;
   label: string;
   detail?: string;
+  /** Tipo forense del laboratorio, solo en ofertas de análisis (GDD §11). */
+  forensicType?: string;
   action: Action;
 }
 
@@ -131,12 +134,19 @@ function analyzeOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   if (isGeneratedCase(def)) {
     return (def.mechanics?.analyses ?? [])
       .filter(rule => generatedAnalysis(def, run, rule.inputEvidenceId))
-      .map((rule): ActionOffer => ({ id: `analyze:${rule.inputEvidenceId}`, label: `Analizar ${rule.inputEvidenceId} en el laboratorio`,
-        detail: `El resultado tarda ${rule.delayMinutes} min`, action: { type: 'analyze', params: { evidenceId: rule.inputEvidenceId } } }));
+      .map((rule): ActionOffer => {
+        const type = forensicTypeForAnalysis(def, rule);
+        return { id: `analyze:${rule.inputEvidenceId}`, label: `Análisis de ${FORENSIC_TYPE_LABELS[type].toLowerCase()} — ${rule.inputEvidenceId}`,
+          detail: `El resultado tarda ${rule.delayMinutes} min`, forensicType: type,
+          action: { type: 'analyze', params: { evidenceId: rule.inputEvidenceId } } };
+      });
   }
-  if (!isFixedCase(def) || !run.inventory.includes('EV-02') || run.discoveries.includes('EV-03')) return [];
-  return [{ id: 'analyze:EV-02', label: 'Analizar EV-02 en el laboratorio',
-    detail: 'El resultado tarda 90 min', action: { type: 'analyze', params: { evidenceId: 'EV-02' } } }];
+  if (!isFixedCase(def) || !run.inventory.includes(FIXED_ANALYSIS_RULE.inputEvidenceId)
+    || run.discoveries.includes(FIXED_ANALYSIS_RULE.resultEvidenceId)) return [];
+  const type = forensicTypeForAnalysis(def, FIXED_ANALYSIS_RULE);
+  return [{ id: `analyze:${FIXED_ANALYSIS_RULE.inputEvidenceId}`, label: `Análisis de ${FORENSIC_TYPE_LABELS[type].toLowerCase()} — ${FIXED_ANALYSIS_RULE.inputEvidenceId}`,
+    detail: `El resultado tarda ${FIXED_ANALYSIS_RULE.delayMinutes} min`, forensicType: type,
+    action: { type: 'analyze', params: { evidenceId: FIXED_ANALYSIS_RULE.inputEvidenceId } } }];
 }
 
 function travelOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {

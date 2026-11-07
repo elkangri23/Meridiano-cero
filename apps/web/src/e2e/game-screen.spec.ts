@@ -22,8 +22,8 @@ async function openGameScreen(page: Page) {
  * irreversibles (viajar, detener, recuperar, pedir orden, cerrar) enseñan
  * el diálogo de confirmación; las baratas (inspeccionar, hablar, recoger,
  * consultar, esperar) se ejecutan en el mismo clic (lote 2). El análisis
- * (90 min) también pide diálogo y vive en la ventana del laboratorio, no
- * en la escena: se pulsa aparte. */
+ * vive en la ventana del laboratorio y pedirlo tampoco avanza el reloj
+ * (los 90 min son la espera del resultado): se pulsa aparte. */
 async function playOffer(page: Page, testId: string, minute: number) {
   const needsDialog = /offer-(travel|detain|recover|request_warrant|finish)/.test(testId);
   await page.getByTestId(testId).click();
@@ -62,13 +62,11 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);
     await playOffer(page, 'offer-collect:EV-02', 30);
-    // El análisis vive en el laboratorio (90 min ≥ 60: pide diálogo) y
-    // madura en el minuto 120, durante la espera posterior.
+    // El análisis vive en el laboratorio y madura en el minuto 120,
+    // durante el viaje posterior. Pedirlo no avanza el reloj (los 90 min
+    // son la espera del resultado, no el coste de la acción).
     await page.getByTestId('open-lab').click();
     await page.getByTestId('offer-analyze:EV-02').click();
-    await expect(page.getByTestId('preview-dialog')).toBeVisible();
-    await page.getByTestId('preview-confirm').click();
-    await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(page.getByTestId('clock')).toContainText('30 min');
     await page.keyboard.press('Escape');
     await travelTo(page, 'paris', 210);

@@ -139,6 +139,12 @@ function lookupFromView(view: PlayerViewDto): DiscoveryLookup {
   };
 }
 
+/** Turno de memoria de conversación con hechos citados (la forma que
+ * guarda el director: `factIds` con lo que el personaje dijo). */
+function isMemoryTurn(value: unknown): value is { factIds: unknown[] } {
+  return !!value && typeof value === 'object' && Array.isArray((value as { factIds?: unknown }).factIds);
+}
+
 /** Textos del expediente que lleva la vista: sin ellos, `discoveryText`
  * traduce los hallazgos con los textos del caso fijo y un expediente
  * generado enseñaba en el dossier frases que no son las suyas. */
@@ -812,6 +818,25 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
   </div>;
 }
 
+/** Un análisis del laboratorio: su método forense, la prueba con su frase
+ * del expediente y su estado (disponible, en curso o con resultado). */
+function LabAnalysisItem({ offer, view, pendingAnalysis, disabled, onAnalyze }: {
+  offer: PublicActionOffer; view: PlayerViewDto; pendingAnalysis: PlayerViewDto['pendingRequests'][number] | undefined;
+  disabled: boolean; onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
+}) {
+  const inputId = typeof offer.action.params.evidenceId === 'string' ? offer.action.params.evidenceId : '';
+  const typeLabel = offer.forensicType && offer.forensicType in FORENSIC_TYPE_LABELS
+    ? FORENSIC_TYPE_LABELS[offer.forensicType as ForensicType]
+    : 'Análisis';
+  const evidence = view.evidenceTexts[inputId] ?? inputId;
+  return <li><span><strong>{typeLabel}</strong><small>{evidence}{offer.detail ? ` · ${offer.detail}` : ''}</small></span>
+    {pendingAnalysis
+      ? <span><small>En curso: responde en el minuto {pendingAnalysis.dueMinute} (ahora {view.clock.minute})</small></span>
+      : <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
+        onClick={event => onAnalyze(offer, event.currentTarget)}>Solicitar análisis</button></span>}
+  </li>;
+}
+
 function LabContent({ view, contacts, recipient, channel, text, busy, labOffers, disabled, onRecipient, onChannel, onText, onSend, onAnalyze, onOpenIntel }: {
   view: PlayerViewDto; contacts: Array<{ id: string; name: string }>; recipient: string; channel: string; text: string; busy: boolean;
   labOffers: PublicActionOffer[]; disabled: boolean;
@@ -819,30 +844,19 @@ function LabContent({ view, contacts, recipient, channel, text, busy, labOffers,
   onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenIntel: () => void;
 }) {
   // Un solo análisis por expediente: una solicitud de tipo análisis en
-  // curso es la de la oferta que se enseña, y su resultado es el hallazgo
-  // `analysis:<resultado>` del dossier.
+  // curso es la de la oferta que se enseña, y su resultado es la primera
+  // evidencia revelada por un análisis (la vista la trae en
+  // `analysisResults`, desde `evidenceRecords` del motor).
   const pendingAnalysis = view.pendingRequests.find(item => item.type === 'analysis');
-  const analysisResult = view.dossier.find(entry => entry.startsWith('analysis:'))?.slice('analysis:'.length);
+  const analysisResult = view.analysisResults[0];
   return <div>
     <h4>Laboratorio forense</h4>
     {labOffers.length === 0 && !analysisResult
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin pruebas para analizar. Recoge una prueba y el laboratorio ofrecerá el método que tenga sentido para ella.</p></div>
-      : <ul className="game-destination-list">{labOffers.map(offer => {
-        const inputId = typeof offer.action.params.evidenceId === 'string' ? offer.action.params.evidenceId : '';
-        const typeLabel = offer.forensicType && offer.forensicType in FORENSIC_TYPE_LABELS
-          ? FORENSIC_TYPE_LABELS[offer.forensicType as ForensicType]
-          : 'Análisis';
-        const evidence = view.evidenceTexts[inputId] ?? inputId;
-        return <li key={offer.id}><span><strong>{typeLabel}</strong><small>{evidence}{offer.detail ? ` · ${offer.detail}` : ''}</small></span>
-          {analysisResult
-            ? <span><small>Resultado: {view.evidenceTexts[analysisResult] ?? analysisResult}</small></span>
-            : pendingAnalysis
-              ? <span><small>En curso: responde en el minuto {pendingAnalysis.dueMinute} (ahora {view.clock.minute})</small></span>
-              : <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
-                onClick={event => onAnalyze(offer, event.currentTarget)}>Solicitar análisis</button></span>}
-        </li>;
-      })}</ul>}
-    {analysisResult && labOffers.length === 0 && <p>Resultado: {view.evidenceTexts[analysisResult] ?? analysisResult}</p>}
+      : <ul className="game-destination-list">{labOffers.map(offer => (
+        <LabAnalysisItem key={offer.id} offer={offer} view={view} pendingAnalysis={pendingAnalysis} disabled={disabled} onAnalyze={onAnalyze} />
+      ))}</ul>}
+    {analysisResult && <p>Resultado: {view.evidenceTexts[analysisResult] ?? analysisResult}</p>}
     <p className="game-panel-note">Nota de procedimiento: la ausencia de registro no demuestra inocencia. Un análisis solo dice lo que la prueba permite decir.</p>
     <p><button type="button" onClick={onOpenIntel}>Abrir la terminal de inteligencia</button></p>
     <h4>Solicitudes pendientes</h4>
@@ -1544,20 +1558,21 @@ export function GameScreen() {
     if (!view || !runId) return [];
     const heard: Array<{ id: string; text: string }> = [];
     const seen = new Set<string>();
+    const addFact = (entry: PlayerViewDto['npcChat'][number], factId: string) => {
+      const knowledge = entry.knowledge.find(item => item.id === factId);
+      if (knowledge && !seen.has(`${entry.id}:${factId}`)) {
+        seen.add(`${entry.id}:${factId}`);
+        heard.push({ id: `npc:${entry.id}:${factId}`, text: `${entry.name}: ${knowledge.text}` });
+      }
+    };
+    const addTurn = (entry: PlayerViewDto['npcChat'][number], turn: unknown) => {
+      if (!isMemoryTurn(turn)) return;
+      for (const factId of turn.factIds) if (typeof factId === 'string') addFact(entry, factId);
+    };
     for (const entry of view.npcChat) {
       const stored = loadStoredChat(`meridiano:chat:${runId}:${entry.id}`);
-      const memory = stored?.memory as { turns?: Array<{ factIds?: unknown }> } | null;
-      for (const turn of memory?.turns ?? []) {
-        if (!turn || typeof turn !== 'object' || !Array.isArray(turn.factIds)) continue;
-        for (const factId of turn.factIds) {
-          if (typeof factId !== 'string') continue;
-          const knowledge = entry.knowledge.find(item => item.id === factId);
-          if (knowledge && !seen.has(`${entry.id}:${factId}`)) {
-            seen.add(`${entry.id}:${factId}`);
-            heard.push({ id: `npc:${entry.id}:${factId}`, text: `${entry.name}: ${knowledge.text}` });
-          }
-        }
-      }
+      const memory = stored?.memory as { turns?: unknown[] } | null;
+      for (const turn of memory?.turns ?? []) addTurn(entry, turn);
     }
     return heard;
   }

@@ -1205,7 +1205,9 @@ describe('validación de la etapa 4 (tipo forense)', () => {
     const outputs = fakeOutputs(geography);
     const clues = { ...outputs.cluesWorld, ...structuredClone(outputs.cluesRules) };
     const mechanics = clues.mechanics as { analyses: Array<Record<string, unknown>> };
-    delete mechanics.analyses[0]!.forensicType;
+    const analysis = mechanics.analyses[0];
+    if (!analysis) throw new Error('el fixture no tiene análisis');
+    delete analysis.forensicType;
     const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
     expect(result.valid).toBe(false);
     expect(result.errors.some(error => error.includes('forensicType'))).toBe(true);
@@ -1216,7 +1218,9 @@ describe('validación de la etapa 4 (tipo forense)', () => {
     const outputs = fakeOutputs(geography);
     const clues = { ...outputs.cluesWorld, ...structuredClone(outputs.cluesRules) };
     const mechanics = clues.mechanics as { analyses: Array<Record<string, unknown>> };
-    mechanics.analyses[0]!.forensicType = 'adn';
+    const analysis = mechanics.analyses[0];
+    if (!analysis) throw new Error('el fixture no tiene análisis');
+    analysis.forensicType = 'adn';
     const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
     expect(result.valid).toBe(false);
     expect(result.errors.some(error => error.includes('forensicType'))).toBe(true);

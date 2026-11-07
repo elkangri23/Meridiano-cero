@@ -445,6 +445,13 @@ export interface PlayerViewDto {
    * mismos textos para mostrar resultados y responder solo con hechos
    * autorizados. */
   evidenceTexts: Record<string, string>;
+  /** Evidencias reveladas por un análisis del laboratorio (por id, en
+   * orden de revelación). El motor registra cómo se reveló cada evidencia
+   * (`evidenceRecords`, método `analyze`); la vista expone solo esos ids
+   * para que el laboratorio enseñe el resultado sin re-derivar la regla.
+   * El dossier lleva el hallazgo como `EV-xx` y el informe final lo
+   * cuenta por `knowsEvidence`, así que este campo no duplica nada. */
+  analysisResults: string[];
   pendingRequests: Array<{ id: string; type: 'analysis' | 'query' | 'request'; dueMinute: number }>;
   warrants: string[];
   detentions: string[];
@@ -745,6 +752,7 @@ function generalCollections(value: Record<string, unknown>): boolean {
   if (!publicObjects(value.objects) || !publicRequests(value.pendingRequests)) return false;
   if (!stringList(value.dossier, 1000, 128) || !stringList(value.conversation, 1000, 16000)) return false;
   if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
+  if (!stringList(value.analysisResults, 100, 128)) return false;
   if (!publicObjectives(value.objectives)) return false;
   if (!publicNpcChat(value.npcChat)) return false;
   if (!publicEvidenceTexts(value.evidenceTexts)) return false;
@@ -782,7 +790,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'analysisResults,batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;

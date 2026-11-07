@@ -431,6 +431,16 @@ function checkMechanicId(group: { key: string }, entry: Record<string, unknown>,
   if (typeof value === 'string' && value !== '' && !KEBAB_ID.test(value)) errors.push(`mechanics.${group.key}[${index}] ${idField} inválido: ${value} (minúsculas con guiones, sin acentos).`);
 }
 
+/** El tipo forense del análisis debe ser uno de los seis canónicos del
+ * GDD §11: el laboratorio solo ofrece el método que tiene sentido para esa
+ * prueba. */
+function checkForensicType(entry: Record<string, unknown>, index: number, errors: string[]): void {
+  if (typeof entry.forensicType !== 'string') return;
+  if (!FORENSIC_TYPES.includes(entry.forensicType as ForensicType)) {
+    errors.push(`mechanics.analyses[${index}] forensicType no canónico: ${entry.forensicType} (huellas, documentos, fotografías, audio, muestras o materiales).`);
+  }
+}
+
 function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[]): void {
   for (const group of MECHANIC_FIELDS) {
     const entries = mechanics[group.key];
@@ -447,13 +457,7 @@ function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[
         if (!ok) errors.push(`mechanics.${group.key}[${index}] debe tener ${field} (${kind}).`);
       }
       checkMechanicId(group, entry, index, errors);
-      // El tipo forense del análisis debe ser uno de los seis canónicos
-      // del GDD §11: el laboratorio solo ofrece el método que tiene
-      // sentido para esa prueba.
-      if (group.key === 'analyses' && typeof entry.forensicType === 'string'
-        && !FORENSIC_TYPES.includes(entry.forensicType as ForensicType)) {
-        errors.push(`mechanics.analyses[${index}] forensicType no canónico: ${entry.forensicType} (huellas, documentos, fotografías, audio, muestras o materiales).`);
-      }
+      if (group.key === 'analyses') checkForensicType(entry, index, errors);
       // El validador v1.5 exige delayMinutes entero entre 1 y 240: con 0 el
       // resultado queda en curso y el paso siguiente que lo necesita se
       // rechaza en la simulación sin que el diagnóstico de orden lo explique.

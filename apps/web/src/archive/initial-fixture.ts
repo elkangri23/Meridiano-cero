@@ -11,6 +11,7 @@ export const initialView: PlayerViewDto = {
   objects: [], dossier: [], conversation: [], pendingRequests: [], warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
   npcChat: [],
   evidenceTexts: {},
+  analysisResults: [],
   objectives: [
     { id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: false },
     { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false },

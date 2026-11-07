@@ -7,7 +7,11 @@ export interface GroupedOffers {
   inspect: PublicActionOffer[];
   /** A dónde se puede viajar desde aquí. */
   travel: PublicActionOffer[];
-  /** Resto de acciones (recoger, consultar, analizar, esperar, órdenes…). */
+  /** Análisis del laboratorio forense: fuera de la lista de la escena
+   * (la ventana «Laboratorio» es su propia herramienta), pero se siguen
+   * enviando por la misma ruta interpret del resto de ofertas. */
+  lab: PublicActionOffer[];
+  /** Resto de acciones (recoger, consultar, esperar, órdenes…). */
   other: PublicActionOffer[];
   /** Cerrar el caso, si está disponible. */
   finish: PublicActionOffer | undefined;
@@ -21,6 +25,7 @@ export function groupOffers(offers: PublicActionOffer[]): GroupedOffers {
   const talk: PublicActionOffer[] = [];
   const inspect: PublicActionOffer[] = [];
   const travel: PublicActionOffer[] = [];
+  const lab: PublicActionOffer[] = [];
   const other: PublicActionOffer[] = [];
   let finish: PublicActionOffer | undefined;
   for (const offer of offers) {
@@ -28,9 +33,10 @@ export function groupOffers(offers: PublicActionOffer[]): GroupedOffers {
       case 'talk': talk.push(offer); break;
       case 'inspect': inspect.push(offer); break;
       case 'travel': travel.push(offer); break;
+      case 'analyze': lab.push(offer); break;
       case 'finish': finish = offer; break;
       default: other.push(offer);
     }
   }
-  return { talk, inspect, travel, other, finish };
+  return { talk, inspect, travel, lab, other, finish };
 }

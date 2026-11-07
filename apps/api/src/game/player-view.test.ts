@@ -156,4 +156,18 @@ describe('objetivos en vivo de la vista del jugador', () => {
     expect(generated.evidenceTexts['EV-02']).toBe('Se localiza una caja de transporte vacía junto al espacio del manuscrito.');
     expect(isPlayerViewDto(generated)).toBe(true);
   });
+
+  it('la vista lleva el resultado del análisis desde evidenceRecords, sin tocar el dossier', () => {
+    const run = fullRun({
+      evidenceRecords: {
+        'EV-03': { revealedMinute: 120, origin: 'MAD-SALA', method: 'analyze' },
+        'EV-04': { revealedMinute: 240, origin: 'PAR-ARCH', method: 'query' },
+      },
+      discoveries: ['EV-03', 'EV-04'],
+    });
+    const view = playerViewDto(astrolabioDefinition, run, 0);
+    expect(view.analysisResults).toEqual(['EV-03']);
+    expect(view.dossier).toEqual(['EV-03', 'EV-04']);
+    expect(isPlayerViewDto(view)).toBe(true);
+  });
 });
