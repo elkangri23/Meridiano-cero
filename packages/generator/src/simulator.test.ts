@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generadoFraudeDefinition } from '@meridiano/engine';
-import { diagnoseGoldenPathFailure, simulateCase, type GoldenPathAction } from './simulator.js';
+import { analyzeWarrantRoutes, diagnoseGoldenPathFailure, obtainableWithout, simulateCase, warrantEvidenceOfPath, type GoldenPathAction } from './simulator.js';
 
 // La ruta dorada del fixture, como en el test del motor: inspeccionar,
 // recoger, analizar, hablar, consultar, viajar, orden, detener, recuperar.
@@ -207,5 +207,181 @@ describe('diagnoseGoldenPathFailure (recuperación sin acceso declarado)', () =>
     );
     const diagnosis = diagnoseGoldenPathFailure(definition, path, 1440);
     expect(diagnosis).toContain('accessEvidenceIds vacío');
+  });
+});
+
+// Ruta A técnica del fixture (la dorada del fixture es la B documental):
+// EV-02 -> análisis EV-03 -> consultas EV-04/EV-05 -> orden con EV-05 de
+// acceso -> detención en persona en Valencia -> recuperación.
+const ALTERNATIVE_PATH: GoldenPathAction[] = [
+  { type: 'inspect', params: { targetId: 'MAD-OFIC' } },
+  { type: 'inspect', params: { targetId: 'MAD-OFIC', elementId: 'cajon' } },
+  { type: 'collect', params: { evidenceId: 'EV-02' } },
+  { type: 'analyze', params: { evidenceId: 'EV-02' } },
+  { type: 'travel', params: { toCityId: 'barcelona' } },
+  { type: 'query', params: { topicId: 'registro-facturas' } },
+  { type: 'query', params: { topicId: 'registro-envios' } },
+  { type: 'wait', params: { minutes: 30 } },
+  { type: 'request_warrant', params: { suspectId: 'carmen', evidenceIds: ['EV-03', 'EV-04', 'EV-05'] } },
+  { type: 'wait', params: { minutes: 30 } },
+  { type: 'travel', params: { toCityId: 'valencia' } },
+  { type: 'talk', params: { npcId: 'carmen', topicId: 'identidad' } },
+  { type: 'detain', params: { suspectId: 'carmen', warrantId: 'warrant:carmen', locationId: 'VLC-ALM', mode: 'interactive' } },
+  { type: 'recover', params: { objectId: 'contrato-original' } },
+  { type: 'finish', params: {} },
+];
+
+describe('simulateCase con ruta alternativa (GDD §4/§18)', () => {
+  it('las dos rutas completan el caso dentro del presupuesto y son independientes', () => {
+    const result = simulateCase(generadoFraudeDefinition, GOLDEN_PATH, 1440, ALTERNATIVE_PATH);
+    expect(result.playable).toBe(true);
+    expect(result.result).toBe('complete');
+    expect(result.minute).toBe(475);
+    expect(result.alternative).toEqual({ minute: 335, result: 'complete', objectivesAchieved: ['obj-detener', 'obj-recuperar'] });
+    expect(result.checks.map(check => check.name)).toEqual([
+      'golden-path', 'early-finish', 'detain-without-warrant', 'recover-without-access',
+      'alternative-path', 'alternative-independent', 'golden-independent',
+    ]);
+    expect(result.checks.every(check => check.passed)).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.diagnosis).toBeNull();
+  });
+
+  it('sin ruta alternativa solo se comprueba la dorada, como antes', () => {
+    const result = simulateCase(generadoFraudeDefinition, GOLDEN_PATH, 1440);
+    expect(result.playable).toBe(true);
+    expect(result.alternative).toBeUndefined();
+    expect(result.checks.map(check => check.name)).toEqual(['golden-path', 'early-finish', 'detain-without-warrant', 'recover-without-access']);
+  });
+
+  it('rechaza una alternativa que es la misma ruta con otros waits (variación cosmética)', () => {
+    // Misma orden, mismos waits extra: se juega, pero no es una vía
+    // distinta — su combinación es la de la dorada.
+    const cosmetic = [
+      ...GOLDEN_PATH.slice(0, 20),
+      { type: 'wait', params: { minutes: 10 } },
+      ...GOLDEN_PATH.slice(20),
+    ];
+    const result = simulateCase(generadoFraudeDefinition, GOLDEN_PATH, 1440, cosmetic);
+    expect(result.playable).toBe(false);
+    expect(result.checks.find(check => check.name === 'alternative-path')?.passed).toBe(true);
+    expect(result.checks.find(check => check.name === 'alternative-independent')?.passed).toBe(false);
+    expect(result.checks.find(check => check.name === 'golden-independent')?.passed).toBe(false);
+    expect(result.diagnosis).toContain('no es independiente de la dorada');
+    expect(result.diagnosis).toContain('EV-06');
+  });
+
+  it('rechaza una alternativa por encima del presupuesto', () => {
+    const slow = [
+      ...ALTERNATIVE_PATH.slice(0, 7),
+      { type: 'wait', params: { minutes: 2000 } },
+      ...ALTERNATIVE_PATH.slice(7),
+    ];
+    const result = simulateCase(generadoFraudeDefinition, GOLDEN_PATH, 1440, slow);
+    expect(result.playable).toBe(false);
+    expect(result.errors.some(error => error.includes('alternativa') && error.includes('presupuesto'))).toBe(true);
+    expect(result.diagnosis).toContain('alternativa');
+    expect(result.diagnosis).toContain('presupuesto');
+  });
+
+  it('rechaza una alternativa que no cierra el caso', () => {
+    const short = ALTERNATIVE_PATH.slice(0, 10);
+    const result = simulateCase(generadoFraudeDefinition, GOLDEN_PATH, 1440, short);
+    expect(result.playable).toBe(false);
+    expect(result.diagnosis).toContain('alternativa');
+    expect(result.diagnosis).toContain('no cierra el caso');
+  });
+
+  it('rechaza una alternativa cuya orden usa una evidencia de la otra ruta', () => {
+    // La ruta B documental con EV-05 (cadena técnica) añadida a la orden:
+    // se juega, pero su evidencia de acceso pertenece a la otra cadena.
+    const shared = GOLDEN_PATH.map(action =>
+      action.type === 'request_warrant'
+        ? { ...action, params: { ...action.params, evidenceIds: ['EV-06', 'EV-07', 'EV-08', 'EV-05'] } }
+        : action,
+    );
+    const result = simulateCase(generadoFraudeDefinition, ALTERNATIVE_PATH, 1440, shared);
+    expect(result.playable).toBe(false);
+    expect(result.checks.find(check => check.name === 'alternative-path')?.passed).toBe(true);
+    expect(result.checks.find(check => check.name === 'alternative-independent')?.passed).toBe(false);
+    expect(result.diagnosis).toContain('no es independiente de la dorada');
+    expect(result.diagnosis).toContain('EV-05');
+  });
+});
+
+describe('obtainableWithout', () => {
+  it('una evidencia de análisis se obtiene sin la otra cadena', () => {
+    expect(obtainableWithout(generadoFraudeDefinition, 'EV-03', new Set(['EV-06', 'EV-07', 'EV-08']))).toBe(true);
+  });
+
+  it('un registro con requires «cualquiera de» se obtiene por la vía libre', () => {
+    // EV-08 exige EV-05 o EV-07: sin EV-05 se obtiene por EV-07.
+    expect(obtainableWithout(generadoFraudeDefinition, 'EV-08', new Set(['EV-05']))).toBe(true);
+    expect(obtainableWithout(generadoFraudeDefinition, 'EV-08', new Set(['EV-05', 'EV-07']))).toBe(false);
+  });
+
+  it('el objeto de la recuperación no se obtiene por ninguna vía', () => {
+    expect(obtainableWithout(generadoFraudeDefinition, 'EV-11', new Set())).toBe(false);
+  });
+
+  it('un ciclo de requisitos no sirve como vía', () => {
+    const definition = structuredClone(generadoFraudeDefinition);
+    const facturas = definition.mechanics?.queries.find(entry => entry.id === 'registro-facturas');
+    const envios = definition.mechanics?.queries.find(entry => entry.id === 'registro-envios');
+    if (!facturas || !envios) throw new Error('Sin consultas del fixture.');
+    facturas.requires = ['EV-05'];
+    envios.requires = ['EV-04'];
+    expect(obtainableWithout(definition, 'EV-04', new Set())).toBe(false);
+    expect(obtainableWithout(definition, 'EV-05', new Set())).toBe(false);
+  });
+});
+
+describe('analyzeWarrantRoutes', () => {
+  it('el fixture tiene dos combinaciones disjuntas e independientes', () => {
+    const analysis = analyzeWarrantRoutes(generadoFraudeDefinition);
+    expect(analysis.solutionId).toBe('carmen');
+    expect(analysis.combinations).toEqual([['EV-03', 'EV-04'], ['EV-06', 'EV-07', 'EV-08']]);
+    expect(analysis.independentPairs).toEqual([{ first: 0, second: 1 }]);
+    expect(analysis.reasons).toEqual([]);
+  });
+
+  it('una sola combinación no admite dos rutas', () => {
+    const definition = structuredClone(generadoFraudeDefinition);
+    const suspect = definition.mechanics?.suspects.find(entry => entry.id === 'carmen');
+    if (!suspect) throw new Error('Sin sospechosa en el fixture.');
+    suspect.warrantCombinations = [['EV-03', 'EV-04']];
+    const analysis = analyzeWarrantRoutes(definition);
+    expect(analysis.independentPairs).toEqual([]);
+    expect(analysis.reasons.join(' ')).toContain('una sola combinación');
+  });
+
+  it('dos combinaciones que comparten evidencia no son dos rutas', () => {
+    const definition = structuredClone(generadoFraudeDefinition);
+    const suspect = definition.mechanics?.suspects.find(entry => entry.id === 'carmen');
+    if (!suspect) throw new Error('Sin sospechosa en el fixture.');
+    suspect.warrantCombinations = [['EV-03', 'EV-04'], ['EV-04', 'EV-05']];
+    const analysis = analyzeWarrantRoutes(definition);
+    expect(analysis.independentPairs).toEqual([]);
+    expect(analysis.reasons.join(' ')).toContain('comparten EV-04');
+  });
+
+  it('una cadena que exige una evidencia de la otra no es independiente', () => {
+    // Como el caso generado-4b7a3c11: la primera combinación es [EV-03,
+    // EV-05] y la custodia (EV-08) exige solo EV-05.
+    const definition = structuredClone(generadoFraudeDefinition);
+    const suspect = definition.mechanics?.suspects.find(entry => entry.id === 'carmen');
+    const custody = definition.mechanics?.queries.find(entry => entry.id === 'custodia-contrato');
+    if (!suspect || !custody) throw new Error('Sin sospechosa ni custodia en el fixture.');
+    suspect.warrantCombinations = [['EV-03', 'EV-05'], ['EV-06', 'EV-07', 'EV-08']];
+    custody.requires = ['EV-05'];
+    const analysis = analyzeWarrantRoutes(definition);
+    expect(analysis.independentPairs).toEqual([]);
+    expect(analysis.reasons.join(' ')).toContain('EV-08');
+  });
+
+  it('warrantEvidenceOfPath recoge la orden de la ruta', () => {
+    expect(warrantEvidenceOfPath(GOLDEN_PATH, 'carmen')).toEqual(['EV-06', 'EV-07', 'EV-08']);
+    expect(warrantEvidenceOfPath(ALTERNATIVE_PATH, 'carmen')).toEqual(['EV-03', 'EV-04', 'EV-05']);
+    expect(warrantEvidenceOfPath(ALTERNATIVE_PATH)).toEqual(['EV-03', 'EV-04', 'EV-05']);
   });
 });

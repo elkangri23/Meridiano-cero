@@ -26,6 +26,12 @@ export interface SimulationCheck {
   detail: string;
 }
 
+export interface AlternativeRouteOutcome {
+  minute: number;
+  result: SimulationResult['result'];
+  objectivesAchieved: string[];
+}
+
 export interface SimulationResult {
   playable: boolean;
   minute: number;
@@ -38,6 +44,9 @@ export interface SimulationResult {
    * con los ids y el arreglo: es el feedback que recibe la reparación de
    * la etapa 4. Null cuando la ruta es jugable. */
   diagnosis: string | null;
+  /** Resultado de la ruta alternativa (GDD §4/§18): solo cuando se pasa
+   * `alternativePath` a `simulateCase`. */
+  alternative?: AlternativeRouteOutcome;
 }
 
 function freshRun(definition: CaseDefinition): CaseRun {
@@ -72,9 +81,9 @@ function applyGoldenStep(definition: CaseDefinition, run: CaseRun, action: Golde
   return { run: result.run, error: null };
 }
 
-function checkGoldenOutcome(definition: CaseDefinition, run: CaseRun): string | null {
-  if (run.status !== 'closed' || !run.finalReport) return 'La ruta dorada no cierra el caso.';
-  if (run.finalReport.result !== 'complete') return `La ruta dorada termina en ${run.finalReport.result}, no en completado.`;
+function checkPathOutcome(definition: CaseDefinition, run: CaseRun, label: 'dorada' | 'alternativa'): string | null {
+  if (run.status !== 'closed' || !run.finalReport) return `La ruta ${label} no cierra el caso.`;
+  if (run.finalReport.result !== 'complete') return `La ruta ${label} termina en ${run.finalReport.result}, no en completado.`;
   const missing = definition.objectives.map(objective => objective.id).filter(id => !run.finalReport?.objectivesAchieved.includes(id));
   if (missing.length > 0) return `Objetivos sin lograr: ${missing.join(', ')}.`;
   return null;
@@ -144,9 +153,9 @@ function pendingEvidence(run: CaseRun): Map<string, { dueMinute: number; method:
 }
 
 /** Paso de la ruta que pidió una evidencia pendiente, con su retardo. */
-function requestingStep(definition: CaseDefinition, goldenPath: GoldenPathAction[], index: number, evidenceId: string): { stepIndex: number; label: string; delayMinutes: number } | null {
+function requestingStep(definition: CaseDefinition, path: GoldenPathAction[], index: number, evidenceId: string): { stepIndex: number; label: string; delayMinutes: number } | null {
   for (let stepIndex = 0; stepIndex < index; stepIndex++) {
-    const action = goldenPath[stepIndex];
+    const action = path[stepIndex];
     if (!action) continue;
     if (action.type === 'query') {
       const rule = definition.mechanics?.queries.find(entry => entry.id === paramId(action, 'topicId'));
@@ -160,16 +169,16 @@ function requestingStep(definition: CaseDefinition, goldenPath: GoldenPathAction
   return null;
 }
 
-function pendingDiagnosis(definition: CaseDefinition, run: CaseRun, goldenPath: GoldenPathAction[], index: number, evidenceId: string): string | null {
+function pendingDiagnosis(definition: CaseDefinition, run: CaseRun, path: GoldenPathAction[], index: number, evidenceId: string): string | null {
   const pending = pendingEvidence(run);
   if (!pending.has(evidenceId)) return null;
-  const request = requestingStep(definition, goldenPath, index, evidenceId);
+  const request = requestingStep(definition, path, index, evidenceId);
   const wait = request ? Math.max(1, request.delayMinutes) : 30;
   const where = request ? `${request.label} en el paso ${request.stepIndex + 1}` : 'un paso anterior';
   return `${evidenceId} ya está pedida (${where}) pero su resultado aún no ha llegado: una consulta o un análisis no entrega su evidencia al instante, solo cuando pasa el tiempo. Añade un wait de al menos ${wait} min —o un viaje— después de ese paso, antes de usar ${evidenceId}.`;
 }
 
-function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
+function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, path: GoldenPathAction[], index: number, engineError: string): string {
   const step = `Paso ${index + 1} (query)`;
   const topicId = paramId(action, 'topicId');
   const rule = definition.mechanics?.queries.find(entry => entry.id === topicId);
@@ -183,7 +192,7 @@ function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenP
   if (rule.requires.length > 0 && !rule.requires.some(id => knowsEvidence(run, id))) {
     const pending = rule.requires.find(id => pendingEvidence(run).has(id));
     if (pending) {
-      const cause = pendingDiagnosis(definition, run, goldenPath, index, pending);
+      const cause = pendingDiagnosis(definition, run, path, index, pending);
       if (cause) return `${step}: la consulta «${topicId}» exige haber obtenido antes ${pending}. ${cause}`;
     }
     return `${step}: la consulta «${topicId}» exige haber obtenido antes al menos una de estas evidencias: ${rule.requires.join(', ')}. En este punto conoces: ${knownEvidenceList(run)}. Mueve la consulta DESPUÉS del paso que revela una de ellas.`;
@@ -194,7 +203,7 @@ function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenP
   return stepFallback(action, index, engineError);
 }
 
-function diagnoseRecover(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
+function diagnoseRecover(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, path: GoldenPathAction[], index: number, engineError: string): string {
   const step = `Paso ${index + 1} (recover)`;
   const recovery = definition.mechanics?.recovery;
   if (!recovery) return `${step}: la mecánica no declara ninguna recuperación.`;
@@ -207,11 +216,11 @@ function diagnoseRecover(definition: CaseDefinition, run: CaseRun, action: Golde
   if (recovery.requiresAccessWarrant && !run.warrants.includes('warrant:access') && !run.discoveries.includes('forced-entry')) {
     const suspect = definition.mechanics?.suspects.find(entry => entry.id === definition.solution);
     const accessIds = suspect?.accessEvidenceIds ?? [];
-    const requestIndex = goldenPath.slice(0, index).findIndex(entry => entry?.type === 'request_warrant');
+    const requestIndex = path.slice(0, index).findIndex(entry => entry?.type === 'request_warrant');
     if (requestIndex === -1) {
       return `${step}: la recuperación exige la orden de acceso (warrant:access) y la ruta no pide ninguna orden antes de recuperar. Pide la orden con request_warrant (con una evidencia de acceso entre sus evidenceIds) y espera 30 min a que madure antes de recuperar.`;
     }
-    const request = goldenPath[requestIndex];
+    const request = path[requestIndex];
     const evidenceIds = Array.isArray(request?.params.evidenceIds)
       ? request.params.evidenceIds.filter((id): id is string => typeof id === 'string')
       : [];
@@ -288,7 +297,7 @@ function diagnoseDetainWarrant(run: CaseRun, suspect: MechanicsSuspect, step: st
   return `${step}: no tienes la orden contra ${suspect.id}. Pide la orden con request_warrant usando una combinación completa de sus warrantCombinations (${JSON.stringify(suspect.warrantCombinations)}) y espera 30 min a que madure antes de detener.`;
 }
 
-function diagnoseRequestWarrant(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
+function diagnoseRequestWarrant(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, path: GoldenPathAction[], index: number, engineError: string): string {
   const step = `Paso ${index + 1} (request_warrant)`;
   const suspectId = paramId(action, 'suspectId');
   const suspect = definition.mechanics?.suspects.find(entry => entry.id === suspectId);
@@ -303,7 +312,7 @@ function diagnoseRequestWarrant(definition: CaseDefinition, run: CaseRun, action
   if (unknown.length > 0) {
     const pending = unknown.find(id => pendingEvidence(run).has(id));
     if (pending) {
-      const cause = pendingDiagnosis(definition, run, goldenPath, index, pending);
+      const cause = pendingDiagnosis(definition, run, path, index, pending);
       if (cause) return `${step}: ${pending} aún no se conoce. ${cause}`;
     }
     return `${step}: estas evidencias aún no se conocen: ${unknown.join(', ')}. Pide la orden solo con evidencias ya obtenidas.`;
@@ -352,18 +361,18 @@ function diagnoseInspect(definition: CaseDefinition, run: CaseRun, action: Golde
   return stepFallback(action, index, engineError);
 }
 
-function diagnoseAnalyze(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
+function diagnoseAnalyze(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, path: GoldenPathAction[], index: number, engineError: string): string {
   const step = `Paso ${index + 1} (analyze)`;
   const evidenceId = paramId(action, 'evidenceId');
   const rule = definition.mechanics?.analyses.find(entry => entry.inputEvidenceId === evidenceId);
   if (!rule) return `${step}: no hay ningún análisis declarado para ${evidenceId}.`;
   if (!run.inventory.includes(evidenceId)) {
-    const pending = pendingDiagnosis(definition, run, goldenPath, index, evidenceId);
+    const pending = pendingDiagnosis(definition, run, path, index, evidenceId);
     if (pending) return `${step}: ${evidenceId} aún no está en tu poder. ${pending}`;
     return `${step}: ${evidenceId} no está en tu poder: recógela antes de analizarla.`;
   }
   if (pendingEvidence(run).has(rule.resultEvidenceId)) {
-    const cause = pendingDiagnosis(definition, run, goldenPath, index, rule.resultEvidenceId);
+    const cause = pendingDiagnosis(definition, run, path, index, rule.resultEvidenceId);
     if (cause) return `${step}: el análisis de ${evidenceId} ya está en curso. ${cause}`;
   }
   if (knowsEvidence(run, rule.resultEvidenceId)) return `${step}: el análisis ya dio su resultado (${rule.resultEvidenceId} ya se conoce). Quita este paso.`;
@@ -389,15 +398,15 @@ function diagnoseTravel(definition: CaseDefinition, run: CaseRun, action: Golden
   return stepFallback(action, index, engineError);
 }
 
-function diagnoseStep(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {
+function diagnoseStep(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, path: GoldenPathAction[], index: number, engineError: string): string {
   switch (action.type) {
-    case 'query': return diagnoseQuery(definition, run, action, goldenPath, index, engineError);
-    case 'recover': return diagnoseRecover(definition, run, action, goldenPath, index, engineError);
+    case 'query': return diagnoseQuery(definition, run, action, path, index, engineError);
+    case 'recover': return diagnoseRecover(definition, run, action, path, index, engineError);
     case 'detain': return diagnoseDetain(definition, run, action, index, engineError);
-    case 'request_warrant': return diagnoseRequestWarrant(definition, run, action, goldenPath, index, engineError);
+    case 'request_warrant': return diagnoseRequestWarrant(definition, run, action, path, index, engineError);
     case 'collect': return diagnoseCollect(definition, run, action, index, engineError);
     case 'inspect': return diagnoseInspect(definition, run, action, index, engineError);
-    case 'analyze': return diagnoseAnalyze(definition, run, action, goldenPath, index, engineError);
+    case 'analyze': return diagnoseAnalyze(definition, run, action, path, index, engineError);
     case 'talk': return diagnoseTalk(definition, run, action, index, engineError);
     case 'travel': return diagnoseTravel(definition, run, action, index, engineError);
     default: return stepFallback(action, index, engineError);
@@ -405,56 +414,63 @@ function diagnoseStep(definition: CaseDefinition, run: CaseRun, action: GoldenPa
 }
 
 /**
- * Reproduce la ruta dorada paso a paso y explica el primer paso que el
+ * Reproduce una ruta paso a paso y explica el primer paso que el
  * motor rechaza (o el resultado cuando todos los pasos se aplican).
  * Devuelve null cuando la ruta es jugable y cierra el caso completo
- * dentro del presupuesto.
+ * dentro del presupuesto. `label` es 'dorada' o 'alternativa' y sale
+ * en los mensajes para que el modelo sepa qué ruta hay que arreglar.
  */
-export function diagnoseGoldenPathFailure(definition: CaseDefinition, goldenPath: GoldenPathAction[], budgetMinutes: number): string | null {
+export function diagnosePathFailure(definition: CaseDefinition, path: GoldenPathAction[], budgetMinutes: number, label: 'dorada' | 'alternativa'): string | null {
   let run = freshRun(definition);
-  for (let index = 0; index < goldenPath.length; index++) {
-    const action = goldenPath[index];
+  for (let index = 0; index < path.length; index++) {
+    const action = path[index];
     if (!action) continue;
     const step = applyGoldenStep(definition, run, action, index);
-    if (step.error) return diagnoseStep(definition, run, action, goldenPath, index, step.error);
+    if (step.error) return diagnoseStep(definition, run, action, path, index, step.error);
     run = step.run;
     if (run.status === 'closed') break;
   }
   if (run.status !== 'closed' || !run.finalReport) {
-    return 'La ruta dorada no cierra el caso: falta la acción finish al final, después de detener al sospechoso y recuperar el objeto.';
+    return `La ruta ${label} no cierra el caso: falta la acción finish al final, después de detener al sospechoso y recuperar el objeto.`;
   }
   if (run.finalReport.result !== 'complete') {
     const missing = definition.objectives
       .map(objective => objective.id)
       .filter(id => !run.finalReport?.objectivesAchieved.includes(id));
-    return `La ruta dorada termina en ${run.finalReport.result}, no en completado. Objetivos sin lograr: ${missing.join(', ') || 'ninguno marcado'}. Revisa que la ruta detenga al sospechoso solución y recupere el objeto, con los dos objetivos del expediente.`;
+    return `La ruta ${label} termina en ${run.finalReport.result}, no en completado. Objetivos sin lograr: ${missing.join(', ') || 'ninguno marcado'}. Revisa que la ruta detenga al sospechoso solución y recupere el objeto, con los dos objetivos del expediente.`;
   }
   if (run.minute > budgetMinutes) {
-    return `La ruta dorada tarda ${run.minute} min, por encima del presupuesto de ${budgetMinutes} min: acorta la ruta (menos esperas o viajes) o quita pasos que no revelan nada nuevo.`;
+    return `La ruta ${label} tarda ${run.minute} min, por encima del presupuesto de ${budgetMinutes} min: acorta la ruta (menos esperas o viajes) o quita pasos que no revelan nada nuevo.`;
   }
   return null;
 }
 
-function checkGoldenPath(definition: CaseDefinition, goldenPath: GoldenPathAction[], budgetMinutes: number): GoldenPathOutcome {
-  const fail = (detail: string, minute = 0): GoldenPathOutcome => ({ check: { name: 'golden-path', passed: false, detail }, minute, result: null, objectivesAchieved: [] });
+/** Atajo para la ruta dorada (la alternativa usa `diagnosePathFailure`). */
+export function diagnoseGoldenPathFailure(definition: CaseDefinition, goldenPath: GoldenPathAction[], budgetMinutes: number): string | null {
+  return diagnosePathFailure(definition, goldenPath, budgetMinutes, 'dorada');
+}
+
+function checkPath(definition: CaseDefinition, path: GoldenPathAction[], budgetMinutes: number, label: 'dorada' | 'alternativa'): GoldenPathOutcome {
+  const checkName = label === 'dorada' ? 'golden-path' : 'alternative-path';
+  const fail = (detail: string, minute = 0): GoldenPathOutcome => ({ check: { name: checkName, passed: false, detail }, minute, result: null, objectivesAchieved: [] });
   let run = freshRun(definition);
-  for (let index = 0; index < goldenPath.length; index++) {
-    const action = goldenPath[index];
+  for (let index = 0; index < path.length; index++) {
+    const action = path[index];
     if (!action) continue;
     const step = applyGoldenStep(definition, run, action, index);
     if (step.error) return fail(step.error, run.minute);
     run = step.run;
     if (run.status === 'closed') break;
   }
-  const outcomeError = checkGoldenOutcome(definition, run);
+  const outcomeError = checkPathOutcome(definition, run, label);
   if (outcomeError) return fail(outcomeError, run.minute);
   const report = run.finalReport;
-  if (!report) return fail('La ruta dorada no cierra el caso.', run.minute);
+  if (!report) return fail(`La ruta ${label} no cierra el caso.`, run.minute);
   if (run.minute > budgetMinutes) {
-    return fail(`La ruta dorada tarda ${run.minute} min, por encima del presupuesto de ${budgetMinutes} min.`, run.minute);
+    return fail(`La ruta ${label} tarda ${run.minute} min, por encima del presupuesto de ${budgetMinutes} min.`, run.minute);
   }
   return {
-    check: { name: 'golden-path', passed: true, detail: `Ruta dorada completa en ${run.minute} min (presupuesto ${budgetMinutes} min).` },
+    check: { name: checkName, passed: true, detail: `Ruta ${label} completa en ${run.minute} min (presupuesto ${budgetMinutes} min).` },
     minute: run.minute,
     result: report.result,
     objectivesAchieved: [...report.objectivesAchieved],
@@ -495,17 +511,199 @@ function checkRecoverWithoutAccess(definition: CaseDefinition): SimulationCheck 
   return { name: 'recover-without-access', passed: true, detail: 'Recuperar sin acceso es imposible.' };
 }
 
-/** Ejecuta las cuatro comprobaciones de jugabilidad sobre un expediente
+// ── Varias rutas (GDD §4/§18) ───────────────────────────────────────────────
+// Una «ruta alternativa» es una segunda vía de resolución distinta y
+// completa: otra cadena de evidencias que llega a orden + detención +
+// recuperación dentro del mismo presupuesto, sin usar ninguna evidencia
+// de la ruta dorada. No es una variación cosmética (otros waits, otro
+// orden de viajes): su combinación de orden es distinta y su cadena no
+// depende de la dorada. El precedente es el caso fijo (SPEC-003): la ruta
+// A técnica (EV-03/EV-04/EV-05) y la ruta B documental (EV-06/EV-07/EV-08)
+// se comprueban eliminando las evidencias exclusivas de la otra ruta.
+//
+// La independencia NO se comprueba repitiendo la ruta con la definición
+// mutilada: la ruta dorada de los generados hace consultas opcionales
+// (p. ej. el registro de envíos, que revela la ubicación) cuyos
+// resultados pertenecen a la otra cadena, y la repetición fallaría aunque
+// la orden no los necesite. Se comprueba sobre el grafo de obtención: cada
+// evidencia de la orden de una ruta debe poder obtenerse sin ninguna
+// evidencia de la orden de la otra (los `requires` de una consulta son
+// «cualquiera de»: basta una vía). La simulación completa demuestra que
+// cada ruta cierra el caso en plazo; este análisis demuestra que sus
+// cadenas decisivas son distintas.
+
+/** Evidencias de la orden que pide una ruta (unión de sus request_warrant
+ * para el sospechoso solución; incluye la evidencia de acceso cuando la
+ * ruta la añade a la combinación). */
+export function warrantEvidenceOfPath(path: GoldenPathAction[], suspectId?: string): string[] {
+  const ids: string[] = [];
+  for (const action of path) {
+    if (action.type !== 'request_warrant') continue;
+    if (suspectId !== undefined && paramId(action, 'suspectId') !== suspectId) continue;
+    const evidenceIds = Array.isArray(action.params.evidenceIds)
+      ? action.params.evidenceIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    for (const id of evidenceIds) if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+/** ¿Se puede obtener una evidencia sin usar ninguna de `forbidden`? Sigue
+ * el grafo de obtención de la mecánica: observación/objeto por
+ * inspeccionar, registro por consulta (basta UNO de sus `requires`),
+ * análisis por su entrada, testimonio por hablar. Los ciclos no sirven
+ * como vía (esa rama falla). Sin mecánica declarada no hay grafo. */
+export function obtainableWithout(definition: CaseDefinition, evidenceId: string, forbidden: ReadonlySet<string>): boolean {
+  return obtainableWithoutVisited(definition, evidenceId, forbidden, new Set<string>());
+}
+
+function obtainableWithoutVisited(definition: CaseDefinition, evidenceId: string, forbidden: ReadonlySet<string>, visiting: Set<string>): boolean {
+  if (forbidden.has(evidenceId)) return false;
+  if (visiting.has(evidenceId)) return false;
+  const evidence = definition.evidence.find(entry => entry.id === evidenceId);
+  const mechanics = definition.mechanics;
+  if (!evidence || !mechanics) return false;
+  visiting.add(evidenceId);
+  try {
+    switch (evidence.type) {
+      case 'observation':
+      case 'object':
+        return mechanics.inspectables.some(entry => entry.evidenceId === evidenceId);
+      case 'record': {
+        const queries = mechanics.queries.filter(entry => entry.evidenceId === evidenceId);
+        return queries.some(query => query.requires.length === 0 || query.requires.some(id => obtainableWithoutVisited(definition, id, forbidden, visiting)));
+      }
+      case 'analysis': {
+        const analysis = mechanics.analyses.find(entry => entry.resultEvidenceId === evidenceId);
+        return analysis !== undefined && obtainableWithoutVisited(definition, analysis.inputEvidenceId, forbidden, visiting);
+      }
+      case 'testimony':
+        return mechanics.talkEvidence.some(entry => entry.evidenceId === evidenceId);
+      default:
+        return false;
+    }
+  } finally {
+    visiting.delete(evidenceId);
+  }
+}
+
+export interface WarrantRouteAnalysis {
+  solutionId: string | null;
+  combinations: string[][];
+  /** Pares de combinaciones disjuntas e independientes entre sí (índices). */
+  independentPairs: Array<{ first: number; second: number }>;
+  /** Por qué no hay par válido (vacío cuando lo hay). */
+  reasons: string[];
+}
+
+/** ¿La mecánica del expediente admite dos rutas? El sospechoso solución
+ * debe tener al menos dos combinaciones de orden disjuntas, cada una
+ * obtenible sin las evidencias de la otra. Es la precondición estructural
+ * de la puerta (etapa 6): sin ella, ninguna pareja de rutas declaradas
+ * puede ser independiente. */
+export function analyzeWarrantRoutes(definition: CaseDefinition): WarrantRouteAnalysis {
+  const mechanics = definition.mechanics;
+  const solution = mechanics?.suspects.find(entry => entry.id === definition.solution);
+  if (!solution) {
+    return { solutionId: null, combinations: [], independentPairs: [], reasons: ['La mecánica no declara al sospechoso solución.'] };
+  }
+  const combinations = solution.warrantCombinations.filter((combo): combo is string[] => Array.isArray(combo));
+  const reasons: string[] = [];
+  if (combinations.length < 2) {
+    reasons.push(combinations.length === 0
+      ? 'El sospechoso solución no tiene ninguna combinación de orden: hacen falta al menos dos combinaciones disjuntas para dos rutas.'
+      : 'El sospechoso solución tiene una sola combinación de orden: hace falta una segunda combinación disjunta para la ruta alternativa.');
+  }
+  const independentPairs: Array<{ first: number; second: number }> = [];
+  for (let first = 0; first < combinations.length; first++) {
+    for (let second = first + 1; second < combinations.length; second++) {
+      const firstCombo = combinations[first] ?? [];
+      const secondCombo = combinations[second] ?? [];
+      const shared = firstCombo.filter(id => secondCombo.includes(id));
+      if (shared.length > 0) {
+        reasons.push(`Las combinaciones ${first + 1} y ${second + 1} comparten ${shared.join(', ')}: cada ruta necesita su propia cadena de evidencias.`);
+        continue;
+      }
+      const blockedFirst = firstCombo.filter(id => !obtainableWithout(definition, id, new Set(secondCombo)));
+      const blockedSecond = secondCombo.filter(id => !obtainableWithout(definition, id, new Set(firstCombo)));
+      if (blockedFirst.length === 0 && blockedSecond.length === 0) {
+        independentPairs.push({ first, second });
+      } else {
+        if (blockedFirst.length > 0) reasons.push(`La combinación ${first + 1} necesita ${blockedFirst.join(', ')}, que solo se obtiene con evidencias de la combinación ${second + 1}.`);
+        if (blockedSecond.length > 0) reasons.push(`La combinación ${second + 1} necesita ${blockedSecond.join(', ')}, que solo se obtiene con evidencias de la combinación ${first + 1}.`);
+      }
+    }
+  }
+  return { solutionId: solution.id, combinations, independentPairs, reasons };
+}
+
+/** Comprobación de independencia de una ruta: cada evidencia de su orden
+ * debe poder obtenerse sin ninguna evidencia de la orden de la otra ruta.
+ * Sin mecánica declarada (caso fijo) no se puede analizar: no se añade
+ * la comprobación. */
+function checkRouteIndependence(definition: CaseDefinition, ownLabel: 'dorada' | 'alternativa', ownEvidence: string[], otherLabel: 'dorada' | 'alternativa', otherEvidence: string[]): SimulationCheck | null {
+  if (definition.mechanics === undefined) return null;
+  const checkName = ownLabel === 'dorada' ? 'golden-independent' : 'alternative-independent';
+  const blocked = ownEvidence.filter(id => !obtainableWithout(definition, id, new Set(otherEvidence)));
+  if (blocked.length === 0) {
+    return { name: checkName, passed: true, detail: `La ruta ${ownLabel} no depende de las evidencias de la ruta ${otherLabel}.` };
+  }
+  return { name: checkName, passed: false, detail: `La ruta ${ownLabel} necesita ${blocked.join(', ')}, que son evidencias de la ruta ${otherLabel}: cada ruta debe completarse solo con su propia cadena.` };
+}
+
+/** Diagnóstico de la simulación con dos rutas: primero la dorada, luego
+ * la alternativa y, si ambas se juegan, la independencia entre ellas. */
+function diagnoseSimulation(definition: CaseDefinition, goldenPath: GoldenPathAction[], alternativePath: GoldenPathAction[] | undefined, budgetMinutes: number): string | null {
+  const goldenDiagnosis = diagnosePathFailure(definition, goldenPath, budgetMinutes, 'dorada');
+  if (goldenDiagnosis) return goldenDiagnosis;
+  if (alternativePath === undefined) return null;
+  const alternativeDiagnosis = diagnosePathFailure(definition, alternativePath, budgetMinutes, 'alternativa');
+  if (alternativeDiagnosis) return alternativeDiagnosis;
+  if (definition.mechanics !== undefined) {
+    const goldenWarrant = warrantEvidenceOfPath(goldenPath, definition.solution);
+    const alternativeWarrant = warrantEvidenceOfPath(alternativePath, definition.solution);
+    const pairs: Array<[string[], string[], 'dorada' | 'alternativa', 'dorada' | 'alternativa']> = [
+      [alternativeWarrant, goldenWarrant, 'alternativa', 'dorada'],
+      [goldenWarrant, alternativeWarrant, 'dorada', 'alternativa'],
+    ];
+    for (const [own, other, ownLabel, otherLabel] of pairs) {
+      const blocked = own.filter(id => !obtainableWithout(definition, id, new Set(other)));
+      if (blocked.length > 0) {
+        return `La ruta ${ownLabel} no es independiente de la ${otherLabel}: ${blocked.join(', ')} solo se obtiene con evidencias de la ruta ${otherLabel} (${other.join(', ')}). Cada ruta debe completarse solo con su propia cadena de evidencias: cambia la combinación de la orden o el requisito de la consulta que ata las dos cadenas.`;
+      }
+    }
+  }
+  return null;
+}
+
+/** Ejecuta las comprobaciones de jugabilidad sobre un expediente
  * generado. `budgetMinutes` es el plazo de la partida más difícil (la mitad
- * del plazo base del expediente): la ruta dorada debe caber ahí. */
-export function simulateCase(definition: CaseDefinition, goldenPath: GoldenPathAction[], budgetMinutes: number): SimulationResult {
-  const golden = checkGoldenPath(definition, goldenPath, budgetMinutes);
+ * del plazo base del expediente): cada ruta debe caber ahí. Con
+ * `alternativePath`, la puerta exige además que la segunda ruta complete
+ * el caso y que ambas sean independientes (GDD §4/§18); sin ella, solo se
+ * comprueba la ruta dorada, como antes. */
+export function simulateCase(definition: CaseDefinition, goldenPath: GoldenPathAction[], budgetMinutes: number, alternativePath?: GoldenPathAction[]): SimulationResult {
+  const golden = checkPath(definition, goldenPath, budgetMinutes, 'dorada');
   const checks = [
     golden.check,
     checkEarlyFinish(definition),
     checkDetainWithoutWarrant(definition),
     checkRecoverWithoutAccess(definition),
   ];
+  let alternative: AlternativeRouteOutcome | undefined;
+  if (alternativePath !== undefined) {
+    const alt = checkPath(definition, alternativePath, budgetMinutes, 'alternativa');
+    checks.push(alt.check);
+    if (alt.check.passed) alternative = { minute: alt.minute, result: alt.result, objectivesAchieved: alt.objectivesAchieved };
+    if (definition.mechanics !== undefined) {
+      const goldenWarrant = warrantEvidenceOfPath(goldenPath, definition.solution);
+      const alternativeWarrant = warrantEvidenceOfPath(alternativePath, definition.solution);
+      const alternativeIndependent = checkRouteIndependence(definition, 'alternativa', alternativeWarrant, 'dorada', goldenWarrant);
+      const goldenIndependent = checkRouteIndependence(definition, 'dorada', goldenWarrant, 'alternativa', alternativeWarrant);
+      if (alternativeIndependent) checks.push(alternativeIndependent);
+      if (goldenIndependent) checks.push(goldenIndependent);
+    }
+  }
   const errors = checks.filter(check => !check.passed).map(check => check.detail);
   return {
     playable: errors.length === 0,
@@ -515,6 +713,7 @@ export function simulateCase(definition: CaseDefinition, goldenPath: GoldenPathA
     objectivesAchieved: golden.objectivesAchieved,
     checks,
     errors,
-    diagnosis: errors.length > 0 ? diagnoseGoldenPathFailure(definition, goldenPath, budgetMinutes) : null,
+    diagnosis: errors.length > 0 ? diagnoseSimulation(definition, goldenPath, alternativePath, budgetMinutes) : null,
+    ...(alternative !== undefined ? { alternative } : {}),
   };
 }
