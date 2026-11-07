@@ -1,4 +1,4 @@
-import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary, GenerationJobDto } from '@meridiano/contracts';
+import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary, CaseImportResultDto, GenerationJobDto } from '@meridiano/contracts';
 import type { ArchiveApi, CreationParams, Filter, GenerationJobParams } from './client';
 import { ArchiveError } from './client';
 import { browserIntents, createRunCoordinator } from './creation';
@@ -30,6 +30,12 @@ function jobFinishedNotice(job: GenerationJobDto, cases: CaseSummary[]): string 
   }
   if (job.status === 'failed') return job.error ? `La generación falló: ${job.error}` : 'La generación falló. Los borradores inválidos se rechazan, no se ofrecen.';
   return 'Generación cancelada.';
+}
+
+function importNotice(result: CaseImportResultDto): string {
+  const warnings = result.warnings.length ? ` Avisos: ${result.warnings.join(' ')}` : '';
+  const known = result.alreadyExisted ? ' Ya estaba en tu catálogo: no se ha duplicado.' : '';
+  return `Expediente importado: ${result.title}. Ya está en el catálogo: elígelo arriba en «Nueva partida».${known}${warnings}`;
 }
 type Ticket = { signal: AbortSignal; current: () => boolean };
 
@@ -228,6 +234,41 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
       if (ticket.current()) set({ ...state, notice: 'No se pudo cancelar la generación. Actualiza el archivo para comprobarlo.' });
     }
   }
+  // Intercambio de expedientes (T4-05 expuesto): descargar el propio y
+  // importar uno validado. La descarga la dispara el componente con el
+  // blob; la importación recarga el catálogo para que el expediente nuevo
+  // aparezca en el formulario de nueva partida.
+  async function exportCase(caseId: string): Promise<{ blob: Blob; filename: string } | null> {
+    if (disposed || !session || state.phase !== 'ready') return null;
+    const identity = session; const ticket = begin();
+    try {
+      const blob = await api.exportCase(caseId, identity, ticket.signal);
+      if (!ticket.current()) return null;
+      set({ ...state, notice: 'Expediente descargado. Contiene la solución: compártelo solo con quien quieras que lo juegue.' });
+      return { blob, filename: `meridiano-caso-${caseId}.json` };
+    } catch (error) {
+      if (!ticket.current()) return null;
+      const detail = error instanceof ArchiveError ? error.detail : undefined;
+      set({ ...state, notice: detail ?? 'No se pudo descargar el expediente. Reinténtalo más tarde.' });
+      return null;
+    }
+  }
+  async function importCase(fileText: string): Promise<void> {
+    if (disposed || !session || state.phase !== 'ready') return;
+    const identity = session; const ticket = begin();
+    set({ ...state, notice: 'Validando el expediente importado…' });
+    try {
+      const result = await api.importCase(fileText, identity, ticket.signal);
+      if (!ticket.current()) return;
+      const catalog = await api.cases(ticket.signal);
+      if (!ticket.current()) return;
+      set({ ...state, cases: catalog.items, notice: importNotice(result) });
+    } catch (error) {
+      if (!ticket.current()) return;
+      const detail = error instanceof ArchiveError ? error.detail : undefined;
+      set({ ...state, notice: detail ?? 'No se pudo importar el expediente. Reinténtalo más tarde.' });
+    }
+  }
   return {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
@@ -248,6 +289,7 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
     },
     deleteRun,
     refreshJobs, createGeneration, cancelGeneration,
+    exportCase, importCase,
     filter: (value: Filter) => navigate(value, null, []),
     next: () => state.page?.nextCursor ? navigate(state.filter, state.page.nextCursor, [...state.previous, state.cursor]) : Promise.resolve(),
     back: () => state.previous.length ? navigate(state.filter, state.previous.at(-1) ?? null, state.previous.slice(0, -1)) : Promise.resolve(),

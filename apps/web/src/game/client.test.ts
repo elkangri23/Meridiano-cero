@@ -42,7 +42,7 @@ describe('T3: frontera HTTP de la pantalla de juego', () => {
   });
   it('catálogo lista casos y rechaza reglas privadas', async () => {
     const caseItem = { caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal',
-      explorationMode: 'guided', deadlineMinutes: 480, contentVersion: 14, canStart: true } as const;
+      explorationMode: 'guided', deadlineMinutes: 480, contentVersion: 14, canStart: true, ownedByMe: false } as const;
     const fetcher = respond({ items: [caseItem], nextCursor: null });
     expect(await gameApi.catalog(signal())).toEqual([caseItem]);
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/cases');

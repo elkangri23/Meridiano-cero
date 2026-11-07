@@ -1,6 +1,6 @@
 import { initialView } from './initial-fixture';
 import { describe, expect, it, vi } from 'vitest';
-import type { RunListDto, SessionDto } from '@meridiano/contracts';
+import type { CaseSummary, RunListDto, SessionDto } from '@meridiano/contracts';
 import { createArchiveModel } from './model';
 import type { ArchiveApi } from './client';
 import { ArchiveError } from './client';
@@ -16,6 +16,8 @@ function api() {
     generationJobs: vi.fn<ArchiveApi['generationJobs']>().mockResolvedValue({ items: [] }),
     createGenerationJob: vi.fn<ArchiveApi['createGenerationJob']>(),
     cancelGenerationJob: vi.fn<ArchiveApi['cancelGenerationJob']>(),
+    exportCase: vi.fn<ArchiveApi['exportCase']>(),
+    importCase: vi.fn<ArchiveApi['importCase']>(),
     me: vi.fn<ArchiveApi['me']>().mockResolvedValue(identity), connect: vi.fn<ArchiveApi['connect']>().mockResolvedValue(identity),
     list: vi.fn<ArchiveApi['list']>().mockResolvedValue(page), logout: vi.fn<ArchiveApi['logout']>().mockResolvedValue() };
 }
@@ -93,7 +95,7 @@ describe('T3: archivo, cuenta y respuestas tardías', () => {
   it('catálogo permite crear una vez; doble activación no envía otro POST y confirmación no expone clave', async () => {
     const transport = api(); const data = new Map<string, string>();
     const memory = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); }, removeItem: (key: string) => { data.delete(key); } };
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 100, contentVersion: 1, canStart: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 100, contentVersion: 1, canStart: true, ownedByMe: false }], nextCursor: null });
     const delayed = deferred<void>(); transport.create.mockReturnValue(delayed.promise);
     transport.lookup.mockResolvedValue({ schemaVersion: 1, kind: 'create_run', status: 'committed', runId });
     const model = createArchiveModel(transport, memory); await model.refresh();
@@ -155,7 +157,7 @@ describe('T4-08: generación de casos en el archivo', () => {
     const transport = api(); const model = createArchiveModel(transport); await model.refresh();
     const done = { ...job, status: 'done' as const, caseId: 'generado-fraude-1', stage: 9 };
     transport.generationJobs.mockResolvedValue({ items: [done] });
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true }], nextCursor: null });
     await model.refreshJobs();
     expect(model.getSnapshot().jobs).toEqual([done]);
     expect(model.getSnapshot().cases.map(item => item.caseId)).toContain('generado-fraude-1');
@@ -167,7 +169,7 @@ describe('T4-08: generación de casos en el archivo', () => {
     expect(model.getSnapshot().notice).toContain('en cola');
     const done = { ...job, status: 'done' as const, caseId: 'generado-fraude-1', stage: 9 };
     transport.generationJobs.mockResolvedValue({ items: [done] });
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true }], nextCursor: null });
     await model.refreshJobs();
     expect(model.getSnapshot().notice).toContain('Expediente listo: Caso sintético generado');
     expect(model.getSnapshot().notice).not.toContain('en cola');
@@ -183,6 +185,42 @@ describe('T4-08: generación de casos en el archivo', () => {
     transport.generationJobs.mockResolvedValue({ items: [failed] });
     await model.refreshJobs();
     expect(model.getSnapshot().notice).toContain('La generación falló: Etapa 4 inválida');
+  });
+});
+
+describe('T4-05: intercambio de expedientes en el archivo', () => {
+  const importedCase: CaseSummary = { caseId: 'importado-1a2b3c4d', title: 'Caso importado', contentMode: 'generated', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true };
+  it('exportar devuelve el fichero y avisa de que contiene la solución', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    const blob = new Blob(['{"version":"1.0.0"}'], { type: 'application/json' });
+    transport.exportCase.mockResolvedValue(blob);
+    const file = await model.exportCase('generado-1');
+    expect(file).toEqual({ blob, filename: 'meridiano-caso-generado-1.json' });
+    expect(model.getSnapshot().notice).toContain('Contiene la solución');
+    transport.exportCase.mockRejectedValueOnce(new ArchiveError('unavailable', 'Este expediente no es tuyo: solo su dueño puede descargarlo.'));
+    expect(await model.exportCase('generado-1')).toBeNull();
+    expect(model.getSnapshot().notice).toBe('Este expediente no es tuyo: solo su dueño puede descargarlo.');
+  });
+  it('importar recarga el catálogo y anuncia el expediente nuevo', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    transport.importCase.mockResolvedValue({ caseId: importedCase.caseId, title: importedCase.title, canStart: true, warnings: [], alreadyExisted: false });
+    transport.cases.mockResolvedValue({ items: [importedCase], nextCursor: null });
+    await model.importCase('{"version":"1.0.0"}');
+    expect(transport.importCase).toHaveBeenCalledWith('{"version":"1.0.0"}', identity, expect.anything());
+    expect(model.getSnapshot().cases.map(item => item.caseId)).toContain('importado-1a2b3c4d');
+    expect(model.getSnapshot().notice).toContain('Expediente importado: Caso importado');
+    expect(model.getSnapshot().notice).toContain('Nueva partida');
+  });
+  it('importar un expediente ya conocido no lo duplica y conserva el motivo si falla', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    transport.importCase.mockResolvedValue({ caseId: importedCase.caseId, title: importedCase.title, canStart: true, warnings: ['El identificador ya existe.'], alreadyExisted: true });
+    transport.cases.mockResolvedValue({ items: [importedCase], nextCursor: null });
+    await model.importCase('{"version":"1.0.0"}');
+    expect(model.getSnapshot().notice).toContain('Ya estaba en tu catálogo');
+    expect(model.getSnapshot().notice).toContain('El identificador ya existe.');
+    transport.importCase.mockRejectedValueOnce(new ArchiveError('unavailable', 'Checksum no coincide: posible corrupción de datos'));
+    await model.importCase('{"version":"1.0.0"}');
+    expect(model.getSnapshot().notice).toBe('Checksum no coincide: posible corrupción de datos');
   });
 });
 

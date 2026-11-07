@@ -215,7 +215,7 @@ function snapshotCityId(snapshot: unknown): string | undefined {
 
 export function registerGameRoutes(app: FastifyInstance, config: AppConfig, database: Database, ready: () => Promise<boolean>): void {
   const store = createSessionStore(database);
-  async function authorize(request: FastifyRequest): Promise<void> {
+  async function authorize(request: FastifyRequest): Promise<{ profileId: string }> {
     if (!await ready()) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
     const session = await available(() => store.find(cookieToken(request.headers.cookie)));
     if (!session) throw new RunStoreError('SESSION_REQUIRED');
@@ -223,6 +223,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       if (request.headers.origin !== config.origin) throw new RunStoreError('ORIGIN_REJECTED');
       if (!matches(request.headers['x-csrf-token'], session.csrfToken)) throw new RunStoreError('CSRF_REJECTED');
     }
+    return { profileId: session.profile.id };
   }
   function digest(request: FastifyRequest): string {
     const token = cookieToken(request.headers.cookie);
@@ -235,10 +236,14 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         (limit !== undefined && (typeof limit !== 'string' || !/^(?:[1-9][0-9]?|100)$/.test(limit)))) {
       throw new RunStoreError('INVALID_REQUEST');
     }
+    const owner = await authorize(request);
     // Un caso en el catálogo actual: no hay segunda página ni cursores emitidos.
-    return { items: await listCases(database.orm), nextCursor: null };
+    return { items: await listCases(database.orm, owner.profileId), nextCursor: null };
   });
-  app.get<{ Params: { caseId: string } }>('/api/v1/cases/:caseId', { onRequest: authorize }, async request => caseSummary(database.orm, request.params.caseId));
+  app.get<{ Params: { caseId: string } }>('/api/v1/cases/:caseId', { onRequest: authorize }, async request => {
+    const owner = await authorize(request);
+    return caseSummary(database.orm, request.params.caseId, owner.profileId);
+  });
   app.get<{ Querystring: Record<string, unknown> }>('/api/v1/runs', { onRequest: authorize }, request =>
     available(() => listStoredRuns(database, digest(request), request.query)));
   app.post('/api/v1/runs', { onRequest: authorize }, async (request, reply) => {
