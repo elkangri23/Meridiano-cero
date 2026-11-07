@@ -11,6 +11,7 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - **Plazo:** límite de tiempo del caso. Al vencer, no se aplican efectos terminales ni el resto del lote.
 - **Evidencia:** prueba física o testimonial recogida durante la investigación.
 - **NPC / contacto:** personaje con el que se puede hablar; la revelación depende de conocimiento, tema y cooperación.
+- **Retrato:** cara pixel-art de un personaje, generada de forma determinista a partir de su identidad; sirve para reconocerlo y no es una pista.
 - **Laboratorio:** servicio de análisis de evidencias con coste de tiempo.
 - **Mandamiento / orden:** autorización para una acción con admisibilidad y costes.
 - **Lote (secuencia):** agrupación de acciones con pausa, continuación confirmada y cancelación.

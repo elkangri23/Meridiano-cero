@@ -13,6 +13,8 @@ import { gameApi, GameError } from './client';
 import { needsConfirmationDialog } from './action-confirmation';
 import { chatFacts, chatGreeting, chatNpcName, chatPersona, chatRefusal, chatRole, findChatEntry } from './npc-chat';
 import { SceneArt } from './scene-art';
+import { Portrait } from './portrait';
+import { portraitSeed, teamPortraitSeed } from './portraits';
 import { groupOffers } from './scene-offers';
 import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
 import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_LABELS, teamRequestText, teamServiceAnswer } from './team';
@@ -391,6 +393,7 @@ function SceneNpcOffer({ offer, view, disabled, onOffer }: { offer: PublicAction
   const name = chatNpcName(entry, getNPC(npcId)?.name) ?? npcNamesFromView(view).get(npcId) ?? npcId;
   const role = chatRole(entry, getNPC(npcId)?.role ?? '');
   return <div className="game-scene-npc">
+    <Portrait seed={portraitSeed(view.caseId, npcId)} name={name} size="small" />
     <span><strong>{name}</strong>{role ? ` · ${role}` : ''}</span>
     <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
       onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}</button>
@@ -821,7 +824,7 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
   }
   const role = chatRole(findChatEntry(view, npc.id), getNPC(npc.id)?.role ?? '');
   return <div className="game-chat">
-    <p className="game-chat-npc"><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</p>
+    <p className="game-chat-npc"><Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" /><span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
     <ol className="game-chat-turns" data-testid="chat-turns" aria-live="polite">
       {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
         <span className="game-chat-speaker">{turn.from === 'you' ? 'Tú' : npc.name}</span>
@@ -893,9 +896,10 @@ function LabContent({ view, labOffers, disabled, onAnalyze, onOpenIntel }: {
  * un documento solo se puede enviar si está en poder del jugador
  * (`view.objects` son las pruebas recogidas, nunca la solución ni pruebas
  * no halladas). */
-function CommsContactList({ contacts }: { contacts: Contact[] }) {
+function CommsContactList({ contacts, caseId }: { contacts: Contact[]; caseId: string }) {
   if (contacts.length === 0) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Habla primero con alguien en persona para poder contactarlo después.</p></div>;
   return <ul className="game-destination-list">{contacts.map(contact => <li key={contact.id}>
+    <Portrait seed={portraitSeed(caseId, contact.id)} name={contact.name} size="small" />
     <span><strong>{contact.name}</strong><small>{contact.channels.length > 0
       ? contact.channels.map(item => channelLabels[item] ?? item).join(', ')
       : 'Sin canales remotos: solo en persona'}</small></span>
@@ -952,7 +956,7 @@ function CommsContent({ view, contacts, recipient, channel, documentId, text, bu
   const channels = selected?.channels ?? [];
   return <div>
     <h4>Contactos</h4>
-    <CommsContactList contacts={contacts} />
+    <CommsContactList contacts={contacts} caseId={view.caseId} />
     <h4>Enviar</h4>
     {contacts.length === 0 ? null : <CommsSendForm view={view} contacts={contacts} recipient={recipient} channel={channel}
       channels={channels} documentId={documentId} text={text} busy={busy} onRecipient={onRecipient} onChannel={onChannel}
@@ -985,6 +989,7 @@ function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, d
   return <div>
     <h4>Miembros</h4>
     <ul className="game-destination-list">{TEAM_MEMBERS.map(member => <li key={member.id}>
+      <Portrait seed={teamPortraitSeed(member.id)} name={member.name} size="small" />
       <span><strong>{member.name}</strong><small>{member.role} · {member.blurb}</small></span>
       <span>
         {member.id === 'margaret' && <button type="button" data-testid="team-briefing" disabled={busy}

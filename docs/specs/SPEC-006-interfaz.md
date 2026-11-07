@@ -29,6 +29,10 @@ Laboratorio y comunicaciones muestran solicitudes pendientes y hora de respuesta
 
 Órdenes requieren sospechoso y pruebas elegidas. Detención presenta identificación y coordinación, sin combate. Finalizar pide confirmación; informe final explica verdad y omisiones solo tras cierre.
 
+## Retratos de personajes
+
+Cada personaje visible tiene retrato pixel-art procedural y determinista (GDD §2, REQ-G02-03): se ve en la escena junto a su acción de hablar, en grande en la ventana de conversación, en la lista de miembros del equipo y en los contactos de la central. La semilla es `caso:npc` (o `team:miembro`); los NPC del caso fijo y el equipo llevan rasgos elegidos a mano y los generados se derivan de su semilla, así que dos personajes distintos no comparten cara y el mismo personaje siempre se ve igual. El retrato no es interactivo ni esconde pistas (sin pixel hunting): no se puede clicar y no revela nada del caso. Los colores no dependen solo del tono: cada vocabulario (piel, pelo, ojos, ropa) se distingue también por luminancia, y el borde sigue el color de borde del tema, así que el retrato se distingue con alto contraste y con cada paleta de daltonismo.
+
 ## Accesibilidad
 
 Objetivo WCAG 2.2 AA para interfaz. Teclado completo, orden de foco estable, foco visible y sin trampas; cerrar panel devuelve foco a quien lo abrió. Ventanas accesibles con nombres/roles; diálogos de confirmación controlan y devuelven foco.

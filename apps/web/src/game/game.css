@@ -190,8 +190,14 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-destination-list button { padding:6px; font-size:.65em; min-height:32px; }
 
 /* Conversación con un personaje: burbujas de chat del prototipo. */
-.game-chat-npc { font-size:.85em; margin-bottom:12px; }
+.game-chat-npc { display:flex; align-items:center; gap:10px; font-size:.85em; margin-bottom:12px; }
 .game-chat-npc strong { color:var(--gold); }
+
+/* Retrato pixel-art de un personaje (GDD §2): SVG con borde del tema, sin
+ * interacción — no es un elemento clicable ni una pista escondida. El fondo
+ * es el gris de la paleta y el borde sigue --edge, así que se distingue
+ * también con alto contraste y con cada paleta de daltonismo. */
+.game-portrait { flex:none; border:2px solid var(--edge); background:#555555; image-rendering:pixelated; }
 .game-chat-turns { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow:auto; }
 .game-chat-turns li { padding:10px 12px; font-size:.85em; line-height:1.6; max-width:92%; }
 .game-chat-turns li span { display:block; }

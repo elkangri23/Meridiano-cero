@@ -32,6 +32,7 @@ No hay multijugador: cada partida pertenece a un único usuario propietario.
 - **Viajar:** moverse entre ciudades, con coste de tiempo.
 - **Inspeccionar:** examinar lugares y objetos.
 - **Hablar:** conversar con NPCs presentes; la revelación de información depende de conocimiento, tema y cooperación.
+- **Retratos:** cada personaje tiene su retrato pixel-art junto a su nombre: en la escena, en la conversación, en el equipo y en tus contactos. Sirve para reconocerlo; no es una pista ni se puede clicar.
 - **Consultar:** pedir análisis al laboratorio (coste de tiempo).
 - **Ordenar:** solicitar mandamientos/órdenes con admisibilidad.
 - **Comunicar:** enviar mensajes al equipo (copia privada, acuse a +30 del reloj interno).
