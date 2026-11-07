@@ -226,14 +226,19 @@ function warrantDetail(response: ActionResponseDto, previous: PlayerViewDto | nu
 }
 
 /** Detenciones nuevas: quedan registradas y el caso sigue abierto (la
- * detención no cierra; el informe final la valorará). */
-function detentionDetail(response: ActionResponseDto, previous: PlayerViewDto | null, lookup: DiscoveryLookup): string {
+ * detención no cierra; el informe final la valorará). La automática la
+ * ejecutan las autoridades (GDD §12): la frase lo dice, para que el
+ * jugador entienda que no viajó a detener en persona. */
+function detentionDetail(response: ActionResponseDto, previous: PlayerViewDto | null, lookup: DiscoveryLookup, offer?: PublicActionOffer): string {
   const added = previous
     ? response.detentions.filter(item => !previous.detentions.includes(item))
     : [...response.detentions];
+  const automatic = offer?.action.type === 'detain' && offer.action.params.mode === 'automatic';
   return added.map(item => {
     const name = lookup.npcName(item) ?? item;
-    return `${name} queda detenida. El caso sigue abierto.`;
+    return automatic
+      ? `Las autoridades han detenido a ${name} por orden de A.C.M.E. El caso sigue abierto.`
+      : `${name} queda detenida. El caso sigue abierto.`;
   }).join(' ');
 }
 
@@ -285,7 +290,7 @@ function actionResultDetail(response: ActionResponseDto, previous: PlayerViewDto
     talkDetail(offer, lookup),
     submittedDetail(response, previous, offer, lookup),
     warrantDetail(response, previous),
-    detentionDetail(response, previous, lookup),
+    detentionDetail(response, previous, lookup, offer),
     finishDetail(response, offer),
   ];
   const told = parts.some(part => part !== '');

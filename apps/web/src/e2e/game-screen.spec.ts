@@ -50,7 +50,7 @@ async function travelTo(page: Page, cityId: string, minute: number) {
 }
 
 test.describe('E2E T3-05 - Pantalla de juego', () => {
-  test('Ruta A completa (455 min): inspeccionar, recoger, analizar, viajar, consultar, orden, detener, recuperar y cerrar', async ({ page }) => {
+  test('Ruta A completa (470 min): inspeccionar, recoger, analizar, viajar, consultar, orden, detener, recuperar y cerrar', async ({ page }) => {
     await openGameScreen(page);
     // Objetivos siempre visibles (lote 2): los dos pendientes al empezar.
     const objectives = page.getByTestId('objectives-panel');
@@ -77,12 +77,14 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await playOffer(page, 'offer-wait:30', 270);
     await travelTo(page, 'lisboa', 420);
     await playOffer(page, 'offer-talk:ines:identidad', 420);
-    await playOffer(page, 'offer-detain:ines', 435);
-    await playOffer(page, 'offer-recover:astrolabio-original', 455);
+    // La detención es automática (GDD §12): 30 min de coordinación con las
+    // autoridades, en vez de 15 min deteniendo en persona.
+    await playOffer(page, 'offer-detain:ines', 450);
+    await playOffer(page, 'offer-recover:astrolabio-original', 470);
     // Al detener y recuperar, el panel marca los dos objetivos como logrados.
     await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'true');
     await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'true');
-    await playOffer(page, 'offer-finish', 455);
+    await playOffer(page, 'offer-finish', 470);
     await expect(page.getByTestId('clock')).toContainText('Cerrada');
     // Partida cerrada: Guardados explica por qué no se puede guardar ni cargar.
     await page.click('button:has-text("Guardados")');
@@ -113,7 +115,7 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(report).toContainText('El registro firmado asigna la herramienta HV-17 a Inés Valera.');
     await expect(report).toContainText('Cronología');
     await expect(report).toContainText('[min 10] Inspección en Sala de embalaje.');
-    await expect(report).toContainText('[min 455] La investigación ha concluido.');
+    await expect(report).toContainText('[min 470] La investigación ha concluido.');
     await expect(report).toContainText('Pruebas halladas');
     await expect(report).toContainText('La caja está a la vista. Su etiqueta remite al archivo de París.');
     await expect(report).toContainText('Pruebas omitidas');
@@ -134,12 +136,12 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(console).toContainText('El resultado llegará sobre el minuto 120.');
     await expect(console).toContainText('Has solicitado una orden contra Inés Valera.');
     await expect(console).toContainText('Orden contra Inés Valera concedida.');
-    await expect(console).toContainText('Inés Valera queda detenida. El caso sigue abierto.');
+    await expect(console).toContainText('Las autoridades han detenido a Inés Valera por orden de A.C.M.E. El caso sigue abierto.');
     await expect(console).toContainText('El informe final está disponible en la ventana «Informe final».');
     await expect(console).not.toContainText('La investigación avanza.');
   });
 
-  test('Ruta B completa (485 min) con guardar y reanudar a mitad de ruta', async ({ page }) => {
+  test('Ruta B completa (500 min) con guardar y reanudar a mitad de ruta', async ({ page }) => {
     await openGameScreen(page);
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await playOffer(page, 'offer-inspect:MAD-SALA:caja', 30);
@@ -175,9 +177,9 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await playOffer(page, 'offer-request_warrant:ines', 420);
     await playOffer(page, 'offer-wait:30', 450);
     await playOffer(page, 'offer-talk:ines:identidad', 450);
-    await playOffer(page, 'offer-detain:ines', 465);
-    await playOffer(page, 'offer-recover:astrolabio-original', 485);
-    await playOffer(page, 'offer-finish', 485);
+    await playOffer(page, 'offer-detain:ines', 480);
+    await playOffer(page, 'offer-recover:astrolabio-original', 500);
+    await playOffer(page, 'offer-finish', 500);
     await expect(page.getByTestId('clock')).toContainText('Cerrada');
   });
 

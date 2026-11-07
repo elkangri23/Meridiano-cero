@@ -65,6 +65,15 @@ describe('resúmenes de eventos de la consola', () => {
     ]);
   });
 
+  it('una detención automática dice que actúan las autoridades; la manual, que detienes tú', () => {
+    expect(summaries([{ type: 'detain', payload: { suspectId: 'ines', mode: 'automatic' } }])).toEqual([
+      'Las autoridades han detenido a Inés Valera por orden de A.C.M.E.',
+    ]);
+    expect(summaries([{ type: 'detain', payload: { suspectId: 'ines', mode: 'interactive' } }])).toEqual([
+      'Detención de Inés Valera.',
+    ]);
+  });
+
   it('ningún resumen del caso fijo enseña IDs crudos ni el genérico sin motivo', () => {
     const all = summaries([
       { type: 'inspect', payload: { targetId: 'MAD-SALA' } },

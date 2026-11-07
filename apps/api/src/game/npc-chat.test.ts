@@ -109,4 +109,21 @@ describe('datos de conversación de los NPC (npcChat)', () => {
     expect(npcChatForDefinition(astrolabioDefinition).every(entry =>
       entry.knowledge.every(fact => !fact.id.startsWith('misconduct:')))).toBe(true);
   });
+
+  it('con una detención, los testigos de la ciudad y el detenido llevan el hecho', () => {
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', '22222222-2222-4222-8222-222222222222',
+      hashDefinition(astrolabioDefinition));
+    // Tomás detenido en Madrid: Lucía (Madrid) lo vio; Inés (Lisboa), no.
+    const withDetention = { ...run, detentions: ['tomas'] };
+    const entries = npcChatForDefinition(astrolabioDefinition, withDetention);
+    const lucia = entries.find(entry => entry.id === 'lucia');
+    expect(lucia?.knowledge).toContainEqual({ id: 'arrest:tomas', text: 'Las autoridades detuvieron a Tomás Ríos por orden de A.C.M.E.' });
+    const tomas = entries.find(entry => entry.id === 'tomas');
+    expect(tomas?.knowledge).toContainEqual({ id: 'arrest:tomas', text: 'Las autoridades me detuvieron por orden de A.C.M.E.' });
+    const ines = entries.find(entry => entry.id === 'ines');
+    expect(ines?.knowledge.some(fact => fact.id.startsWith('arrest:'))).toBe(false);
+    // Sin partida no hay hechos de detención.
+    expect(npcChatForDefinition(astrolabioDefinition).every(entry =>
+      entry.knowledge.every(fact => !fact.id.startsWith('arrest:')))).toBe(true);
+  });
 });

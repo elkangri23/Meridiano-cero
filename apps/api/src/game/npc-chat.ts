@@ -7,7 +7,7 @@
 import type { CaseDefinition, CaseRun, NPC } from '@meridiano/case-schema';
 import { channelsForNpc, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal } from '@meridiano/case-schema';
 import type { NpcChatEntry } from '@meridiano/contracts';
-import { misconductFactsForNpc } from '@meridiano/engine';
+import { misconductFactsForNpc, arrestFactsForNpc } from '@meridiano/engine';
 
 /** Hecho de identidad sintético (solo expedientes generados): los textos
  * de conocimiento generados describen temas («Conocimiento del mercado de
@@ -65,7 +65,8 @@ function fixedEntry(definition: CaseDefinition, npc: NPC): NpcChatEntry {
  * su definición. El caso fijo usa el catálogo (mismos valores que la web
  * calculaba antes); el generado usa su definición. Con la partida (`run`),
  * cada personaje lleva además los hechos de conducta irregular que conoce
- * de verdad (lo que le hiciste o lo que vio, GDD §14): el director los
+ * de verdad (lo que le hiciste o lo que vio, GDD §14) y los de detención
+ * (lo que vio detener o su propia detención, GDD §12): el director los
  * usa si el jugador pregunta por ello, sin inventar nada. Sin partida no
  * hay hechos de conducta (la vista inicial no tiene actos que contar). */
 export function npcChatForDefinition(definition: CaseDefinition, run?: CaseRun): NpcChatEntry[] {
@@ -73,8 +74,10 @@ export function npcChatForDefinition(definition: CaseDefinition, run?: CaseRun):
     const entry = definition.texts ? generatedEntry(definition, npc, definition.texts) : fixedEntry(definition, npc);
     if (!run) return entry;
     // El validador de la vista admite 16 hechos por personaje: los de
-    // conducta se añaden solo si caben, sin desplazar el conocimiento.
-    const extra = misconductFactsForNpc(definition, run, npc.id)
+    // conducta y detención se añaden solo si caben, sin desplazar el
+    // conocimiento. La detención va primero: es un hecho del caso, no un
+    // acto del jugador.
+    const extra = [...arrestFactsForNpc(definition, run, npc.id), ...misconductFactsForNpc(definition, run, npc.id)]
       .filter(fact => !entry.knowledge.some(item => item.id === fact.id));
     const room = Math.max(0, 16 - entry.knowledge.length);
     return { ...entry, knowledge: [...entry.knowledge, ...extra.slice(0, room)] };

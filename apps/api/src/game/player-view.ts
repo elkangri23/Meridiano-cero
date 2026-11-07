@@ -247,7 +247,11 @@ const eventSummaries: Record<string, EventNamer> = {
   warrant_denied: () => 'Una orden solicitada ha sido denegada.',
   detain: (definition, payload) => {
     const npc = definition.npcs.find(item => item.id === payload.suspectId)?.name ?? String(payload.suspectId ?? '');
-    return 'Detención de ' + npc + '.';
+    // La automática la ejecutan las autoridades (GDD §12): el resumen lo
+    // dice, para que el jugador entienda quién detuvo y por qué no viajó.
+    return payload.mode === 'automatic'
+      ? `Las autoridades han detenido a ${npc} por orden de A.C.M.E.`
+      : 'Detención de ' + npc + '.';
   },
   irregular: (definition, payload) => {
     // El acto queda en la cronología con su tipo y su objetivo; si te
