@@ -13,7 +13,7 @@
 import { hashDefinition } from '@meridiano/case-schema/server';
 import { arrestTypeOf } from '@meridiano/case-schema';
 import { canIssueWarrant, confirmAction, createInitialRun, knowsEvidence, knownSuspect, resolveAction } from '@meridiano/engine';
-import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
+import type { ArrestType, CaseDefinition, CaseRun, MechanicsSuspect } from '@meridiano/case-schema';
 
 export interface GoldenPathAction {
   type: string;
@@ -245,22 +245,47 @@ function diagnoseDetain(definition: CaseDefinition, run: CaseRun, action: Golden
   if (paramId(action, 'mode') !== arrestType) {
     return `${step}: el modo de la detención es «${paramId(action, 'mode') || '(sin modo)'}» pero el caso es «${arrestType}»: pon mode: '${arrestType}' en el detain.`;
   }
-  if (!run.discoveries.includes(`identity:${suspectId}`) || !run.discoveries.includes(`location:${suspectId}`)) {
-    return `${step}: el sospechoso aún no es conocido: falta hablar con él con topicId «identidad» (es el único tema que revela identity:${suspectId} y location:${suspectId}) antes de detenerlo.`;
-  }
+  const known = diagnoseDetainKnown(run, suspect, step, arrestType);
+  if (known) return known;
   // La automática no exige presencia: se coordina desde cualquier ciudad.
-  if (arrestType === 'interactive' && (run.position.cityId !== suspect.cityId || run.position.locationId !== suspect.locationId)) {
-    return `${step}: el sospechoso está en ${cityLabel(definition, suspect.cityId)} / ${locationLabel(definition, suspect.locationId)} y estás en ${positionLabel(definition, run)}. Viaja antes a esa ciudad.`;
-  }
-  if (!run.warrants.includes(`warrant:${suspectId}`)) {
-    const pending = run.pendingRequests.find(entry => entry.type === 'warrant');
-    if (pending) {
-      return `${step}: la orden se pidió pero aún no ha madurado (vence en el minuto ${pending.dueMinute} y estás en el minuto ${run.minute}). Espera ${pending.dueMinute - run.minute} min más con wait antes de detener.`;
-    }
-    return `${step}: no tienes la orden contra ${suspectId}. Pide la orden con request_warrant usando una combinación completa de sus warrantCombinations (${JSON.stringify(suspect.warrantCombinations)}) y espera 30 min a que madure antes de detener.`;
-  }
+  const presence = diagnoseDetainPresence(definition, run, suspect, step, arrestType);
+  if (presence) return presence;
+  const warrant = diagnoseDetainWarrant(run, suspect, step);
+  if (warrant) return warrant;
   if (run.detentions.includes(suspectId)) return `${step}: el sospechoso ya está detenido. Quita este paso.`;
   return stepFallback(action, index, engineError);
+}
+
+// ¿Se conoce lo necesario para detener? En automático basta la ubicación
+// (GDD §12: orden válida y ubicación conocida); en interactivo, además
+// la identidad, porque se detiene en persona. En los casos generados el
+// único tema que revela ambos marcadores es «identidad».
+function diagnoseDetainKnown(run: CaseRun, suspect: MechanicsSuspect, step: string, arrestType: ArrestType): string | undefined {
+  if (run.discoveries.includes(`location:${suspect.id}`)) {
+    if (arrestType !== 'interactive' || run.discoveries.includes(`identity:${suspect.id}`)) return undefined;
+    return `${step}: el sospechoso aún no es conocido: falta hablar con él con topicId «identidad» (es el único tema que revela identity:${suspect.id}) antes de detenerlo en persona.`;
+  }
+  return `${step}: aún no se conoce la ubicación del sospechoso: habla con él con topicId «identidad» (es el único tema que revela location:${suspect.id}) antes de detenerlo.`;
+}
+
+// ¿Está el jugador donde está el sospechoso? Solo la interactiva lo
+// exige: la automática se coordina desde cualquier ciudad.
+function diagnoseDetainPresence(definition: CaseDefinition, run: CaseRun, suspect: MechanicsSuspect, step: string, arrestType: ArrestType): string | undefined {
+  if (arrestType !== 'interactive') return undefined;
+  if (run.position.cityId === suspect.cityId && run.position.locationId === suspect.locationId) return undefined;
+  return `${step}: el sospechoso está en ${cityLabel(definition, suspect.cityId)} / ${locationLabel(definition, suspect.locationId)} y estás en ${positionLabel(definition, run)}. Viaja antes a esa ciudad.`;
+}
+
+// ¿Por qué no se puede detener todavía, si falta la orden? Con una
+// orden pedida y sin madurar dice cuánto falta; sin pedir, recuerda
+// pedirla con una combinación completa y esperar 30 min.
+function diagnoseDetainWarrant(run: CaseRun, suspect: MechanicsSuspect, step: string): string | undefined {
+  if (run.warrants.includes(`warrant:${suspect.id}`)) return undefined;
+  const pending = run.pendingRequests.find(entry => entry.type === 'warrant');
+  if (pending) {
+    return `${step}: la orden se pidió pero aún no ha madurado (vence en el minuto ${pending.dueMinute} y estás en el minuto ${run.minute}). Espera ${pending.dueMinute - run.minute} min más con wait antes de detener.`;
+  }
+  return `${step}: no tienes la orden contra ${suspect.id}. Pide la orden con request_warrant usando una combinación completa de sus warrantCombinations (${JSON.stringify(suspect.warrantCombinations)}) y espera 30 min a que madure antes de detener.`;
 }
 
 function diagnoseRequestWarrant(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, goldenPath: GoldenPathAction[], index: number, engineError: string): string {

@@ -11,7 +11,7 @@ Un astrolabio de una exposición del Instituto Horizonte en Madrid desaparece du
 
 Cronología anterior al juego: Inés prepara la réplica, obtiene acceso autorizado, sustituye el objeto y sale con una caja de conservación; Tomás mueve la caja vacía según su trabajo; Inés registra el envío y queda en Lisboa. Inicio en sala de embalaje de Madrid. Plazo interno: 2.880 minutos (48 h), sin movimiento autónomo del sospechoso. Hora base narrativa: 09:00 de un día ficticio actual; el motor usa minutos relativos.
 
-Objetivos: detener a Inés con orden válida y recuperar el original. Detenciones interactivas; confirmar identidad, presentar orden y coordinar intervención, sin violencia. Autoridad ficticia A.C.M.E.; no describir reglas procesales como derecho real.
+Objetivos: detener a Inés con orden válida y recuperar el original. Detención automática (GDD §12): coordinar con las autoridades con orden válida y ubicación conocida, sin presencia; en los expedientes interactivos, la detención en persona exige además confirmar la identidad. Sin violencia. Autoridad ficticia A.C.M.E.; no describir reglas procesales como derecho real.
 
 ## Lugares y conocimiento
 

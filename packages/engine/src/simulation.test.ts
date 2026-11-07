@@ -214,13 +214,23 @@ describe('T2: rutas por acciones, sin inyectar descubrimientos', () => {
     order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
     expect(s.read().warrants).not.toContain('warrant:ines');
   });
-  it('no detiene sin confirmar identidad ni recupera por adivinar un objeto', () => {
-    const s = scenario(); prepareA(s); order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
+  it('la interactiva no detiene sin confirmar identidad; la automática sí, con orden y ubicación; ni recuperar por adivinar un objeto', () => {
+    // Interactiva: sin hablar con Inés no hay detención en persona, aunque
+    // haya orden y se conozca su ubicación.
+    const interactive = { ...astrolabioDefinition, arrestType: 'interactive' as const };
+    const s = scenario(interactive); prepareA(s); order(s, 'ines', ['EV-03', 'EV-04', 'EV-05']);
     s.step('travel', { toCityId: 'lisboa' });
-    expect(s.attempt('detain', { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'automatic' }).status).toBe('impossible');
+    expect(s.attempt('detain', { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'interactive' }).status).toBe('impossible');
     expect(s.attempt('recover', { objectId: 'another-object' }).status).toBe('impossible');
-    detain(s, 'ines');
+    s.step('talk', { npcId: 'ines', topicId: 'identidad' });
+    s.step('detain', { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'interactive' });
     expect(s.step('finish', {}).run.finalReport?.result).toBe('partial');
+    // Automática (caso fijo): basta la orden y la ubicación — EV-05 ya
+    // reveló dónde está Inés — y se coordina desde París sin hablar con ella.
+    const auto = scenario(); prepareA(auto); order(auto, 'ines', ['EV-03', 'EV-04', 'EV-05']);
+    const detained = auto.attempt('detain', { suspectId: 'ines', warrantId: 'warrant:ines', locationId: 'LIS-ALM', mode: 'automatic' });
+    expect(detained.status).toBe('applied');
+    expect(auto.read().detentions).toEqual(['ines']);
   });
   it('plazo alcanzado no revela el registro situado exactamente en ese minuto', () => {
     const s = scenario({ ...astrolabioDefinition, deadlineMinutes: 30 });

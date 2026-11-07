@@ -56,7 +56,8 @@ describe('informe final completo por HTTP (GDD §12)', () => {
     return response.json() as Record<string, unknown>;
   }
 
-  // Ruta A del juego (455 min): la misma que el E2E, por API.
+  // Ruta A del juego (470 min): la misma que el E2E, por API. La detención
+  // es automática (GDD §12): 30 min de coordinación con las autoridades.
   async function playRouteA(runId: string): Promise<Record<string, unknown>> {
     const steps: Array<Record<string, unknown>> = [
       { type: 'inspect', params: { targetId: 'MAD-SALA' } },
@@ -71,7 +72,7 @@ describe('informe final completo por HTTP (GDD §12)', () => {
       { type: 'wait', params: { minutes: 30 } },
       { type: 'travel', params: { toCityId: 'lisboa' } },
       { type: 'talk', params: { npcId: 'ines', topicId: 'identidad' } },
-      { type: 'detain', params: { suspectId: 'ines', mode: 'interactive', locationId: 'LIS-ALM', warrantId: 'warrant:ines' } },
+      { type: 'detain', params: { suspectId: 'ines', mode: 'automatic', locationId: 'LIS-ALM', warrantId: 'warrant:ines' } },
       { type: 'recover', params: { objectId: 'astrolabio-original' } },
       { type: 'finish', params: {} },
     ];
@@ -96,7 +97,7 @@ describe('informe final completo por HTTP (GDD §12)', () => {
     const report = closed.finalReport as Record<string, unknown>;
     expect(report.result).toBe('complete');
     expect(report.reason).toBe('finished');
-    expect(report.minute).toBe(455);
+    expect(report.minute).toBe(470);
     const truth = report.truth as Record<string, unknown>;
     expect(truth.culpritId).toBe('ines-valera');
     expect(truth.culpritName).toBe('Inés Valera');
@@ -131,7 +132,7 @@ describe('informe final completo por HTTP (GDD §12)', () => {
     // del evento público (el validador del cliente lo rechazaría).
     expect(Object.keys(timeline[0] as Record<string, unknown>).sort()).toEqual(['minute', 'sequence', 'summary', 'type']);
     expect(timeline[0]).toMatchObject({ sequence: 1, minute: 10, type: 'inspect', summary: 'Inspección en Sala de embalaje.' });
-    expect(timeline[timeline.length - 1]).toMatchObject({ minute: 455, type: 'finish', summary: 'La investigación ha concluido.' });
+    expect(timeline[timeline.length - 1]).toMatchObject({ minute: 470, type: 'finish', summary: 'La investigación ha concluido.' });
     expect(timeline.map(entry => entry.sequence as number))
       .toEqual([...timeline.map(entry => entry.sequence as number)].sort((a, b) => a - b));
   });

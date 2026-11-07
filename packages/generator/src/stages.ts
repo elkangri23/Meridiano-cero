@@ -579,10 +579,15 @@ function checkGoldenSpecialParams(action: Record<string, unknown>, index: number
     if (!isNonEmptyString(action.params.suspectId) || !Array.isArray(action.params.evidenceIds)) errors.push(`goldenPath[${index}] (request_warrant) debe tener suspectId y evidenceIds.`);
   }
   if (action.type === 'wait' && typeof action.params.minutes !== 'number') errors.push(`goldenPath[${index}] (wait) debe tener minutes.`);
-  // El modo de la detención es el del expediente (GDD §12): la automática
-  // se coordina con las autoridades y la interactiva detiene en persona.
-  // Un modo distinto lo rechaza el motor con «Intervención no disponible».
-  if (action.type === 'detain' && arrestType !== undefined && action.params.mode !== arrestType) {
+  checkGoldenDetainMode(action, index, errors, arrestType);
+}
+
+// El modo de la detención es el del expediente (GDD §12): la automática
+// se coordina con las autoridades y la interactiva detiene en persona.
+// Un modo distinto lo rechaza el motor con «Intervención no disponible».
+function checkGoldenDetainMode(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType): void {
+  if (action.type !== 'detain' || arrestType === undefined || !isRecord(action.params)) return;
+  if (action.params.mode !== arrestType) {
     errors.push(`goldenPath[${index}] (detain) usa mode '${String(action.params.mode)}' pero el caso es '${arrestType}': la detención automática se coordina desde cualquier ciudad y la interactiva exige estar en la ciudad del sospechoso.`);
   }
 }
@@ -688,16 +693,26 @@ function checkGoldenPosition(
 function actionCity(action: Record<string, unknown>, cityOfLocation: Map<string, string>, cityOfQuery: Map<string, string>, arrestType?: ArrestType): string | undefined {
   const params = action.params;
   if (!isRecord(params)) return undefined;
-  if (action.type === 'detain' && (arrestType === 'automatic' || params.mode === 'automatic')) return undefined;
-  if (action.type === 'inspect' || action.type === 'detain') {
-    const locationId = action.type === 'inspect' ? params.targetId : params.locationId;
-    return typeof locationId === 'string' ? cityOfLocation.get(locationId) : undefined;
+  if (action.type === 'detain') return detainCity(action, cityOfLocation, arrestType);
+  if (action.type === 'inspect') {
+    const targetId = params.targetId;
+    return typeof targetId === 'string' ? cityOfLocation.get(targetId) : undefined;
   }
   if (action.type === 'query') {
     const topicId = params.topicId;
     return typeof topicId === 'string' ? cityOfQuery.get(topicId) : undefined;
   }
   return undefined;
+}
+
+// Ciudad de una detención en la ruta: el lugar del sospechoso en
+// interactivo; ninguna en automático (se coordina desde donde se esté).
+function detainCity(action: Record<string, unknown>, cityOfLocation: Map<string, string>, arrestType?: ArrestType): string | undefined {
+  const params = action.params;
+  if (!isRecord(params)) return undefined;
+  if (arrestType === 'automatic' || params.mode === 'automatic') return undefined;
+  const locationId = params.locationId;
+  return typeof locationId === 'string' ? cityOfLocation.get(locationId) : undefined;
 }
 
 // Recoger solo sirve para evidencias de tipo object (EV-02, EV-06, EV-11):

@@ -57,9 +57,10 @@ test.describe('E2E - Detenciones automáticas (GDD §12)', () => {
     await playOffer(page, 'offer-wait:30', 240);
     await playOffer(page, 'offer-request_warrant:ines', 240);
     await playOffer(page, 'offer-wait:30', 270);
-    // La orden ha madurado en París y la identidad y la ubicación de Inés
-    // ya se conocen (EV-05, el traslado): la oferta de coordinar la
-    // detención está disponible SIN viajar a Lisboa ni hablar con ella.
+    // La orden ha madurado en París y la ubicación de Inés ya se conoce
+    // (EV-05, el traslado): la orden es la que la identifica, así que la
+    // oferta de coordinar la detención está disponible SIN viajar a
+    // Lisboa ni hablar con ella.
     const detain = page.getByTestId('offer-detain:ines');
     await expect(detain).toBeVisible();
     await expect(detain).toContainText('Coordinar la detención de Inés Valera con las autoridades');

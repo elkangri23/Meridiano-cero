@@ -113,6 +113,24 @@ export function confirmAction(def: CaseDefinition, run: CaseRun, action: Action)
   return completeTransition(run, action, () => confirmActionInternal(def, run, action));
 }
 
+/** Preview propia de la detención: siempre pide confirmación
+ * (irreversible) y su descripción dice de qué modo es — en persona o
+ * coordinada con las autoridades (GDD §12). Sin plan válido, es
+ * imposible, con el mismo motivo que al confirmar. */
+function previewDetention(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  const suspectId = typeof action.params.suspectId === 'string' ? action.params.suspectId : undefined;
+  const plan = suspectId === undefined ? undefined : detentionPlan(def, run, suspectId, action.params.mode, action.params);
+  if (!plan?.ok) return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
+  const name = def.npcs.find(npc => npc.id === plan.suspect.id)?.name ?? plan.suspect.id;
+  const minutes = plan.minutes;
+  return { status: 'confirmation_required', run, events: [], preview: {
+    actionType: 'detain', estimatedMinutes: minutes, estimatedEndTime: run.minute + minutes,
+    description: action.params.mode === 'automatic'
+      ? `Coordinar la detención de ${name} con las autoridades (orden válida, ubicación conocida): ${minutes} minutos estimados. Las autoridades actúan; una detención errónea deja el resultado en «incorrecto».`
+      : `Detener a ${name} en persona (orden válida, ubicación conocida): ${minutes} minutos estimados. Una detención errónea deja el resultado en «incorrecto».`,
+  } };
+}
+
 function previewAction(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
   // La acción irregular siempre pide confirmación con los riesgos
   // conocidos (testigos, advertencia, retirada): su descripción no es la
@@ -126,19 +144,7 @@ function previewAction(def: CaseDefinition, run: CaseRun, action: Action): Actio
   // descripción dice de qué modo es: en persona o coordinada con las
   // autoridades (GDD §12). Sin plan válido, es imposible, con el mismo
   // motivo que al confirmar.
-  if (action.type === 'detain') {
-    const suspectId = typeof action.params.suspectId === 'string' ? action.params.suspectId : undefined;
-    const plan = suspectId === undefined ? undefined : detentionPlan(def, run, suspectId, action.params.mode, action.params);
-    if (!plan?.ok) return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
-    const name = def.npcs.find(npc => npc.id === plan.suspect.id)?.name ?? plan.suspect.id;
-    const minutes = plan.minutes;
-    return { status: 'confirmation_required', run, events: [], preview: {
-      actionType: 'detain', estimatedMinutes: minutes, estimatedEndTime: run.minute + minutes,
-      description: action.params.mode === 'automatic'
-        ? `Coordinar la detención de ${name} con las autoridades (orden válida, ubicación conocida): ${minutes} minutos estimados. Las autoridades actúan; una detención errónea deja el resultado en «incorrecto».`
-        : `Detener a ${name} en persona (orden válida, ubicación conocida): ${minutes} minutos estimados. Una detención errónea deja el resultado en «incorrecto».`,
-    } };
-  }
+  if (action.type === 'detain') return previewDetention(def, run, action);
   const result = resolvePreview(def, run, action);
   requireTransitionVersion(run, result.run);
   if (result.status === 'impossible') return result;

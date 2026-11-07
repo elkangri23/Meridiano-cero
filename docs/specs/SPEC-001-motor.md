@@ -34,7 +34,7 @@ Talk solo puede emitir hechos autorizados por conocimiento y condiciones del NPC
 
 ## Órdenes, detención y cierre
 
-Request_warrant evalúa suficiencia de evidencias admisibles mediante reglas del expediente, sin consultar guilty como criterio de concesión. Denegación no cierra. Detain exige orden activa, identidad confirmada y localización conocida; el modo interactivo requiere presencia del detective. El objetivo queda fijo cuando se satisfacen orden y ubicación; no hay fugas improvisadas. La detención no cierra el caso.
+Request_warrant evalúa suficiencia de evidencias admisibles mediante reglas del expediente, sin consultar guilty como criterio de concesión. Denegación no cierra. Detain exige orden activa y localización conocida; el modo interactivo exige además identidad confirmada y presencia del detective. El objetivo queda fijo cuando se satisfacen orden y ubicación; no hay fugas improvisadas. La detención no cierra el caso.
 
 Recover exige posesión/localización accesible del objeto definido. Finish requiere confirmación y evalúa objetivos ya materializados. Resultado: incorrect si hay inocente detenido; complete si todos los objetivos se cumplen sin detenciones erróneas; partial si se logra al menos un objetivo sin error de detención; unresolved en otro caso. El vencimiento usa los mismos criterios sobre efectos logrados antes del plazo, conservando reason=deadline.
 
@@ -74,7 +74,7 @@ Máximo 32 solicitudes pendientes por partida. Alcanzarlo produce EngineStateErr
 
 request_warrant recibe suspectId y evidenceIds: selección explícita de 1–16 IDs únicos, definidos y conocidos. Campos extra, evidencias ocultas, duplicadas o inexistentes se rechazan sin transición. La selección se copia al solicitar; la suficiencia y admisibilidad se verifican al madurar a +30 minutos. Una selección conocida pero insuficiente produce denegación, sin cerrar el caso. No se consulta culpabilidad ni solución para conceder autoridad. Una selección equivalente pendiente no crea otra solicitud.
 
-Las órdenes no autorizan acceder a L-7 con pruebas omitidas: EV-05 o EV-08 debe estar incluida y ser admisible, además de la suficiencia para Inés. Detener exige orden correspondiente, identidad y ubicación conocidas; la presencia exacta solo en el modo interactivo (en automático se coordina con las autoridades desde cualquier ciudad). Recuperar exige el original, presencia y acceso autorizado; una marca irregular controlada conserva inadmisibilidad. La acción jugable para entrada irregular con preview aún no está implementada.
+Las órdenes no autorizan acceder a L-7 con pruebas omitidas: EV-05 o EV-08 debe estar incluida y ser admisible, además de la suficiencia para Inés. Detener exige orden correspondiente y ubicación conocida; la identidad, solo en el modo interactivo, y la presencia exacta solo en el modo interactivo (en automático se coordina con las autoridades desde cualquier ciudad). Recuperar exige el original, presencia y acceso autorizado; una marca irregular controlada conserva inadmisibilidad. La acción jugable para entrada irregular con preview aún no está implementada.
 
 **Límites pendientes:** costes de inspección/detención/recuperación, confirmaciones de acciones materiales y contrato completo de lotes. Estas reglas no se exponen todavía como acciones HTTP. La implementación usa módulos concretos del caso fijo; no acredita un lenguaje genérico de reglas para expedientes generados. [Evidencia v3](../quality/T2-evidencias-ordenes-v3.md).
 

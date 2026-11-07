@@ -89,7 +89,7 @@ Cada item estructurado contiene exactamente type y params. Campos no listados se
 | query | topicId, subjectIds opcional (hasta 16 IDs) | Tema y sujetos públicos de consulta permitida |
 | wait | minutes | Entero entre 1 y deadlineMinutes; el motor domina el empate y limita al plazo |
 | request_warrant | suspectId, evidenceIds (1 a 16 únicos) | Solo prueba elegida y admisible; sin consultar culpabilidad |
-| detain | suspectId, warrantId, locationId, mode | Orden, identidad y ubicación acreditadas; mode del caso coordinated/interactive |
+| detain | suspectId, warrantId, locationId, mode | Orden y ubicación acreditadas (identidad, solo en modo interactivo); mode del caso automatic/interactive |
 | recover | objectId | Acceso/localización materializada según reglas |
 | finish | Objeto vacío | Confirmación explícita y cierre por reglas; no acepta confirmed del cliente |
 

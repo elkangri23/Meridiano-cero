@@ -31,18 +31,48 @@ function suspectOf(def: CaseDefinition, suspectId: string): DetentionSuspect | u
   return suspect ? { id: suspect.id, cityId: suspect.cityId, locationId: suspect.locationId } : undefined;
 }
 
-/** ¿Conoce el jugador al sospechoso (identidad y ubicación)? Es la misma
- * condición en los dos modos: la automática no es un atajo, solo cambia
- * quién interviene. */
+/** ¿Conoce el jugador al sospechoso (identidad y ubicación)? Es la
+ * condición de la detención en persona (GDD §12: las interactivas son
+ * «identificación, conversación y coordinación»): para detener a alguien
+ * en persona hay que saber quién es y dónde está. */
 export function suspectKnown(run: CaseRun, suspectId: string): boolean {
   return run.discoveries.includes('identity:' + suspectId) && run.discoveries.includes('location:' + suspectId);
+}
+
+/** ¿Se conoce la ubicación del sospechoso? Es la condición de la
+ * detención automática (GDD §12): «una vez que existe orden válida y se
+ * conoce la ubicación del sospechoso, este permanece allí hasta la
+ * intervención». La orden es la que identifica al sospechoso: las
+ * autoridades actúan con la orden y la ubicación, sin que el jugador
+ * haya tenido que hablar con él en persona. */
+export function suspectLocated(run: CaseRun, suspectId: string): boolean {
+  return run.discoveries.includes('location:' + suspectId);
+}
+
+/** ¿Se cumple la condición de conocimiento de este modo? En persona
+ * (interactivo), identidad y ubicación; coordinada (automática), solo la
+ * ubicación, porque la orden identifica al sospechoso. */
+function detentionIdentified(mode: unknown, run: CaseRun, suspectId: string): boolean {
+  return mode === 'interactive' ? suspectKnown(run, suspectId) : suspectLocated(run, suspectId);
+}
+
+/** Los parámetros declarados, cuando los hay, deben nombrar a este
+ * sospechoso con su orden y su lugar: una orden de otro o un lugar
+ * distinto no detienen a nadie. Sin parámetros (ofertas), no hay nada
+ * que comprobar. */
+function detentionParamsMatch(suspect: DetentionSuspect, params?: Record<string, unknown>): boolean {
+  if (params === undefined) return true;
+  return params.warrantId === 'warrant:' + suspect.id && params.locationId === suspect.locationId;
 }
 
 /** Plan de detención para un sospechoso con un modo: si se puede detener,
  * con qué modo y cuánto cuesta; si no, `ok: false` sin decir por qué (el
  * llamador pone el motivo genérico). Reglas (GDD §12, SPEC-001): orden
- * válida y ubicación conocida en los dos modos; presencia exacta solo en
- * el interactivo; el modo debe ser el del expediente; sin detenciones
+ * válida en los dos modos; identidad y ubicación conocidas en el
+ * interactivo (hay que saber a quién se detiene en persona), solo
+ * ubicación conocida en el automático (la orden identifica al sospechoso
+ * y las autoridades actúan con ella); presencia exacta solo en el
+ * interactivo; el modo debe ser el del expediente; sin detenciones
  * repetidas. Los parámetros, cuando se pasan, se comprueban estrictos
  * (orden y lugar exactos): un `detain` con parámetros ajenos no se aplica. */
 export function detentionPlan(
@@ -55,11 +85,9 @@ export function detentionPlan(
   const suspect = suspectOf(def, suspectId);
   if (!suspect) return { ok: false };
   if (mode !== arrestTypeOf(def)) return { ok: false };
-  if (params !== undefined) {
-    if (params.warrantId !== 'warrant:' + suspect.id) return { ok: false };
-    if (params.locationId !== suspect.locationId) return { ok: false };
-  }
-  if (!suspectKnown(run, suspect.id)) return { ok: false };
+  if (!detentionParamsMatch(suspect, params)) return { ok: false };
+  const identified = detentionIdentified(mode, run, suspect.id);
+  if (!identified) return { ok: false };
   if (!run.warrants.includes('warrant:' + suspect.id)) return { ok: false };
   if (run.detentions.includes(suspect.id)) return { ok: false };
   if (mode === 'interactive') {

@@ -41,13 +41,23 @@ describe('detenciones automáticas (GDD §12)', () => {
     expect(ARREST_COORDINATION_MINUTES).toBe(30);
   });
 
-  it('la automática rechaza modo interactivo, orden ausente, identidad desconocida, ubicación errónea y repetición', () => {
+  it('la automática rechaza modo interactivo, orden ausente, ubicación desconocida, ubicación errónea y repetición; la identidad solo la exige la interactiva', () => {
     const run = readyFixed();
     expect(detentionPlan(astrolabioDefinition, run, 'ines', 'interactive',
       { warrantId: 'warrant:ines', locationId: 'LIS-ALM' }).ok).toBe(false);
     expect(detentionPlan(astrolabioDefinition, { ...run, warrants: [] }, 'ines', 'automatic',
       { warrantId: 'warrant:ines', locationId: 'LIS-ALM' }).ok).toBe(false);
+    // Solo identidad, sin ubicación: la automática no puede actuar.
+    expect(detentionPlan(astrolabioDefinition, { ...run, discoveries: ['identity:ines'] }, 'ines', 'automatic',
+      { warrantId: 'warrant:ines', locationId: 'LIS-ALM' }).ok).toBe(false);
+    // Solo ubicación, sin identidad: la automática SÍ actúa (GDD §12: orden
+    // válida y ubicación conocida; la orden identifica al sospechoso).
     expect(detentionPlan(astrolabioDefinition, { ...run, discoveries: ['location:ines'] }, 'ines', 'automatic',
+      { warrantId: 'warrant:ines', locationId: 'LIS-ALM' }).ok).toBe(true);
+    // La interactiva sí exige la identidad: sin hablar con el sospechoso
+    // no hay detención en persona.
+    const interactive = { ...astrolabioDefinition, arrestType: 'interactive' as const };
+    expect(detentionPlan(interactive, { ...run, discoveries: ['location:ines'] }, 'ines', 'interactive',
       { warrantId: 'warrant:ines', locationId: 'LIS-ALM' }).ok).toBe(false);
     expect(detentionPlan(astrolabioDefinition, run, 'ines', 'automatic',
       { warrantId: 'warrant:ines', locationId: 'MAD-SALA' }).ok).toBe(false);
