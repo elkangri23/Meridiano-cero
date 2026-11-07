@@ -50,6 +50,19 @@ export const ELENA_REFUSAL = 'Sin registro en los archivos consultados. La ausen
 export const ELENA_GREETING = 'Soy Elena Vázquez, inteligencia de A.C.M.E. Pregunta por lo investigado: sospechosos, pruebas, lugares. Solo respondo con lo que consta en los registros.';
 export const TEAM_GREETING = 'Soy Margaret Sullivan, directora de A.C.M.E. Pregunta al equipo: yo te recuerdo el encargo, Richter explica los análisis, Elena consulta los registros, David coordina detenciones y Clara organiza el expediente.';
 
+/** Respuesta de un servicio determinista desde la vista, o null si el
+ * servicio no tiene respuesta calculable (la consulta de Elena y la
+ * coordinación de David van por otro camino). */
+export function teamServiceAnswer(serviceId: TeamServiceId, view: PlayerViewDto, targetId?: string): string | null {
+  switch (serviceId) {
+    case 'briefing': return briefingAnswer(view);
+    case 'explain': return targetId ? explainAnswer(view, targetId) : null;
+    case 'routes': return routesAnswer(view);
+    case 'organize': return organizeAnswer(view);
+    default: return null;
+  }
+}
+
 /** La frase con la que el jugador pide el servicio: texto fijo para los
  * servicios deterministas (la consulta de Elena lleva la pregunta real). */
 export function teamRequestText(serviceId: TeamServiceId, targetId?: string): string {

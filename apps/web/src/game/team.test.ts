@@ -33,7 +33,7 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
 
   it('Richter explica el análisis con su texto y el recordatorio de procedimiento', () => {
     const view = viewWith({ evidenceTexts: { 'EV-03': 'La huella técnica es compatible con una herramienta de la serie HV-17.' },
-      objects: [{ id: 'EV-03', type: 'analysis', origin: 'lab', minute: 90, admissible: true, revealedEvidence: [] }] });
+      objects: [{ id: 'EV-03', type: 'analysis', origin: 'lab', minute: 90, admissible: true }] });
     const answer = explainAnswer(view, 'EV-03');
     expect(answer).toContain('La huella técnica es compatible con una herramienta de la serie HV-17.');
     expect(answer).toContain('Un análisis solo dice lo que la prueba permite decir.');
@@ -41,7 +41,7 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
   });
 
   it('Clara organiza lo recogido con admisibilidad, lo pendiente y los objetivos', () => {
-    const view = viewWith({ objects: [{ id: 'EV-02', type: 'object', origin: 'scene', minute: 10, admissible: true, revealedEvidence: [] }],
+    const view = viewWith({ objects: [{ id: 'EV-02', type: 'object', origin: 'scene', minute: 10, admissible: true }],
       evidenceTexts: { 'EV-02': 'La cerradura de la vitrina tiene residuo de herramienta.' },
       pendingRequests: [{ id: 'req-1', type: 'analysis', dueMinute: 120 }],
       objectives: [{ id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false }] });

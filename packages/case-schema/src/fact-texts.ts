@@ -380,28 +380,19 @@ function irregularRecordText(
 function teamRecordText(record: string): string | null {
   const match = /^team:([a-z]+):([a-z]+)(?::([A-Za-z0-9._:-]+))?@(\d+)$/.exec(record);
   if (!match) return null;
-  const member = teamMember(match[1] ?? '');
-  const service = match[2] ?? '';
-  const target = match[3] ?? '';
-  const minute = match[4] ?? '';
+  const [, memberId = '', serviceId = '', targetId = '', minute = ''] = match;
+  const member = teamMember(memberId);
   if (!member) return record;
-  const serviceText: Record<string, string> = {
-    briefing: 'Preguntaste a',
-    explain: 'Pediste a',
-    lookup: 'Consultaste a',
-    routes: 'Preguntaste a',
-    organize: 'Pediste a',
+  const phrases: Record<string, { verb: string; object: string }> = {
+    briefing: { verb: 'Preguntaste a', object: 'sobre el encargo' },
+    explain: { verb: 'Pediste a', object: targetId ? `que te explicara el análisis ${targetId}` : 'que te explicara un análisis' },
+    lookup: { verb: 'Consultaste a', object: 'en inteligencia' },
+    routes: { verb: 'Preguntaste a', object: 'por las rutas de viaje' },
+    organize: { verb: 'Pediste a', object: 'que organizara el expediente' },
   };
-  const what: Record<string, string> = {
-    briefing: 'sobre el encargo',
-    explain: target ? `que te explicara el análisis ${target}` : 'que te explicara un análisis',
-    lookup: 'en inteligencia',
-    routes: 'por las rutas de viaje',
-    organize: 'que organizara el expediente',
-  };
-  const verb = serviceText[service] ?? 'Pediste a';
-  const object = what[service] ?? '';
-  return object ? `${verb} ${member.name} ${object} (min ${minute}).` : `${verb} ${member.name} (min ${minute}).`;
+  const phrase = phrases[serviceId];
+  if (!phrase) return record;
+  return `${phrase.verb} ${member.name} ${phrase.object} (min ${minute}).`;
 }
 
 export function conversationRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined, locationName?: (id: string) => string | undefined): string {

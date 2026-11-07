@@ -38,13 +38,30 @@ function teamKeys(data: Record<string, unknown>): boolean {
 export function isTeamParams(value: unknown): value is TeamParams {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const data = value as Record<string, unknown>;
-  if (!teamKeys(data)) return false;
-  if (!isTeamMemberId(data.memberId)) return false;
-  if (!isTeamServiceId(data.memberId, data.serviceId)) return false;
+  return teamKeys(data) && teamMemberService(data) && teamExtraParams(data);
+}
+
+/** El miembro existe y el servicio es uno de los suyos. */
+function teamMemberService(data: Record<string, unknown>): boolean {
+  return isTeamMemberId(data.memberId) && isTeamServiceId(data.memberId, data.serviceId);
+}
+
+/** La pregunta solo acompaña a la consulta de inteligencia; el objetivo
+ * solo a la explicación de un análisis; y ambos son obligatorios en su
+ * servicio. */
+function teamExtraParams(data: Record<string, unknown>): boolean {
+  return teamExtraFormats(data) && teamExtraPlacement(data);
+}
+
+/** El objetivo y la pregunta, si vienen, tienen la forma debida. */
+function teamExtraFormats(data: Record<string, unknown>): boolean {
   if (data.targetId !== undefined && !teamId(data.targetId)) return false;
   if (data.question !== undefined && !questionText(data.question)) return false;
-  // La pregunta solo acompaña a la consulta de inteligencia; el objetivo
-  // solo a la explicación de un análisis.
+  return true;
+}
+
+/** Cada extra va solo en su servicio, y es obligatorio en él. */
+function teamExtraPlacement(data: Record<string, unknown>): boolean {
   if (data.question !== undefined && data.serviceId !== 'lookup') return false;
   if (data.targetId !== undefined && data.serviceId !== 'explain') return false;
   if (data.serviceId === 'lookup' && data.question === undefined) return false;

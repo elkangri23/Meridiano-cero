@@ -7,7 +7,7 @@ import { validateCaseDefinition, type CaseDefinition } from '@meridiano/case-sch
 import { createInitialRun, ENGINE_VERSION } from '@meridiano/engine';
 import type { Database } from '../database/connection.ts';
 import type { CaseRun } from '@meridiano/case-schema';
-import { isCommunicationRecord, isMisconductRecord } from '@meridiano/case-schema';
+import { isCommunicationRecord, isMisconductRecord, isTeamRecord } from '@meridiano/case-schema';
 
 export type RunStoreErrorCode = 'SESSION_REQUIRED' | 'SESSION_CHANGED' | 'NOT_FOUND' | 'IDEMPOTENCY_CONFLICT' | 'INVALID_REQUEST' |
   'CASE_NOT_READY' | 'DEPENDENCY_UNAVAILABLE' | 'ORIGIN_REJECTED' | 'CSRF_REJECTED' | 'SAVE_LIMIT_REACHED' | 'VERSION_CONFLICT' |
@@ -170,7 +170,7 @@ export function readStoredRun(database: Database, sessionDigest: string, runId: 
 const runStateKeys = new Set([
   'id', 'ownerId', 'definitionId', 'definitionHash', 'engineVersion', 'eventOrdinal', 'tripCount',
   'version', 'minute', 'status', 'position', 'discoveries', 'evidenceRecords', 'inventory',
-  'admissibility', 'npcRelations', 'conversationRecords', 'communications', 'misconduct', 'pendingRequests', 'warrants',
+  'admissibility', 'npcRelations', 'conversationRecords', 'communications', 'misconduct', 'teamRequests', 'pendingRequests', 'warrants',
   'detentions', 'recoveredObjects', 'pendingBatch', 'finalReport',
 ]);
 function isRecordValue(value: unknown): value is Record<string, unknown> {
@@ -205,6 +205,10 @@ const stateFields: Array<{ key: string; check: (value: unknown) => boolean }> = 
   // Acciones irregulares (GDD §14): ausente en partidas v14 anteriores;
   // el motor lo trata como vacío y lo crea con el primer acto.
   { key: 'misconduct', check: value => value === undefined || (Array.isArray(value) && value.every(isMisconductRecord)) },
+  // Peticiones al equipo A.C.M.E. (GDD §8): ausente en partidas v14
+  // anteriores al equipo; el motor lo trata como vacío y lo crea con la
+  // primera petición.
+  { key: 'teamRequests', check: value => value === undefined || (Array.isArray(value) && value.every(isTeamRecord)) },
   { key: 'pendingRequests', check: value => Array.isArray(value) },
   { key: 'warrants', check: isStringList },
   { key: 'detentions', check: isStringList },
@@ -227,12 +231,13 @@ export function assertRunShape(state: unknown): void {
 export function pureRun(run: CaseRun): CaseRun {
   const { id, ownerId, definitionId, definitionHash, engineVersion, eventOrdinal, tripCount, version, minute,
     status, position, discoveries, evidenceRecords, inventory, admissibility, npcRelations,
-    conversationRecords, communications, misconduct, pendingRequests, warrants, detentions, recoveredObjects, pendingBatch, finalReport } = run;
+    conversationRecords, communications, misconduct, teamRequests, pendingRequests, warrants, detentions, recoveredObjects, pendingBatch, finalReport } = run;
   return { id, ownerId, definitionId, definitionHash, engineVersion, eventOrdinal, tripCount, version, minute,
     status, position, discoveries, ...(evidenceRecords !== undefined ? { evidenceRecords } : {}),
     inventory, admissibility, npcRelations, conversationRecords,
     ...(communications !== undefined ? { communications } : {}),
     ...(misconduct !== undefined ? { misconduct } : {}),
+    ...(teamRequests !== undefined ? { teamRequests } : {}),
     pendingRequests, warrants, detentions,
     recoveredObjects, pendingBatch, finalReport };
 }

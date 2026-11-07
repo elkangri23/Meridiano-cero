@@ -15,7 +15,7 @@ import { chatFacts, chatGreeting, chatNpcName, chatPersona, chatRefusal, chatRol
 import { SceneArt } from './scene-art';
 import { groupOffers } from './scene-offers';
 import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
-import { briefingAnswer, ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, explainAnswer, organizeAnswer, routesAnswer, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_LABELS, teamRequestText } from './team';
+import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_LABELS, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
@@ -1869,10 +1869,7 @@ export function GameScreen() {
    * registrada en el motor con una acción `team` gratuita. */
   function requestTeamService(memberId: TeamMemberId, serviceId: TeamServiceId, targetId: string | undefined, trigger: HTMLElement | null) {
     if (!runId || !view) return;
-    const answer = serviceId === 'briefing' ? briefingAnswer(view)
-      : serviceId === 'explain' && targetId ? explainAnswer(view, targetId)
-      : serviceId === 'routes' ? routesAnswer(view)
-      : serviceId === 'organize' ? organizeAnswer(view) : '';
+    const answer = teamServiceAnswer(serviceId, view, targetId);
     if (!answer) return;
     const name = TEAM_MEMBERS.find(member => member.id === memberId)?.name ?? memberId;
     const offer: PublicActionOffer = { id: `team:${memberId}:${serviceId}${targetId ? `:${targetId}` : ''}`,
