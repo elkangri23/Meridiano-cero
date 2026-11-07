@@ -1,0 +1,5183 @@
+{
+ "generado-1589b7bf": {
+  "id": "generado-1589b7bf",
+  "npcs": [
+   {
+    "id": "marcos",
+    "name": "Marcos",
+    "role": "Gestor de archivos",
+    "cityId": "barcelona",
+    "persona": "Soy el gestor de archivos del Meridiano-cero en Barcelona y conozco el estado de los registros.",
+    "knowledge": [
+     "registro-comprometedor",
+     "auditoria-archivos",
+     "maletin-documentos"
+    ],
+    "cooperation": 3
+   },
+   {
+    "id": "laura",
+    "name": "Laura",
+    "role": "Comisaria de eventos",
+    "cityId": "bilbao",
+    "persona": "Soy la comisaria de eventos y coordino actividades institucionales en Bilbao.",
+    "knowledge": [
+     "agenda-eventos",
+     "acceso-archivos",
+     "testigo-desaparicion"
+    ],
+    "cooperation": 6
+   },
+   {
+    "id": "jorge",
+    "name": "Jorge",
+    "role": "Vigilante",
+    "cityId": "malaga",
+    "persona": "Soy vigilante y controlo accesos y horarios en las instalaciones de Málaga.",
+    "knowledge": [
+     "registro-accesos",
+     "camaras-seguridad",
+     "horarios-turno"
+    ],
+    "cooperation": 7
+   },
+   {
+    "id": "ana",
+    "name": "Ana",
+    "role": "Bibliotecaria",
+    "cityId": "barcelona",
+    "persona": "Soy bibliotecaria y gestiono consultas y catálogos en Barcelona.",
+    "knowledge": [
+     "catalogo-archivos",
+     "solicitud-documentos",
+     "auditoria"
+    ],
+    "cooperation": 8
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "registro-comprometedor",
+   "auditoria-archivos",
+   "maletin-documentos",
+   "agenda-eventos",
+   "acceso-archivos",
+   "testigo-desaparicion",
+   "registro-accesos",
+   "camaras-seguridad",
+   "horarios-turno",
+   "catalogo-archivos",
+   "solicitud-documentos",
+   "auditoria"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "Se observa un acceso reciente a los archivos desde la oficina de coordinación.",
+    "EV-02": "Se recoge un cuaderno de control con anotaciones sobre movimientos de documentos.",
+    "EV-03": "El análisis del cuaderno revela una alteración en el registro de auditoría.",
+    "EV-04": "El registro de archivos muestra una consulta fuera de horario.",
+    "EV-05": "La ficha de préstamo indica la salida temporal de un maletín con documentos.",
+    "EV-06": "Se localiza una tarjeta de acceso usada en el puesto de vigilancia.",
+    "EV-07": "El registro de accesos vincula la tarjeta con un turno nocturno.",
+    "EV-08": "Las cámaras registran un traslado discreto hacia el archivo central.",
+    "EV-09": "Un testigo describe la consulta de un catálogo antes de la auditoría.",
+    "EV-10": "La solicitud de documentos confirma la reserva de un maletín.",
+    "EV-11": "Se identifica el maletín con documentos oculto en el archivo central."
+   },
+   "greetings": {
+    "ana": "Hola, soy la bibliotecaria y gestiono consultas y catálogos.",
+    "jorge": "Hola, soy el vigilante y controlo accesos y horarios en las instalaciones.",
+    "laura": "Hola, soy la comisaria de eventos y coordino actividades institucionales.",
+    "marcos": "Hola, soy el gestor de archivos y puedo orientarte sobre el estado de los registros."
+   },
+   "knowledge": {
+    "auditoria": "Sé que la auditoría revisa la integridad y disponibilidad de los registros.",
+    "agenda-eventos": "Coordino la agenda de eventos institucionales, con actividades vinculadas a los archivos.",
+    "horarios-turno": "Controlo los horarios de los turnos de vigilancia.",
+    "acceso-archivos": "Sé que el acceso a los archivos está controlado por credenciales y horarios.",
+    "registro-accesos": "Llevo el registro de accesos: ahí quedan las entradas y salidas del personal.",
+    "camaras-seguridad": "Puedo revisar las cámaras de seguridad, que registran los movimientos en las instalaciones.",
+    "catalogo-archivos": "Gestiono el catálogo de archivos: con él localizo documentos y consultas.",
+    "auditoria-archivos": "Sé que se prepara una auditoría sobre el estado de los archivos.",
+    "maletin-documentos": "Sé que un maletín con documentos dejó de estar en su ubicación habitual.",
+    "solicitud-documentos": "Gestiono las solicitudes de documentos: quedan registradas en el sistema.",
+    "testigo-desaparicion": "Sé que un testigo aporta datos sobre la desaparición vinculada a los archivos.",
+    "registro-comprometedor": "Sé que existe un registro comprometedor vinculado a los archivos del Meridiano-cero."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Asignación inicial",
+   "speaker": "Directora de Investigación",
+   "paragraphs": [
+    "Se ha reportado la desaparición de una persona vinculada a los archivos del Meridiano-cero.",
+    "La investigación debe seguir documentos, registros y testimonios para reconstruir los hechos.",
+    "Tu objetivo es identificar al responsable y recuperar el objeto oculto sin comprometer la seguridad de los testigos."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCHIVO",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCHIVO",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-VIGILANCIA",
+    "relations": [
+     "EV-03"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-VIGILANCIA",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-VIGILANCIA",
+    "relations": [
+     "EV-07"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "BAR-ARCHIVO",
+    "relations": [
+     "EV-05"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCHIVO",
+    "relations": [
+     "EV-09"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "BAR-ARCHIVO",
+    "relations": [
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "marcos",
+  "locations": [
+   {
+    "id": "BIL-OFIC",
+    "name": "Oficina de coordinación",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Espacio de gestión de eventos y acceso a archivos institucionales."
+   },
+   {
+    "id": "BAR-ARCHIVO",
+    "name": "Archivo central",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Depósito de registros y documentos del Meridiano-cero."
+   },
+   {
+    "id": "MAL-VIGILANCIA",
+    "name": "Puesto de vigilancia",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Control de accesos y monitoreo de instalaciones."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registro-archivos",
+     "label": "Registro de archivos",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-01"
+     ],
+     "evidenceId": "EV-04",
+     "locationId": "BAR-ARCHIVO",
+     "delayMinutes": 30
+    },
+    {
+     "id": "auditoria-archivos",
+     "label": "Auditoría de archivos",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-ARCHIVO",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-accesos",
+     "label": "Registro de accesos",
+     "cityId": "malaga",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-VIGILANCIA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "camaras-seguridad",
+     "label": "Cámaras de seguridad",
+     "cityId": "malaga",
+     "requires": [
+      "EV-07"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "MAL-VIGILANCIA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "solicitud-documentos",
+     "label": "Solicitud de documentos",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-09"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BAR-ARCHIVO",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Maletín con documentos",
+    "cityId": "barcelona",
+    "objectId": "maletin-documentos",
+    "evidenceId": "EV-11",
+    "locationId": "BAR-ARCHIVO",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "marcos",
+     "cityId": "barcelona",
+     "locationId": "BAR-ARCHIVO",
+     "accessEvidenceIds": [
+      "EV-10"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05",
+      "EV-10"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05"
+      ]
+     ]
+    },
+    {
+     "id": "laura",
+     "cityId": "bilbao",
+     "locationId": "BIL-OFIC",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-01",
+      "EV-02"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-01",
+       "EV-02"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala de coordinación",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Caja de archivos",
+     "elementId": "caja-archivos",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Terminal de vigilancia",
+     "elementId": "terminal-vigilancia",
+     "evidenceId": "EV-06",
+     "locationId": "MAL-VIGILANCIA"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Auditoría de archivos",
+     "npcId": "ana",
+     "topicId": "auditoria",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener al responsable de la desaparición"
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el objeto oculto"
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "desaparicion",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 1440,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-1dfd99b9": {
+  "id": "generado-1dfd99b9",
+  "npcs": [
+   {
+    "id": "carlos",
+    "name": "Carlos Mendieta",
+    "role": "investigador",
+    "cityId": "barcelona",
+    "persona": "Soy Carlos Mendieta, investigador. Me preocupaba que ciertas notas privadas se hicieran públicas.",
+    "knowledge": [
+     "cuaderno-campo",
+     "notas-privadas",
+     "barcelona"
+    ],
+    "cooperation": 4
+   },
+   {
+    "id": "marcos",
+    "name": "Marcos Urrutia",
+    "role": "colega",
+    "cityId": "bilbao",
+    "persona": "Soy Marcos Urrutia, colega de Carlos. Lo vi antes de su desaparición, pero no sé dónde está ahora.",
+    "knowledge": [
+     "avistamiento-carlos",
+     "relacion-laboral",
+     "bilbao"
+    ],
+    "cooperation": 7
+   },
+   {
+    "id": "laura",
+    "name": "Laura Soto",
+    "role": "testigo",
+    "cityId": "malaga",
+    "persona": "Soy Laura Soto. Vi a Carlos en Málaga y recuerdo detalles de su comportamiento.",
+    "knowledge": [
+     "avistamiento-malaga",
+     "comportamiento"
+    ],
+    "cooperation": 8
+   },
+   {
+    "id": "sofia",
+    "name": "Sofía Rivas",
+    "role": "testigo",
+    "cityId": "barcelona",
+    "persona": "Soy Sofía Rivas. Observé movimientos relacionados con el cuaderno en Barcelona.",
+    "knowledge": [
+     "cuaderno-barcelona",
+     "movimientos"
+    ],
+    "cooperation": 8
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "cuaderno-campo",
+   "notas-privadas",
+   "barcelona",
+   "avistamiento-carlos",
+   "relacion-laboral",
+   "bilbao",
+   "avistamiento-malaga",
+   "comportamiento",
+   "cuaderno-barcelona",
+   "movimientos"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "Observación inicial en la oficina de Bilbao.",
+    "EV-02": "Objeto localizado en la oficina de Bilbao.",
+    "EV-03": "Análisis del objeto localizado en Bilbao.",
+    "EV-04": "Registro consultado en Bilbao.",
+    "EV-05": "Registro consultado en Barcelona.",
+    "EV-06": "Objeto localizado en el archivo de Barcelona.",
+    "EV-07": "Registro consultado en Barcelona.",
+    "EV-08": "Registro consultado en Málaga.",
+    "EV-09": "Testimonio recogido en Barcelona.",
+    "EV-10": "Registro consultado en Málaga.",
+    "EV-11": "Objeto recuperado en Barcelona."
+   },
+   "greetings": {
+    "laura": "Hola, soy Laura Soto.",
+    "sofia": "Hola, soy Sofía Rivas.",
+    "carlos": "Hola, soy Carlos Mendieta.",
+    "marcos": "Hola, soy Marcos Urrutia."
+   },
+   "knowledge": {
+    "bilbao": "Conozco Bilbao.",
+    "barcelona": "Conozco Barcelona.",
+    "movimientos": "Observé movimientos relacionados con el cuaderno en Barcelona.",
+    "comportamiento": "Recuerdo detalles del comportamiento de Carlos en Málaga.",
+    "cuaderno-campo": "Conozco el cuaderno de campo.",
+    "notas-privadas": "Me preocupaba que ciertas notas privadas del cuaderno se hicieran públicas.",
+    "relacion-laboral": "Conozco la relación laboral que tenía con Carlos.",
+    "cuaderno-barcelona": "Sé que el cuaderno estuvo en Barcelona.",
+    "avistamiento-carlos": "Vi a Carlos antes de su desaparición, pero no sé dónde está ahora.",
+    "avistamiento-malaga": "Vi a Carlos en Málaga."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Caso: desaparición en el Meridiano-cero",
+   "speaker": "Comisaría",
+   "paragraphs": [
+    "Se ha denunciado la desaparición de un investigador y la pérdida de un cuaderno de campo vinculado a su trabajo.",
+    "El caso se desarrolla entre Bilbao, Barcelona y Málaga, con varios testigos y un sospechoso inicial.",
+    "Deberás reconstruir los hechos mediante documentos, registros y testimonios para localizar al responsable y recuperar el objeto."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-05"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-BIB",
+    "relations": [
+     "EV-07"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-08"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-BIB",
+    "relations": [
+     "EV-09"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "carlos",
+  "locations": [
+   {
+    "id": "BIL-OFIC",
+    "name": "Oficina de Marcos",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Despacho donde se revisaron documentos laborales."
+   },
+   {
+    "id": "BAR-ARCH",
+    "name": "Archivo de Barcelona",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Archivo con registros y movimientos del cuaderno."
+   },
+   {
+    "id": "MAL-BIB",
+    "name": "Biblioteca de Málaga",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Lugar de consulta y testimonios."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registro-laboral",
+     "label": "Registro laboral",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-01"
+     ],
+     "evidenceId": "EV-04",
+     "locationId": "BIL-OFIC",
+     "delayMinutes": 5
+    },
+    {
+     "id": "movimientos-archivo",
+     "label": "Movimientos del archivo",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-ARCH",
+     "delayMinutes": 5
+    },
+    {
+     "id": "registro-cuaderno",
+     "label": "Registro del cuaderno",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "BAR-ARCH",
+     "delayMinutes": 5
+    },
+    {
+     "id": "testimonio-malaga",
+     "label": "Testimonio en Málaga",
+     "cityId": "malaga",
+     "requires": [
+      "EV-07"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "MAL-BIB",
+     "delayMinutes": 5
+    },
+    {
+     "id": "registro-final",
+     "label": "Registro final",
+     "cityId": "malaga",
+     "requires": [
+      "EV-09"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "MAL-BIB",
+     "delayMinutes": 5
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 10,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Cuaderno de campo",
+    "cityId": "barcelona",
+    "objectId": "cuaderno-campo",
+    "evidenceId": "EV-11",
+    "locationId": "BAR-ARCH",
+    "requiresAccessWarrant": false
+   },
+   "suspects": [
+    {
+     "id": "carlos",
+     "cityId": "barcelona",
+     "locationId": "BAR-ARCH",
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05",
+      "EV-09"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05"
+      ],
+      [
+       "EV-09",
+       "EV-10"
+      ]
+     ]
+    },
+    {
+     "id": "marcos",
+     "cityId": "bilbao",
+     "locationId": "BIL-OFIC",
+     "knownFromEvidence": [
+      "EV-01",
+      "EV-02",
+      "EV-04"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-01",
+       "EV-04"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala de la oficina",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Escritorio",
+     "elementId": "escritorio",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Estantería",
+     "elementId": "estanteria",
+     "evidenceId": "EV-06",
+     "locationId": "BAR-ARCH"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Movimientos del cuaderno",
+     "npcId": "sofia",
+     "topicId": "movimientos-cuaderno",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener al responsable de la desaparición"
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el cuaderno de campo desaparecido"
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "desaparicion",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 2880,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-21d02570": {
+  "id": "generado-21d02570",
+  "npcs": [
+   {
+    "id": "elena",
+    "name": "Elena",
+    "role": "Restauradora",
+    "cityId": "barcelona",
+    "persona": "Soy restauradora y trabajo habitualmente con piezas históricas del Meridiano-cero.",
+    "knowledge": [
+     "restauracion",
+     "acceso-interno"
+    ],
+    "cooperation": 4
+   },
+   {
+    "id": "marcos",
+    "name": "Marcos",
+    "role": "Comerciante",
+    "cityId": "bilbao",
+    "persona": "Soy comerciante y conozco el mercado de antigüedades de la zona.",
+    "knowledge": [
+     "mercado-negro",
+     "movimiento-objeto"
+    ],
+    "cooperation": 6
+   },
+   {
+    "id": "laura",
+    "name": "Laura",
+    "role": "Guardia de seguridad",
+    "cityId": "malaga",
+    "persona": "Soy guardia de seguridad y controlo los accesos al edificio.",
+    "knowledge": [
+     "registro-acceso",
+     "horario"
+    ],
+    "cooperation": 7
+   },
+   {
+    "id": "jorge",
+    "name": "Jorge",
+    "role": "Archivero",
+    "cityId": "bilbao",
+    "persona": "Soy archivero y gestiono los documentos e inventarios.",
+    "knowledge": [
+     "inventario",
+     "fondo-falso"
+    ],
+    "cooperation": 8
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "restauracion",
+   "acceso-interno",
+   "mercado-negro",
+   "movimiento-objeto",
+   "registro-acceso",
+   "horario",
+   "inventario",
+   "fondo-falso"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "En el archivo se observa que el manuscrito no está en su ubicación habitual.",
+    "EV-02": "Se localiza una caja de transporte vacía junto al espacio del manuscrito.",
+    "EV-03": "El análisis de la caja revela indicios de manipulación interna.",
+    "EV-04": "El registro de acceso muestra movimientos en el archivo durante el periodo investigado.",
+    "EV-05": "El inventario del taller indica una pieza histórica pendiente de catalogación.",
+    "EV-06": "Se encuentra una etiqueta de envío vinculada al traslado de material.",
+    "EV-07": "El registro de seguridad asocia la etiqueta con un envío reciente.",
+    "EV-08": "La documentación comercial relaciona el envío con una transacción de antigüedades.",
+    "EV-09": "El testimonio de la guardia describe un acceso no habitual al edificio.",
+    "EV-10": "El informe archivístico conecta los registros con la desaparición del manuscrito.",
+    "EV-11": "Se recupera el manuscrito del Meridiano-cero en su ubicación oculta."
+   },
+   "greetings": {
+    "elena": "Hola, soy Elena. Trabajo como restauradora con piezas históricas.",
+    "jorge": "Buenas, soy Jorge. Gestiono el archivo y los inventarios.",
+    "laura": "Hola, soy Laura. Soy guardia de seguridad del edificio.",
+    "marcos": "Buenos días, soy Marcos. Me dedico al comercio de antigüedades."
+   },
+   "knowledge": {
+    "horario": "Controlo los horarios de acceso y vigilancia.",
+    "inventario": "Gestiono los inventarios y el control de las piezas documentadas.",
+    "fondo-falso": "Conozco los compartimentos ocultos y los fondos falsos.",
+    "restauracion": "Conozco las técnicas y los procesos de restauración de piezas históricas.",
+    "mercado-negro": "Conozco el mercado de antigüedades y los canales de venta.",
+    "acceso-interno": "Conozco los accesos internos y los permisos del personal autorizado.",
+    "registro-acceso": "Llevo los registros de entrada y salida del edificio.",
+    "movimiento-objeto": "Conozco los traslados y movimientos de objetos valiosos."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Informe inicial",
+   "speaker": "Comisaria Vega",
+   "paragraphs": [
+    "Se ha denunciado la desaparición de un objeto valioso vinculado al Meridiano-cero.",
+    "La investigación se desarrollará en varias ciudades y requerirá contrastar documentos, registros y testimonios.",
+    "El objetivo es identificar al responsable y recuperar el objeto sin recurrir a la violencia."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-RESTAURACION",
+    "relations": [
+     "EV-03"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-SEGURIDAD",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-SEGURIDAD",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-RESTAURACION",
+    "relations": [
+     "EV-05"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "MAL-SEGURIDAD",
+    "relations": [
+     "EV-07"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-09"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "BAR-RESTAURACION",
+    "relations": [
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "elena",
+  "locations": [
+   {
+    "id": "BIL-ARCHIVO",
+    "name": "Archivo Municipal",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Sala de inventarios y documentos históricos del Meridiano-cero."
+   },
+   {
+    "id": "BAR-RESTAURACION",
+    "name": "Taller de Restauración",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Espacio de trabajo con piezas históricas y material de restauración."
+   },
+   {
+    "id": "MAL-SEGURIDAD",
+    "name": "Puesto de Seguridad",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Control de accesos, registros y vigilancia del edificio."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "consulta-inventario",
+     "label": "Consulta de inventario",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-01"
+     ],
+     "evidenceId": "EV-04",
+     "locationId": "BIL-ARCHIVO",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-restauracion",
+     "label": "Consulta de restauración",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-03"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-RESTAURACION",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-taller",
+     "label": "Consulta del taller",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-05"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "BAR-RESTAURACION",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-seguridad",
+     "label": "Consulta de seguridad",
+     "cityId": "malaga",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-SEGURIDAD",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-archivo",
+     "label": "Consulta de archivo",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-09"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BIL-ARCHIVO",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Manuscrito del Meridiano-cero",
+    "cityId": "barcelona",
+    "objectId": "manuscrito-meridiano",
+    "evidenceId": "EV-11",
+    "locationId": "BAR-RESTAURACION",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "elena",
+     "cityId": "barcelona",
+     "locationId": "BAR-RESTAURACION",
+     "accessEvidenceIds": [
+      "EV-08"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05",
+      "EV-08"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05",
+       "EV-08"
+      ]
+     ]
+    },
+    {
+     "id": "marcos",
+     "cityId": "bilbao",
+     "locationId": "BIL-ARCHIVO",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-04",
+      "EV-07"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-04",
+       "EV-07"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala de inventarios",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-ARCHIVO"
+    },
+    {
+     "label": "Manuscrito del Meridiano-cero",
+     "elementId": "manuscrito-meridiano",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-ARCHIVO"
+    },
+    {
+     "label": "Registro de acceso",
+     "elementId": "registro-de-acceso",
+     "evidenceId": "EV-06",
+     "locationId": "MAL-SEGURIDAD"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Testimonio sobre el acceso",
+     "npcId": "laura",
+     "topicId": "registro-acceso",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener al responsable del robo."
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el objeto sustraído."
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "robo",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 2880,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-25b39aed": {
+  "id": "generado-25b39aed",
+  "npcs": [
+   {
+    "id": "elena",
+    "name": "Elena Vargas",
+    "role": "curadora",
+    "cityId": "barcelona",
+    "persona": "Soy curadora y conozco el manuscrito; no tengo nada que ocultar.",
+    "knowledge": [
+     "manuscrito-meridiano",
+     "registro-venta"
+    ],
+    "cooperation": 6
+   },
+   {
+    "id": "marcos",
+    "name": "Marcos Rivas",
+    "role": "coleccionista",
+    "cityId": "bilbao",
+    "persona": "Soy coleccionista y seguí el caso por interés profesional.",
+    "knowledge": [
+     "rivalidad-coleccionistas",
+     "pista-bilbao"
+    ],
+    "cooperation": 5
+   },
+   {
+    "id": "laura",
+    "name": "Laura Soto",
+    "role": "bibliotecaria",
+    "cityId": "malaga",
+    "persona": "Soy bibliotecaria y vi movimientos de documentos en el archivo.",
+    "knowledge": [
+     "registro-biblioteca",
+     "horario-acceso"
+    ],
+    "cooperation": 8
+   },
+   {
+    "id": "jorge",
+    "name": "Jorge Nieto",
+    "role": "periodista",
+    "cityId": "barcelona",
+    "persona": "Soy periodista e investigo el mercado de antigüedades.",
+    "knowledge": [
+     "articulo-mercado",
+     "fuente-anonima"
+    ],
+    "cooperation": 7
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "manuscrito-meridiano",
+   "registro-venta",
+   "rivalidad-coleccionistas",
+   "pista-bilbao",
+   "registro-biblioteca",
+   "horario-acceso",
+   "articulo-mercado",
+   "fuente-anonima"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "Se observa un registro de acceso al archivo con la firma del investigador desaparecido.",
+    "EV-02": "Se encuentra una carpeta con notas sobre el manuscrito del Meridiano-cero.",
+    "EV-03": "El análisis de las notas revela coincidencias con documentos de venta de antigüedades.",
+    "EV-04": "El registro de la galería muestra una transacción vinculada al manuscrito.",
+    "EV-05": "La factura de transporte indica el traslado del manuscrito entre ciudades.",
+    "EV-06": "Un sobre con sello de biblioteca contiene referencias al manuscrito.",
+    "EV-07": "El registro de préstamos muestra el movimiento de documentos en la biblioteca.",
+    "EV-08": "El horario de acceso coincide con los movimientos registrados.",
+    "EV-09": "Un testigo describe movimientos de documentos en la galería.",
+    "EV-10": "La comunicación entre coleccionistas aporta contexto sobre la rivalidad.",
+    "EV-11": "Se recupera el manuscrito del Meridiano-cero."
+   },
+   "greetings": {
+    "elena": "Hola, soy Elena. Puedo ayudarte con información sobre el manuscrito.",
+    "jorge": "Hola, soy Jorge. Investigo el mercado de antigüedades.",
+    "laura": "Hola, soy Laura. Trabajo en la biblioteca y vi movimientos de documentos.",
+    "marcos": "Hola, soy Marcos. He seguido el caso por interés profesional."
+   },
+   "knowledge": {
+    "pista-bilbao": "Conozco una pista relacionada con Bilbao.",
+    "fuente-anonima": "Tengo una fuente anónima sobre el caso.",
+    "horario-acceso": "Conozco los horarios de acceso al archivo.",
+    "registro-venta": "Conozco los registros de venta relacionados con el manuscrito.",
+    "articulo-mercado": "Conozco un artículo sobre el mercado de antigüedades.",
+    "registro-biblioteca": "Conozco los registros de la biblioteca.",
+    "manuscrito-meridiano": "Conozco el manuscrito y su valor histórico.",
+    "rivalidad-coleccionistas": "Conozco la rivalidad entre coleccionistas."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Desaparición en el Meridiano-cero",
+   "speaker": "Comisaria Vega",
+   "paragraphs": [
+    "Un investigador ha desaparecido mientras seguía la pista de un manuscrito antiguo vinculado al Meridiano-cero.",
+    "La investigación debe reconstruir sus movimientos mediante documentos, registros y testimonios en varias ciudades.",
+    "El objetivo es localizar al responsable y recuperar el objeto desaparecido sin recurrir a la violencia."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-GALERIA",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-GALERIA",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-BIBLIOTECA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-BIBLIOTECA",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-BIBLIOTECA",
+    "relations": [
+     "EV-07"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "BAR-GALERIA",
+    "relations": [
+     "EV-05"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-09"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "BAR-GALERIA",
+    "relations": [
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "elena",
+  "locations": [
+   {
+    "id": "BIL-ARCHIVO",
+    "name": "Archivo Municipal de Bilbao",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Archivo donde se consultan registros y documentos relacionados con el caso."
+   },
+   {
+    "id": "BAR-GALERIA",
+    "name": "Galería de Arte Meridiano",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Espacio de exposición y mercado de antigüedades vinculado al manuscrito."
+   },
+   {
+    "id": "MAL-BIBLIOTECA",
+    "name": "Biblioteca Histórica de Málaga",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Biblioteca con registros de préstamos y accesos a documentos antiguos."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registro-galeria",
+     "label": "Registro de la galería",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-01"
+     ],
+     "evidenceId": "EV-04",
+     "locationId": "BAR-GALERIA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-venta",
+     "label": "Registro de venta",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-GALERIA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-biblioteca",
+     "label": "Registro bibliotecario",
+     "cityId": "malaga",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-BIBLIOTECA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-acceso",
+     "label": "Registro de acceso",
+     "cityId": "malaga",
+     "requires": [
+      "EV-07"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "MAL-BIBLIOTECA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-archivo",
+     "label": "Registro del archivo",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-09"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BIL-ARCHIVO",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Manuscrito del Meridiano-cero",
+    "cityId": "barcelona",
+    "objectId": "manuscrito-meridiano",
+    "evidenceId": "EV-11",
+    "locationId": "BAR-GALERIA",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "elena",
+     "cityId": "barcelona",
+     "locationId": "BAR-GALERIA",
+     "accessEvidenceIds": [
+      "EV-05"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05"
+      ],
+      [
+       "EV-09",
+       "EV-10"
+      ]
+     ]
+    },
+    {
+     "id": "marcos",
+     "cityId": "bilbao",
+     "locationId": "BIL-ARCHIVO",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-10"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-10",
+       "EV-01"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala del archivo",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-ARCHIVO"
+    },
+    {
+     "label": "Manuscrito antiguo",
+     "elementId": "manuscrito-antiguo",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-ARCHIVO"
+    },
+    {
+     "label": "Registro de préstamos",
+     "elementId": "registro-prestamos",
+     "evidenceId": "EV-06",
+     "locationId": "MAL-BIBLIOTECA"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Testimonio sobre el mercado",
+     "npcId": "jorge",
+     "topicId": "testimonio-mercado",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener a la persona responsable de la desaparición."
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el manuscrito desaparecido."
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "desaparicion",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 2880,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-4242ea44": {
+  "id": "generado-4242ea44",
+  "npcs": [
+   {
+    "id": "marcos-vega",
+    "name": "Marcos Vega",
+    "role": "Ingeniero de sistemas",
+    "cityId": "bilbao",
+    "persona": "Soy ingeniero de sistemas y conozco bien el proyecto Meridiano-cero. No tengo nada que ocultar sobre mi trabajo.",
+    "knowledge": [
+     "planos-meridiano",
+     "pendrive-biblioteca"
+    ],
+    "cooperation": 4
+   },
+   {
+    "id": "laura-santos",
+    "name": "Laura Santos",
+    "role": "Consultora externa",
+    "cityId": "barcelona",
+    "persona": "Trabajo como consultora externa y reviso procesos de la empresa. No he visto los planos filtrados.",
+    "knowledge": [
+     "consultoria-externa",
+     "acceso-registros"
+    ],
+    "cooperation": 6
+   },
+   {
+    "id": "jorge-mendez",
+    "name": "Jorge Méndez",
+    "role": "Bibliotecario",
+    "cityId": "bilbao",
+    "persona": "Soy bibliotecario en Bilbao y recuerdo movimientos extraños entre los libros. Ayudo con lo que recuerdo.",
+    "knowledge": [
+     "libro-oculto",
+     "horario-biblioteca"
+    ],
+    "cooperation": 8
+   },
+   {
+    "id": "ana-ruiz",
+    "name": "Ana Ruiz",
+    "role": "Recepcionista",
+    "cityId": "malaga",
+    "persona": "Soy recepcionista en Málaga y gestiono visitas y paquetes. Puedo consultar los registros de acceso.",
+    "knowledge": [
+     "visitas-malaga",
+     "registro-acceso"
+    ],
+    "cooperation": 7
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "planos-meridiano",
+   "pendrive-biblioteca",
+   "consultoria-externa",
+   "acceso-registros",
+   "libro-oculto",
+   "horario-biblioteca",
+   "visitas-malaga",
+   "registro-acceso"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "Se observa un movimiento inusual entre los libros de la biblioteca de Bilbao.",
+    "EV-02": "Se localiza un objeto oculto en un libro de la biblioteca de Bilbao.",
+    "EV-03": "El análisis del objeto revela datos vinculados a los planos del proyecto Meridiano-cero.",
+    "EV-04": "El registro de la biblioteca muestra un acceso relevante para la investigación.",
+    "EV-05": "Los documentos de consultoría de Barcelona contienen referencias a procesos internos.",
+    "EV-06": "Se encuentra un elemento físico relacionado con la revisión de documentos en Barcelona.",
+    "EV-07": "El registro de Málaga anota una visita vinculada al caso.",
+    "EV-08": "El registro de accesos de Málaga muestra una entrada relevante.",
+    "EV-09": "Un testigo describe un movimiento extraño observado en la biblioteca.",
+    "EV-10": "El registro de Málaga confirma datos de una visita relacionada con el caso.",
+    "EV-11": "Se identifica el pendrive que contiene los planos filtrados del proyecto Meridiano-cero."
+   },
+   "greetings": {
+    "ana-ruiz": "Hola. Soy Ana Ruiz, recepcionista. Puedo consultar los registros de acceso.",
+    "marcos-vega": "Buenos días. Soy Marcos Vega, ingeniero de sistemas. ¿En qué puedo ayudarle?",
+    "jorge-mendez": "Buenas. Soy Jorge Méndez, bibliotecario. Puedo ayudarle con lo que recuerdo.",
+    "laura-santos": "Hola. Soy Laura Santos, consultora externa. Estoy a su disposición."
+   },
+   "knowledge": {
+    "libro-oculto": "Recuerdo que un libro de la biblioteca se usó para ocultar un objeto.",
+    "visitas-malaga": "Gestiono las visitas y los paquetes en la recepción de Málaga.",
+    "registro-acceso": "Puedo consultar el registro de acceso: tiene anotaciones sobre visitas relacionadas con el caso.",
+    "acceso-registros": "Reviso los registros de acceso: permiten consultar visitas y movimientos.",
+    "planos-meridiano": "Conozco los planos del proyecto Meridiano-cero: son información confidencial de la empresa.",
+    "horario-biblioteca": "Recuerdo movimientos extraños en un horario concreto.",
+    "consultoria-externa": "Reviso los procesos de la empresa como consultora externa.",
+    "pendrive-biblioteca": "Sé que un pendrive quedó oculto en un libro de la biblioteca de Bilbao."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Informe inicial",
+   "speaker": "Directora de Seguridad",
+   "paragraphs": [
+    "Se ha detectado una filtración de información confidencial del proyecto Meridiano-cero.",
+    "El equipo de investigación debe reunir documentos, registros y testimonios para identificar al responsable.",
+    "La prioridad es detener al culpable y recuperar el material filtrado."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-BIBLIOTECA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-BIBLIOTECA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-BIBLIOTECA",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-BIBLIOTECA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-CONSULTORIA",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "BAR-CONSULTORIA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-RECEPCION",
+    "relations": [
+     "EV-05"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-RECEPCION",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "BIL-BIBLIOTECA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-RECEPCION",
+    "relations": [
+     "EV-09"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-BIBLIOTECA",
+    "relations": [],
+    "admissible": true
+   }
+  ],
+  "solution": "marcos-vega",
+  "locations": [
+   {
+    "id": "BIL-BIBLIOTECA",
+    "name": "Biblioteca de Bilbao",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Sala de lectura y consulta con estanterías, mostrador y zona de archivo."
+   },
+   {
+    "id": "BAR-CONSULTORIA",
+    "name": "Oficina de consultoría de Barcelona",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Espacio de trabajo con documentos, equipos y registros de procesos."
+   },
+   {
+    "id": "MAL-RECEPCION",
+    "name": "Recepción de Málaga",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Mostrador de atención con registro de visitas, paquetes y accesos."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registro-biblioteca",
+     "label": "Registro de movimientos de la biblioteca",
+     "cityId": "bilbao",
+     "requires": [],
+     "evidenceId": "EV-04",
+     "locationId": "BIL-BIBLIOTECA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registros-consultoria",
+     "label": "Registros de procesos de consultoría",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-CONSULTORIA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "visitas-malaga",
+     "label": "Registro de visitas de Málaga",
+     "cityId": "malaga",
+     "requires": [
+      "EV-05"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-RECEPCION",
+     "delayMinutes": 30
+    },
+    {
+     "id": "accesos-malaga",
+     "label": "Registro de accesos de Málaga",
+     "cityId": "malaga",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "MAL-RECEPCION",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-testimonio",
+     "label": "Registro vinculado al testimonio",
+     "cityId": "malaga",
+     "requires": [
+      "EV-09"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "MAL-RECEPCION",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Pendrive con planos del proyecto Meridiano-cero",
+    "cityId": "bilbao",
+    "objectId": "pendrive-planos",
+    "evidenceId": "EV-11",
+    "locationId": "BIL-BIBLIOTECA",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "marcos-vega",
+     "cityId": "bilbao",
+     "locationId": "BIL-BIBLIOTECA",
+     "accessEvidenceIds": [
+      "EV-03"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05"
+      ]
+     ]
+    },
+    {
+     "id": "laura-santos",
+     "cityId": "barcelona",
+     "locationId": "BAR-CONSULTORIA",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-06",
+      "EV-08"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-06",
+       "EV-08"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Mostrador y sala de lectura",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-BIBLIOTECA"
+    },
+    {
+     "label": "Libro con hueco interior",
+     "elementId": "libro-oculto",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-BIBLIOTECA"
+    },
+    {
+     "label": "Documentos de consultoría",
+     "elementId": "documentos-consultoria",
+     "evidenceId": "EV-06",
+     "locationId": "BAR-CONSULTORIA"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Movimiento inusual en la biblioteca",
+     "npcId": "jorge-mendez",
+     "topicId": "movimiento-inusual",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener al responsable del espionaje"
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el pendrive con los planos filtrados"
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "espionaje",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 1440,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-48a17a5b": {
+  "id": "generado-48a17a5b",
+  "npcs": [
+   {
+    "id": "laura-vega",
+    "name": "Laura Vega",
+    "role": "Analista de datos",
+    "cityId": "barcelona",
+    "persona": "Soy analista de datos y trabajo con documentación técnica del proyecto. Puedo explicar cómo se gestiona la información confidencial.",
+    "knowledge": [
+     "acceso-planos",
+     "memoria-usb",
+     "empresa-rival"
+    ],
+    "cooperation": 4
+   },
+   {
+    "id": "marcos-ruiz",
+    "name": "Marcos Ruiz",
+    "role": "Consultor externo",
+    "cityId": "bilbao",
+    "persona": "Soy consultor externo y revisé documentos del proyecto. Puedo aclarar qué material tuve disponible.",
+    "knowledge": [
+     "acceso-planos",
+     "revision-documentos"
+    ],
+    "cooperation": 7
+   },
+   {
+    "id": "ana-soto",
+    "name": "Ana Soto",
+    "role": "Recepcionista",
+    "cityId": "malaga",
+    "persona": "Soy recepcionista y controlo el acceso a la oficina. Puedo indicar quién entró y salió.",
+    "knowledge": [
+     "registro-accesos",
+     "visitas"
+    ],
+    "cooperation": 8
+   },
+   {
+    "id": "diego-ramos",
+    "name": "Diego Ramos",
+    "role": "Técnico de seguridad",
+    "cityId": "bilbao",
+    "persona": "Soy técnico de seguridad y superviso los sistemas. Puedo revisar registros y dispositivos.",
+    "knowledge": [
+     "logs-seguridad",
+     "dispositivos"
+    ],
+    "cooperation": 8
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "acceso-planos",
+   "memoria-usb",
+   "empresa-rival",
+   "revision-documentos",
+   "registro-accesos",
+   "visitas",
+   "logs-seguridad",
+   "dispositivos"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "Se observa un puesto de trabajo con acceso a documentación técnica protegida.",
+    "EV-02": "Se localiza un informe que contiene una memoria USB oculta.",
+    "EV-03": "El análisis confirma que la memoria USB contiene planos confidenciales.",
+    "EV-04": "El registro de accesos muestra movimientos recientes en la oficina.",
+    "EV-05": "El registro del archivo confirma consulta de documentos técnicos.",
+    "EV-06": "Se encuentra un dispositivo de almacenamiento en el archivo.",
+    "EV-07": "El registro técnico vincula el dispositivo con una extracción no autorizada.",
+    "EV-08": "El registro de recepción muestra visitas vinculadas a la oficina.",
+    "EV-09": "Un testigo describe quién entró y salió durante el periodo investigado.",
+    "EV-10": "El registro de seguridad resume los dispositivos detectados.",
+    "EV-11": "Se recupera la memoria USB con los planos confidenciales."
+   },
+   "greetings": {
+    "ana-soto": "Hola, soy Ana Soto. Puedo indicar quién entró y salió.",
+    "laura-vega": "Hola, soy Laura Vega. Puedo explicar cómo se gestiona la información confidencial.",
+    "diego-ramos": "Hola, soy Diego Ramos. Puedo revisar registros y dispositivos.",
+    "marcos-ruiz": "Hola, soy Marcos Ruiz. Puedo aclarar qué material tuve disponible."
+   },
+   "knowledge": {
+    "visitas": "Controlo las visitas registradas durante el periodo investigado.",
+    "memoria-usb": "Conozco el dispositivo que se usó para extraer los planos.",
+    "dispositivos": "Puedo revisar los dispositivos detectados por seguridad.",
+    "acceso-planos": "Conozco el acceso a los planos confidenciales del proyecto.",
+    "empresa-rival": "Conozco el interés de una empresa rival en los documentos.",
+    "logs-seguridad": "Puedo revisar los registros de seguridad de los sistemas.",
+    "registro-accesos": "Controlo la entrada y salida de la oficina: llevo el registro de accesos.",
+    "revision-documentos": "Revisé los documentos del proyecto como consultor externo."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Caso: fuga de información en Meridiano-cero",
+   "speaker": "Directora de Seguridad",
+   "paragraphs": [
+    "Se ha detectado la salida no autorizada de documentos técnicos protegidos desde una oficina del proyecto Meridiano-cero.",
+    "La investigación debe reconstruir quién tuvo acceso a la información y cómo pudo extraerla sin activar los controles habituales.",
+    "Recupera el dispositivo comprometido y reúne pruebas suficientes antes de solicitar una intervención."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-03"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-RECEP",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "MAL-RECEP",
+    "relations": [
+     "EV-08"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-09"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "laura-vega",
+  "locations": [
+   {
+    "id": "BIL-OFIC",
+    "name": "Oficina técnica",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Oficina del proyecto Meridiano-cero donde se gestiona documentación técnica protegida."
+   },
+   {
+    "id": "BAR-ARCH",
+    "name": "Archivo confidencial",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Archivo donde se custodian planos y registros del proyecto."
+   },
+   {
+    "id": "MAL-RECEP",
+    "name": "Recepción",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Punto de control de accesos y visitas de la oficina."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registro-accesos",
+     "label": "Registro de accesos",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-01"
+     ],
+     "evidenceId": "EV-04",
+     "locationId": "BIL-OFIC",
+     "delayMinutes": 30
+    },
+    {
+     "id": "archivo-planos",
+     "label": "Archivo de planos",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-03"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-ARCH",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-archivos",
+     "label": "Registro de archivos",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "BAR-ARCH",
+     "delayMinutes": 30
+    },
+    {
+     "id": "control-visitas",
+     "label": "Control de visitas",
+     "cityId": "malaga",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "MAL-RECEP",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-seguridad",
+     "label": "Registro de seguridad",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-09"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BIL-OFIC",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Memoria USB con planos",
+    "cityId": "barcelona",
+    "objectId": "memoria-usb",
+    "evidenceId": "EV-11",
+    "locationId": "BAR-ARCH",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "laura-vega",
+     "cityId": "barcelona",
+     "locationId": "BAR-ARCH",
+     "accessEvidenceIds": [
+      "EV-10"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05",
+      "EV-10"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05",
+       "EV-10"
+      ]
+     ]
+    },
+    {
+     "id": "marcos-ruiz",
+     "cityId": "bilbao",
+     "locationId": "BIL-OFIC",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-04",
+      "EV-10"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-04",
+       "EV-10"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala técnica",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Informe técnico",
+     "elementId": "informe-tecnico",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Caja de archivos",
+     "elementId": "caja-archivos",
+     "evidenceId": "EV-06",
+     "locationId": "BAR-ARCH"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Testimonio de recepción",
+     "npcId": "ana-soto",
+     "topicId": "registro-accesos",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener a la persona responsable del espionaje."
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el dispositivo con los planos confidenciales."
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "espionaje",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 1440,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-4b7a3c11": {
+  "id": "generado-4b7a3c11",
+  "npcs": [
+   {
+    "id": "marcos-ibarra",
+    "name": "Marcos Ibarra",
+    "role": "Colega arqueólogo",
+    "cityId": "malaga",
+    "persona": "Soy arqueólogo y trabajo con Elena Vargas. No tengo nada que ocultar sobre el cuaderno.",
+    "knowledge": [
+     "cuaderno-campo",
+     "notas-arqueologicas",
+     "viaje-malaga"
+    ],
+    "cooperation": 3
+   },
+   {
+    "id": "laura-ruiz",
+    "name": "Laura Ruiz",
+    "role": "Ayudante de archivo",
+    "cityId": "barcelona",
+    "persona": "Trabajo en el archivo y ayudé a Elena con sus documentos. Estoy dispuesta a colaborar.",
+    "knowledge": [
+     "archivo-bilbao",
+     "registro-prestamos"
+    ],
+    "cooperation": 6
+   },
+   {
+    "id": "elena-vargas",
+    "name": "Elena Vargas",
+    "role": "Arqueóloga",
+    "cityId": "bilbao",
+    "persona": "Soy la arqueóloga que denunció la desaparición de mi cuaderno de campo. Quiero recuperarlo.",
+    "knowledge": [
+     "cuaderno-campo",
+     "jornada-trabajo"
+    ],
+    "cooperation": 8
+   },
+   {
+    "id": "jorge-mendez",
+    "name": "Jorge Méndez",
+    "role": "Bibliotecario",
+    "cityId": "barcelona",
+    "persona": "Soy bibliotecario en Barcelona. Puedo aportar información sobre registros y visitantes.",
+    "knowledge": [
+     "registro-prestamos",
+     "visitantes"
+    ],
+    "cooperation": 7
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "cuaderno-campo",
+   "notas-arqueologicas",
+   "viaje-malaga",
+   "archivo-bilbao",
+   "registro-prestamos",
+   "jornada-trabajo",
+   "visitantes"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "En el archivo de Bilbao se observa una mesa de trabajo con documentos de la jornada de Elena Vargas.",
+    "EV-02": "Se localiza un estuche de campo con restos de notas arqueológicas.",
+    "EV-03": "El análisis del estuche revela marcas compatibles con el material de trabajo de Elena Vargas.",
+    "EV-04": "El registro de la biblioteca de Barcelona muestra consultas recientes sobre archivos de arqueología.",
+    "EV-05": "El registro de préstamos vincula un documento consultado con las notas del cuaderno.",
+    "EV-06": "En el almacén de Málaga se encuentra un paquete con material de archivo sin identificar.",
+    "EV-07": "El registro del almacén indica un envío recibido desde Barcelona.",
+    "EV-08": "El registro de movimientos conecta el envío con la documentación consultada en Barcelona.",
+    "EV-09": "Un bibliotecario declara haber visto a un colega de Elena revisar documentos en Barcelona.",
+    "EV-10": "El registro de Bilbao confirma que el cuaderno estuvo en el archivo antes de su desaparición.",
+    "EV-11": "El cuaderno de campo de Elena Vargas se recupera en el almacén de Málaga."
+   },
+   "greetings": {
+    "laura-ruiz": "Hola, soy Laura Ruiz. Trabajo en el archivo y puedo colaborar.",
+    "elena-vargas": "Hola, soy Elena Vargas. Quiero recuperar mi cuaderno de campo.",
+    "jorge-mendez": "Hola, soy Jorge Méndez. Puedo aportar información sobre registros y visitantes.",
+    "marcos-ibarra": "Hola, soy Marcos Ibarra. Puedo hablar sobre el cuaderno y las notas."
+   },
+   "knowledge": {
+    "visitantes": "Puedo revisar los registros de visitantes: ayudan a reconstruir los movimientos en la biblioteca.",
+    "viaje-malaga": "Conozco el desplazamiento hacia Málaga relacionado con el caso.",
+    "archivo-bilbao": "Trabajo en el archivo de Bilbao y sé que allí se custodian los documentos y registros de la investigación.",
+    "cuaderno-campo": "Conozco el cuaderno de campo y las notas de la jornada de trabajo.",
+    "jornada-trabajo": "Mi jornada de trabajo tuvo lugar en Bilbao.",
+    "registro-prestamos": "Puedo consultar el registro de préstamos: ahí quedan las consultas y los movimientos de archivos.",
+    "notas-arqueologicas": "Conozco las notas arqueológicas: describen hallazgos y observaciones de campo."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Expediente: cuaderno desaparecido",
+   "speaker": "Comisaria Vega",
+   "paragraphs": [
+    "La arqueóloga Elena Vargas denuncia la desaparición de su cuaderno de campo tras una jornada de trabajo en Bilbao.",
+    "Las pesquisas iniciales apuntan a un entorno cercano y a posibles desplazamientos entre Bilbao, Barcelona y Málaga.",
+    "Deberás reunir documentos, registros y testimonios para localizar el objeto y determinar quién lo sustrajo."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-BIBLIOTECA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-BIBLIOTECA",
+    "relations": [
+     "EV-03"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-ALMACEN",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-ALMACEN",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-ALMACEN",
+    "relations": [
+     "EV-05"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "BAR-BIBLIOTECA",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-09"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-ALMACEN",
+    "relations": [
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "marcos-ibarra",
+  "locations": [
+   {
+    "id": "BIL-ARCHIVO",
+    "name": "Archivo de Bilbao",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Sala de consulta y depósito documental del archivo municipal."
+   },
+   {
+    "id": "BAR-BIBLIOTECA",
+    "name": "Biblioteca de Barcelona",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Biblioteca pública con registros de visitantes y préstamos."
+   },
+   {
+    "id": "MAL-ALMACEN",
+    "name": "Almacén de Málaga",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Depósito logístico donde se guardan objetos y envíos."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registro-archivo-bilbao",
+     "label": "Registro del archivo de Bilbao",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-01"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BIL-ARCHIVO",
+     "delayMinutes": 5
+    },
+    {
+     "id": "registro-prestamos-barcelona",
+     "label": "Registro de préstamos de Barcelona",
+     "cityId": "barcelona",
+     "requires": [],
+     "evidenceId": "EV-04",
+     "locationId": "BAR-BIBLIOTECA",
+     "delayMinutes": 5
+    },
+    {
+     "id": "registro-visitas-barcelona",
+     "label": "Registro de visitantes de Barcelona",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-03"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-BIBLIOTECA",
+     "delayMinutes": 5
+    },
+    {
+     "id": "registro-envios-malaga",
+     "label": "Registro de envíos de Málaga",
+     "cityId": "malaga",
+     "requires": [],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-ALMACEN",
+     "delayMinutes": 5
+    },
+    {
+     "id": "registro-almacen-malaga",
+     "label": "Registro del almacén de Málaga",
+     "cityId": "malaga",
+     "requires": [
+      "EV-05"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "MAL-ALMACEN",
+     "delayMinutes": 5
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 10,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Cuaderno de campo",
+    "cityId": "malaga",
+    "objectId": "cuaderno-campo",
+    "evidenceId": "EV-11",
+    "locationId": "MAL-ALMACEN",
+    "requiresAccessWarrant": false
+   },
+   "suspects": [
+    {
+     "id": "marcos-ibarra",
+     "cityId": "malaga",
+     "locationId": "MAL-ALMACEN",
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05",
+      "EV-08"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05"
+      ],
+      [
+       "EV-06",
+       "EV-07",
+       "EV-08"
+      ]
+     ]
+    },
+    {
+     "id": "laura-ruiz",
+     "cityId": "barcelona",
+     "locationId": "BAR-BIBLIOTECA",
+     "knownFromEvidence": [
+      "EV-04",
+      "EV-09",
+      "EV-10"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-04",
+       "EV-09",
+       "EV-10"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala del archivo",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-ARCHIVO"
+    },
+    {
+     "label": "Caja de archivo",
+     "elementId": "caja-archivo",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-ARCHIVO"
+    },
+    {
+     "label": "Paquete en almacén",
+     "elementId": "paquete-malaga",
+     "evidenceId": "EV-06",
+     "locationId": "MAL-ALMACEN"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Visitantes de la biblioteca",
+     "npcId": "jorge-mendez",
+     "topicId": "visitantes",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener a Marcos Ibarra"
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el cuaderno de campo de Elena Vargas"
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "desaparicion",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 1440,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-71f0f281": {
+  "id": "generado-71f0f281",
+  "npcs": [
+   {
+    "id": "alvaro",
+    "name": "Álvaro Méndez",
+    "role": "Contable",
+    "cityId": "barcelona",
+    "persona": "Soy contable de Meridiano-cero. Me encargo de los registros financieros de la empresa.",
+    "knowledge": [
+     "documentos-falsificados",
+     "cuenta-personal",
+     "desvio-fondos"
+    ],
+    "cooperation": 3
+   },
+   {
+    "id": "lucia",
+    "name": "Lucía Vargas",
+    "role": "Asesora",
+    "cityId": "bilbao",
+    "persona": "Soy asesora en la empresa. Mi firma fue confundida con la del responsable del fraude.",
+    "knowledge": [
+     "firma-similar",
+     "asesoria-legal"
+    ],
+    "cooperation": 8
+   },
+   {
+    "id": "carmen",
+    "name": "Carmen Ruiz",
+    "role": "Secretaria",
+    "cityId": "malaga",
+    "persona": "Trabajo como secretaria en Málaga. Vi irregularidades en los documentos contables.",
+    "knowledge": [
+     "irregularidades-malaga",
+     "documentos-alterados"
+    ],
+    "cooperation": 7
+   },
+   {
+    "id": "roberto",
+    "name": "Roberto Gil",
+    "role": "Compañero",
+    "cityId": "bilbao",
+    "persona": "Soy compañero en Bilbao. Noté movimientos extraños en las cuentas de la empresa.",
+    "knowledge": [
+     "movimientos-bilbao",
+     "cuentas-sospechosas"
+    ],
+    "cooperation": 6
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "documentos-falsificados",
+   "cuenta-personal",
+   "desvio-fondos",
+   "firma-similar",
+   "asesoria-legal",
+   "irregularidades-malaga",
+   "documentos-alterados",
+   "movimientos-bilbao",
+   "cuentas-sospechosas"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "En la oficina de Bilbao se observan carpetas contables con anotaciones inconsistentes.",
+    "EV-02": "Se recoge un cuaderno de asientos con correcciones manuscritas.",
+    "EV-03": "El análisis del cuaderno revela alteraciones en cifras y firmas.",
+    "EV-04": "Registro bancario de transferencias a una cuenta personal.",
+    "EV-05": "Extracto de cuenta con movimientos repetidos.",
+    "EV-06": "Carpeta de documentos alterados localizada en el archivo de Málaga.",
+    "EV-07": "Informe interno sobre irregularidades detectadas en Málaga.",
+    "EV-08": "Acta de revisión de documentos contables de la sucursal.",
+    "EV-09": "Testimonio sobre movimientos extraños en las cuentas de la empresa.",
+    "EV-10": "Registro mercantil y administrativo de Meridiano-cero.",
+    "EV-11": "Maletín con documentos falsificados localizado en el archivo."
+   },
+   "greetings": {
+    "lucia": "Hola. Soy Lucía Vargas, asesora de la empresa.",
+    "alvaro": "Buenos días. Soy Álvaro Méndez, contable de Meridiano-cero.",
+    "carmen": "Buenos días. Soy Carmen Ruiz, secretaria en Málaga.",
+    "roberto": "Hola. Soy Roberto Gil, compañero en Bilbao."
+   },
+   "knowledge": {
+    "desvio-fondos": "Sé que los fondos se desviaron mediante documentos alterados.",
+    "firma-similar": "Mi firma se confundió con la del responsable del fraude.",
+    "asesoria-legal": "Sé que la asesoría legal revisó la documentación y detectó inconsistencias.",
+    "cuenta-personal": "En los registros bancarios que llevo hay transferencias a una cuenta personal.",
+    "movimientos-bilbao": "Noté movimientos extraños en las cuentas en Bilbao.",
+    "cuentas-sospechosas": "He visto operaciones sospechosas en las cuentas de la empresa.",
+    "documentos-alterados": "Vi que los documentos del archivo tenían modificaciones no autorizadas.",
+    "irregularidades-malaga": "Vi irregularidades en los documentos contables en Málaga.",
+    "documentos-falsificados": "Sé que los documentos contables presentan alteraciones y firmas inconsistentes."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Informe inicial",
+   "speaker": "Comisario",
+   "paragraphs": [
+    "Se ha detectado un fraude documental en la empresa Meridiano-cero. Los fondos han sido desviados mediante documentos contables alterados.",
+    "El caso se extiende por varias ciudades y requiere recopilar evidencias, testimonios y registros para identificar al responsable.",
+    "Tu misión es detener al culpable y recuperar el maletín con los documentos falsificados."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-CONT",
+    "relations": [
+     "EV-03"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-CONT",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-ARCH",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-ARCH",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-ARCH",
+    "relations": [
+     "EV-07"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-CONT",
+    "relations": [
+     "EV-05"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-ARCH",
+    "relations": [
+     "EV-08"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "alvaro",
+  "locations": [
+   {
+    "id": "BIL-OFIC",
+    "name": "Oficina central de Meridiano-cero",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Sala de trabajo donde se revisan registros y se atiende a empleados."
+   },
+   {
+    "id": "BAR-CONT",
+    "name": "Despacho contable",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Espacio de contabilidad con archivos y equipos de gestión financiera."
+   },
+   {
+    "id": "MAL-ARCH",
+    "name": "Archivo administrativo",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Archivo de documentos y correspondencia de la sucursal."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registros-contables",
+     "label": "Consultar registros contables",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-03"
+     ],
+     "evidenceId": "EV-04",
+     "locationId": "BAR-CONT",
+     "delayMinutes": 30
+    },
+    {
+     "id": "extracto-bancario",
+     "label": "Consultar extracto bancario",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-CONT",
+     "delayMinutes": 30
+    },
+    {
+     "id": "auditoria-interna",
+     "label": "Consultar auditoría interna",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-05"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BAR-CONT",
+     "delayMinutes": 30
+    },
+    {
+     "id": "archivo-malaga",
+     "label": "Consultar archivo de Málaga",
+     "cityId": "malaga",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-ARCH",
+     "delayMinutes": 30
+    },
+    {
+     "id": "correspondencia-sucursal",
+     "label": "Consultar correspondencia de sucursal",
+     "cityId": "malaga",
+     "requires": [
+      "EV-07"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "MAL-ARCH",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Maletín con documentos falsificados",
+    "cityId": "malaga",
+    "objectId": "maletin-documentos",
+    "evidenceId": "EV-11",
+    "locationId": "MAL-ARCH",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "alvaro",
+     "cityId": "barcelona",
+     "locationId": "BAR-CONT",
+     "accessEvidenceIds": [
+      "EV-10"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05",
+      "EV-10"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05",
+       "EV-10"
+      ],
+      [
+       "EV-06",
+       "EV-07",
+       "EV-08",
+       "EV-10"
+      ]
+     ]
+    },
+    {
+     "id": "lucia",
+     "cityId": "bilbao",
+     "locationId": "BIL-OFIC",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-01",
+      "EV-09"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-01",
+       "EV-09"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala principal",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Caja fuerte",
+     "elementId": "caja-fuerte",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Estantería de archivo",
+     "elementId": "estanteria",
+     "evidenceId": "EV-06",
+     "locationId": "MAL-ARCH"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Preguntar por movimientos sospechosos",
+     "npcId": "roberto",
+     "topicId": "movimientos-sospechosos",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener al autor del fraude"
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el maletín con los documentos falsificados"
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "fraude",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 2880,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-8621c8a9": {
+  "id": "generado-8621c8a9",
+  "npcs": [
+   {
+    "id": "marcos",
+    "name": "Marcos Aldana",
+    "role": "Colega investigador",
+    "cityId": "barcelona",
+    "persona": "Soy colega del Dr. Vela y trabajo en investigación académica.",
+    "knowledge": [
+     "publicacion-academica",
+     "presion-vela",
+     "manuscrito-malaga"
+    ],
+    "cooperation": 3
+   },
+   {
+    "id": "laura",
+    "name": "Laura Soto",
+    "role": "Asistente de investigación",
+    "cityId": "malaga",
+    "persona": "Soy asistente de investigación del Dr. Vela.",
+    "knowledge": [
+     "despacho-bilbao",
+     "manuscrito-restauracion"
+    ],
+    "cooperation": 7
+   },
+   {
+    "id": "jorge",
+    "name": "Jorge Etxeberria",
+    "role": "Guardia de seguridad",
+    "cityId": "bilbao",
+    "persona": "Soy guardia de seguridad del edificio en Bilbao.",
+    "knowledge": [
+     "acceso-despacho",
+     "registro-entrada"
+    ],
+    "cooperation": 6
+   },
+   {
+    "id": "ana",
+    "name": "Ana Ruiz",
+    "role": "Bibliotecaria",
+    "cityId": "malaga",
+    "persona": "Soy bibliotecaria en Málaga.",
+    "knowledge": [
+     "documento-malaga",
+     "consulta-registros"
+    ],
+    "cooperation": 7
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "publicacion-academica",
+   "presion-vela",
+   "manuscrito-malaga",
+   "despacho-bilbao",
+   "manuscrito-restauracion",
+   "acceso-despacho",
+   "registro-entrada",
+   "documento-malaga",
+   "consulta-registros"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "El despacho aparece ordenado pero sin el manuscrito; no hay signos de violencia.",
+    "EV-02": "Caja de restauración con etiqueta de envío y restos de papel antiguo.",
+    "EV-03": "El análisis de la caja revela un compartimento oculto y huellas de manipulación reciente.",
+    "EV-04": "Registro de entrada del edificio con accesos del día de la desaparición.",
+    "EV-05": "Listado de salidas del edificio que coincide con el horario del registro.",
+    "EV-06": "Funda protectora con un documento antiguo localizado en una estantería reservada.",
+    "EV-07": "Ficha de consulta de la biblioteca con fecha y nombre del solicitante.",
+    "EV-08": "Registro interno de depósito que vincula el documento con una reserva académica.",
+    "EV-09": "Testimonio del guardia sobre los movimientos observados en el edificio.",
+    "EV-10": "Correspondencia académica sobre la publicación de hallazgos del manuscrito.",
+    "EV-11": "Manuscrito del siglo XVI recuperado en su funda protectora."
+   },
+   "greetings": {
+    "ana": "Hola, soy Ana Ruiz, bibliotecaria.",
+    "jorge": "Buenos días, soy Jorge Etxeberria, guardia de seguridad.",
+    "laura": "Hola, soy Laura Soto. Estoy a tu disposición.",
+    "marcos": "Hola, soy Marcos Aldana. ¿En qué puedo ayudarte?"
+   },
+   "knowledge": {
+    "presion-vela": "Sé que el Dr. Vela recibió presiones para trasladarse a Barcelona.",
+    "acceso-despacho": "Controlo los accesos al despacho del Dr. Vela.",
+    "despacho-bilbao": "Sé que el despacho del Dr. Vela en Bilbao fue el punto de partida de la desaparición.",
+    "documento-malaga": "Conozco el documento custodiado en Málaga.",
+    "registro-entrada": "Llevo el registro de entrada: ahí queda quién accedió al edificio.",
+    "manuscrito-malaga": "Sé que el manuscrito quedó vinculado a un depósito en Málaga.",
+    "consulta-registros": "Puedo consultar los registros de la biblioteca.",
+    "publicacion-academica": "Me interesaba publicar hallazgos académicos relacionados con el manuscrito.",
+    "manuscrito-restauracion": "Sé que el manuscrito estaba en proceso de restauración cuando desapareció."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Desaparición en el Meridiano-cero",
+   "speaker": "Comisario",
+   "paragraphs": [
+    "El Dr. Ignacio Vela, historiador y restaurador de manuscritos, ha desaparecido de su despacho en Bilbao junto con un valioso manuscrito del siglo XVI que estaba restaurando. Su familia denunció la desaparición hace 48 horas.",
+    "La investigación nos lleva por Bilbao, Barcelona y Málaga. Los documentos, registros y testimonios serán clave para reconstruir lo ocurrido. No hay indicios de violencia, pero el manuscrito tiene un gran valor académico.",
+    "Tu misión es descubrir qué ocurrió con el Dr. Vela y el manuscrito, identificar al responsable y recuperar el documento. Trabaja con discreción y sigue las pistas."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-BIBLIOTECA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-BIBLIOTECA",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-BIBLIOTECA",
+    "relations": [
+     "EV-07"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-03"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-BIBLIOTECA",
+    "relations": [
+     "EV-08",
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "marcos",
+  "locations": [
+   {
+    "id": "BIL-OFIC",
+    "name": "Despacho del Dr. Vela",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Despacho de trabajo del historiador, con mesa de restauración y estanterías de documentos."
+   },
+   {
+    "id": "BAR-ARCH",
+    "name": "Archivo académico",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Archivo universitario con registros de publicaciones y correspondencia académica."
+   },
+   {
+    "id": "MAL-BIBLIOTECA",
+    "name": "Biblioteca municipal",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Biblioteca con salas de consulta y depósito de documentos antiguos."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registro-acceso",
+     "label": "Consultar registro de acceso",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-01"
+     ],
+     "evidenceId": "EV-04",
+     "locationId": "BIL-OFIC",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-entrada",
+     "label": "Consultar registro de entrada",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BIL-OFIC",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-registros",
+     "label": "Consultar registros de biblioteca",
+     "cityId": "malaga",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-BIBLIOTECA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-deposito",
+     "label": "Consultar registro de depósito",
+     "cityId": "malaga",
+     "requires": [
+      "EV-07"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "MAL-BIBLIOTECA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "archivo-publicaciones",
+     "label": "Consultar archivo de publicaciones",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-03"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BAR-ARCH",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Manuscrito del siglo XVI",
+    "cityId": "malaga",
+    "objectId": "manuscrito",
+    "evidenceId": "EV-11",
+    "locationId": "MAL-BIBLIOTECA",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "marcos",
+     "cityId": "barcelona",
+     "locationId": "BAR-ARCH",
+     "accessEvidenceIds": [
+      "EV-08"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05"
+      ],
+      [
+       "EV-06",
+       "EV-07",
+       "EV-08"
+      ]
+     ]
+    },
+    {
+     "id": "laura",
+     "cityId": "malaga",
+     "locationId": "MAL-BIBLIOTECA",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-09"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-01",
+       "EV-02"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala del despacho",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Mesa de restauración",
+     "elementId": "mesa-restauracion",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Estante de documentos antiguos",
+     "elementId": "estante-antiguo",
+     "evidenceId": "EV-06",
+     "locationId": "MAL-BIBLIOTECA"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Preguntar por el acceso al despacho",
+     "npcId": "jorge",
+     "topicId": "acceso-despacho",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener al responsable de la desaparición del manuscrito"
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el manuscrito desaparecido"
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "desaparicion",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 2880,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-9c165dae": {
+  "id": "generado-9c165dae",
+  "npcs": [
+   {
+    "id": "marcos",
+    "name": "Marcos",
+    "role": "restaurador",
+    "cityId": "bilbao",
+    "persona": "Soy restaurador y trabajo con piezas del Meridiano-cero. Conozco los procedimientos de acceso y traslado de objetos.",
+    "knowledge": [
+     "acceso-restauracion",
+     "traslado-bilbao"
+    ],
+    "cooperation": 3
+   },
+   {
+    "id": "laura",
+    "name": "Laura",
+    "role": "coleccionista",
+    "cityId": "barcelona",
+    "persona": "Colecciono documentos antiguos y sigo el mercado de arte. Puedo hablar de procedencia y valor.",
+    "knowledge": [
+     "mercado-arte",
+     "procedencia-documentos"
+    ],
+    "cooperation": 6
+   },
+   {
+    "id": "jorge",
+    "name": "Jorge",
+    "role": "vigilante",
+    "cityId": "malaga",
+    "persona": "Vigilo las instalaciones y registro entradas y salidas. Recuerdo movimientos inusuales.",
+    "knowledge": [
+     "registro-entrada",
+     "movimiento-objeto"
+    ],
+    "cooperation": 7
+   },
+   {
+    "id": "sofia",
+    "name": "Sofía",
+    "role": "recepcionista",
+    "cityId": "bilbao",
+    "persona": "Atiendo en recepción y gestiono citas y accesos. Tengo constancia de visitas y entregas.",
+    "knowledge": [
+     "agenda-visitas",
+     "entrega-maletin"
+    ],
+    "cooperation": 8
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "acceso-restauracion",
+   "traslado-bilbao",
+   "mercado-arte",
+   "procedencia-documentos",
+   "registro-entrada",
+   "movimiento-objeto",
+   "agenda-visitas",
+   "entrega-maletin"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "La sala de restauración muestra un acceso reciente y ordenado.",
+    "EV-02": "Etiqueta de traslado vinculada a una pieza del archivo.",
+    "EV-03": "El análisis de la etiqueta revela manipulación reciente.",
+    "EV-04": "Registro mercantil de documentos antiguos en Barcelona.",
+    "EV-05": "Factura de adquisición vinculada al mercado de arte.",
+    "EV-06": "Cuaderno de vigilancia con anotaciones de movimientos.",
+    "EV-07": "Informe de recepción con entregas registradas.",
+    "EV-08": "Agenda de visitas con citas y accesos.",
+    "EV-09": "Testimonio sobre movimientos inusuales en la instalación.",
+    "EV-10": "Certificado de procedencia de documentos antiguos.",
+    "EV-11": "Maletín con documentos antiguos localizado para recuperación."
+   },
+   "greetings": {
+    "jorge": "Hola, soy Jorge. Vigilo las instalaciones.",
+    "laura": "Hola, soy Laura. Colecciono documentos antiguos.",
+    "sofia": "Hola, soy Sofía. Atiendo en recepción.",
+    "marcos": "Hola, soy Marcos. Trabajo como restaurador en el archivo."
+   },
+   "knowledge": {
+    "mercado-arte": "Sigo el mercado de arte antiguo y sé que hay que verificar procedencia y valor.",
+    "agenda-visitas": "Gestiono las citas y los accesos con la agenda de recepción.",
+    "entrega-maletin": "Tengo constancia de las entregas de maletines en recepción.",
+    "traslado-bilbao": "Conozco los traslados de piezas hacia Bilbao que se registran en el archivo.",
+    "registro-entrada": "Registro las entradas y salidas en el sistema de vigilancia.",
+    "movimiento-objeto": "Recuerdo los movimientos inusuales: los anoto en el cuaderno de vigilancia.",
+    "acceso-restauracion": "Conozco los procedimientos que controlan el acceso a la sala de restauración.",
+    "procedencia-documentos": "Puedo hablar de la procedencia de los documentos antiguos: queda documentada en certificados."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Informe inicial",
+   "speaker": "Comisaría",
+   "paragraphs": [
+    "Se ha denunciado la desaparición de un objeto valioso vinculado al Meridiano-cero.",
+    "La investigación se centra en documentos, registros y testimonios para reconstruir los hechos.",
+    "El objetivo es identificar al responsable y recuperar el objeto sin causar daños."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-01"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-GALERIA",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-GALERIA",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-MUSEO",
+    "relations": [
+     "EV-03"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-MUSEO",
+    "relations": [
+     "EV-05"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "MAL-MUSEO",
+    "relations": [
+     "EV-07"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-GALERIA",
+    "relations": [
+     "EV-08"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-ARCHIVO",
+    "relations": [
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "marcos",
+  "locations": [
+   {
+    "id": "BIL-ARCHIVO",
+    "name": "Archivo de restauración",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Sala donde se custodian y tratan piezas del Meridiano-cero."
+   },
+   {
+    "id": "BAR-GALERIA",
+    "name": "Galería de documentos",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Espacio de exposición y consulta de documentos antiguos."
+   },
+   {
+    "id": "MAL-MUSEO",
+    "name": "Museo del Meridiano-cero",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Instalación principal con salas de vigilancia y recepción."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "registro-galeria",
+     "label": "Consultar registro de galería",
+     "cityId": "barcelona",
+     "requires": [],
+     "evidenceId": "EV-04",
+     "locationId": "BAR-GALERIA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "procedencia-documentos",
+     "label": "Consultar procedencia de documentos",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-GALERIA",
+     "delayMinutes": 30
+    },
+    {
+     "id": "registro-entrada",
+     "label": "Consultar registro de entrada",
+     "cityId": "malaga",
+     "requires": [
+      "EV-05"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-MUSEO",
+     "delayMinutes": 30
+    },
+    {
+     "id": "archivo-traslado",
+     "label": "Consultar archivo de traslado",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "BIL-ARCHIVO",
+     "delayMinutes": 30
+    },
+    {
+     "id": "mercado-arte",
+     "label": "Consultar mercado de arte",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-08"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BAR-GALERIA",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Maletín con documentos antiguos",
+    "cityId": "bilbao",
+    "objectId": "maletin-documentos-antiguos",
+    "evidenceId": "EV-11",
+    "locationId": "BIL-ARCHIVO",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "marcos",
+     "cityId": "bilbao",
+     "locationId": "BIL-ARCHIVO",
+     "accessEvidenceIds": [
+      "EV-03"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05"
+      ],
+      [
+       "EV-06",
+       "EV-07",
+       "EV-08"
+      ]
+     ]
+    },
+    {
+     "id": "laura",
+     "cityId": "barcelona",
+     "locationId": "BAR-GALERIA",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-04",
+      "EV-10"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-04",
+       "EV-10"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala de restauración",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-ARCHIVO"
+    },
+    {
+     "label": "Mesa de trabajo",
+     "elementId": "mesa-restauracion",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-ARCHIVO"
+    },
+    {
+     "label": "Vitrina principal",
+     "elementId": "vitrina-principal",
+     "evidenceId": "EV-06",
+     "locationId": "MAL-MUSEO"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Preguntar por movimiento del objeto",
+     "npcId": "jorge",
+     "topicId": "movimiento-objeto",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener al responsable del robo."
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el objeto sustraído."
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "robo",
+   "contentRating": "familiar"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 2880,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ },
+ "generado-f6559983": {
+  "id": "generado-f6559983",
+  "npcs": [
+   {
+    "id": "elena",
+    "name": "Elena Vargas",
+    "role": "Analista de datos",
+    "cityId": "barcelona",
+    "persona": "Soy analista de datos y trabajo con información técnica del proyecto. Prefiero mantener mis tareas y horarios en reserva.",
+    "knowledge": [
+     "planos-infraestructura",
+     "acceso-barcelona",
+     "dispositivo-cifrado"
+    ],
+    "cooperation": 4
+   },
+   {
+    "id": "marcos",
+    "name": "Marcos Rivas",
+    "role": "Consultor externo",
+    "cityId": "bilbao",
+    "persona": "Soy consultor externo y colaboro en revisiones de seguridad. Puedo explicar mi trabajo, pero no los detalles internos de otros equipos.",
+    "knowledge": [
+     "auditoria-externa",
+     "acceso-bilbao"
+    ],
+    "cooperation": 6
+   },
+   {
+    "id": "lucia",
+    "name": "Lucía Ortega",
+    "role": "Recepcionista",
+    "cityId": "malaga",
+    "persona": "Soy recepcionista y atiendo el acceso en Málaga. Recuerdo visitas y entregas, aunque no siempre los nombres.",
+    "knowledge": [
+     "registro-accesos",
+     "entrega-dispositivo"
+    ],
+    "cooperation": 7
+   },
+   {
+    "id": "diego",
+    "name": "Diego Soto",
+    "role": "Técnico de seguridad",
+    "cityId": "bilbao",
+    "persona": "Soy técnico de seguridad y reviso sistemas de control. Puedo aportar registros técnicos dentro de mis competencias.",
+    "knowledge": [
+     "logs-seguridad",
+     "alerta-filtracion"
+    ],
+    "cooperation": 5
+   }
+  ],
+  "seed": 0,
+  "facts": [
+   "EV-01",
+   "EV-02",
+   "EV-03",
+   "EV-04",
+   "EV-05",
+   "EV-06",
+   "EV-07",
+   "EV-08",
+   "EV-09",
+   "EV-10",
+   "EV-11",
+   "planos-infraestructura",
+   "acceso-barcelona",
+   "dispositivo-cifrado",
+   "auditoria-externa",
+   "acceso-bilbao",
+   "registro-accesos",
+   "entrega-dispositivo",
+   "logs-seguridad",
+   "alerta-filtracion"
+  ],
+  "rules": [],
+  "texts": {
+   "evidence": {
+    "EV-01": "Se observa un acceso anómalo en la terminal de seguridad de Bilbao.",
+    "EV-02": "Se localiza un dispositivo auxiliar de almacenamiento en la oficina de seguridad.",
+    "EV-03": "El análisis del dispositivo auxiliar revela metadatos vinculados a Barcelona.",
+    "EV-04": "El registro del archivo técnico muestra consultas a planos de infraestructura.",
+    "EV-05": "El registro ampliado confirma la descarga de documentación confidencial.",
+    "EV-06": "Se encuentra una caja de entrega en la recepción de Málaga.",
+    "EV-07": "El registro de recepción asocia la caja con una entrega reciente.",
+    "EV-08": "El registro de seguridad vincula la entrega con un acceso previo en Bilbao.",
+    "EV-09": "Un testimonio describe la entrega del dispositivo en Málaga.",
+    "EV-10": "El registro final conecta la entrega con la documentación de Barcelona.",
+    "EV-11": "Se recupera el dispositivo de almacenamiento cifrado con los datos confidenciales."
+   },
+   "greetings": {
+    "diego": "Hola. Soy Diego Soto, técnico de seguridad.",
+    "elena": "Buenos días. Soy Elena Vargas, analista de datos del proyecto.",
+    "lucia": "Buenas. Soy Lucía Ortega, recepcionista de la sede de Málaga.",
+    "marcos": "Hola. Soy Marcos Rivas, consultor externo de seguridad."
+   },
+   "knowledge": {
+    "acceso-bilbao": "Sé que se registraron accesos relevantes en la sede de Bilbao.",
+    "logs-seguridad": "Reviso los logs de seguridad, que registran los eventos técnicos del sistema.",
+    "acceso-barcelona": "Sé que se detectaron accesos vinculados a la sede de Barcelona.",
+    "registro-accesos": "Llevo los registros de acceso: documentan las entradas y salidas del personal.",
+    "alerta-filtracion": "Sé que la alerta de filtración inició la investigación del caso.",
+    "auditoria-externa": "Sé que la auditoría externa revisó los controles de seguridad del proyecto.",
+    "dispositivo-cifrado": "Sé que el dispositivo cifrado contenía los datos confidenciales desaparecidos.",
+    "entrega-dispositivo": "Tengo constancia de la entrega del dispositivo en recepción.",
+    "planos-infraestructura": "Sé que los planos de infraestructura forman parte de la documentación confidencial filtrada."
+   }
+  },
+  "cities": [
+   {
+    "id": "bilbao",
+    "name": "Bilbao",
+    "country": "ES"
+   },
+   {
+    "id": "barcelona",
+    "name": "Barcelona",
+    "country": "ES"
+   },
+   {
+    "id": "malaga",
+    "name": "Málaga",
+    "country": "ES"
+   }
+  ],
+  "briefing": {
+   "title": "Informe inicial",
+   "speaker": "Comisaría",
+   "paragraphs": [
+    "Se ha detectado una filtración de información confidencial vinculada al proyecto Meridiano-cero.",
+    "El dispositivo que contenía los datos ha desaparecido y la investigación se extiende por varias ciudades.",
+    "Deberá reunir pruebas, localizar al responsable y recuperar el dispositivo."
+   ]
+  },
+  "evidence": [
+   {
+    "id": "EV-01",
+    "type": "observation",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-02",
+    "type": "object",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-03",
+    "type": "analysis",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-02"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-04",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-03"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-05",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-04"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-06",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-RECEP",
+    "relations": [],
+    "admissible": true
+   },
+   {
+    "id": "EV-07",
+    "type": "record",
+    "minute": 0,
+    "origin": "MAL-RECEP",
+    "relations": [
+     "EV-06"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-08",
+    "type": "record",
+    "minute": 0,
+    "origin": "BIL-OFIC",
+    "relations": [
+     "EV-07"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-09",
+    "type": "testimony",
+    "minute": 0,
+    "origin": "MAL-RECEP",
+    "relations": [
+     "EV-08"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-10",
+    "type": "record",
+    "minute": 0,
+    "origin": "BAR-ARCH",
+    "relations": [
+     "EV-09"
+    ],
+    "admissible": true
+   },
+   {
+    "id": "EV-11",
+    "type": "object",
+    "minute": 0,
+    "origin": "MAL-RECEP",
+    "relations": [
+     "EV-10"
+    ],
+    "admissible": true
+   }
+  ],
+  "solution": "elena",
+  "locations": [
+   {
+    "id": "BIL-OFIC",
+    "name": "Oficina de seguridad",
+    "cityId": "bilbao",
+    "accessible": true,
+    "description": "Sala de control y revisión de accesos del proyecto Meridiano-cero."
+   },
+   {
+    "id": "BAR-ARCH",
+    "name": "Archivo técnico",
+    "cityId": "barcelona",
+    "accessible": true,
+    "description": "Depósito documental con planos e informes de infraestructura."
+   },
+   {
+    "id": "MAL-RECEP",
+    "name": "Recepción central",
+    "cityId": "malaga",
+    "accessible": true,
+    "description": "Punto de control de visitas y entregas en la sede de Málaga."
+   }
+  ],
+  "mechanics": {
+   "queries": [
+    {
+     "id": "consulta-registros-barcelona",
+     "label": "Consultar registros técnicos",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-03"
+     ],
+     "evidenceId": "EV-04",
+     "locationId": "BAR-ARCH",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-accesos-barcelona",
+     "label": "Consultar accesos documentales",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-04"
+     ],
+     "evidenceId": "EV-05",
+     "locationId": "BAR-ARCH",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-entregas-malaga",
+     "label": "Consultar entregas en recepción",
+     "cityId": "malaga",
+     "requires": [
+      "EV-06"
+     ],
+     "evidenceId": "EV-07",
+     "locationId": "MAL-RECEP",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-alertas-bilbao",
+     "label": "Consultar alertas de seguridad",
+     "cityId": "bilbao",
+     "requires": [
+      "EV-07"
+     ],
+     "evidenceId": "EV-08",
+     "locationId": "BIL-OFIC",
+     "delayMinutes": 30
+    },
+    {
+     "id": "consulta-planos-barcelona",
+     "label": "Consultar planos de infraestructura",
+     "cityId": "barcelona",
+     "requires": [
+      "EV-09"
+     ],
+     "evidenceId": "EV-10",
+     "locationId": "BAR-ARCH",
+     "delayMinutes": 30
+    }
+   ],
+   "analyses": [
+    {
+     "delayMinutes": 90,
+     "inputEvidenceId": "EV-02",
+     "resultEvidenceId": "EV-03"
+    }
+   ],
+   "recovery": {
+    "label": "Dispositivo de almacenamiento cifrado",
+    "cityId": "malaga",
+    "objectId": "dispositivo-cifrado",
+    "evidenceId": "EV-11",
+    "locationId": "MAL-RECEP",
+    "requiresAccessWarrant": true
+   },
+   "suspects": [
+    {
+     "id": "elena",
+     "cityId": "barcelona",
+     "locationId": "BAR-ARCH",
+     "accessEvidenceIds": [
+      "EV-10"
+     ],
+     "knownFromEvidence": [
+      "EV-03",
+      "EV-05",
+      "EV-10"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-03",
+       "EV-05"
+      ],
+      [
+       "EV-10",
+       "EV-04"
+      ]
+     ]
+    },
+    {
+     "id": "marcos",
+     "cityId": "bilbao",
+     "locationId": "BIL-OFIC",
+     "accessEvidenceIds": [],
+     "knownFromEvidence": [
+      "EV-08"
+     ],
+     "warrantCombinations": [
+      [
+       "EV-08",
+       "EV-07"
+      ]
+     ]
+    }
+   ],
+   "inspectables": [
+    {
+     "label": "Sala de control",
+     "elementId": "",
+     "evidenceId": "EV-01",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Panel de control",
+     "elementId": "panel-control",
+     "evidenceId": "EV-02",
+     "locationId": "BIL-OFIC"
+    },
+    {
+     "label": "Taquilla de recepción",
+     "elementId": "taquilla-recepcion",
+     "evidenceId": "EV-06",
+     "locationId": "MAL-RECEP"
+    }
+   ],
+   "talkEvidence": [
+    {
+     "label": "Preguntar por la entrega del dispositivo",
+     "npcId": "lucia",
+     "topicId": "entrega-dispositivo",
+     "evidenceId": "EV-09"
+    }
+   ]
+  },
+  "difficulty": "normal",
+  "objectives": [
+   {
+    "id": "obj-detener",
+    "achieved": false,
+    "description": "Detener a la persona responsable de la filtración."
+   },
+   {
+    "id": "obj-recuperar",
+    "achieved": false,
+    "description": "Recuperar el dispositivo con los datos confidenciales."
+   }
+  ],
+  "catalogMeta": {
+   "crimeType": "espionaje",
+   "contentRating": "general"
+  },
+  "contentMode": "generated",
+  "schemaVersion": 1,
+  "catalogVersion": "1.0",
+  "contentVersion": 1,
+  "deadlineMinutes": 2880,
+  "explorationMode": "guided",
+  "travelDurations": [
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "bilbao"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "malaga",
+    "fromCityId": "barcelona"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "bilbao",
+    "fromCityId": "malaga"
+   },
+   {
+    "minutes": 120,
+    "toCityId": "barcelona",
+    "fromCityId": "malaga"
+   }
+  ],
+  "scheduledResults": [],
+  "validationReport": {
+   "errors": [],
+   "status": "validated",
+   "scenarios": [
+    "structural"
+   ],
+   "validatorVersion": "1.5.0"
+  },
+  "engineCompatibility": 1
+ }
+}
