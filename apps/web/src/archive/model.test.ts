@@ -220,7 +220,7 @@ describe('T4-05: intercambio de expedientes en el archivo', () => {
     expect(model.getSnapshot().notice).toContain('El identificador ya existe.');
     transport.importCase.mockRejectedValueOnce(new ArchiveError('unavailable', 'Checksum no coincide: posible corrupción de datos'));
     await model.importCase('{"version":"1.0.0"}');
-    expect(model.getSnapshot().notice).toBe('Checksum no coincide: posible corrupción de datos');
+    expect(model.getSnapshot().notice).toBe('No se pudo importar el expediente: Checksum no coincide: posible corrupción de datos');
   });
 });
 

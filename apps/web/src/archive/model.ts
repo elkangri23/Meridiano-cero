@@ -266,7 +266,7 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
     } catch (error) {
       if (!ticket.current()) return;
       const detail = error instanceof ArchiveError ? error.detail : undefined;
-      set({ ...state, notice: detail ?? 'No se pudo importar el expediente. Reinténtalo más tarde.' });
+      set({ ...state, notice: detail ? `No se pudo importar el expediente: ${detail}` : 'No se pudo importar el expediente. Reinténtalo más tarde.' });
     }
   }
   return {
