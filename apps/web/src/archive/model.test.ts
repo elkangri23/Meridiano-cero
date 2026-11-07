@@ -16,6 +16,8 @@ function api() {
     generationJobs: vi.fn<ArchiveApi['generationJobs']>().mockResolvedValue({ items: [] }),
     createGenerationJob: vi.fn<ArchiveApi['createGenerationJob']>(),
     cancelGenerationJob: vi.fn<ArchiveApi['cancelGenerationJob']>(),
+    exportCase: vi.fn<ArchiveApi['exportCase']>(),
+    importCase: vi.fn<ArchiveApi['importCase']>(),
     me: vi.fn<ArchiveApi['me']>().mockResolvedValue(identity), connect: vi.fn<ArchiveApi['connect']>().mockResolvedValue(identity),
     list: vi.fn<ArchiveApi['list']>().mockResolvedValue(page), logout: vi.fn<ArchiveApi['logout']>().mockResolvedValue() };
 }
@@ -93,7 +95,7 @@ describe('T3: archivo, cuenta y respuestas tardías', () => {
   it('catálogo permite crear una vez; doble activación no envía otro POST y confirmación no expone clave', async () => {
     const transport = api(); const data = new Map<string, string>();
     const memory = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); }, removeItem: (key: string) => { data.delete(key); } };
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 100, contentVersion: 1, canStart: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 100, contentVersion: 1, canStart: true, ownedByMe: false }], nextCursor: null });
     const delayed = deferred<void>(); transport.create.mockReturnValue(delayed.promise);
     transport.lookup.mockResolvedValue({ schemaVersion: 1, kind: 'create_run', status: 'committed', runId });
     const model = createArchiveModel(transport, memory); await model.refresh();
@@ -155,7 +157,7 @@ describe('T4-08: generación de casos en el archivo', () => {
     const transport = api(); const model = createArchiveModel(transport); await model.refresh();
     const done = { ...job, status: 'done' as const, caseId: 'generado-fraude-1', stage: 9 };
     transport.generationJobs.mockResolvedValue({ items: [done] });
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true }], nextCursor: null });
     await model.refreshJobs();
     expect(model.getSnapshot().jobs).toEqual([done]);
     expect(model.getSnapshot().cases.map(item => item.caseId)).toContain('generado-fraude-1');
@@ -167,7 +169,7 @@ describe('T4-08: generación de casos en el archivo', () => {
     expect(model.getSnapshot().notice).toContain('en cola');
     const done = { ...job, status: 'done' as const, caseId: 'generado-fraude-1', stage: 9 };
     transport.generationJobs.mockResolvedValue({ items: [done] });
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true }], nextCursor: null });
     await model.refreshJobs();
     expect(model.getSnapshot().notice).toContain('Expediente listo: Caso sintético generado');
     expect(model.getSnapshot().notice).not.toContain('en cola');

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { deadlineMinutesForDifficulty, GDD_CRIME_TYPES, CRIME_TYPE_LABELS, caseLabel } from '@meridiano/case-schema';
 import type { ContentRating, CrimeType } from '@meridiano/case-schema';
@@ -20,7 +20,35 @@ function randomOf<T>(items: readonly T[]): T | undefined {
   return items[Math.floor(Math.random() * items.length)];
 }
 export function NewRun({ state, model }: Props) {
-  return <section className="archive-create" aria-labelledby="new-run-title"><p className="archive-overline">Nueva investigación</p><h2 id="new-run-title">Nueva partida</h2><p>Elige un delito y una dificultad para empezar a investigar.</p><CreationContent state={state} model={model} /></section>;
+  return <section className="archive-create" aria-labelledby="new-run-title"><p className="archive-overline">Nueva investigación</p><h2 id="new-run-title">Nueva partida</h2><p>Elige un delito y una dificultad para empezar a investigar.</p><CreationContent state={state} model={model} /><CaseExchange state={state} model={model} /></section>;
+}
+/** Descarga del expediente propio (DEC-011): el fichero contiene la
+ * solución, así que solo lo ve su dueño y nunca sale en la proyección. */
+async function downloadExport(model: ReturnType<typeof createArchiveModel>, caseId: string): Promise<void> {
+  const file = await model.exportCase(caseId);
+  if (!file) return;
+  const url = URL.createObjectURL(file.blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = file.filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+/** Entrada de importar: un fichero .json de expediente; el servidor lo
+ * valida (v1.5) antes de registrarlo en el catálogo. */
+function CaseExchange({ state, model }: Props) {
+  const busy = state.phase === 'loading';
+  async function onFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await model.importCase(await file.text());
+    event.target.value = '';
+  }
+  return <div>
+    <h3>Importar expediente</h3>
+    <p>Trae un expediente exportado por otro jugador: se valida antes de entrar en el catálogo y solo se puede jugar si pasa la validación.</p>
+    <label>Expediente (.json) <input type="file" accept=".json,application/json" disabled={busy} onChange={event => void onFile(event)} /></label>
+  </div>;
 }
 function openCreatedRun(previousPhase: string, phase: string, runId: string | null, navigate: (path: string) => void): void {
   if (previousPhase !== 'created' && phase === 'created' && runId) navigate('/runs/' + runId);
@@ -95,6 +123,7 @@ function CreationContent({ state, model }: Props) {
     <ContentField content={content} busy={busy} hasGeneral={hasGeneral} onChange={chooseContent} />
     {matchingCases.length > 1 && <CaseField cases={matchingCases} selectedCase={selectedCase} busy={busy} onChange={setCaseId} />}
     {selectedCase && <p>Expediente: {displayCaseTitle(selectedCase.title)} — {caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.</p>}
+    {selectedCase?.ownedByMe && <p><button type="button" disabled={busy} onClick={() => void downloadExport(model, selectedCase.caseId)}>Exportar expediente</button> La descarga contiene el expediente completo, incluida la solución. Compártela solo con quien quieras que lo juegue.</p>}
     {!selectedCase && state.cases.length > 0 && <p>Todavía no hay expedientes validados de este delito y contenido.</p>}
     <button type="submit" disabled={busy || !selectedCase}>Empezar partida</button>{state.cases.length === 0 && <p>No hay expedientes disponibles.</p>}
   </form>;

@@ -90,6 +90,7 @@ export {
   serializeExport,
   deserializeImport,
   computeChecksum,
+  MAX_IMPORT_SIZE_BYTES,
 } from './import-export.js';
 
 export type {

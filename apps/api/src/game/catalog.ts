@@ -97,7 +97,7 @@ export async function caseBriefing(db: Orm, caseId: string): Promise<{ speaker: 
   return briefingForDefinition(await findCase(db, caseId));
 }
 
-export function caseSummaryFor(definition: CaseDefinition): CaseSummary {
+export function caseSummaryFor(definition: CaseDefinition, ownedByMe = false): CaseSummary {
   const meta = metaForDefinition(definition);
   return {
     caseId: definition.id,
@@ -110,21 +110,26 @@ export function caseSummaryFor(definition: CaseDefinition): CaseSummary {
     deadlineMinutes: definition.deadlineMinutes,
     contentVersion: definition.contentVersion,
     canStart: validateCaseDefinition(definition).valid,
+    ownedByMe,
   };
 }
 
-export async function caseSummary(db: Orm, caseId: string): Promise<CaseSummary> {
-  return caseSummaryFor(await findCase(db, caseId));
+export async function caseSummary(db: Orm, caseId: string, ownerId?: string): Promise<CaseSummary> {
+  const definition = await findCase(db, caseId);
+  if (caseId === astrolabioDefinition.id || ownerId === undefined) return caseSummaryFor(definition, false);
+  const rows = await db.select({ createdBy: generatedCases.createdBy }).from(generatedCases)
+    .where(eq(generatedCases.caseId, caseId)).limit(1);
+  return caseSummaryFor(definition, rows[0]?.createdBy === ownerId);
 }
 
-export async function listCases(db: Orm): Promise<CaseSummary[]> {
+export async function listCases(db: Orm, ownerId?: string): Promise<CaseSummary[]> {
   const items = [caseSummaryFor(structuredClone(astrolabioDefinition))];
   const rows = await db.select().from(generatedCases).orderBy(generatedCases.createdAt);
   for (const row of rows) {
     if (typeof row.definition !== 'object' || row.definition === null) continue;
     const definition = row.definition as unknown as CaseDefinition;
     if (definition.id !== row.caseId || validateCaseDefinition(definition).valid === false) continue;
-    items.push(caseSummaryFor(structuredClone(definition)));
+    items.push(caseSummaryFor(structuredClone(definition), ownerId !== undefined && row.createdBy === ownerId));
   }
   return items;
 }

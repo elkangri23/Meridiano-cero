@@ -3,6 +3,7 @@ import type { RuntimeState } from './lifecycle.ts';
 import type { Telemetry } from './telemetry.ts';
 import { registerGameRoutes } from './game/routes.ts';
 import { registerGenerationRoutes } from './generation/routes.ts';
+import { registerCaseExchangeRoutes } from './generation/exchange-routes.ts';
 import { startGenerationWorker } from './generation/worker.ts';
 import { registerAiRoutes } from './ai/routes.ts';
 import { registerAiConnectionRoutes } from './ai/connections-routes.ts';
@@ -17,11 +18,11 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { HealthResponse } from '@meridiano/contracts';
 
-/** Solo INVALID_DESTINATION y VALIDATION_ERROR llevan mensaje propio (texto
- * seguro del validador); el resto usa el mensaje genérico para no filtrar
- * detalles. */
+/** Solo INVALID_DESTINATION, VALIDATION_ERROR, GENERATION_LIMIT y FORBIDDEN
+ * llevan mensaje propio (texto seguro del validador); el resto usa el
+ * mensaje genérico para no filtrar detalles. */
 function runStoreErrorMessage(error: RunStoreError): string {
-  return (error.code === 'INVALID_DESTINATION' || error.code === 'VALIDATION_ERROR' || error.code === 'GENERATION_LIMIT') && error.detail
+  return (error.code === 'INVALID_DESTINATION' || error.code === 'VALIDATION_ERROR' || error.code === 'GENERATION_LIMIT' || error.code === 'FORBIDDEN') && error.detail
     ? error.detail
     : 'No se pudo completar la solicitud.';
 }
@@ -61,6 +62,7 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
     if (options.config.registrationEnabled) registerPublicAuth(app, options.config, options.database, options.mailer ?? null);
     registerGameRoutes(app, options.config, options.database, ready);
     registerGenerationRoutes(app, options.config, options.database, ready);
+    registerCaseExchangeRoutes(app, options.config, options.database, ready);
     // El worker de generación vive en el proceso de la API (T4-08). Solo se
     // arranca en el servidor real: los tests lo crean a mano cuando lo necesitan.
     if (options.generationWorker) {
@@ -79,9 +81,10 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
         SESSION_REQUIRED: 401, SESSION_CHANGED: 409, NOT_FOUND: 404, IDEMPOTENCY_CONFLICT: 409, INVALID_REQUEST: 400,
         CASE_NOT_READY: 409, DEPENDENCY_UNAVAILABLE: 503, ORIGIN_REJECTED: 403, CSRF_REJECTED: 403, SAVE_LIMIT_REACHED: 409,
         VERSION_CONFLICT: 409, RUN_CLOSED: 409, SAVE_NOT_ACTIVE: 400, SAVE_INCOMPATIBLE: 422, INVALID_DESTINATION: 400, VALIDATION_ERROR: 400,
-        GENERATION_LIMIT: 429,
+        GENERATION_LIMIT: 429, FORBIDDEN: 403,
       } as const;
-      // Solo INVALID_DESTINATION y VALIDATION_ERROR llevan mensaje propio (ver runStoreErrorMessage).
+      // Solo INVALID_DESTINATION, VALIDATION_ERROR, GENERATION_LIMIT y
+      // FORBIDDEN llevan mensaje propio (ver runStoreErrorMessage).
       return reply.code(statuses[error.code]).send({ error: { code: error.code, message: runStoreErrorMessage(error), requestId: request.id } });
     }
     const clientErrors = {

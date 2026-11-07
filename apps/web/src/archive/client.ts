@@ -1,5 +1,5 @@
-import { isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto, isGenerationJobDto, isGenerationJobListDto } from '@meridiano/contracts';
-import type { PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto, CrimeType, ContentRating, GenerationJobDto, GenerationJobListDto } from '@meridiano/contracts';
+import { isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto, isGenerationJobDto, isGenerationJobListDto, isCaseImportResultDto } from '@meridiano/contracts';
+import type { PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto, CrimeType, ContentRating, GenerationJobDto, GenerationJobListDto, CaseImportResultDto } from '@meridiano/contracts';
 
 export type Filter = 'all' | 'active' | 'closed';
 
@@ -21,6 +21,12 @@ export interface ArchiveApi {
   generationJobs(signal: AbortSignal): Promise<GenerationJobListDto>;
   createGenerationJob(params: GenerationJobParams, identity: SessionDto, signal: AbortSignal): Promise<GenerationJobDto>;
   cancelGenerationJob(jobId: string, identity: SessionDto, signal: AbortSignal): Promise<GenerationJobDto>;
+  /** Descarga el expediente propio (DEC-011: solo el dueño autorizado).
+   * Devuelve el fichero; el componente dispara la descarga. */
+  exportCase(caseId: string, identity: SessionDto, signal: AbortSignal): Promise<Blob>;
+  /** Importa un fichero de expediente: el servidor lo valida (v1.5) antes
+   * de registrarlo en el catálogo. */
+  importCase(fileText: string, identity: SessionDto, signal: AbortSignal): Promise<CaseImportResultDto>;
 }
 
 /** Parámetros de generación (T4-08): delito opcional (sin él, el servidor
@@ -107,6 +113,22 @@ async function readGenerationJobListDto(response: Response): Promise<GenerationJ
   const body = await read(response);
   if (!isGenerationJobListDto(body)) throw new ArchiveError('invalid');
   return body;
+}
+
+async function readCaseImportResultDto(response: Response): Promise<CaseImportResultDto> {
+  const body = await read(response);
+  if (!isCaseImportResultDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
+
+/** Motivo del servidor cuando lo trae (VALIDATION_ERROR, FORBIDDEN,
+ * GENERATION_LIMIT); sin él queda el mensaje genérico. */
+async function errorDetail(response: Response): Promise<string | undefined> {
+  try {
+    const parsed = await boundedJson(response);
+    if (isValidBody(parsed) && isValidBody(parsed.error) && typeof parsed.error.message === 'string') return parsed.error.message;
+  } catch { /* el detalle es opcional */ }
+  return undefined;
 }
 
 async function readSessionDtoOrNull(response: Response): Promise<SessionDto | null> {
@@ -224,5 +246,20 @@ export const archiveApi: ArchiveApi = {
     const response = await request('/api/v1/generation/jobs/' + encodeURIComponent(jobId) + '/cancel', signal,
       { method: 'POST', headers: mutationHeaders(identity), body: '{}' });
     return readGenerationJobDto(response);
+  },
+
+  async exportCase(caseId: string, identity: SessionDto, signal: AbortSignal): Promise<Blob> {
+    if (!/^[A-Za-z0-9._:-]{1,128}$/.test(caseId)) throw new ArchiveError('invalid');
+    const response = await request('/api/v1/cases/' + encodeURIComponent(caseId) + '/export', signal,
+      { headers: { 'x-csrf-token': identity.csrfToken, 'x-expected-profile-id': identity.profile.id } });
+    if (response.status === 200) return response.blob();
+    throw new ArchiveError('unavailable', await errorDetail(response));
+  },
+
+  async importCase(fileText: string, identity: SessionDto, signal: AbortSignal): Promise<CaseImportResultDto> {
+    const response = await request('/api/v1/cases/import', signal,
+      { method: 'POST', headers: mutationHeaders(identity), body: fileText });
+    if (response.status === 200 || response.status === 201) return readCaseImportResultDto(response);
+    throw new ArchiveError('unavailable', await errorDetail(response));
   },
 };
