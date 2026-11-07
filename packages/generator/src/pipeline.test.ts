@@ -77,8 +77,12 @@ function fakeOutputs(geography: SelectedGeography) {
         'EV-11': 'El contrato original está recuperado.',
       },
       knowledge: {
-        'jorge-vio-facturas': 'Vi a Carmen revisar las facturas, pero no vi qué había dentro del sobre.',
-        'registro-facturas': 'Llevo el registro de facturas del archivo y puedo comprobar a quién se asignó cada serie.',
+        // Textos con contenido real (tercera vuelta, 2026-11-07): cada uno
+        // nombra elementos concretos del mundo (serie F-17, traslado del
+        // contrato, sobre); la paráfrasis del tema sin ancla al mundo la
+        // rechaza la puerta de la etapa 4a y el validador v1.5.
+        'jorge-vio-facturas': 'Vi a Carmen revisar las facturas y firmar el traslado del contrato, pero no vi qué había dentro del sobre.',
+        'registro-facturas': 'Llevo el registro de facturas del archivo: la serie F-17 está asignada a Carmen.',
         truth: 'Soy Carmen, directora financiera de la empresa.',
       },
       greetings: {
@@ -1309,6 +1313,16 @@ describe('validación de la etapa 4 (textos de conocimiento decibles)', () => {
     const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'], knowledgeIds: ['jorge-vio-facturas', 'registro-facturas', 'truth'] });
     expect(result.valid).toBe(true);
   });
+  it('rechaza una salida 4a con una frase en primera persona sin contenido real', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = structuredClone({ ...outputs.cluesWorld, ...outputs.cluesRules });
+    const knowledge = (clues as { texts: { knowledge: Record<string, string> } }).texts.knowledge;
+    knowledge['registro-facturas'] = 'Conozco bien el mercado de facturas y los canales de venta de la zona.';
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'], knowledgeIds: ['jorge-vio-facturas', 'registro-facturas', 'truth'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('elemento concreto'))).toBe(true);
+  });
 });
 
 describe('validación del expediente completo (textos de conocimiento decibles)', () => {
@@ -1337,5 +1351,31 @@ describe('validación del expediente completo (textos de conocimiento decibles)'
     const check = validateCaseDefinition(labelled);
     expect(check.valid).toBe(false);
     expect(check.errors.some(error => error.includes('etiqueta'))).toBe(true);
+  });
+  it('el validador v1.5 rechaza el expediente si un texto de conocimiento es una paráfrasis del tema sin contenido real', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) return stage4Output(outputs, context as Record<string, unknown>);
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    const definition = result.definition!;
+    expect(validateCaseDefinition(definition).valid).toBe(true);
+    const paraphrase = structuredClone(definition) as unknown as Record<string, unknown>;
+    const texts = paraphrase.texts as { knowledge: Record<string, string> };
+    texts.knowledge['registro-facturas'] = 'Conozco bien el mercado de facturas y los canales de venta de la zona.';
+    const check = validateCaseDefinition(paraphrase);
+    expect(check.valid).toBe(false);
+    expect(check.errors.some(error => error.includes('elemento concreto'))).toBe(true);
   });
 });

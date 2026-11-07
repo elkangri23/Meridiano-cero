@@ -133,8 +133,12 @@ export const generadoFraudeDefinition: CaseDefinition = {
       'EV-11': 'El contrato original está recuperado.',
     },
     knowledge: {
-      'jorge-vio-facturas': 'Vi a Carmen revisar las facturas, pero no vi qué había dentro del sobre.',
-      'registro-facturas': 'Llevo el registro de facturas del archivo y puedo comprobar a quién se asignó cada serie.',
+      // Textos con contenido real (tercera vuelta, 2026-11-07): cada uno
+      // nombra elementos concretos del mundo (serie F-17, traslado del
+      // contrato, sobre); la paráfrasis del tema sin ancla al mundo la
+      // rechaza la puerta de la etapa 4a y el validador v1.5.
+      'jorge-vio-facturas': 'Vi a Carmen revisar las facturas y firmar el traslado del contrato, pero no vi qué había dentro del sobre.',
+      'registro-facturas': 'Llevo el registro de facturas del archivo: la serie F-17 está asignada a Carmen.',
       truth: 'Soy Carmen, directora financiera de la empresa.',
     },
     greetings: {

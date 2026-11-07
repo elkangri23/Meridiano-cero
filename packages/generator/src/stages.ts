@@ -15,7 +15,7 @@
 // resto de etapas (geografía, ensamblaje, validación, simulación,
 // persistencia) son deterministas.
 
-import { GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, isKnowledgeLabelText, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating } from '@meridiano/case-schema';
+import { GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type KnowledgeContentAnchors } from '@meridiano/case-schema';
 import type { GenerationParams, GenerationStage } from './pipeline.js';
 
 /** Delitos generables (lista canónica sin 'aleatorio', que es modo de
@@ -489,7 +489,7 @@ function checkClueMechanics(output: Record<string, unknown>, errors: string[]): 
   }
 }
 
-function checkClueKnowledgeTexts(texts: Record<string, unknown>, knowledgeIds: string[], errors: string[]): void {
+function checkClueKnowledgeTexts(texts: Record<string, unknown>, knowledgeIds: string[], errors: string[], anchors?: KnowledgeContentAnchors): void {
   if (!isRecord(texts.knowledge)) { errors.push('texts.knowledge debe ser un objeto.'); return; }
   for (const id of knowledgeIds) {
     const entry = (texts.knowledge as Record<string, unknown>)[id];
@@ -499,16 +499,30 @@ function checkClueKnowledgeTexts(texts: Record<string, unknown>, knowledgeIds: s
     // suena a conversación. La etapa 4a debe escribir frases en primera
     // persona que el NPC diría («Conozco…», «Sé que…»).
     else if (isKnowledgeLabelText(entry)) errors.push(`El texto de conocimiento de ${id} es una etiqueta de tema, no una frase que diría el personaje.`);
+    // Contenido real (tercera vuelta, 2026-11-07): el texto debe nombrar al
+    // menos un elemento concreto del mundo del caso; si solo nombra el tema,
+    // el modelo solo puede parafrasearlo y nunca da información.
+    else if (anchors && !hasKnowledgeContent(entry, anchors)) errors.push(`El texto de conocimiento de ${id} no nombra ningún elemento concreto del mundo del caso (lugar, objeto, procedimiento o suceso de las evidencias).`);
   }
 }
 
-function checkClueTexts(output: Record<string, unknown>, castIds: string[], knowledgeIds: string[], errors: string[]): void {
+function checkClueTexts(output: Record<string, unknown>, castIds: string[], knowledgeIds: string[], errors: string[], geography?: SelectedGeography): void {
   if (!isRecord(output.texts)) { errors.push('texts debe ser un objeto.'); return; }
   const texts = output.texts;
   if (!isRecord(texts.evidence) || Object.keys(texts.evidence).length !== 11) errors.push('texts.evidence debe tener 11 textos.');
   if (!isRecord(texts.greetings)) errors.push('texts.greetings debe ser un objeto.');
   for (const id of castIds) if (!isRecord(texts.greetings) || !isNonEmptyString((texts.greetings as Record<string, unknown>)[id])) errors.push(`Falta el saludo de ${id}.`);
-  checkClueKnowledgeTexts(texts, knowledgeIds, errors);
+  // Anclas del mundo 4a (lugares, evidencias, ciudades, saludos): la
+  // mecánica de 4b aún no existe aquí, así que la puerta de la etapa 4a usa
+  // este subconjunto; el validador v1.5, con el expediente completo, exige
+  // lo mismo con todas las anclas.
+  const locations = Array.isArray(output.locations) ? output.locations.filter(isRecord) : [];
+  checkClueKnowledgeTexts(texts, knowledgeIds, errors, knowledgeContentAnchors({
+    locations: locations.map(entry => ({ name: typeof entry.name === 'string' ? entry.name : undefined, description: typeof entry.description === 'string' ? entry.description : undefined })),
+    cities: (geography?.cities ?? []).map(city => ({ name: city.name })),
+    evidenceTexts: isRecord(texts.evidence) ? Object.values(texts.evidence).filter((entry): entry is string => typeof entry === 'string') : [],
+    greetings: isRecord(texts.greetings) ? Object.values(texts.greetings).filter((entry): entry is string => typeof entry === 'string') : [],
+  }));
 }
 
 // Parámetros obligatorios (cadenas no vacías) de cada tipo de acción de
@@ -666,7 +680,7 @@ function validateClueWorld(output: unknown, geography: SelectedGeography, castId
   const cityIds = new Set(geography.cities.map(city => city.id));
   const locationIds = checkClueLocations(output, cityIds, errors);
   if (locationIds) checkClueEvidence(output, locationIds, cityIds, errors);
-  checkClueTexts(output, castIds, knowledgeIds, errors);
+  checkClueTexts(output, castIds, knowledgeIds, errors, geography);
 }
 
 function validateClueRules(output: unknown, world: unknown, geography: SelectedGeography, errors: string[]): void {

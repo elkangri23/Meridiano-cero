@@ -6,7 +6,7 @@ import { RECURRENT_NPCS } from './npc-catalog.js';
 import {
   EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, OBJECTIVE_TEXT,
   REPORT_REASON_TEXT, REPORT_RESULT_TEXT, conversationRecordText,
-  discoveryText, evidenceText, isKnowledgeLabelText, npcGreeting, npcKnowledgeFacts, npcRefusal,
+  discoveryText, evidenceText, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, npcGreeting, npcKnowledgeFacts, npcRefusal,
   objectiveText, reportReasonText, reportResultText, travelText,
 } from './fact-texts.js';
 
@@ -131,5 +131,38 @@ describe('detector de textos-etiqueta de conocimiento', () => {
       'La taquilla L-7 es un depósito de custodia del almacén.',
       ...Object.values(KNOWLEDGE_TEXTS),
     ]) expect(isKnowledgeLabelText(text), text).toBe(false);
+  });
+});
+
+describe('contenido real en textos de conocimiento (tercera vuelta)', () => {
+  const anchors = knowledgeContentAnchors({
+    locations: [
+      { name: 'Archivo de conservación', description: 'Archivo de conservación de París' },
+      { name: 'Taller del anticuario', description: 'Taller con inventario de piezas y caja de transporte' },
+    ],
+    cities: [{ name: 'París' }, { name: 'Málaga' }],
+    npcs: [{ name: 'Marcos', persona: 'Comerciante de antigüedades de Málaga' }],
+    evidenceTexts: [
+      'La etiqueta de envío del archivo indica el destino del manuscrito.',
+      'El registro de seguridad anota quién entró en el taller.',
+    ],
+    greetings: ['Soy Marcos, comerciante de antigüedades.'],
+    briefing: ['El manuscrito desapareció del archivo de conservación.'],
+    labels: ['Inspeccionar el taller', 'Consultar el registro de seguridad'],
+  });
+  it('rechaza la paráfrasis del tema sin ancla al mundo (el defecto de Marcos)', () => {
+    for (const text of [
+      'Conozco bien el mercado de antigüedades y los canales de venta, así como los traslados y movimientos de objetos valiosos por la zona.',
+      'Sé de los traslados y movimientos de objetos valiosos que se dan por esta zona.',
+      'Conozco el mercado de antigüedades y los canales de venta.',
+    ]) expect(hasKnowledgeContent(text, anchors), text).toBe(false);
+  });
+  it('acepta textos que nombran un elemento concreto del mundo', () => {
+    for (const text of [
+      'Vi a Marcos en el taller, junto a la caja de transporte del manuscrito.',
+      'La etiqueta de envío del archivo indica el destino del manuscrito.',
+      'Llevo el registro de seguridad del taller y anoto quién entra.',
+      'Sé que el manuscrito estuvo en Málaga antes de desaparecer.',
+    ]) expect(hasKnowledgeContent(text, anchors), text).toBe(true);
   });
 });

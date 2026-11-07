@@ -116,6 +116,109 @@ export function isKnowledgeLabelText(text: string): boolean {
   return KNOWLEDGE_LABEL_PATTERN.test(text.trim());
 }
 
+/**
+ * Contenido real en un texto de conocimiento (tercera vuelta de la
+ * conversación natural, 2026-11-07): no basta con que el texto sea una frase
+ * en primera persona; debe nombrar al menos un elemento concreto del mundo
+ * del caso — un lugar, un objeto, un procedimiento o un suceso de las
+ * evidencias, los lugares o la mecánica — porque el modelo solo puede
+ * declarar lo que los hechos autorizados contienen: si el hecho es solo el
+ * tema («Conozco el mercado…», «Sé que los traslados…»), la respuesta solo
+ * puede parafrasear el tema y nunca da información. Fechas, rutas o
+ * cantidades no existen en estos mundos y no se exigen; el contenido es
+ * objeto/lugar/procedimiento/suceso.
+ *
+ * La comprobación es heurística y deliberadamente léxica, como el detector
+ * de etiquetas: el texto pasa si comparte al menos un bigrama de palabras
+ * de contenido con el mundo del caso (p. ej. «registro de seguridad»,
+ * «etiqueta de envío», «cuaderno de campo», «archivo municipal») o si
+ * nombra una ciudad o un personaje del caso. Las palabras funcionales y los
+ * términos genéricos de tema (mercado, traslados, movimientos, objetos,
+ * conocimiento, información…) no cuentan: «Conozco el mercado de
+ * antigüedades y los canales de venta» no comparte ningún bigrama con el
+ * mundo y se rechaza, aunque «antigüedades» aparezca en alguna evidencia.
+ * Es un suelo, no una garantía de profundidad: un texto puede nombrar un
+ * lugar y seguir siendo vago, pero sin ancla al mundo no puede dar
+ * información. El humo en producción con preguntas reales es la aceptación.
+ */
+export interface KnowledgeContentWorld {
+  locations?: Array<{ name?: string | undefined; description?: string | undefined }>;
+  cities?: Array<{ name?: string | undefined }>;
+  npcs?: Array<{ name?: string | undefined; persona?: string | undefined }>;
+  evidenceTexts?: string[];
+  greetings?: string[];
+  briefing?: string[];
+  labels?: string[];
+}
+
+const KNOWLEDGE_CONTENT_STOP_WORDS: ReadonlySet<string> = new Set([
+  'de', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'en', 'con', 'por', 'a', 'y', 'o',
+  'su', 'sus', 'mi', 'mis', 'tu', 'tus', 'se', 'que', 'es', 'son', 'fue', 'fueron', 'ha', 'han', 'he',
+  'del', 'al', 'lo', 'le', 'les', 'me', 'te', 'nos', 'os', 'si', 'no', 'ya', 'mas', 'muy', 'pero',
+  'como', 'cuando', 'donde', 'porque', 'tambien', 'entre', 'hasta', 'desde', 'hacia', 'cada',
+  'ante', 'bajo', 'tras', 'segun', 'aunque', 'ademas', 'luego', 'ahora', 'antes', 'despues',
+  'siempre', 'nunca', 'mucho', 'poco', 'bien', 'mal', 'tanto', 'tanta', 'todo', 'toda', 'todos',
+  'todas', 'esto', 'esta', 'este', 'estos', 'estas', 'otro', 'otra', 'otros', 'otras', 'mismo',
+  'misma', 'parte', 'forma', 'manera', 'general', 'ser', 'estar', 'haber', 'poder', 'deber',
+  'hacer', 'saber', 'decir', 'ver', 'venir', 'salir', 'entrar', 'pasar', 'quedar', 'poner', 'dar',
+  'tener', 'conozco', 'conoces', 'conoce', 'sabes', 'sabe', 'trabajo', 'trabaja', 'gestiono',
+  'gestiona', 'llevo', 'lleva', 'puedo', 'puede', 'reviso', 'revisa', 'controlo', 'controla',
+  'tengo', 'tiene', 'recuerdo', 'recuerda', 'observe', 'observo', 'note', 'noto', 'veo', 'dice',
+  'dicen', 'creo', 'cree', 'parece', 'parecia', 'hay', 'estoy', 'estas', 'estan', 'era', 'eran', 'sera',
+]);
+
+function stripAccents(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function knowledgeContentWords(text: string): string[] {
+  return stripAccents(text.toLowerCase()).split(/[^a-z0-9]+/).filter(word => word.length > 0 && !KNOWLEDGE_CONTENT_STOP_WORDS.has(word));
+}
+
+function knowledgeContentBigrams(text: string): Set<string> {
+  const words = knowledgeContentWords(text);
+  const out = new Set<string>();
+  for (let i = 0; i + 1 < words.length; i++) out.add(`${words[i]} ${words[i + 1]}`);
+  return out;
+}
+
+export interface KnowledgeContentAnchors {
+  bigrams: Set<string>;
+  names: Set<string>;
+}
+
+export function knowledgeContentAnchors(world: KnowledgeContentWorld): KnowledgeContentAnchors {
+  const sources: string[] = [];
+  for (const location of world.locations ?? []) {
+    if (location.name) sources.push(location.name);
+    if (location.description) sources.push(location.description);
+  }
+  for (const city of world.cities ?? []) if (city.name) sources.push(city.name);
+  for (const npc of world.npcs ?? []) {
+    if (npc.name) sources.push(npc.name);
+    if (npc.persona) sources.push(npc.persona);
+  }
+  for (const text of world.evidenceTexts ?? []) sources.push(text);
+  for (const text of world.greetings ?? []) sources.push(text);
+  for (const text of world.briefing ?? []) sources.push(text);
+  for (const text of world.labels ?? []) sources.push(text);
+  const bigrams = new Set<string>();
+  for (const source of sources) for (const bigram of knowledgeContentBigrams(source)) bigrams.add(bigram);
+  const names = new Set<string>();
+  for (const city of world.cities ?? []) if (city.name) names.add(stripAccents(city.name.toLowerCase()));
+  for (const npc of world.npcs ?? []) if (npc.name) names.add(stripAccents(npc.name.toLowerCase()));
+  return { bigrams, names };
+}
+
+export function hasKnowledgeContent(text: string, anchors: KnowledgeContentAnchors): boolean {
+  const normalized = stripAccents(text.toLowerCase());
+  for (const name of anchors.names) {
+    if (name && new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(normalized)) return true;
+  }
+  for (const bigram of knowledgeContentBigrams(text)) if (anchors.bigrams.has(bigram)) return true;
+  return false;
+}
+
 /** Frase de un objetivo logrado del informe final. */
 export function objectiveText(objectiveId: string): string {
   return OBJECTIVE_TEXT[objectiveId] ?? objectiveId;
