@@ -143,6 +143,26 @@ function fakeOutputs(geography: SelectedGeography) {
       { type: 'recover', params: { objectId: 'contrato-original' } },
       { type: 'finish', params: {} },
     ],
+    // Ruta alternativa técnica (GDD §4/§18): la cadena del análisis
+    // (EV-02 -> EV-03 -> EV-04/EV-05) con EV-05 como evidencia de acceso,
+    // sin compartir evidencias de la orden con la dorada.
+    alternativePath: [
+      { type: 'inspect', params: { targetId: locStart } },
+      { type: 'inspect', params: { targetId: locStart, elementId: 'cajon' } },
+      { type: 'collect', params: { evidenceId: 'EV-02' } },
+      { type: 'analyze', params: { evidenceId: 'EV-02' } },
+      { type: 'travel', params: { toCityId: second.id } },
+      { type: 'query', params: { topicId: 'registro-facturas' } },
+      { type: 'query', params: { topicId: 'registro-envios' } },
+      { type: 'wait', params: { minutes: 30 } },
+      { type: 'request_warrant', params: { suspectId: 'carmen', evidenceIds: ['EV-03', 'EV-04', 'EV-05'] } },
+      { type: 'wait', params: { minutes: 30 } },
+      { type: 'travel', params: { toCityId: third.id } },
+      { type: 'talk', params: { npcId: 'carmen', topicId: 'identidad' } },
+      { type: 'detain', params: { suspectId: 'carmen', warrantId: 'warrant:carmen', locationId: locThird, mode: 'interactive' } },
+      { type: 'recover', params: { objectId: 'contrato-original' } },
+      { type: 'finish', params: {} },
+    ],
   };
   const clues = { ...cluesWorld, ...cluesRules };
   return { premise, npcs, clues, cluesWorld, cluesRules };
@@ -318,7 +338,7 @@ describe('pipeline con LLM simulado (T4-08)', () => {
     expect(result.draft.repairUsed).not.toBe(true);
     expect(stage4bCalls).toBe(2);
     const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
-    expect(secondFeedback?.join(' ')).toMatch(/no se puede jugar/);
+    expect(secondFeedback?.join(' ')).toMatch(/no se pueden jugar/);
   });
 
   it('reintenta la etapa 1 con el error como feedback cuando los ids vienen como suspect_01', async () => {
@@ -1178,6 +1198,91 @@ describe('diagnóstico de la etapa 4 en el pipeline', () => {
   });
 });
 
+describe('puerta de varias rutas (GDD §4/§18)', () => {
+  function stage4bFixture() {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    return { geography, outputs, base: { geography, castIds: ['carmen', 'jorge', 'pablo'], world: outputs.cluesWorld } };
+  }
+
+  it('la etapa 4b exige la ruta alternativa', () => {
+    const { outputs, base } = stage4bFixture();
+    const rules = structuredClone(outputs.cluesRules) as Record<string, unknown>;
+    delete rules.alternativePath;
+    const result = validateStagePart('b', rules, { ...base, arrestType: 'interactive' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('alternativePath'))).toBe(true);
+  });
+
+  it('la etapa 4b rechaza dos rutas con la misma evidencia de orden', () => {
+    const { outputs, base } = stage4bFixture();
+    const rules = structuredClone(outputs.cluesRules) as Record<string, unknown>;
+    rules.alternativePath = rules.goldenPath;
+    const result = validateStagePart('b', rules, { ...base, arrestType: 'interactive' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('mismas evidencias'))).toBe(true);
+  });
+
+  it('la etapa 4b rechaza una alternativa sin detención', () => {
+    const { outputs, base } = stage4bFixture();
+    const rules = structuredClone(outputs.cluesRules) as Record<string, unknown>;
+    rules.alternativePath = (rules.alternativePath as unknown[]).filter(
+      (action: unknown) => (action as Record<string, unknown>).type !== 'detain',
+    );
+    const result = validateStagePart('b', rules, { ...base, arrestType: 'interactive' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('alternativePath') && error.includes('detención'))).toBe(true);
+  });
+
+  it('el pipeline rechaza una alternativa por encima del presupuesto', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    // La alternativa nunca se repara: con 2000 min de espera no cabe en
+    // el presupuesto de difícil (1440 min) en ningún intento.
+    const broken = structuredClone(outputs.cluesRules);
+    const alternative = broken.alternativePath as Array<{ type: string; params: Record<string, unknown> }>;
+    alternative.splice(7, 0, { type: 'wait', params: { minutes: 2000 } });
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) return (context as Record<string, unknown>).part === 'a' ? outputs.cluesWorld : broken;
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/alternativa/);
+    expect(result.error).toMatch(/presupuesto/);
+  });
+
+  it('el pipeline guarda la ruta alternativa en el borrador validado', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) return stage4Output(outputs, context as Record<string, unknown>);
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(result.draft.alternativePath).toBeDefined();
+    expect(result.draft.simulation?.alternative?.result).toBe('complete');
+    expect(result.draft.simulation?.checks.map(check => check.name)).toContain('alternative-path');
+  });
+});
+
 describe('validación de la etapa 4 (delayMinutes)', () => {
   it('rechaza una consulta con delayMinutes 0 (el resultado quedaría en curso)', () => {
     const geography = selectGeography(PARAMS);
@@ -1460,22 +1565,28 @@ describe('detenciones automáticas (GDD §12)', () => {
   // Ruta dorada automática: hablar con Carmen en la tercera ciudad,
   // volver a la segunda, coordinar la detención desde allí y regresar a
   // recuperar. En interactivo ese detain sería imposible por presencia.
+  // La alternativa se reescribe igual (GDD §4/§18: las dos rutas deben
+  // jugarse con el modo del expediente).
   function automaticRules(outputs: ReturnType<typeof fakeOutputs>, geography: SelectedGeography) {
     const rules = structuredClone(outputs.cluesRules) as Record<string, unknown>;
-    const path = rules.goldenPath as Array<{ type: string; params: Record<string, unknown> }>;
     const [, second, third] = geography.cities;
     if (!second || !third) throw new Error('Geografía incompleta.');
+    rules.goldenPath = automaticPath(rules.goldenPath as Array<{ type: string; params: Record<string, unknown> }>, second.id, third.id);
+    rules.alternativePath = automaticPath(rules.alternativePath as Array<{ type: string; params: Record<string, unknown> }>, second.id, third.id);
+    return rules;
+  }
+
+  function automaticPath(path: Array<{ type: string; params: Record<string, unknown> }>, secondId: string, thirdId: string) {
     const rewritten: typeof path = [];
     for (const action of path) {
       if (action.type === 'talk' && action.params.npcId === 'carmen') {
-        rewritten.push(action, { type: 'travel', params: { toCityId: second.id } });
+        rewritten.push(action, { type: 'travel', params: { toCityId: secondId } });
       } else if (action.type === 'detain') {
         rewritten.push({ type: 'detain', params: { ...action.params, mode: 'automatic' } },
-          { type: 'travel', params: { toCityId: third.id } });
+          { type: 'travel', params: { toCityId: thirdId } });
       } else rewritten.push(action);
     }
-    rules.goldenPath = rewritten;
-    return rules;
+    return rewritten;
   }
 
   it('el contexto de la etapa 4b trae el tipo de detención fijado por el id', () => {

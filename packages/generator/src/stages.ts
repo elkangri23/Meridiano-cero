@@ -167,7 +167,7 @@ export function buildStageContext(
   if (stage === 1) return base;
   if (stage === 3) return { ...base, premise: prior.premise };
   if (stage === 4) return { ...stage4Context(base, prior, part, caseId), startCityId: geography.cities[0]?.id ?? '' };
-  if (stage === 7) return { ...base, definition: prior.definition, goldenPath: prior.goldenPath, budgetMinutes: prior.budgetMinutes };
+  if (stage === 7) return { ...base, definition: prior.definition, goldenPath: prior.goldenPath, alternativePath: prior.alternativePath, budgetMinutes: prior.budgetMinutes };
   return base;
 }
 
@@ -254,7 +254,7 @@ export function stageOutputSchema(stage: GenerationStage, part?: 'a' | 'b'): Rec
 // usan `evidenceId`, NO `grantsEvidenceId`.
 export const STAGE_4B_SCHEMA: Record<string, unknown> = {
   type: 'object',
-  required: ['mechanics', 'goldenPath'],
+  required: ['mechanics', 'goldenPath', 'alternativePath'],
   properties: {
     mechanics: {
       type: 'object',
@@ -269,6 +269,13 @@ export const STAGE_4B_SCHEMA: Record<string, unknown> = {
       },
     },
     goldenPath: { type: 'array', minItems: 10, maxItems: 40 },
+    // Segunda vía de resolución (GDD §4/§18): otra cadena de evidencias
+    // que llega a orden + detención + recuperación dentro del mismo
+    // presupuesto, con una combinación de orden distinta y sin compartir
+    // evidencias de la orden con la ruta dorada. El simulador la juega
+    // y comprueba la independencia; la validación de forma solo exige
+    // que tenga la misma estructura que la dorada.
+    alternativePath: { type: 'array', minItems: 10, maxItems: 40 },
   },
 };
 
@@ -560,8 +567,9 @@ function checkClueTexts(output: Record<string, unknown>, castIds: string[], know
 }
 
 // Parámetros obligatorios (cadenas no vacías) de cada tipo de acción de
-// la ruta dorada, según el motor: viajar usa toCityId (no cityId),
-// consultar usa topicId (no queryId), inspeccionar exige targetId.
+// una ruta (dorada o alternativa), según el motor: viajar usa toCityId
+// (no cityId), consultar usa topicId (no queryId), inspeccionar exige
+// targetId.
 const GOLDEN_PARAM_STRINGS: Array<{ type: string; fields: string[] }> = [
   { type: 'travel', fields: ['toCityId'] },
   { type: 'query', fields: ['topicId'] },
@@ -573,57 +581,57 @@ const GOLDEN_PARAM_STRINGS: Array<{ type: string; fields: string[] }> = [
   { type: 'recover', fields: ['objectId'] },
 ];
 
-function checkGoldenSpecialParams(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType): void {
+function checkRouteSpecialParams(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType, field = 'goldenPath'): void {
   if (!isRecord(action.params) || typeof action.type !== 'string') return;
   if (action.type === 'request_warrant') {
-    if (!isNonEmptyString(action.params.suspectId) || !Array.isArray(action.params.evidenceIds)) errors.push(`goldenPath[${index}] (request_warrant) debe tener suspectId y evidenceIds.`);
+    if (!isNonEmptyString(action.params.suspectId) || !Array.isArray(action.params.evidenceIds)) errors.push(`${field}[${index}] (request_warrant) debe tener suspectId y evidenceIds.`);
   }
-  if (action.type === 'wait' && typeof action.params.minutes !== 'number') errors.push(`goldenPath[${index}] (wait) debe tener minutes.`);
-  checkGoldenDetainMode(action, index, errors, arrestType);
+  if (action.type === 'wait' && typeof action.params.minutes !== 'number') errors.push(`${field}[${index}] (wait) debe tener minutes.`);
+  checkRouteDetainMode(action, index, errors, arrestType, field);
 }
 
 // El modo de la detención es el del expediente (GDD §12): la automática
 // se coordina con las autoridades y la interactiva detiene en persona.
 // Un modo distinto lo rechaza el motor con «Intervención no disponible».
-function checkGoldenDetainMode(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType): void {
+function checkRouteDetainMode(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType, field = 'goldenPath'): void {
   if (action.type !== 'detain' || arrestType === undefined || !isRecord(action.params)) return;
   if (action.params.mode !== arrestType) {
-    errors.push(`goldenPath[${index}] (detain) usa mode '${String(action.params.mode)}' pero el caso es '${arrestType}': la detención automática se coordina desde cualquier ciudad y la interactiva exige estar en la ciudad del sospechoso.`);
+    errors.push(`${field}[${index}] (detain) usa mode '${String(action.params.mode)}' pero el caso es '${arrestType}': la detención automática se coordina desde cualquier ciudad y la interactiva exige estar en la ciudad del sospechoso.`);
   }
 }
 
-function checkGoldenActionParams(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType): void {
+function checkRouteActionParams(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType, field = 'goldenPath'): void {
   if (!isRecord(action.params) || typeof action.type !== 'string') return;
   const spec = GOLDEN_PARAM_STRINGS.find(item => item.type === action.type);
   if (spec) {
-    for (const field of spec.fields) {
-      if (!isNonEmptyString(action.params[field])) errors.push(`goldenPath[${index}] (${action.type}) debe tener ${field}.`);
+    for (const fieldName of spec.fields) {
+      if (!isNonEmptyString(action.params[fieldName])) errors.push(`${field}[${index}] (${action.type}) debe tener ${fieldName}.`);
     }
   }
-  checkGoldenSpecialParams(action, index, errors, arrestType);
+  checkRouteSpecialParams(action, index, errors, arrestType, field);
 }
 
-function checkGoldenActions(output: Record<string, unknown>, errors: string[], arrestType?: ArrestType): string[] {
-  if (!Array.isArray(output.goldenPath)) return [];
-  for (const action of output.goldenPath) {
-    if (!isRecord(action) || !isNonEmptyString(action.type) || !isRecord(action.params)) errors.push('Una acción de goldenPath no tiene type/params.');
+function checkRouteActions(output: Record<string, unknown>, errors: string[], arrestType?: ArrestType, field = 'goldenPath'): string[] {
+  if (!Array.isArray(output[field])) return [];
+  for (const action of output[field] as unknown[]) {
+    if (!isRecord(action) || !isNonEmptyString(action.type) || !isRecord(action.params)) errors.push(`Una acción de ${field} no tiene type/params.`);
   }
-  for (const [index, action] of (output.goldenPath as unknown[]).entries()) {
-    if (isRecord(action)) checkGoldenActionParams(action, index, errors, arrestType);
+  for (const [index, action] of (output[field] as unknown[]).entries()) {
+    if (isRecord(action)) checkRouteActionParams(action, index, errors, arrestType, field);
   }
-  return output.goldenPath.map((action: unknown) => isRecord(action) && typeof action.type === 'string' ? action.type : '');
+  return (output[field] as unknown[]).map((action: unknown) => isRecord(action) && typeof action.type === 'string' ? action.type : '');
 }
 
-function checkGoldenPath(output: Record<string, unknown>, startCityId: string, errors: string[], arrestType?: ArrestType): void {
-  if (!Array.isArray(output.goldenPath) || output.goldenPath.length < 10 || output.goldenPath.length > 40) errors.push('goldenPath debe tener entre 10 y 40 acciones.');
-  if (!Array.isArray(output.goldenPath)) return;
-  const types = checkGoldenActions(output, errors, arrestType);
-  if (!types.includes('detain')) errors.push('goldenPath debe incluir una detención.');
-  if (!types.includes('recover')) errors.push('goldenPath debe incluir una recuperación.');
-  const last = output.goldenPath[output.goldenPath.length - 1];
-  if (!isRecord(last) || last.type !== 'finish') errors.push('goldenPath debe terminar con el cierre del caso.');
-  checkGoldenCollects(output, errors);
-  checkGoldenPositions(output, startCityId, errors, arrestType);
+function checkRoutePath(output: Record<string, unknown>, startCityId: string, errors: string[], arrestType?: ArrestType, field = 'goldenPath'): void {
+  if (!Array.isArray(output[field]) || (output[field] as unknown[]).length < 10 || (output[field] as unknown[]).length > 40) errors.push(`${field} debe tener entre 10 y 40 acciones.`);
+  if (!Array.isArray(output[field])) return;
+  const types = checkRouteActions(output, errors, arrestType, field);
+  if (!types.includes('detain')) errors.push(`${field} debe incluir una detención.`);
+  if (!types.includes('recover')) errors.push(`${field} debe incluir una recuperación.`);
+  const last = (output[field] as unknown[])[(output[field] as unknown[]).length - 1];
+  if (!isRecord(last) || last.type !== 'finish') errors.push(`${field} debe terminar con el cierre del caso.`);
+  checkRouteCollects(output, errors, field);
+  checkRoutePositions(output, startCityId, errors, arrestType, field);
 }
 
 // La ruta empieza en la ciudad de inicio y cada acción ocurre en la ciudad
@@ -632,14 +640,14 @@ function checkGoldenPath(output: Record<string, unknown>, startCityId: string, e
 // ni detener en una ciudad distinta. Se sigue la posición por la ruta. La
 // detención automática es la excepción (GDD §12): se coordina con las
 // autoridades desde donde esté el detective, así que no ata a la ciudad.
-function checkGoldenPositions(output: Record<string, unknown>, startCityId: string, errors: string[], arrestType?: ArrestType): void {
-  if (!Array.isArray(output.goldenPath)) return;
+function checkRoutePositions(output: Record<string, unknown>, startCityId: string, errors: string[], arrestType?: ArrestType, field = 'goldenPath'): void {
+  if (!Array.isArray(output[field])) return;
   const cityOfLocation = cityOfLocations(output);
   const cityOfQuery = cityOfQueries(output);
   let currentCity = startCityId;
-  output.goldenPath.forEach((action: unknown, index: number) => {
+  (output[field] as unknown[]).forEach((action: unknown, index: number) => {
     if (!isRecord(action)) return;
-    currentCity = checkGoldenPosition(action, index, currentCity, cityOfLocation, cityOfQuery, errors, arrestType);
+    currentCity = checkRoutePosition(action, index, currentCity, cityOfLocation, cityOfQuery, errors, arrestType, field);
   });
 }
 
@@ -664,9 +672,9 @@ function cityOfQueries(output: Record<string, unknown>): Map<string, string> {
   return map;
 }
 
-// Comprueba una acción de la ruta dorada contra la ciudad actual y devuelve
+// Comprueba una acción de la ruta contra la ciudad actual y devuelve
 // la ciudad tras la acción (cambia solo al viajar).
-function checkGoldenPosition(
+function checkRoutePosition(
   action: Record<string, unknown>,
   index: number,
   currentCity: string,
@@ -674,16 +682,17 @@ function checkGoldenPosition(
   cityOfQuery: Map<string, string>,
   errors: string[],
   arrestType?: ArrestType,
+  field = 'goldenPath',
 ): string {
   if (!isRecord(action.params)) return currentCity;
   if (action.type === 'travel') {
     const toCityId = action.params.toCityId;
     if (typeof toCityId !== 'string') return currentCity;
-    if (toCityId === currentCity) errors.push(`goldenPath[${index}] (travel) viaja a ${toCityId}, la ciudad actual: la ruta empieza en la ciudad de inicio y cada viaje va a una ciudad distinta.`);
+    if (toCityId === currentCity) errors.push(`${field}[${index}] (travel) viaja a ${toCityId}, la ciudad actual: la ruta empieza en la ciudad de inicio y cada viaje va a una ciudad distinta.`);
     return toCityId;
   }
   const city = actionCity(action, cityOfLocation, cityOfQuery, arrestType);
-  if (city && city !== currentCity) errors.push(`goldenPath[${index}] (${action.type}) ocurre en ${city} estando en ${currentCity}: cada acción ocurre en la ciudad donde estás en ese momento de la ruta.`);
+  if (city && city !== currentCity) errors.push(`${field}[${index}] (${action.type}) ocurre en ${city} estando en ${currentCity}: cada acción ocurre en la ciudad donde estás en ese momento de la ruta.`);
   return currentCity;
 }
 
@@ -718,20 +727,50 @@ function detainCity(action: Record<string, unknown>, cityOfLocation: Map<string,
 // Recoger solo sirve para evidencias de tipo object (EV-02, EV-06, EV-11):
 // una observación se revela al inspeccionar y no se recoge; un registro
 // llega por consulta, un análisis por analyze y un testimonio por hablar.
-function checkGoldenCollects(output: Record<string, unknown>, errors: string[]): void {
-  if (!Array.isArray(output.evidence) || !Array.isArray(output.goldenPath)) return;
+function checkRouteCollects(output: Record<string, unknown>, errors: string[], field = 'goldenPath'): void {
+  if (!Array.isArray(output.evidence) || !Array.isArray(output[field])) return;
   const types = new Map<string, string>();
   for (const evidence of output.evidence) {
     if (isRecord(evidence) && typeof evidence.id === 'string' && typeof evidence.type === 'string') types.set(evidence.id, evidence.type);
   }
-  output.goldenPath.forEach((action: unknown, index: number) => {
+  (output[field] as unknown[]).forEach((action: unknown, index: number) => {
     if (!isRecord(action) || action.type !== 'collect' || !isRecord(action.params)) return;
     const evidenceId = action.params.evidenceId;
     if (typeof evidenceId !== 'string') return;
     const type = types.get(evidenceId);
-    if (type === undefined) errors.push(`goldenPath[${index}] (collect) recoge ${evidenceId}, que no existe.`);
-    else if (type !== 'object') errors.push(`goldenPath[${index}] (collect) recoge ${evidenceId}, de tipo ${type}: solo se recogen evidencias de tipo object.`);
+    if (type === undefined) errors.push(`${field}[${index}] (collect) recoge ${evidenceId}, que no existe.`);
+    else if (type !== 'object') errors.push(`${field}[${index}] (collect) recoge ${evidenceId}, de tipo ${type}: solo se recogen evidencias de tipo object.`);
   });
+}
+
+// Las dos rutas deben pedir la orden con evidencias distintas: si la
+// alternativa usa la misma combinación que la dorada (o la incluye),
+// no es una vía distinta sino la misma con otros waits. La jugabilidad y
+// la independencia completa las comprueba el simulador; aquí solo se
+// exige que los conjuntos de la orden no se solapen.
+function warrantEvidenceOfRoute(output: Record<string, unknown>, field: string): string[] {
+  if (!Array.isArray(output[field])) return [];
+  const ids: string[] = [];
+  for (const action of output[field] as unknown[]) {
+    if (!isRecord(action) || action.type !== 'request_warrant' || !isRecord(action.params)) continue;
+    const evidenceIds = Array.isArray(action.params.evidenceIds)
+      ? action.params.evidenceIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    for (const id of evidenceIds) if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+function checkRoutesDistinct(output: Record<string, unknown>, errors: string[]): void {
+  const golden = warrantEvidenceOfRoute(output, 'goldenPath');
+  const alternative = warrantEvidenceOfRoute(output, 'alternativePath');
+  if (golden.length === 0) errors.push('goldenPath no pide ninguna orden: cada ruta debe pedir la orden con una combinación completa.');
+  if (alternative.length === 0) errors.push('alternativePath no pide ninguna orden: cada ruta debe pedir la orden con una combinación completa.');
+  if (golden.length === 0 || alternative.length === 0) return;
+  const shared = golden.filter(id => alternative.includes(id));
+  if (shared.length > 0) {
+    errors.push(`Las dos rutas piden la orden con las mismas evidencias (${shared.join(', ')}): la ruta alternativa debe usar otra combinación de orden, sin compartir evidencias con la dorada.`);
+  }
 }
 
 function validateClueWorld(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {
@@ -745,13 +784,15 @@ function validateClueWorld(output: unknown, geography: SelectedGeography, castId
 
 function validateClueRules(output: unknown, world: unknown, geography: SelectedGeography, errors: string[], arrestType?: ArrestType): void {
   if (!isRecord(output)) { errors.push('La red de pistas debe ser un objeto.'); return; }
-  checkKeys(output, ['mechanics', 'goldenPath'], errors);
+  checkKeys(output, ['mechanics', 'goldenPath', 'alternativePath'], errors);
   // Las comprobaciones de la mecánica leen las evidencias del mundo (4a)
   // para validar recogidas y referencias.
   const merged = isRecord(world) ? { ...world, ...output } : output;
   checkClueMechanics(merged, errors);
   checkEvidenceObtainable(merged, errors);
-  checkGoldenPath(merged, geography.cities[0]?.id ?? '', errors, arrestType);
+  checkRoutePath(merged, geography.cities[0]?.id ?? '', errors, arrestType, 'goldenPath');
+  checkRoutePath(merged, geography.cities[0]?.id ?? '', errors, arrestType, 'alternativePath');
+  checkRoutesDistinct(merged, errors);
 }
 
 // Cada evidencia (salvo EV-11, el objeto de la recuperación, que se obtiene
@@ -893,7 +934,7 @@ export function assembleDefinition(input: AssemblyInput): CaseDefinition {
   const { caseId, choice, params, geography, premise, npcs, clues } = input;
   const cast = [premise.solution, premise.decoy, ...(premise.witnesses as Array<Record<string, unknown>>)] as Array<Record<string, unknown>>;
   const npcStage = (npcs.npcs as Array<Record<string, unknown>>);
-  const cluesStage = clues as unknown as { locations: Array<Record<string, unknown>>; evidence: Array<Record<string, unknown>>; mechanics: CaseMechanics; texts: CaseTexts; goldenPath: Array<{ type: string; params: Record<string, unknown> }> };
+  const cluesStage = clues as unknown as { locations: Array<Record<string, unknown>>; evidence: Array<Record<string, unknown>>; mechanics: CaseMechanics; texts: CaseTexts; goldenPath: Array<{ type: string; params: Record<string, unknown> }>; alternativePath: Array<{ type: string; params: Record<string, unknown> }> };
   const knowledgeTokens = new Set<string>();
   for (const npc of npcStage) for (const token of npc.knowledge as string[]) knowledgeTokens.add(token);
   const evidenceIds = (cluesStage.evidence as Array<Record<string, unknown>>).map(evidence => String(evidence.id));

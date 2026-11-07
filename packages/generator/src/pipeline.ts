@@ -30,7 +30,7 @@ import {
 } from './stages.js';
 import { validateGenerationParams } from './validator.js';
 export { validateGenerationParams };
-import { simulateCase, type GoldenPathAction, type SimulationResult } from './simulator.js';
+import { analyzeWarrantRoutes, simulateCase, type GoldenPathAction, type SimulationResult } from './simulator.js';
 
 // ============================================================================
 // Parámetros de entrada
@@ -92,6 +92,10 @@ export interface CaseDraft {
   geography?: SelectedGeography;
   /** Ruta dorada declarada por el generador (etapa 4). */
   goldenPath?: GoldenPathAction[];
+  /** Ruta alternativa declarada por el generador (etapa 4, GDD §4/§18):
+   * otra cadena de evidencias que resuelve el caso sin compartir la
+   * orden con la dorada. */
+  alternativePath?: GoldenPathAction[];
   /** Introducción del caso, sin spoilers (etapa 1). */
   briefing?: { speaker: string; title: string; paragraphs: string[] };
   /** Resultado de la simulación (etapa 8). */
@@ -156,7 +160,7 @@ export const STAGE_NAMES: Record<GenerationStage, string> = {
   5: 'ensamblar_definicion',
   6: 'validar_estructura_referencias_contenido',
   7: 'revision_semantica_independiente',
-  8: 'simular_ruta_dorada_motor',
+  8: 'simular_rutas_motor',
   9: 'publicar_version_hash_reporte',
 };
 
@@ -367,8 +371,8 @@ async function runLlmStage(
 // intentos sin converger. Solo cuando el fallo es del mundo (o mixto)
 // se descarta y se regenera entero.
 function isStage4bError(error: string): boolean {
-  return error.startsWith('mechanics.') || error.startsWith('goldenPath')
-    || error.includes('no se puede obtener') || error.includes('ruta dorada');
+  return error.startsWith('mechanics.') || error.startsWith('goldenPath') || error.startsWith('alternativePath')
+    || error.includes('no se puede obtener') || error.includes('ruta dorada') || error.includes('ruta alternativa');
 }
 
 async function runSplitStage4(
@@ -397,11 +401,12 @@ async function runSplitStage4(
   return merged;
 }
 
-// La ruta dorada no solo debe tener buena forma: debe JUGARSE por el motor
-// real (cada acción aplicable en orden, con sus requisitos obtenidos antes).
-// Comprobarlo aquí, dentro de la etapa 4, da al modelo el error exacto del
-// motor como feedback de reintento (3 intentos) en vez de quemar la única
-// reparación de la puerta cuando la revisión o la simulación lo detectan.
+// Las dos rutas no solo deben tener buena forma: deben JUGARSE por el
+// motor real (cada acción aplicable en orden, con sus requisitos obtenidos
+// antes). Comprobarlo aquí, dentro de la etapa 4, da al modelo el error
+// exacto del motor como feedback de reintento (3 intentos) en vez de quemar
+// la única reparación de la puerta cuando la revisión o la simulación lo
+// detectan.
 function checkGoldenPathPlayable(
   clues: Record<string, unknown>,
   prior: Record<string, unknown>,
@@ -413,11 +418,13 @@ function checkGoldenPathPlayable(
   const premise = prior.premise as Record<string, unknown> | undefined;
   const npcs = prior.npcs as Record<string, unknown> | undefined;
   const goldenPath = clues.goldenPath as GoldenPathAction[] | undefined;
+  const alternativePath = clues.alternativePath as GoldenPathAction[] | undefined;
   if (!premise || !npcs || !Array.isArray(goldenPath)) throw new StageOutputError('Etapa 4 inválida: falta la premisa, los NPC o la ruta dorada.', clues);
+  if (!Array.isArray(alternativePath)) throw new StageOutputError('Etapa 4 inválida: falta la ruta alternativa (GDD §4/§18: el caso debe resolverse por dos vías distintas).', clues);
   const definition = assembleDefinitionOrFail(clues, premise, npcs, draft, choice, geography, config);
   const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
-  const simulation = simulateCase(definition, goldenPath, budgetMinutes);
-  if (!simulation.playable) throw new StageOutputError(`Etapa 4 inválida: la ruta dorada no se puede jugar: ${simulation.errors.join('; ')}${simulation.diagnosis ? ` Diagnóstico: ${simulation.diagnosis}` : ''}`, clues);
+  const simulation = simulateCase(definition, goldenPath, budgetMinutes, alternativePath);
+  if (!simulation.playable) throw new StageOutputError(`Etapa 4 inválida: las rutas no se pueden jugar: ${simulation.errors.join('; ')}${simulation.diagnosis ? ` Diagnóstico: ${simulation.diagnosis}` : ''}`, clues);
 }
 
 function assembleDefinitionOrFail(
@@ -461,24 +468,35 @@ function assembleStage(draft: CaseDraft, choice: ResolvedChoice, geography: Sele
   });
   draft.definition = definition;
   draft.goldenPath = (clues.goldenPath as GoldenPathAction[]);
+  draft.alternativePath = (clues.alternativePath as GoldenPathAction[]);
   draft.briefing = premiseBriefing(premise);
   return { assembled: true, caseId: definition.id };
 }
 
-/** Etapa 6 (puerta): validador v1.5 + contenido. */
+/** Etapa 6 (puerta): validador v1.5 + contenido + dos rutas (GDD §4/§18).
+ * La precondición estructural no vive en el validador compartido: ese
+ * validador lo usa también el catálogo en producción (`canStart`) y un
+ * error duro dejaría sin jugar los 11 casos generados antes de esta
+ * puerta, que tienen una sola vía. Aquí, en la puerta de generación, sí
+ * se exige: el sospechoso solución debe admitir dos combinaciones
+ * disjuntas e independientes. */
 function validateStage(draft: CaseDraft, choice: ResolvedChoice): { validated: boolean } {
   const definition = draft.definition;
   if (!definition) throw new Error('Sin definición que validar.');
   const structural = validateCaseDefinition(definition);
   const contentErrors: string[] = [];
   validateGeneratedContent(definition as unknown as Record<string, unknown>, choice.contentRating, contentErrors);
-  const errors = [...structural.errors, ...contentErrors];
+  const routeAnalysis = analyzeWarrantRoutes(definition);
+  const routeErrors = routeAnalysis.independentPairs.length === 0
+    ? [`Varias rutas (GDD §4/§18): ${routeAnalysis.reasons.join(' ')}`]
+    : [];
+  const errors = [...structural.errors, ...contentErrors, ...routeErrors];
   if (errors.length > 0) throw new StageGateError(errors);
   definition.validationReport = createValidationReport([]);
   draft.validationReport = {
     validatorVersion: '1.5.0',
     timestamp: new Date().toISOString(),
-    stages: [{ stage: 6, name: STAGE_NAMES[6], passed: true, checks: ['estructura', 'referencias', 'mecánica', 'textos', 'contenido'], errors: [], warnings: [] }],
+    stages: [{ stage: 6, name: STAGE_NAMES[6], passed: true, checks: ['estructura', 'referencias', 'mecánica', 'textos', 'contenido', 'rutas'], errors: [], warnings: [] }],
     overall: 'passed',
     errors: [],
     warnings: [],
@@ -492,19 +510,22 @@ async function reviewStage(draft: CaseDraft, choice: ResolvedChoice, geography: 
   const definition = draft.definition;
   if (!definition || !draft.goldenPath) throw new Error('Sin definición que revisar.');
   const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
-  const output = await runLlmStage(7, draft, choice, geography, config, { definition, goldenPath: draft.goldenPath, budgetMinutes });
+  const output = await runLlmStage(7, draft, choice, geography, config, { definition, goldenPath: draft.goldenPath, alternativePath: draft.alternativePath, budgetMinutes });
   const review = output as { coherent: boolean; issues: string[] };
   if (!review.coherent) throw new StageGateError(review.issues);
   return { coherent: true };
 }
 
-/** Etapa 8 (puerta): simulación de la ruta dorada por el motor real. */
+/** Etapa 8 (puerta): simulación de las dos rutas por el motor real.
+ * Sin ruta alternativa no hay caso: la puerta rechaza el borrador con
+ * el diagnóstico de qué falta (evidencia, ubicación o tiempo). */
 function simulateStage(draft: CaseDraft, config: PipelineConfig): { playable: boolean; minute: number; budgetMinutes: number } {
   if (!config.enableSimulation) return { playable: true, minute: 0, budgetMinutes: 0 };
   const definition = draft.definition;
   if (!definition || !draft.goldenPath) throw new Error('Sin definición que simular.');
+  if (!draft.alternativePath) throw new Error('Sin ruta alternativa que simular (GDD §4/§18).');
   const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
-  const simulation = simulateCase(definition, draft.goldenPath, budgetMinutes);
+  const simulation = simulateCase(definition, draft.goldenPath, budgetMinutes, draft.alternativePath);
   draft.simulation = simulation;
   if (!simulation.playable) throw new StageGateError(simulation.diagnosis ? [...simulation.errors, `Diagnóstico: ${simulation.diagnosis}`] : simulation.errors);
   return { playable: true, minute: simulation.minute, budgetMinutes };
@@ -563,6 +584,7 @@ async function repairAfterGateFailure(draft: CaseDraft, error: StageGateError, c
   draft.repairFeedback = error.errors;
   delete draft.definition;
   delete draft.goldenPath;
+  delete draft.alternativePath;
   delete draft.simulation;
   for (let reset = 4; reset <= MAX_STAGE; reset++) {
     const target = draft.stages[reset - 1];
