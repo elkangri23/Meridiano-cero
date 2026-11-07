@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import type { CaseSummary } from '@meridiano/contracts';
 import { deadlineMinutesForDifficulty, GDD_CRIME_TYPES, CRIME_TYPE_LABELS, caseLabel } from '@meridiano/case-schema';
 import type { ContentRating, CrimeType } from '@meridiano/case-schema';
 import type { ArchiveState, createArchiveModel } from './model';
@@ -123,12 +124,16 @@ function CreationContent({ state, model }: Props) {
     <ContentField content={content} busy={busy} hasGeneral={hasGeneral} onChange={chooseContent} />
     {matchingCases.length > 1 && <CaseField cases={matchingCases} selectedCase={selectedCase} busy={busy} onChange={setCaseId} />}
     {selectedCase && <p>Expediente: {displayCaseTitle(selectedCase.title)} — {caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.</p>}
-    {selectedCase?.ownedByMe && <p><button type="button" disabled={busy} onClick={() => void downloadExport(model, selectedCase.caseId)}>Exportar expediente</button> La descarga contiene el expediente completo, incluida la solución. Compártela solo con quien quieras que lo juegue.</p>}
+    <ExportOwnCaseButton model={model} selectedCase={selectedCase} busy={busy} />
     {!selectedCase && state.cases.length > 0 && <p>Todavía no hay expedientes validados de este delito y contenido.</p>}
     <button type="submit" disabled={busy || !selectedCase}>Empezar partida</button>{state.cases.length === 0 && <p>No hay expedientes disponibles.</p>}
   </form>;
 }
 type DifficultyFieldProps = { busy: boolean; difficulty: Difficulty; selectedCase: { deadlineMinutes: number } | undefined; onChange: (next: Difficulty) => void };
+function ExportOwnCaseButton({ model, selectedCase, busy }: { model: ReturnType<typeof createArchiveModel>; selectedCase: CaseSummary | undefined; busy: boolean }) {
+  if (!selectedCase?.ownedByMe) return null;
+  return <p><button type="button" disabled={busy} onClick={() => void downloadExport(model, selectedCase.caseId)}>Exportar expediente</button> La descarga contiene el expediente completo, incluida la solución. Compártela solo con quien quieras que lo juegue.</p>;
+}
 function DifficultyField({ busy, difficulty, selectedCase, onChange }: DifficultyFieldProps) {
   return <fieldset disabled={busy} className="difficulty-field"><legend>Dificultad</legend><div className="difficulty-options">{difficultyOptions.map(option => <label key={option.id}><input type="radio" name="difficulty" value={option.id} checked={difficulty === option.id} onChange={() => onChange(option.id)} /> <span><strong>{option.label}{selectedCase ? ` · plazo ${hours(deadlineMinutesForDifficulty(selectedCase.deadlineMinutes, option.id))}` : ''}</strong> — {option.note}</span></label>)}</div></fieldset>;
 }

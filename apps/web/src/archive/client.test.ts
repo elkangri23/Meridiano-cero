@@ -131,6 +131,44 @@ describe('T4-08: frontera HTTP de generación', () => {
   });
 });
 
+describe('T4-05: frontera HTTP de intercambio de expedientes', () => {
+  const imported = { caseId: 'importado-1a2b3c4d', title: 'Caso importado', canStart: true, warnings: [], alreadyExisted: false };
+  it('exportar descarga el fichero del expediente propio con GET', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"version":"1.0.0"}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetcher);
+    const blob = await archiveApi.exportCase('generado-1', session, signal());
+    expect(await blob.text()).toBe('{"version":"1.0.0"}');
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/cases/generado-1/export');
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ credentials: 'same-origin', cache: 'no-store', redirect: 'error' });
+    expect(fetcher.mock.calls[0]?.[1]?.method).toBeUndefined();
+  });
+  it('exportar un expediente ajeno conserva el motivo 403 del servidor', async () => {
+    respond({ error: { code: 'FORBIDDEN', message: 'Este expediente no es tuyo: solo su dueño puede descargarlo.' } }, 403);
+    await expect(archiveApi.exportCase('generado-1', session, signal()))
+      .rejects.toEqual(new ArchiveError('unavailable', 'Este expediente no es tuyo: solo su dueño puede descargarlo.'));
+  });
+  it('exportar rechaza identificadores que intenten modificar la ruta', async () => {
+    const fetcher = respond('{}');
+    await expect(archiveApi.exportCase('../me', session, signal())).rejects.toEqual(new ArchiveError('invalid'));
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('importar envía el fichero tal cual y devuelve el resultado validado', async () => {
+    const fetcher = respond(imported, 201);
+    expect(await archiveApi.importCase('{"version":"1.0.0"}', session, signal())).toEqual(imported);
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/cases/import');
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken }, body: '{"version":"1.0.0"}' });
+  });
+  it('importar un fichero inválido conserva el motivo 400 del servidor', async () => {
+    respond({ error: { code: 'VALIDATION_ERROR', message: 'Checksum no coincide: posible corrupción de datos' } }, 400);
+    await expect(archiveApi.importCase('{"version":"1.0.0"}', session, signal()))
+      .rejects.toEqual(new ArchiveError('unavailable', 'Checksum no coincide: posible corrupción de datos'));
+  });
+  it('importar rechaza un resultado fuera de contrato antes de mostrarlo', async () => {
+    respond({ ...imported, solution: 'SYNTHETIC_PRIVATE' }, 201);
+    await expect(archiveApi.importCase('{"version":"1.0.0"}', session, signal())).rejects.toEqual(new ArchiveError('invalid'));
+  });
+});
+
 describe('T3: lectura de partida sin aceptar replay ni contrato ajeno', () => {
   it('consulta GET del ID elegido y conserva las garantías del transporte', async () => {
     const fetcher = respond(initialView);

@@ -38,7 +38,9 @@ function jsonDepth(value: unknown): number {
   let max = 0;
   const stack: Array<{ node: unknown; depth: number }> = [{ node: value, depth: 1 }];
   while (stack.length > 0) {
-    const { node, depth } = stack.pop()!;
+    const item = stack.pop();
+    if (!item) break;
+    const { node, depth } = item;
     if (depth > max) max = depth;
     if (depth >= MAX_JSON_DEPTH) continue;
     if (Array.isArray(node)) {
@@ -86,18 +88,9 @@ export async function exportCase(orm: Orm, ownerId: string, caseId: string): Pro
   return result.export;
 }
 
-/** Valida el fichero (formato, checksum, profundidad, v1.5) y lo registra
- * en el catálogo como expediente del importador. Un fichero inválido no
- * registra nada y un expediente ya importado por el mismo usuario no se
- * duplica. */
-export async function importCase(orm: Orm, ownerId: string, data: unknown): Promise<CaseImportResultDto> {
-  if (jsonDepth(data) > MAX_JSON_DEPTH) validationError(['El fichero es demasiado profundo.']);
-  const checked = validateImport(data);
-  if (!checked.success) validationError(checked.errors);
-  const warnings = [...checked.warnings];
-  const exported = data as CaseExport;
-  const definition = exported.definition as unknown;
-  if (!isRecord(definition)) validationError(['Definición de caso requerida.']);
+/** Delito y contenido del fichero: el validador v1.5 los admite ausentes,
+ * pero el catálogo los necesita para listar y crear partidas. */
+function checkImportCatalogMeta(definition: Record<string, unknown>): { crimeType: string; contentRating: string } {
   const catalogMeta = definition.catalogMeta as unknown;
   if (!isRecord(catalogMeta) || typeof catalogMeta.crimeType !== 'string' ||
       !(GDD_CRIME_TYPES as readonly string[]).includes(catalogMeta.crimeType) || catalogMeta.crimeType === 'aleatorio' ||
@@ -105,69 +98,114 @@ export async function importCase(orm: Orm, ownerId: string, data: unknown): Prom
       !crimeAllowedForRating(catalogMeta.crimeType as never, catalogMeta.contentRating)) {
     validationError(['El expediente no trae delito y contenido válidos.']);
   }
-  const meta = catalogMeta as { crimeType: string; contentRating: string };
+  return catalogMeta as { crimeType: string; contentRating: string };
+}
+
+function importTitle(definition: Record<string, unknown>): string {
   const rawId = definition.id;
   if (typeof rawId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(rawId)) {
     validationError(['El expediente no trae un identificador válido.']);
   }
   const briefing = isRecord(definition.briefing) ? definition.briefing : null;
-  const rawTitle = briefing !== null && typeof briefing.title === 'string' ? briefing.title : rawId;
-  if (rawTitle.trim().length === 0 || rawTitle.length > MAX_TITLE_LENGTH) {
+  const title = briefing !== null && typeof briefing.title === 'string' ? briefing.title : rawId;
+  if (title.trim().length === 0 || title.length > MAX_TITLE_LENGTH) {
     validationError(['El título del expediente es demasiado largo.']);
   }
-  const title: string = rawTitle;
-  // Lo importado vive en generated_cases: su modo es generado, aunque el
-  // fichero diga otra cosa.
+  return title;
+}
+
+interface ParsedImport {
+  exported: CaseExport;
+  definition: Record<string, unknown>;
+  meta: { crimeType: string; contentRating: string };
+  title: string;
+  warnings: string[];
+}
+
+/** Formato, checksum, profundidad, delito/contenido e identificador: todo
+ * lo que se puede comprobar sin abrir el validador v1.5. */
+function parseImportFile(data: unknown): ParsedImport {
+  if (jsonDepth(data) > MAX_JSON_DEPTH) validationError(['El fichero es demasiado profundo.']);
+  const checked = validateImport(data);
+  if (!checked.success) validationError(checked.errors);
+  const exported = data as CaseExport;
+  const definition = exported.definition as unknown;
+  if (!isRecord(definition)) validationError(['Definición de caso requerida.']);
+  const meta = checkImportCatalogMeta(definition);
+  const title = importTitle(definition);
+  return { exported, definition, meta, title, warnings: [...checked.warnings] };
+}
+
+/** La puerta v1.5: lo importado vive en generated_cases, así que su modo
+ * es generado aunque el fichero diga otra cosa. */
+function validateImportDefinition(definition: Record<string, unknown>): CaseDefinition {
   definition.contentMode = 'generated';
   const report = validateCaseDefinition(definition);
   if (!report.valid) validationError(['El expediente no pasa la validación: ' + report.errors.slice(0, 3).join(' ') +
     (report.errors.length > 3 ? ` (y ${report.errors.length - 3} más)` : '')]);
-  const typed = definition as unknown as CaseDefinition;
-  const definitionHash = hashDefinition(typed);
+  return definition as unknown as CaseDefinition;
+}
 
+/** Resuelve el identificador en el catálogo: deduplica si el importador ya
+ * tiene ese mismo expediente; si colisiona, el importador se queda su
+ * propia copia con un identificador nuevo. Devuelve null si hay que
+ * insertar. El id fijo nunca se importa como tal: su definición ya
+ * gobierna el caso fijo y la fila quedaría tapada por el fixture. */
+async function resolveImportTarget(orm: Orm, ownerId: string, typed: CaseDefinition, definitionHash: string,
+  warnings: string[]): Promise<{ caseId: string; title: string } | null> {
   const existing = await orm.select().from(generatedCases).where(eq(generatedCases.caseId, typed.id)).limit(1);
   const found = existing[0];
+  if (found && found.createdBy === ownerId && found.definitionHash === definitionHash) {
+    return { caseId: found.caseId, title: found.title };
+  }
   if (found) {
-    // El mismo expediente ya está en el catálogo del importador: no duplicar.
-    if (found.createdBy === ownerId && found.definitionHash === definitionHash) {
-      return { caseId: found.caseId, title: found.title, canStart: true, warnings, alreadyExisted: true };
-    }
-    // El identificador ya existe (de otro jugador o con otro contenido):
-    // el importador se queda su propia copia con un identificador nuevo.
     const freshId = `importado-${randomBytes(4).toString('hex')}`;
     warnings.push(`El identificador ${typed.id} ya existe en el catálogo; se ha importado como ${freshId}.`);
     typed.id = freshId;
   }
-  // El id fijo nunca se importa como tal: su definición ya gobierna el caso
-  // fijo y la fila quedaría tapada por el fixture.
   if (typed.id === astrolabioDefinition.id) {
     const freshId = `importado-${randomBytes(4).toString('hex')}`;
     warnings.push(`El identificador ${typed.id} es el del expediente fijo; se ha importado como ${freshId}.`);
     typed.id = freshId;
   }
+  return null;
+}
 
+async function checkImportLimit(orm: Orm, ownerId: string): Promise<void> {
   const today = await orm.select({ n: sql<string>`count(*)::text` }).from(generatedCases)
     .where(and(eq(generatedCases.createdBy, ownerId), sql`${generatedCases.jobId} IS NULL`,
       sql`date_trunc('day', ${generatedCases.createdAt}) = date_trunc('day', now())`));
   if (Number(today[0]?.n ?? 0) >= MAX_IMPORTS_PER_DAY_PER_USER) {
     throw new RunStoreError('GENERATION_LIMIT', `Has llegado al límite de ${MAX_IMPORTS_PER_DAY_PER_USER} expedientes importados por día.`);
   }
+}
 
-  const duration = exported.metadata !== undefined && isRecord(exported.metadata) &&
-    (exported.metadata.duration === 'short' || exported.metadata.duration === 'medium' || exported.metadata.duration === 'long')
-    ? exported.metadata.duration
-    : 'medium';
-  const finalHash = hashDefinition(typed);
+function importDuration(exported: CaseExport): 'short' | 'medium' | 'long' {
+  const duration = (exported.metadata as unknown as Record<string, unknown> | undefined)?.duration;
+  return duration === 'short' || duration === 'medium' || duration === 'long' ? duration : 'medium';
+}
+
+/** Valida el fichero (formato, checksum, profundidad, v1.5) y lo registra
+ * en el catálogo como expediente del importador. Un fichero inválido no
+ * registra nada y un expediente ya importado por el mismo usuario no se
+ * duplica. */
+export async function importCase(orm: Orm, ownerId: string, data: unknown): Promise<CaseImportResultDto> {
+  const parsed = parseImportFile(data);
+  const typed = validateImportDefinition(parsed.definition);
+  const definitionHash = hashDefinition(typed);
+  const existing = await resolveImportTarget(orm, ownerId, typed, definitionHash, parsed.warnings);
+  if (existing) return { caseId: existing.caseId, title: existing.title, canStart: true, warnings: parsed.warnings, alreadyExisted: true };
+  await checkImportLimit(orm, ownerId);
   await orm.insert(generatedCases).values({
     caseId: typed.id,
-    title,
-    crimeType: meta.crimeType,
-    contentRating: meta.contentRating,
-    duration,
+    title: parsed.title,
+    crimeType: parsed.meta.crimeType,
+    contentRating: parsed.meta.contentRating,
+    duration: importDuration(parsed.exported),
     definition: typed as unknown as Record<string, unknown>,
-    definitionHash: finalHash,
+    definitionHash: hashDefinition(typed),
     jobId: null,
     createdBy: ownerId,
   });
-  return { caseId: typed.id, title, canStart: true, warnings, alreadyExisted: false };
+  return { caseId: typed.id, title: parsed.title, canStart: true, warnings: parsed.warnings, alreadyExisted: false };
 }

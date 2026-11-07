@@ -1,4 +1,4 @@
-import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary, GenerationJobDto } from '@meridiano/contracts';
+import type { PlayerViewDto, RunListDto, SessionDto, CaseSummary, CaseImportResultDto, GenerationJobDto } from '@meridiano/contracts';
 import type { ArchiveApi, CreationParams, Filter, GenerationJobParams } from './client';
 import { ArchiveError } from './client';
 import { browserIntents, createRunCoordinator } from './creation';
@@ -30,6 +30,12 @@ function jobFinishedNotice(job: GenerationJobDto, cases: CaseSummary[]): string 
   }
   if (job.status === 'failed') return job.error ? `La generación falló: ${job.error}` : 'La generación falló. Los borradores inválidos se rechazan, no se ofrecen.';
   return 'Generación cancelada.';
+}
+
+function importNotice(result: CaseImportResultDto): string {
+  const warnings = result.warnings.length ? ` Avisos: ${result.warnings.join(' ')}` : '';
+  const known = result.alreadyExisted ? ' Ya estaba en tu catálogo: no se ha duplicado.' : '';
+  return `Expediente importado: ${result.title}. Ya está en el catálogo: elígelo arriba en «Nueva partida».${known}${warnings}`;
 }
 type Ticket = { signal: AbortSignal; current: () => boolean };
 
@@ -256,10 +262,7 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
       if (!ticket.current()) return;
       const catalog = await api.cases(ticket.signal);
       if (!ticket.current()) return;
-      const warnings = result.warnings.length ? ` Avisos: ${result.warnings.join(' ')}` : '';
-      const known = result.alreadyExisted ? ' Ya estaba en tu catálogo: no se ha duplicado.' : '';
-      set({ ...state, cases: catalog.items,
-        notice: `Expediente importado: ${result.title}. Ya está en el catálogo: elígelo arriba en «Nueva partida».${known}${warnings}` });
+      set({ ...state, cases: catalog.items, notice: importNotice(result) });
     } catch (error) {
       if (!ticket.current()) return;
       const detail = error instanceof ArchiveError ? error.detail : undefined;

@@ -1,6 +1,6 @@
 import { initialView } from './initial-fixture';
 import { describe, expect, it, vi } from 'vitest';
-import type { RunListDto, SessionDto } from '@meridiano/contracts';
+import type { CaseSummary, RunListDto, SessionDto } from '@meridiano/contracts';
 import { createArchiveModel } from './model';
 import type { ArchiveApi } from './client';
 import { ArchiveError } from './client';
@@ -185,6 +185,42 @@ describe('T4-08: generación de casos en el archivo', () => {
     transport.generationJobs.mockResolvedValue({ items: [failed] });
     await model.refreshJobs();
     expect(model.getSnapshot().notice).toContain('La generación falló: Etapa 4 inválida');
+  });
+});
+
+describe('T4-05: intercambio de expedientes en el archivo', () => {
+  const importedCase: CaseSummary = { caseId: 'importado-1a2b3c4d', title: 'Caso importado', contentMode: 'generated', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true };
+  it('exportar devuelve el fichero y avisa de que contiene la solución', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    const blob = new Blob(['{"version":"1.0.0"}'], { type: 'application/json' });
+    transport.exportCase.mockResolvedValue(blob);
+    const file = await model.exportCase('generado-1');
+    expect(file).toEqual({ blob, filename: 'meridiano-caso-generado-1.json' });
+    expect(model.getSnapshot().notice).toContain('Contiene la solución');
+    transport.exportCase.mockRejectedValueOnce(new ArchiveError('unavailable', 'Este expediente no es tuyo: solo su dueño puede descargarlo.'));
+    expect(await model.exportCase('generado-1')).toBeNull();
+    expect(model.getSnapshot().notice).toBe('Este expediente no es tuyo: solo su dueño puede descargarlo.');
+  });
+  it('importar recarga el catálogo y anuncia el expediente nuevo', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    transport.importCase.mockResolvedValue({ caseId: importedCase.caseId, title: importedCase.title, canStart: true, warnings: [], alreadyExisted: false });
+    transport.cases.mockResolvedValue({ items: [importedCase], nextCursor: null });
+    await model.importCase('{"version":"1.0.0"}');
+    expect(transport.importCase).toHaveBeenCalledWith('{"version":"1.0.0"}', identity, expect.anything());
+    expect(model.getSnapshot().cases.map(item => item.caseId)).toContain('importado-1a2b3c4d');
+    expect(model.getSnapshot().notice).toContain('Expediente importado: Caso importado');
+    expect(model.getSnapshot().notice).toContain('Nueva partida');
+  });
+  it('importar un expediente ya conocido no lo duplica y conserva el motivo si falla', async () => {
+    const transport = api(); const model = createArchiveModel(transport); await model.refresh();
+    transport.importCase.mockResolvedValue({ caseId: importedCase.caseId, title: importedCase.title, canStart: true, warnings: ['El identificador ya existe.'], alreadyExisted: true });
+    transport.cases.mockResolvedValue({ items: [importedCase], nextCursor: null });
+    await model.importCase('{"version":"1.0.0"}');
+    expect(model.getSnapshot().notice).toContain('Ya estaba en tu catálogo');
+    expect(model.getSnapshot().notice).toContain('El identificador ya existe.');
+    transport.importCase.mockRejectedValueOnce(new ArchiveError('unavailable', 'Checksum no coincide: posible corrupción de datos'));
+    await model.importCase('{"version":"1.0.0"}');
+    expect(model.getSnapshot().notice).toBe('Checksum no coincide: posible corrupción de datos');
   });
 });
 
