@@ -146,7 +146,27 @@ describe('Intercambio de expedientes (T4-05 expuesto)', () => {
     expect(again.json().caseId).toBe(importedCaseId);
   });
 
+  it('reimportar la copia con título distinto tampoco duplica', async () => {
+    // El fichero con el título cambiado y el id ya existente se guarda
+    // como importado-<hex>. Volver a importarlo debe devolver esa misma
+    // copia, no crear otra.
+    const modified = structuredClone(seedExport.export) as unknown as Record<string, unknown>;
+    const definition = modified.definition as Record<string, unknown>;
+    const briefing = definition.briefing as Record<string, unknown>;
+    briefing.title = 'Caso importado de prueba';
+    modified.checksum = computeChecksum(definition);
+    const first = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(other), payload: JSON.stringify(modified) });
+    expect(first.statusCode).toBe(201);
+    expect(first.json().caseId).toMatch(/^importado-[a-f0-9]{8}$/);
+    expect(first.json().caseId).not.toBe(importedCaseId);
+    const again = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(other), payload: JSON.stringify(modified) });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().alreadyExisted).toBe(true);
+    expect(again.json().caseId).toBe(first.json().caseId);
+  });
+
   it('importar con checksum roto o JSON inválido es 400 sin registrar nada', async () => {
+    const before = await owner.pool.query('SELECT count(*)::text AS n FROM generated_cases WHERE created_by=$1 AND case_id LIKE $2', [other.id, 'importado-%']);
     const tampered = structuredClone(seedExport.export) as unknown as Record<string, unknown>;
     (tampered.definition as Record<string, unknown>).solution = 'solución manipulada';
     const badChecksum = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(other), payload: JSON.stringify(tampered) });
@@ -155,8 +175,8 @@ describe('Intercambio de expedientes (T4-05 expuesto)', () => {
     const badJson = await app.inject({ method: 'POST', url: '/api/v1/cases/import',
       headers: { ...headersFor(other), 'content-type': 'application/json' }, payload: '{no-es-json' });
     expect(badJson.statusCode).toBe(400);
-    const count = await owner.pool.query('SELECT count(*)::text AS n FROM generated_cases WHERE created_by=$1 AND case_id LIKE $2', [other.id, 'importado-%']);
-    expect(Number(count.rows[0]?.n ?? 0)).toBe(1);
+    const after = await owner.pool.query('SELECT count(*)::text AS n FROM generated_cases WHERE created_by=$1 AND case_id LIKE $2', [other.id, 'importado-%']);
+    expect(Number(after.rows[0]?.n ?? 0)).toBe(Number(before.rows[0]?.n ?? 0));
   });
 
   it('importar un expediente que no pasa v1.5 o sin catalogMeta es 400', async () => {
@@ -186,7 +206,15 @@ describe('Intercambio de expedientes (T4-05 expuesto)', () => {
       headers: { cookie: headersFor(other).cookie, origin: config.origin }, payload: seedFile });
     expect(noCsrf.statusCode).toBe(403);
     expect(noCsrf.json().error.code).toBe('CSRF_REJECTED');
-    const limitedResponse = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(limited), payload: seedFile });
+    // El fichero sin modificar ya lo tiene `limited` (sus 10 filas semilla
+    // son clones del mismo expediente salvo el id): reimportarlo sería
+    // deduplicación, no una importación nueva. La cuota se prueba con un
+    // contenido que no tenga.
+    const fresh = structuredClone(seedExport.export) as unknown as Record<string, unknown>;
+    const freshDefinition = fresh.definition as Record<string, unknown>;
+    (freshDefinition.briefing as Record<string, unknown>).title = 'Expediente nuevo para la cuota';
+    fresh.checksum = computeChecksum(freshDefinition);
+    const limitedResponse = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(limited), payload: JSON.stringify(fresh) });
     expect(limitedResponse.statusCode).toBe(429);
     expect(limitedResponse.json().error.code).toBe('GENERATION_LIMIT');
   });
