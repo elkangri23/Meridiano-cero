@@ -10,6 +10,7 @@ export const initialView: PlayerViewDto = {
   locations: [{ id: 'synthetic-room', name: 'Sala sintética', description: 'Descripción pública de prueba.' }],
   objects: [], dossier: [], conversation: [], pendingRequests: [], warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
   npcChat: [],
+  evidenceTexts: {},
   objectives: [
     { id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: false },
     { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false },

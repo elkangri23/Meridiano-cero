@@ -1,5 +1,6 @@
 import { check, identifier, integer, isRecord, text, type DataRecord } from './validation-fields.js';
 import { hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type KnowledgeContentAnchors } from './fact-texts.js';
+import { FORENSIC_TYPES, type ForensicType } from './forensics.js';
 import type { EntityGroups } from './validation-entities.js';
 
 /**
@@ -68,6 +69,13 @@ function analyses(mechanics: DataRecord, groups: EntityGroups, errors: string[])
     check(identifier(entry.resultEvidenceId) && groups.evidence.some(evidence => evidence.id === entry.resultEvidenceId), 'mechanics.analyses.resultEvidenceId inexistente', errors);
     check(entry.inputEvidenceId !== entry.resultEvidenceId, 'mechanics.analyses entrada y resultado iguales', errors);
     check(integer(entry.delayMinutes, 1) && Number(entry.delayMinutes) <= 240, 'mechanics.analyses.delayMinutes fuera de rango', errors);
+    // El tipo forense es opcional (los expedientes generados antes de esta
+    // entrega no lo declaran y el motor lo deriva); si está presente debe
+    // ser uno de los seis canónicos del GDD §11.
+    if (entry.forensicType !== undefined) {
+      check(typeof entry.forensicType === 'string' && FORENSIC_TYPES.includes(entry.forensicType as ForensicType),
+        'mechanics.analyses.forensicType no canónico', errors);
+    }
   }
 }
 

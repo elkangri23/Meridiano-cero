@@ -142,4 +142,18 @@ describe('objetivos en vivo de la vista del jugador', () => {
     ]);
     expect(isPlayerViewDto(view)).toBe(true);
   });
+
+  it('la vista lleva los textos de evidencia del expediente, no los del caso fijo', () => {
+    const fixed = playerViewDto(astrolabioDefinition, fullRun(), 0);
+    expect(fixed.evidenceTexts['EV-02']).toBe('La cerradura de la vitrina tiene residuo de herramienta.');
+    expect(isPlayerViewDto(fixed)).toBe(true);
+    const definition = structuredClone(astrolabioDefinition) as unknown as import('@meridiano/case-schema').CaseDefinition;
+    definition.texts = {
+      evidence: { 'EV-02': 'Se localiza una caja de transporte vacía junto al espacio del manuscrito.' },
+      knowledge: {}, greetings: {},
+    };
+    const generated = playerViewDto(definition, fullRun(), 0);
+    expect(generated.evidenceTexts['EV-02']).toBe('Se localiza una caja de transporte vacía junto al espacio del manuscrito.');
+    expect(isPlayerViewDto(generated)).toBe(true);
+  });
 });

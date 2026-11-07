@@ -15,7 +15,7 @@
 // resto de etapas (geografía, ensamblaje, validación, simulación,
 // persistencia) son deterministas.
 
-import { GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type KnowledgeContentAnchors } from '@meridiano/case-schema';
+import { FORENSIC_TYPES, GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type ForensicType, type KnowledgeContentAnchors } from '@meridiano/case-schema';
 import type { GenerationParams, GenerationStage } from './pipeline.js';
 
 /** Delitos generables (lista canónica sin 'aleatorio', que es modo de
@@ -254,7 +254,7 @@ export const STAGE_4B_SCHEMA: Record<string, unknown> = {
       properties: {
         inspectables: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'object', required: ['locationId', 'elementId', 'label', 'evidenceId'] } },
         queries: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', required: ['id', 'label', 'cityId', 'locationId', 'evidenceId', 'requires', 'delayMinutes'] } },
-        analyses: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['inputEvidenceId', 'resultEvidenceId', 'delayMinutes'] } },
+        analyses: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['inputEvidenceId', 'resultEvidenceId', 'delayMinutes', 'forensicType'] } },
         talkEvidence: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'object', required: ['npcId', 'topicId', 'label', 'evidenceId'] } },
         suspects: { type: 'array', minItems: 1, maxItems: 2, items: { type: 'object', required: ['id', 'cityId', 'locationId', 'knownFromEvidence', 'warrantCombinations'] } },
         recovery: { type: 'object', required: ['objectId', 'label', 'cityId', 'locationId', 'evidenceId', 'requiresAccessWarrant'] },
@@ -404,7 +404,7 @@ const MECHANIC_FIELDS: Array<{ key: string; fields: Array<[string, 'nonempty' | 
   // misma (inspeccionar la sala, sin elemento concreto).
   { key: 'inspectables', fields: [['locationId', 'nonempty'], ['elementId', 'string'], ['label', 'nonempty'], ['evidenceId', 'nonempty']] },
   { key: 'queries', fields: [['id', 'nonempty'], ['label', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['evidenceId', 'nonempty'], ['requires', 'array'], ['delayMinutes', 'number']] },
-  { key: 'analyses', fields: [['inputEvidenceId', 'nonempty'], ['resultEvidenceId', 'nonempty'], ['delayMinutes', 'number']] },
+  { key: 'analyses', fields: [['inputEvidenceId', 'nonempty'], ['resultEvidenceId', 'nonempty'], ['delayMinutes', 'number'], ['forensicType', 'nonempty']] },
   { key: 'talkEvidence', fields: [['npcId', 'nonempty'], ['topicId', 'nonempty'], ['label', 'nonempty'], ['evidenceId', 'nonempty']] },
   { key: 'suspects', fields: [['id', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['knownFromEvidence', 'array'], ['warrantCombinations', 'array'], ['accessEvidenceIds', 'array']] },
 ];
@@ -447,6 +447,13 @@ function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[
         if (!ok) errors.push(`mechanics.${group.key}[${index}] debe tener ${field} (${kind}).`);
       }
       checkMechanicId(group, entry, index, errors);
+      // El tipo forense del análisis debe ser uno de los seis canónicos
+      // del GDD §11: el laboratorio solo ofrece el método que tiene
+      // sentido para esa prueba.
+      if (group.key === 'analyses' && typeof entry.forensicType === 'string'
+        && !FORENSIC_TYPES.includes(entry.forensicType as ForensicType)) {
+        errors.push(`mechanics.analyses[${index}] forensicType no canónico: ${entry.forensicType} (huellas, documentos, fotografías, audio, muestras o materiales).`);
+      }
       // El validador v1.5 exige delayMinutes entero entre 1 y 240: con 0 el
       // resultado queda en curso y el paso siguiente que lo necesita se
       // rechaza en la simulación sin que el diagnóstico de orden lo explique.

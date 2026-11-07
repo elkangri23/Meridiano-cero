@@ -100,7 +100,7 @@ export const generadoFraudeDefinition: CaseDefinition = {
       { id: 'custodia-contrato', label: 'Consultar la custodia del contrato', cityId: 'valencia', locationId: 'VLC-ALM', evidenceId: 'EV-08', requires: ['EV-05', 'EV-07'], delayMinutes: 30 },
     ],
     analyses: [
-      { inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90 },
+      { inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90, forensicType: 'documentos' },
     ],
     talkEvidence: [
       { npcId: 'jorge', topicId: 'facturas', label: 'Preguntar a Jorge por las facturas', evidenceId: 'EV-09', requiresRelation: true },

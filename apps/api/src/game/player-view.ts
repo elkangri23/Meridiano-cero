@@ -103,6 +103,13 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     // web solo conocía el catálogo fijo y un NPC generado llegaba al
     // director sin hechos ni persona.
     npcChat: npcChatForDefinition(definition),
+    // Textos legibles de las evidencias del expediente, por id: sin ellos
+    // la web traducía los hallazgos con el catálogo fijo y el dossier de
+    // un expediente generado enseñaba los textos del astrolabio.
+    evidenceTexts: Object.fromEntries(definition.evidence.flatMap(evidence => {
+      const text = evidenceText(evidence.id, definition.texts);
+      return text ? [[evidence.id, text]] : [];
+    })),
     pendingRequests: run.pendingRequests.map(request => {
       const payload = (request.payload ?? {}) as Record<string, unknown>;
       const method = payload.method;

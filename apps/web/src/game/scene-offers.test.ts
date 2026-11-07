@@ -25,6 +25,16 @@ describe('groupOffers: las acciones de la escena salen de las ofertas reales', (
     expect(grouped.finish?.id).toBe('finish');
   });
 
+  it('los análisis salen de la escena y van al grupo del laboratorio', () => {
+    const offers = [
+      offer('analyze:EV-02', 'analyze', 'Análisis de huellas — EV-02 · 90 min'),
+      offer('collect:EV-06', 'collect', 'Recoger EV-06 · objeto'),
+    ];
+    const grouped = groupOffers(offers);
+    expect(grouped.lab.map(item => item.id)).toEqual(['analyze:EV-02']);
+    expect(grouped.other.map(item => item.id)).toEqual(['collect:EV-06']);
+  });
+
   it('conserva el orden del motor dentro de cada grupo', () => {
     const offers = [
       offer('talk:lucia:identidad', 'talk', 'Hablar con Lucía sobre su identidad'),
@@ -37,7 +47,7 @@ describe('groupOffers: las acciones de la escena salen de las ofertas reales', (
 
   it('sin ofertas, todos los grupos quedan vacíos y sin cierre', () => {
     const grouped = groupOffers([]);
-    expect(grouped).toEqual({ talk: [], inspect: [], travel: [], other: [], finish: undefined });
+    expect(grouped).toEqual({ talk: [], inspect: [], travel: [], lab: [], other: [], finish: undefined });
   });
 });
 

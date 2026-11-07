@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 
-export type WindowId = 'map' | 'dossier' | 'lab' | 'saves' | 'settings' | 'report' | 'chat';
+export type WindowId = 'map' | 'dossier' | 'lab' | 'saves' | 'settings' | 'report' | 'chat' | 'intel';
 
 export interface WindowState {
   open: boolean;
@@ -18,6 +18,7 @@ const initialPositions: Record<WindowId, { x: number; y: number }> = {
   settings: { x: 200, y: 180 },
   report: { x: 300, y: 160 },
   chat: { x: 180, y: 260 },
+  intel: { x: 260, y: 300 },
 };
 
 export function useWindows() {
@@ -144,7 +145,7 @@ export function GameWindow({ id, title, state, moving, onMoveStart, onMoveEnd, o
 export function MinimizedBar({ windows, onRestore }: { windows: Record<WindowId, WindowState>; onRestore: (id: WindowId) => void }) {
   const minimized = (Object.keys(windows) as WindowId[]).filter(id => windows[id].open && windows[id].minimized);
   if (!minimized.length) return null;
-  const labels: Record<WindowId, string> = { map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio y comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación' };
+  const labels: Record<WindowId, string> = { map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio y comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia' };
   return <div className="game-minimized-bar" role="group" aria-label="Ventanas minimizadas">
     {minimized.map(id => <button key={id} type="button" onClick={() => onRestore(id)}>Restaurar {labels[id]}</button>)}
   </div>;

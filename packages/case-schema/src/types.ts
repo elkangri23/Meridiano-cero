@@ -96,6 +96,11 @@ export interface MechanicsAnalysis {
   inputEvidenceId: string;
   resultEvidenceId: string;
   delayMinutes: number;
+  /** Tipo forense del laboratorio (GDD §11): huellas, documentos,
+   * fotografías, audio, muestras o materiales. Lo declaran los
+   * expedientes generados nuevos; los anteriores no lo traen y el motor
+   * lo deriva del tipo de la evidencia de entrada (ver forensics.ts). */
+  forensicType?: string;
 }
 
 export interface MechanicsTalkEvidence {

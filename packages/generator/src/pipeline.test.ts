@@ -107,7 +107,7 @@ function fakeOutputs(geography: SelectedGeography) {
         { id: 'firma-contrato', label: 'Consultar la firma del contrato', cityId: second.id, locationId: locSecond, evidenceId: 'EV-07', requires: ['EV-06'], delayMinutes: 30 },
         { id: 'custodia-contrato', label: 'Consultar la custodia del contrato', cityId: third.id, locationId: locThird, evidenceId: 'EV-08', requires: ['EV-05', 'EV-07'], delayMinutes: 30 },
       ],
-      analyses: [{ inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90 }],
+      analyses: [{ inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90, forensicType: 'documentos' }],
       talkEvidence: [{ npcId: 'jorge', topicId: 'facturas', label: 'Preguntar a Jorge por las facturas', evidenceId: 'EV-09', requiresRelation: true }],
       suspects: [
         { id: 'carmen', cityId: third.id, locationId: locThird, knownFromEvidence: ['EV-04', 'EV-05', 'EV-07', 'EV-08'],
@@ -1191,6 +1191,38 @@ describe('validación de la etapa 4 (delayMinutes)', () => {
   });
 
   it('acepta delayMinutes 30 en las consultas del doble', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = { ...outputs.cluesWorld, ...outputs.cluesRules };
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(true);
+  });
+});
+
+describe('validación de la etapa 4 (tipo forense)', () => {
+  it('rechaza un análisis sin tipo forense (la puerta exige declararlo)', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = { ...outputs.cluesWorld, ...structuredClone(outputs.cluesRules) };
+    const mechanics = clues.mechanics as { analyses: Array<Record<string, unknown>> };
+    delete mechanics.analyses[0]!.forensicType;
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('forensicType'))).toBe(true);
+  });
+
+  it('rechaza un tipo forense que no es de los seis canónicos del GDD §11', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const clues = { ...outputs.cluesWorld, ...structuredClone(outputs.cluesRules) };
+    const mechanics = clues.mechanics as { analyses: Array<Record<string, unknown>> };
+    mechanics.analyses[0]!.forensicType = 'adn';
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('forensicType'))).toBe(true);
+  });
+
+  it('acepta el análisis con su tipo forense declarado (documentos, la factura rota)', () => {
     const geography = selectGeography(PARAMS);
     const outputs = fakeOutputs(geography);
     const clues = { ...outputs.cluesWorld, ...outputs.cluesRules };

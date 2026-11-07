@@ -14,13 +14,14 @@ import { needsConfirmationDialog } from './action-confirmation';
 import { chatFacts, chatGreeting, chatNpcName, chatPersona, chatRefusal, chatRole, findChatEntry } from './npc-chat';
 import { SceneArt } from './scene-art';
 import { groupOffers } from './scene-offers';
+import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
-import type { DiscoveryLookup, PaletteMode } from '@meridiano/case-schema';
+import { caseLabel, conversationRecordText, discoveryText, FORENSIC_TYPE_LABELS, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
+import type { CaseTexts, DiscoveryLookup, ForensicType, PaletteMode } from '@meridiano/case-schema';
 import './game.css';
 
 type OrderPhase =
@@ -36,7 +37,7 @@ type ScreenPhase = 'loading' | 'ready' | 'signed_out' | 'not_found' | 'error';
 type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
 
 const windowLabels: Record<WindowId, string> = {
-  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio y comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación',
+  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio y comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia',
 };
 const channelLabels: Record<string, string> = { call: 'Llamada', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Correo', fax: 'Fax' };
 const requestTypeLabels: Record<string, string> = { analysis: 'Análisis', query: 'Consulta', request: 'Solicitud' };
@@ -138,6 +139,13 @@ function lookupFromView(view: PlayerViewDto): DiscoveryLookup {
   };
 }
 
+/** Textos del expediente que lleva la vista: sin ellos, `discoveryText`
+ * traduce los hallazgos con los textos del caso fijo y un expediente
+ * generado enseñaba en el dossier frases que no son las suyas. */
+function textsFromView(view: PlayerViewDto): CaseTexts {
+  return { evidence: view.evidenceTexts, knowledge: {}, greetings: {} };
+}
+
 /** Órdenes en la escena: `warrant:<npc>` nombra al sospechoso y
  * `warrant:access` es la orden de acceso. Sin esto la escena enseñaba los
  * IDs crudos (`warrant:ines`). */
@@ -167,7 +175,8 @@ function travelDetail(offer: PublicActionOffer | undefined, previous: PlayerView
 function discoveryDetail(response: ActionResponseDto, previous: PlayerViewDto | null, lookup: DiscoveryLookup): string {
   const entries = (previous ? response.dossier.filter(entry => !previous.dossier.includes(entry)) : [...response.dossier])
     .filter(entry => !entry.startsWith('travel:'));
-  return entries.map(entry => discoveryText(entry, lookup)).join(' ');
+  const texts = textsFromView(previous ?? response);
+  return entries.map(entry => discoveryText(entry, lookup, texts)).join(' ');
 }
 
 /** Solicitudes enviadas por la acción: qué se pidió y cuándo llega el
@@ -384,7 +393,7 @@ function SceneMeta({ view }: { view: PlayerViewDto }) {
 }
 
 /** Acciones de la escena, agrupadas: quién hay aquí, viajes y el resto. */
-function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+function SceneActions({ view, grouped, disabled, onOffer, onOpenLab }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void }) {
   const finishOffer = grouped.finish;
   if (view.status === 'closed') return <p className="game-scene-closed">La partida está cerrada. Consulta el informe final.</p>;
   return <>
@@ -397,6 +406,11 @@ function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDt
         <p key={offer.id}><button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
           onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}{offer.detail ? ` · ${offer.detail}` : ''}</button></p>
       ))}
+    </div>}
+    {grouped.lab.length > 0 && <div className="game-scene-group">
+      <p className="game-overline">Laboratorio</p>
+      <p><button type="button" data-testid="open-lab" disabled={disabled} onClick={onOpenLab}>
+        {grouped.lab.length === 1 ? 'Hay un análisis disponible en el Laboratorio' : `Hay ${grouped.lab.length} análisis disponibles en el Laboratorio`}</button></p>
     </div>}
     {grouped.travel.length > 0 && <div className="game-scene-group">
       <p className="game-overline">Viajes</p>
@@ -434,7 +448,7 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
  * inspeccionar, a dónde se puede viajar, y el resto de acciones. Cada oferta
  * sale una sola vez y con su mismo testid, así que la caja de texto libre
  * queda para las órdenes creativas. */
-function SceneSection({ view, disabled, clockPulse, onOffer }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+function SceneSection({ view, disabled, clockPulse, onOffer, onOpenLab }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void }) {
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   const grouped = groupOffers(view.offers);
   return <section className="game-scene" aria-labelledby="scene-heading">
@@ -443,7 +457,7 @@ function SceneSection({ view, disabled, clockPulse, onOffer }: { view: PlayerVie
     <div className="game-scene-caption"><div><p className="game-overline">{view.position.city.name}</p><h2 id="scene-heading">{view.position.location.name}</h2></div>{clockPulse && <SceneHourglass delta={clockPulse.delta} animKey={clockPulse.key} />}</div>
     <p className="game-scene-description">{view.position.location.description}</p>
     <SceneMeta view={view} />
-    <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} />
+    <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} onOpenLab={onOpenLab} />
   </section>;
 }
 
@@ -718,7 +732,7 @@ function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void
  * salen de `resumeSummary` (vista del jugador + estado del motor). */
 function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boolean; onDismiss: () => void }) {
   if (!open) return null;
-  const summary = resumeSummary(view, lookupFromView(view), discoveryText);
+  const summary = resumeSummary(view, lookupFromView(view), (id, lookup) => discoveryText(id, lookup, textsFromView(view)));
   return <section className="game-briefing" data-testid="resume-panel" aria-label="Resumen al retomar">
     <p className="game-overline">Resumen al retomar</p>
     <h2>Así quedó la investigación</h2>
@@ -752,7 +766,8 @@ function DossierContent({ view }: { view: PlayerViewDto }) {
     <h4>Hallazgos</h4>
     {view.dossier.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin hallazgos todavía.</p></div>
-      : view.dossier.map((entry, index) => <article key={index} className="game-evidence-card"><span className="game-evidence-kind">Hallazgo</span><p>{discoveryText(entry, lookup)}</p></article>)}
+      : view.dossier.map((entry, index) => <article key={index} className="game-evidence-card"><span className="game-evidence-kind">Hallazgo</span><p>{discoveryText(entry, lookup, textsFromView(view))}</p></article>)}
+    <p className="game-panel-note">Nota de procedimiento: la ausencia de registro no demuestra inocencia.</p>
     <h4>Conversación registrada</h4>
     {view.conversation.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin conversaciones registradas.</p></div>
@@ -768,9 +783,10 @@ type ChatTurn = { from: 'you' | 'npc'; text: string };
  * partida y personaje; la memoria del servidor no se persiste (límite
  * documentado: al recargar la página la conversación sigue en esta pestaña,
  * pero una sesión nueva empieza de cero). */
-function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend }: {
+function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, placeholder, note }: {
   npc: { id: string; name: string } | null; view: PlayerViewDto; turns: ChatTurn[]; draft: string; busy: boolean; error: string;
   onDraft: (value: string) => void; onSend: (event: FormEvent) => void;
+  placeholder?: string; note?: string;
 }) {
   if (!npc) {
     return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span>
@@ -787,23 +803,51 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend }: 
     </ol>
     <form onSubmit={onSend} className="game-chat-form">
       <input type="text" data-testid="chat-input" value={draft} disabled={busy} maxLength={4000}
-        placeholder="Pregúntale por lo que sabe: su tarea, lo que vio…" aria-label="Pregunta para el personaje"
+        placeholder={placeholder ?? 'Pregúntale por lo que sabe: su tarea, lo que vio…'} aria-label="Pregunta para el personaje"
         onChange={event => onDraft(event.target.value)} />
       <button type="submit" data-testid="chat-send" disabled={!draft.trim() || busy}>{busy ? 'Preguntando…' : 'Preguntar'}</button>
     </form>
     {error && <p className="game-error" role="alert">{error}</p>}
-    <p className="game-panel-note">Hablar en persona no consume tiempo. Preguntar aquí tampoco: el reloj solo avanza al actuar.</p>
+    <p className="game-panel-note">{note ?? 'Hablar en persona no consume tiempo. Preguntar aquí tampoco: el reloj solo avanza al actuar.'}</p>
   </div>;
 }
 
-function LabContent({ view, contacts, recipient, channel, text, busy, onRecipient, onChannel, onText, onSend }: {
+function LabContent({ view, contacts, recipient, channel, text, busy, labOffers, disabled, onRecipient, onChannel, onText, onSend, onAnalyze, onOpenIntel }: {
   view: PlayerViewDto; contacts: Array<{ id: string; name: string }>; recipient: string; channel: string; text: string; busy: boolean;
+  labOffers: PublicActionOffer[]; disabled: boolean;
   onRecipient: (value: string) => void; onChannel: (value: string) => void; onText: (value: string) => void; onSend: (event: FormEvent) => void;
+  onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenIntel: () => void;
 }) {
+  // Un solo análisis por expediente: una solicitud de tipo análisis en
+  // curso es la de la oferta que se enseña, y su resultado es el hallazgo
+  // `analysis:<resultado>` del dossier.
+  const pendingAnalysis = view.pendingRequests.find(item => item.type === 'analysis');
+  const analysisResult = view.dossier.find(entry => entry.startsWith('analysis:'))?.slice('analysis:'.length);
   return <div>
+    <h4>Laboratorio forense</h4>
+    {labOffers.length === 0 && !analysisResult
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin pruebas para analizar. Recoge una prueba y el laboratorio ofrecerá el método que tenga sentido para ella.</p></div>
+      : <ul className="game-destination-list">{labOffers.map(offer => {
+        const inputId = typeof offer.action.params.evidenceId === 'string' ? offer.action.params.evidenceId : '';
+        const typeLabel = offer.forensicType && offer.forensicType in FORENSIC_TYPE_LABELS
+          ? FORENSIC_TYPE_LABELS[offer.forensicType as ForensicType]
+          : 'Análisis';
+        const evidence = view.evidenceTexts[inputId] ?? inputId;
+        return <li key={offer.id}><span><strong>{typeLabel}</strong><small>{evidence}{offer.detail ? ` · ${offer.detail}` : ''}</small></span>
+          {analysisResult
+            ? <span><small>Resultado: {view.evidenceTexts[analysisResult] ?? analysisResult}</small></span>
+            : pendingAnalysis
+              ? <span><small>En curso: responde en el minuto {pendingAnalysis.dueMinute} (ahora {view.clock.minute})</small></span>
+              : <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
+                onClick={event => onAnalyze(offer, event.currentTarget)}>Solicitar análisis</button></span>}
+        </li>;
+      })}</ul>}
+    {analysisResult && labOffers.length === 0 && <p>Resultado: {view.evidenceTexts[analysisResult] ?? analysisResult}</p>}
+    <p className="game-panel-note">Nota de procedimiento: la ausencia de registro no demuestra inocencia. Un análisis solo dice lo que la prueba permite decir.</p>
+    <p><button type="button" onClick={onOpenIntel}>Abrir la terminal de inteligencia</button></p>
     <h4>Solicitudes pendientes</h4>
     {view.pendingRequests.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin solicitudes pendientes. Los análisis tardan 90 min y las consultas 30 min de juego.</p></div>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin solicitudes pendientes. Las consultas tardan 30 min de juego; cada análisis indica su propio tiempo.</p></div>
       : <ul className="game-destination-list">{view.pendingRequests.map(item => <li key={item.id}><span><strong>{requestTypeLabels[item.type] ?? item.type}</strong><small>Responde en el minuto {item.dueMinute} (ahora {view.clock.minute})</small></span></li>)}</ul>}
     <h4>Contactar</h4>
     {contacts.length === 0
@@ -1271,6 +1315,14 @@ export function GameScreen() {
   const [chatDraft, setChatDraft] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState('');
+  // Terminal de inteligencia (GDD §11): misma forma que la conversación
+  // con un personaje, pero con la terminal como interlocutora y sus hechos
+  // autorizados (lo descubierto, los objetivos, el resumen y lo oído).
+  const [intelTurns, setIntelTurns] = useState<ChatTurn[]>([]);
+  const [intelMemory, setIntelMemory] = useState<unknown>(null);
+  const [intelDraft, setIntelDraft] = useState('');
+  const [intelBusy, setIntelBusy] = useState(false);
+  const [intelError, setIntelError] = useState('');
   // Lote 1 de jugabilidad: reloj de arena y animación de viaje (ver hook).
   const timeFeedback = useTimeFeedback();
 
@@ -1480,6 +1532,102 @@ export function GameScreen() {
       setChatError('La IA no responde. Tu pregunta queda registrada; inténtalo de nuevo.');
     } finally {
       setChatBusy(false);
+    }
+  }
+
+  /** Lo que la partida ha oído de los personajes: el conocimiento citado
+   * en las memorias de conversación guardadas en esta pestaña (cada turno
+   * guarda sus `factIds`). Solo eso entra en la terminal como «oído»: el
+   * conocimiento completo de un personaje no es del jugador hasta que el
+   * personaje lo dice. */
+  function heardIntelFacts(): Array<{ id: string; text: string }> {
+    if (!view || !runId) return [];
+    const heard: Array<{ id: string; text: string }> = [];
+    const seen = new Set<string>();
+    for (const entry of view.npcChat) {
+      const stored = loadStoredChat(`meridiano:chat:${runId}:${entry.id}`);
+      const memory = stored?.memory as { turns?: Array<{ factIds?: unknown }> } | null;
+      for (const turn of memory?.turns ?? []) {
+        if (!turn || typeof turn !== 'object' || !Array.isArray(turn.factIds)) continue;
+        for (const factId of turn.factIds) {
+          if (typeof factId !== 'string') continue;
+          const knowledge = entry.knowledge.find(item => item.id === factId);
+          if (knowledge && !seen.has(`${entry.id}:${factId}`)) {
+            seen.add(`${entry.id}:${factId}`);
+            heard.push({ id: `npc:${entry.id}:${factId}`, text: `${entry.name}: ${knowledge.text}` });
+          }
+        }
+      }
+    }
+    return heard;
+  }
+
+  /** Abre la terminal de inteligencia: recupera sus turnos y su memoria
+   * de esta pestaña o la inicia con su saludo. */
+  function openIntel() {
+    if (!runId) return;
+    const key = `meridiano:intel:${runId}`;
+    const stored = loadStoredChat(key);
+    if (stored) {
+      setIntelTurns(stored.turns);
+      setIntelMemory(stored.memory ?? null);
+    } else {
+      const turns: ChatTurn[] = [{ from: 'npc', text: INTEL_GREETING }];
+      const memory = { schemaVersion: 1, runId, npcId: INTEL_ID, treatment: 'neutral', turns: [] };
+      setIntelTurns(turns);
+      setIntelMemory(memory);
+      saveChat(key, turns, memory);
+    }
+    setIntelError('');
+    windows.open('intel', null);
+  }
+
+  /** Pregunta a la terminal: recupera los hechos autorizados que responden
+   * (determinista, sin modelo) y solo entonces llama al modelo para
+   * redactar lo recuperado. Sin hecho que respalde la respuesta, la
+   * terminal lo dice sin llamar al modelo y sin inventar nada. */
+  async function sendIntelMessage(event: FormEvent) {
+    event.preventDefault();
+    const text = intelDraft.trim();
+    if (!text || !runId || !identity || !view || intelBusy) return;
+    const turns: ChatTurn[] = [...intelTurns, { from: 'you', text }];
+    setIntelTurns(turns);
+    setIntelDraft('');
+    setIntelBusy(true);
+    setIntelError('');
+    const key = `meridiano:intel:${runId}`;
+    const memory = intelMemory ?? { schemaVersion: 1, runId, npcId: INTEL_ID, treatment: 'neutral', turns: [] };
+    const facts = buildIntelFacts({
+      dossier: view.dossier,
+      objectives: view.objectives,
+      briefing: view.briefing,
+      heard: heardIntelFacts(),
+      textForDiscovery: id => discoveryText(id, lookupFromView(view), textsFromView(view)),
+    });
+    const selected = selectIntelFacts(text, facts);
+    if (selected.length === 0) {
+      const next: ChatTurn[] = [...turns, { from: 'npc', text: INTEL_NO_RECORD }];
+      setIntelTurns(next);
+      setIntelMemory(memory);
+      saveChat(key, next, memory);
+      setIntelBusy(false);
+      return;
+    }
+    const controller = new AbortController();
+    try {
+      const factIds = selected.map(fact => fact.id);
+      const result = await aiApi.converse({ runId, text,
+        npc: { id: INTEL_ID, name: INTEL_NAME, persona: INTEL_PERSONA, knownFactIds: factIds, revealableFactIds: factIds, refusal: INTEL_REFUSAL },
+        facts: selected, memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
+      controller.signal, { csrfToken: identity.csrfToken });
+      const next: ChatTurn[] = [...turns, { from: 'npc', text: result.narrative.text }];
+      setIntelTurns(next);
+      setIntelMemory(result.memory);
+      saveChat(key, next, result.memory);
+    } catch {
+      setIntelError('La terminal no responde. Tu pregunta queda registrada; inténtalo de nuevo.');
+    } finally {
+      setIntelBusy(false);
     }
   }
 
@@ -1696,7 +1844,7 @@ export function GameScreen() {
     </div>
 
     <ObjectivesSection view={view} />
-    <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
+    <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} onOpenLab={() => windows.open('lab', null)} />
     <ConsoleSection log={log} orderHistory={orderHistory} />
     <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
       onDraft={setDraft} onSubmit={interpretOrder} onKeyDown={onOrderKeyDown} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
@@ -1717,7 +1865,9 @@ export function GameScreen() {
     </GameWindow>
     <GameWindow id="lab" title="Laboratorio y comunicaciones" state={windows.windows.lab} {...windowProps}>
       <LabContent view={view} contacts={contacts} recipient={commRecipient} channel={commChannel} text={commText} busy={busy}
-        onRecipient={setCommRecipient} onChannel={setCommChannel} onText={setCommText} onSend={sendCommunication} />
+        labOffers={groupOffers(view.offers).lab} disabled={busy}
+        onRecipient={setCommRecipient} onChannel={setCommChannel} onText={setCommText} onSend={sendCommunication}
+        onAnalyze={(offer, trigger) => void startPreview(offer, trigger)} onOpenIntel={openIntel} />
     </GameWindow>
     <GameWindow id="saves" title="Guardados" state={windows.windows.saves} {...windowProps}>
       <SavesContent view={view} saves={saves} savePhase={savePhase} saveName={saveName} replaceTarget={replaceTarget} loadTarget={loadTarget}
@@ -1736,6 +1886,12 @@ export function GameScreen() {
     <GameWindow id="chat" title="Conversación" state={windows.windows.chat} {...windowProps}>
       <ChatContent npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
         onDraft={setChatDraft} onSend={event => void sendChatMessage(event)} />
+    </GameWindow>
+    <GameWindow id="intel" title="Terminal de inteligencia" state={windows.windows.intel} {...windowProps}>
+      <ChatContent npc={{ id: INTEL_ID, name: INTEL_NAME }} view={view} turns={intelTurns} draft={intelDraft} busy={intelBusy} error={intelError}
+        onDraft={setIntelDraft} onSend={event => void sendIntelMessage(event)}
+        placeholder="Pregunta por lo investigado: un sospechoso, una prueba, un lugar…"
+        note="La terminal solo responde con lo que consta en los registros de la partida. Sin registro, lo dice: la ausencia de registro no demuestra inocencia. Preguntar aquí no consume tiempo." />
     </GameWindow>
   </main>;
 }

@@ -3,7 +3,7 @@ import { startBatch, decideBatch } from './batch.js';
 import { materialMinutes, confirmation } from './timed-action.js';
 import { appendRequest, pendingEvidence } from './requests.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
-import { revealInspection, canCollect, revealTalk, queryRule, matureEvidence, revealEvidence } from './fixed-evidence.js';
+import { revealInspection, canCollect, revealTalk, queryRule, matureEvidence, revealEvidence, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
 import { generatedAnalysis, generatedQueryRule, generatedSuspect, matureGeneratedEvidence, revealGeneratedInspection, revealGeneratedTalk } from './generated-mechanics.js';
 import { requestWarrant, matureSelectedWarrant } from './warrants.js';
 export { canIssueWarrant, knownSuspect } from './warrants.js';
@@ -286,11 +286,12 @@ function queueEvidence(run: CaseRun, evidenceId: string, delay: number, method: 
 function requestAnalysis(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
   const generic = generatedAnalysis(def, run, action.params.evidenceId);
   if (generic) return queueEvidence(run, generic.resultEvidenceId, generic.delayMinutes, 'analyze');
-  if (!isFixedCase(def) || action.params.evidenceId !== 'EV-02' || !run.inventory.includes('EV-02')) {
+  if (!isFixedCase(def) || action.params.evidenceId !== FIXED_ANALYSIS_RULE.inputEvidenceId
+    || !run.inventory.includes(FIXED_ANALYSIS_RULE.inputEvidenceId)) {
     return { status: 'impossible', run, events: [], reason: 'Análisis no disponible.' };
   }
-  if (run.discoveries.includes('EV-03')) return { status: 'impossible', run, events: [], reason: 'Análisis ya disponible.' };
-  return queueEvidence(run, 'EV-03', 90, 'analyze');
+  if (run.discoveries.includes(FIXED_ANALYSIS_RULE.resultEvidenceId)) return { status: 'impossible', run, events: [], reason: 'Análisis ya disponible.' };
+  return queueEvidence(run, FIXED_ANALYSIS_RULE.resultEvidenceId, FIXED_ANALYSIS_RULE.delayMinutes, 'analyze');
 }
 
 function requestQuery(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {

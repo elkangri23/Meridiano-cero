@@ -81,7 +81,7 @@ export function generatedQueryRule(def: CaseDefinition, run: CaseRun, topicId: u
   return { ...rule, requires: [...rule.requires], reveals: [...(rule.reveals ?? [])] };
 }
 
-export function generatedAnalysis(def: CaseDefinition, run: CaseRun, evidenceId: unknown): { inputEvidenceId: string; resultEvidenceId: string; delayMinutes: number } | undefined {
+export function generatedAnalysis(def: CaseDefinition, run: CaseRun, evidenceId: unknown): MechanicsAnalysis | undefined {
   const mechanics = def.mechanics;
   if (!mechanics || typeof evidenceId !== 'string') return undefined;
   const rule = mechanics.analyses.find(entry => entry.inputEvidenceId === evidenceId);

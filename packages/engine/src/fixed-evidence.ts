@@ -1,6 +1,14 @@
 import { EngineStateError } from './state-error.js';
-import type { CaseDefinition, CaseRun, ScheduledResult } from '@meridiano/case-schema';
+import type { CaseDefinition, CaseRun, MechanicsAnalysis, ScheduledResult } from '@meridiano/case-schema';
 import { isFixedCase } from './fixed-case.js';
+
+/** Análisis del caso fijo: el residuo de herramienta de la cerradura
+ * (EV-02) se examina en el laboratorio como huella técnica y revela la
+ * compatibilidad con la serie HV-17 (EV-03). 90 min, como el resto de
+ * análisis. La huella técnica no acusa a nadie por sí sola (ver EV-03). */
+export const FIXED_ANALYSIS_RULE: MechanicsAnalysis = {
+  inputEvidenceId: 'EV-02', resultEvidenceId: 'EV-03', delayMinutes: 90, forensicType: 'huellas',
+};
 
 type QueryRule = { city: string; location: string; evidenceId: string; requires: readonly string[]; delayMinutes: number };
 const queries: Readonly<Record<string, QueryRule>> = {

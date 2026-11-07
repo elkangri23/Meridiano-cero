@@ -37,6 +37,19 @@ describe('ofertas disponibles (Fase A)', () => {
     expect(ids).not.toContain('request_warrant:ines');
   });
 
+  it('la oferta de análisis del caso fijo es de huellas, con su coste', () => {
+    const s = scenario();
+    s.step('inspect', { targetId: 'MAD-SALA' });
+    s.step('inspect', { targetId: 'MAD-SALA', elementId: 'cerradura' });
+    s.step('collect', { evidenceId: 'EV-02' });
+    const offer = availableOffers(astrolabioDefinition, s.read()).find(item => item.id === 'analyze:EV-02');
+    expect(offer).toBeDefined();
+    expect(offer?.forensicType).toBe('huellas');
+    expect(offer?.label).toContain('huellas');
+    expect(offer?.detail).toContain('90 min');
+    expect(offer?.action).toEqual({ type: 'analyze', params: { evidenceId: 'EV-02' } });
+  });
+
   it('tras inspeccionar la sala aparecen los elementos; tras la cerradura, recoger EV-02', () => {
     const s = scenario();
     s.step('inspect', { targetId: 'MAD-SALA' });

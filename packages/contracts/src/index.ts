@@ -438,6 +438,13 @@ export interface PlayerViewDto {
    * NpcChatEntry): la charla libre los usa para construir la petición
    * converse. Sin esta lista, la web solo conocía el catálogo fijo. */
   npcChat: NpcChatEntry[];
+  /** Texto legible de cada evidencia del expediente, por id. Sin esta
+   * lista la web traducía los hallazgos con el catálogo fijo del
+   * astrolabio y el dossier de un expediente generado enseñaba los textos
+   * del caso fijo. El laboratorio y la terminal de inteligencia usan estos
+   * mismos textos para mostrar resultados y responder solo con hechos
+   * autorizados. */
+  evidenceTexts: Record<string, string>;
   pendingRequests: Array<{ id: string; type: 'analysis' | 'query' | 'request'; dueMinute: number }>;
   warrants: string[];
   detentions: string[];
@@ -476,6 +483,8 @@ export interface PublicActionOffer {
   id: string;
   label: string;
   detail?: string;
+  /** Tipo forense del laboratorio, solo en ofertas de análisis (GDD §11). */
+  forensicType?: string;
   action: { type: string; params: Record<string, unknown> };
 }
 
@@ -661,9 +670,11 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 }
 function offerIdentity(record: Record<string, unknown>): boolean {
   const keys = Object.keys(record).sort().join(',');
-  if (keys !== 'action,id,label' && keys !== 'action,detail,id,label') return false;
+  if (keys !== 'action,id,label' && keys !== 'action,detail,id,label'
+    && keys !== 'action,forensicType,id,label' && keys !== 'action,detail,forensicType,id,label') return false;
   if (!boundedString(record.id, 128)) return false;
   if (!boundedString(record.label, 200)) return false;
+  if (record.forensicType !== undefined && !boundedString(record.forensicType, 32)) return false;
   return optionalBoundedString(record.detail, 200);
 }
 function offerAction(record: Record<string, unknown>): boolean {
@@ -723,12 +734,20 @@ function publicNpcChat(value: unknown): value is NpcChatEntry[] {
   return Array.isArray(value) && value.length <= 64 && value.every(publicNpcChatEntry) &&
     new Set(value.map(item => item.id)).size === value.length;
 }
+function publicEvidenceTexts(value: unknown): value is Record<string, string> {
+  if (!isPlainRecord(value)) return false;
+  const entries = Object.entries(value);
+  if (entries.length > 64) return false;
+  return entries.every(([key, text]) => boundedString(key, 128)
+    && typeof text === 'string' && text.length > 0 && text.length <= 2000);
+}
 function generalCollections(value: Record<string, unknown>): boolean {
   if (!publicObjects(value.objects) || !publicRequests(value.pendingRequests)) return false;
   if (!stringList(value.dossier, 1000, 128) || !stringList(value.conversation, 1000, 16000)) return false;
   if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
   if (!publicObjectives(value.objectives)) return false;
   if (!publicNpcChat(value.npcChat)) return false;
+  if (!publicEvidenceTexts(value.evidenceTexts)) return false;
   return publicOffers(value.offers);
 }
 function generalReports(value: Record<string, unknown>): boolean {
@@ -763,7 +782,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,finalReport,locations,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;
