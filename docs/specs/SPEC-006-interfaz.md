@@ -7,7 +7,7 @@ Fuentes: GDD §1–3,5,6,8–15; TAD §12. ACC-003/019/031.
 
 Pantalla principal: cabecera con detective, caso, ciudad, reloj/plazo; escenario central con descripción accesible; herramientas laterales; consola narrativa y campo de órdenes inferior. Diseño retro MS-DOS legible, sin depender de una fuente pixelada para textos largos.
 
-Paneles: mapa, dossier/maletín, laboratorio, comunicaciones, inteligencia, perfil/carrera, configuración y archivo. Ventanas movibles/minimizables en escritorio; en móvil se convierten en panel de ancho disponible con navegación clara. No reproducir ventanas fuera de pantalla; recuperar posición o restablecer distribución. Posición visual no determina acceso a datos.
+Paneles: mapa, dossier/maletín, laboratorio, comunicaciones, equipo A.C.M.E., inteligencia, perfil/carrera, configuración y archivo. Ventanas movibles/minimizables en escritorio; en móvil se convierten en panel de ancho disponible con navegación clara. No reproducir ventanas fuera de pantalla; recuperar posición o restablecer distribución. Posición visual no determina acceso a datos.
 
 Primer caso usa escenas/avatares provisionales identificados como tales en documentación del hito, no carteles técnicos en el flujo de juego. No exigir assets definitivos para validar motor.
 

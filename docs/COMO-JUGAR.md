@@ -35,6 +35,7 @@ No hay multijugador: cada partida pertenece a un único usuario propietario.
 - **Consultar:** pedir análisis al laboratorio (coste de tiempo).
 - **Ordenar:** solicitar mandamientos/órdenes con admisibilidad.
 - **Comunicar:** enviar mensajes al equipo (copia privada, acuse a +30 del reloj interno).
+- **Equipo A.C.M.E.:** pedir ayuda a Margaret, Richter, Elena, David o Clara. Pedir ayuda es gratis y queda registrado; lo que te responden es solo lo que ya consta en tu expediente (ver «Equipo A.C.M.E.» más abajo).
 - **Detener/Recuperar:** intervenciones con confirmación. Cada expediente fija su tipo de detención: en persona (15 min, hay que estar en la ciudad del sospechoso) o automática (30 min de coordinación: actúan las autoridades y no hace falta viajar). En ambos casos hace falta una orden válida y conocer la ubicación del sospechoso; en persona hay que conocer además su identidad (ver «Detenciones automáticas» más abajo).
 - **Acciones irregulares:** forzar un acceso, sobornar o suplantar. Cuestan 30 min cada una, siempre piden confirmación con los riesgos, y lo obtenido por esa vía no es admisible como prueba (ver «Acciones irregulares» más abajo).
 - **Cerrar:** finalizar el caso tras confirmación.
@@ -72,6 +73,15 @@ Cada expediente fija su tipo de detención al generarse (en el caso fijo, autom�
 - **Los testigos reaccionan:** los personajes de la ciudad del detenido —y el propio detenido— saben que ocurrió y pueden hablar de ello si les preguntas.
 - **Una detención errónea penaliza igual en ambos modos:** el informe final la valora como incorrecta (−20 puntos) y el resultado es «incorrecto».
 - **Las pruebas inadmisibles no sirven:** una orden pedida con pruebas obtenidas por una acción irregular se deniega al madurar, así que nunca puede sostener una detención, ni automática ni en persona.
+
+## Equipo A.C.M.E.
+
+Tu equipo recurrente (GDD §8) está en su propia ventana, «Equipo A.C.M.E.», desde la barra de herramientas. Son cinco: **Margaret Sullivan** (directora), **Dr. Samuel Richter** (laboratorio forense), **Elena Vázquez** (inteligencia), **David Nakamura** (viajes y detenciones) y **Clara Beaumont** (expedientes).
+
+- **Pedir ayuda no cuesta tiempo:** conversar y leer no avanzan el reloj. Lo que cuesta tiempo son las gestiones que ya existen: un análisis (90 min de espera), coordinar una detención (30 min) o enviar un documento (30 min).
+- **Margaret** te recuerda el encargo y tus objetivos con su estado. **Richter** te explica un análisis ya completado, solo con lo que la prueba permite decir. **Elena** consulta los registros de la partida como la terminal de inteligencia: sospechosos, pruebas, lugares; sin registro, lo dice y no inventa nada. **David** te enseña las rutas de viaje desde tu ciudad y coordina las detenciones (la detención en sí se pide desde aquí, con la misma oferta y confirmación que en la escena). **Clara** organiza tu expediente: pruebas con su admisibilidad, solicitudes pendientes, órdenes, detenciones y objetivos.
+- **El equipo nunca te dice si vas bien, ni señala al culpable ni sugiere la siguiente pista.** Sus respuestas son resúmenes de lo que ya consta en tu expediente: nada nuevo, solo ordenado. Si una pregunta no tiene respaldo en los registros, la respuesta es que no consta.
+- **Cada petición queda registrada** en la cronología y en el dossier (quién, qué servicio y en qué minuto), pero el texto libre de tu pregunta a Elena no se guarda.
 
 ## Errores y conexión
 

@@ -18,6 +18,7 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - **Guardado manual:** hasta 10 por partida; permite regresar a un punto anterior.
 - **Detención automática:** detención coordinada con las autoridades por orden de A.C.M.E., sin que el detective viaje a detener en persona. Cuesta 30 min y exige orden válida y ubicación conocida (la orden identifica al sospechoso).
 - **Detención en persona:** detención que hace el detective en la ciudad y el lugar del sospechoso. Cuesta 15 min y exige lo mismo que la automática, más conocer la identidad del sospechoso y la presencia.
+- **Equipo A.C.M.E.:** equipo recurrente de la agencia (Margaret Sullivan, Dr. Samuel Richter, Elena Vázquez, David Nakamura y Clara Beaumont). Pedirles ayuda es gratis y queda registrado; solo responden con lo que ya consta en el expediente, sin indicar si se va bien ni señalar al culpable.
 - **Primer resultado oficial:** primer cierre de caso que cuenta para carrera y reputación.
 - **Carrera / reputación:** progreso del detective; idempotente, sin duplicación por repeticiones.
 - **Archivo:** listado de partidas propias con filtros y paginación.
@@ -39,6 +40,7 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 13. Las acciones irregulares (forzar un acceso, sobornar, suplantar) cuestan 30 min, siempre piden confirmación con los riesgos, y lo obtenido por esa vía no es admisible como prueba. Solo te pueden ver los personajes de la misma ciudad; a la tercera vez que te ven, A.C.M.E. retira el caso. Cada acto descuenta 10 puntos en el informe final. Ninguna acción irregular revela la solución.
 14. Ninguna consecuencia reescribe la verdad del caso.
 15. Cada expediente fija su tipo de detención (en persona o automática) al generarse; la automática se coordina con las autoridades desde cualquier ciudad (30 min) y la en persona exige presencia (15 min). Ambas exigen orden válida y ubicación conocida; la en persona exige además conocer la identidad del sospechoso, y una detención errónea penaliza igual en el informe final. Ninguna detención ocurre sin que el jugador la pida.
+16. Pedir ayuda al equipo A.C.M.E. es gratis (0 min) y queda registrado en la cronología y en el dossier; el equipo solo responde con hechos autorizados del expediente y nunca revela la solución ni valora si se va bien.
 
 ## Costes y tiempos
 
@@ -49,6 +51,7 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - Consultas paralelas: +30 al reloj interno.
 - Acciones irregulares: +30 al reloj interno cada una.
 - Detención en persona: +15 al reloj interno; detención automática (coordinación con las autoridades): +30.
+- Pedir ayuda al equipo A.C.M.E.: gratis; las gestiones que ya existen (análisis, coordinar una detención, enviar un documento) mantienen su coste.
 
 ## FAQ
 
@@ -57,6 +60,12 @@ A.C.M.E. te advierte y los testigos dejan de cooperar contigo. A la tercera vez 
 
 **¿Qué es una detención automática?**
 En algunos expedientes (unas tres de cada diez, y en el caso fijo siempre), la detención no la haces tú en persona: la coordinas con las autoridades. Hace falta una orden válida y conocer la ubicación del sospechoso —la orden es la que lo identifica; en persona hay que conocer además su identidad— pero no tienes que viajar a la ciudad del sospechoso; cuesta 30 min de coordinación. La consola dice que actúan las autoridades, y una detención errónea penaliza igual que una manual.
+
+**¿Qué puedo pedirle al equipo A.C.M.E.?**
+A Margaret, que te recuerde el encargo y tus objetivos; a Richter, que te explique un análisis ya completado; a Elena, que consulte los registros de la partida; a David, las rutas de viaje y coordinar una detención; a Clara, que organice tu expediente. Pedir ayuda es gratis y queda registrado en el dossier.
+
+**¿El equipo me dice si voy bien?**
+No. Nunca indica si vas bien, ni señala al culpable ni sugiere la siguiente pista: solo resume lo que ya consta en tu expediente. Si preguntas por algo sin registro, te dice que no consta.
 
 **¿Puede una acción irregular resolver el caso?**
 No. Nunca revela la solución ni sustituye las pruebas: lo obtenido por esa vía no es admisible y no puede sostener una orden.
