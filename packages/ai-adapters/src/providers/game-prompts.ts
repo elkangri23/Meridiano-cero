@@ -54,7 +54,7 @@ CONVERSAR CON NPC
 Entrada: persona del NPC, hechos conocidos (cada uno con su id), fragmento de conversación (turnos con lo que preguntó el jugador y lo que respondió el personaje), trato recibido, actos de habla permitidos (allowedActs).
 Salida: JSON con { act, factIds, text }
 - act: un acto de habla de allowedActs. Solo existen estos cuatro: 'state', 'acknowledge', 'decline', 'silence'. No uses ningún otro.
-- 'state': la pregunta se responde con uno o varios hechos autorizados (la identidad del NPC, su tarea, lo que vio). factIds con los ids EXACTOS de esos hechos, copiados tal cual de la entrada. text debe ser cadena vacía: el servidor muestra los textos factuales autorizados, nunca texto libre del modelo sobre el caso.
+- 'state': la pregunta se responde con uno o varios hechos autorizados (la identidad del NPC, su tarea, lo que vio). factIds con los ids EXACTOS de esos hechos, copiados tal cual de la entrada. text es tu respuesta: 1-3 frases, en español, en primera persona y en la voz del personaje, que CONTESTE a la pregunta usando SOLO lo que dicen esos hechos. No copies los textos de los hechos literalmente: compón una respuesta natural con su contenido, sin añadir detalles que no estén en los hechos citados. Si te piden información sobre un tema, da la información que los hechos contienen, no te limites a decir que lo conoces. Si te preguntan si viste algo, di qué viste según tus hechos. Si te preguntan qué conoces, enumera tu conocimiento como una frase natural, no como una lista de temas.
 - 'acknowledge': la pregunta NO se puede responder con los hechos autorizados y NO pide declarar sobre el robo, acusar a nadie ni revelar hechos no autorizados. factIds debe ser []. text es tu respuesta: 1-3 frases, en español, en primera persona y en la voz del personaje. Si es charla ajena al caso (el tiempo, lo que vende, lo que sea), responde con naturalidad como lo haría ese personaje. Si es sobre el caso pero ningún hecho lo cubre, desvía en personaje sin inventar nada. Nunca inventes hechos del caso, mentiras ni acusaciones.
 - 'decline': SOLO cuando la pregunta pide declarar sobre el robo, acusar a alguien o revelar hechos que no están autorizados. factIds debe ser []. text debe ser cadena vacía: el servidor usa la negativa del personaje.
 - 'silence': SOLO cuando el personaje se niega a hablar en absoluto. factIds debe ser []. text debe ser cadena vacía.
@@ -130,32 +130,36 @@ function validateFactual(value: Record<string, unknown>): void {
   if (ids.length > 16 || ids.some(id => typeof id !== 'string')) throw new Error('INVALID_OUTPUT');
 }
 
-/** Longitud máxima de la respuesta escrita por el modelo en `acknowledge`
- * (1-3 frases en personaje): por encima es verborrea, no conversación. */
+/** Longitud máxima de la respuesta escrita por el modelo en `state` y
+ * `acknowledge` (1-3 frases en personaje): por encima es verborrea, no
+ * conversación. */
 export const MAX_CONVERSE_TEXT_LENGTH = 600;
 
 /** La conversación libre devuelve { act, factIds, text }: el texto es la
- * respuesta del NPC solo cuando el acto es `acknowledge` (charla o desvío
- * no probatorio, GDD §7: el LLM expresa conversaciones). Para `state` el
- * servidor muestra los textos factuales autorizados y para `decline` y
- * `silence` sus líneas fijas: el contrato no acepta texto probatorio libre
- * (CONVERSACIONES.md), así que el texto del modelo en esos actos se ignora
- * y no se valida su contenido, solo su longitud. Un `acknowledge` sin texto
- * no es una respuesta: es salida inválida. */
+ * respuesta del NPC escrita por el modelo cuando el acto es `state`
+ * (redacción natural de los hechos citados, GDD §7: el LLM expresa
+ * conversaciones; lo probatorio sigue siendo los factIds, que el servidor
+ * valida contra los hechos autorizados) o `acknowledge` (charla o desvío
+ * no probatorio). Para `decline` y `silence` valen sus líneas fijas: el
+ * contrato no acepta texto probatorio libre (CONVERSACIONES.md), así que
+ * el texto del modelo en esos actos se ignora y no se valida su contenido,
+ * solo su longitud. Un `state` o un `acknowledge` sin texto no es una
+ * respuesta: es salida inválida. */
 function validateConverse(value: Record<string, unknown>): void {
   exactKeys(value, ['act', 'factIds', 'text']);
   requireField(value, 'act', 'string');
   requireField(value, 'factIds', 'array');
-  // El texto puede ser vacío: el prompt pide `text: ''` en `state`,
-  // `decline` y `silence` (el servidor muestra sus textos fijos). Por eso
-  // no vale `requireField(..., 'string')`, que exige longitud > 0.
+  // El texto puede ser vacío: el prompt pide `text: ''` en `decline` y
+  // `silence` (el servidor muestra sus textos fijos). Por eso no vale
+  // `requireField(..., 'string')`, que exige longitud > 0. En `state` y
+  // `acknowledge` el texto es la respuesta y no puede ser vacío.
   if (typeof value.text !== 'string') throw new Error('INVALID_OUTPUT');
   if (!['state', 'acknowledge', 'decline', 'silence'].includes(value.act as string)) throw new Error('INVALID_OUTPUT');
   const ids = value.factIds as unknown[];
   if (ids.length > 16 || ids.some(id => typeof id !== 'string') || new Set(ids).size !== ids.length) throw new Error('INVALID_OUTPUT');
   const text = value.text as string;
   if (text.length > MAX_CONVERSE_TEXT_LENGTH) throw new Error('INVALID_OUTPUT');
-  if (value.act === 'acknowledge' && text.trim().length === 0) throw new Error('INVALID_OUTPUT');
+  if ((value.act === 'acknowledge' || value.act === 'state') && text.trim().length === 0) throw new Error('INVALID_OUTPUT');
 }
 
 /** Valida la forma mínima de la salida del modelo según la función.

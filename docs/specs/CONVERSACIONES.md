@@ -54,12 +54,14 @@ Las referencias a turnos anteriores usan turnId/factIds conocidos de esa rama. S
 
 ## Hechos, actos y renderizado
 
-El contrato actual de salida del modelo es {act,factIds}. No se acepta texto probatorio libre.
+El contrato actual de salida del modelo es {act,factIds,text}. No se acepta texto probatorio libre: el texto es la *expresión* de los hechos citados en factIds, nunca contenido probatorio nuevo. El servidor valida que los factIds sean hechos autorizados (conocidos y revelables por ese NPC en esa interacción) y acota el texto (1-3 frases, máx. 600 caracteres); lo probatorio sigue viniendo solo de los hechos autorizados, el modelo solo redacta y expresa (GDD §7, línea 69: «el LLM expresa conversaciones y descripciones sin alterar hechos»). La correspondencia entre texto y hechos citados se verifica con modelo real en el smoke de producción y en la verificación en navegador, no con una comprobación léxica del servidor: una respuesta de identidad («Soy Marcos, Comerciante.») es legítimamente idéntica a su hecho, así que el servidor no puede rechazar un texto por parecerse a un hecho.
+
+Enmienda 2026-11-07 (vuelta 2 de conversación natural): antes el servidor ignoraba el texto del modelo en `state` e imprimía los textos factuales verbatim; eso volcaba los temas de conocimiento enlatados en vez de contestar («¿viste algo?» → «Conozco el mercado… Conozco los traslados…»). Desde esta enmienda el modelo escribe también la respuesta de `state`, apoyada solo en los hechos citados. El respaldo ante fallo del proveedor sigue mostrando los textos factuales autorizados del servidor, no texto del modelo.
 
 | act | Condición | Texto final |
 |---|---|---|
-| state | Uno o más IDs únicos autorizados, máximo 16 | Textos factuales del servidor |
-| acknowledge | Ningún factId y acto permitido | Reconocimiento neutro, sin pistas |
+| state | Uno o más IDs únicos autorizados, máximo 16, y texto no vacío | Texto redactado por el modelo a partir de los hechos citados |
+| acknowledge | Ningún factId, acto permitido y texto no vacío | Charla o desvío en personaje, sin pistas |
 | decline | Ningún factId y negativa permitida | Negativa sin insinuar culpabilidad |
 | silence | Ningún factId y silencio permitido | Descripción neutra del silencio |
 | null | Solo resultado operativo del servicio, nunca propuesto por modelo | Error/cancelación; sin turno ficticio |

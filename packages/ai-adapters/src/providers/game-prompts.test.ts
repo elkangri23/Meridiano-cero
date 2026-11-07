@@ -39,14 +39,28 @@ describe('prompt de conversación', () => {
     expect(prompt).not.toContain('niégate, calla o desvía');
     expect(prompt).toMatch(/desvía en personaje \('acknowledge'\) sin inventar/s);
   });
+
+  it('en state el modelo escribe la respuesta, sin copiar los hechos literalmente', () => {
+    // Sin esta regla el servidor imprimía los textos factuales verbatim y
+    // Marcos volcaba sus dos temas enlatados («Conozco el mercado…»)
+    // en vez de contestar a «¿viste algo?» o a «Dame información sobre
+    // traslados…»: la respuesta era el tema, no una respuesta.
+    expect(prompt).toMatch(/'state'.*CONTESTE a la pregunta usando SOLO lo que dicen esos hechos/s);
+    expect(prompt).toMatch(/No copies los textos de los hechos literalmente/s);
+    expect(prompt).toMatch(/da la información que los hechos contienen, no te limites a decir que lo conoces/s);
+  });
 });
 
 describe('validación de salida de conversación', () => {
   it('acepta acknowledge con texto en personaje', () => {
     expect(() => validateGameOutput('converse', { act: 'acknowledge', factIds: [], text: 'Buenos días, hoy hace sol.' })).not.toThrow();
   });
-  it('acepta state sin texto (el servidor muestra los textos factuales)', () => {
-    expect(() => validateGameOutput('converse', { act: 'state', factIds: ['truth'], text: '' })).not.toThrow();
+  it('acepta state con texto redactado a partir de los hechos citados', () => {
+    expect(() => validateGameOutput('converse', { act: 'state', factIds: ['truth'], text: 'Sí, la recepción quedó registrada esta mañana.' })).not.toThrow();
+  });
+  it('rechaza state sin texto: en state el modelo escribe la respuesta', () => {
+    expect(() => validateGameOutput('converse', { act: 'state', factIds: ['truth'], text: '' })).toThrow('INVALID_OUTPUT');
+    expect(() => validateGameOutput('converse', { act: 'state', factIds: ['truth'], text: '   ' })).toThrow('INVALID_OUTPUT');
   });
   it('rechaza acknowledge sin texto, acto desconocido, campo extra y texto desmesurado', () => {
     for (const bad of [

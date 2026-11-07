@@ -47,11 +47,16 @@ export function createEvaluationMock(): AiProvider {
     const acts = request.context.allowedActs;
     const act = factIds.length ? 'state' : (Array.isArray(acts) ? acts.find(act => act !== 'state') : 'acknowledge');
     // La narración sigue con { act, factIds } y el director muestra los
-    // textos factuales; la conversación libre lleva además el texto, que
-    // solo se muestra en `acknowledge` (en `state` valen los textos
-    // factuales y en `silence` su línea fija, así que aquí basta '').
+    // textos factuales; la conversación libre lleva además el texto: en
+    // `state` el mock redacta con los textos de los hechos citados (el
+    // modelo real compone su propia respuesta a partir de ellos) y en
+    // `acknowledge` basta '' porque el acto no se alcanza con hechos.
+    // En `silence` su línea fija, así que aquí basta ''.
     if (request.operation === 'narrateResult') return { act, factIds };
-    return { act, factIds, text: '' };
+    const facts = Array.isArray(request.context.facts) ? request.context.facts.filter(record) : [];
+    const text = act === 'state'
+      ? facts.filter(fact => factIds.includes(fact.id as string)).map(fact => fact.text).join('\n') : '';
+    return { act, factIds, text };
   });
 }
 async function evaluateMemory(director: ReturnType<typeof createDirector>) {

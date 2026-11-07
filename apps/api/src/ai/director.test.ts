@@ -76,7 +76,7 @@ describe('Narración factual y fallos posteriores a la ejecución', () => {
 describe('Conocimiento y memoria NPC', () => {
   it('envía solo hechos conocidos y revelables y guarda solo selección autorizada', async () => {
     let captured: AiRequest | undefined;
-    const service = createDirector(createMockProvider(request => { captured = request; return { act: 'state', factIds: ['receipt'], text: '' }; }));
+    const service = createDirector(createMockProvider(request => { captured = request; return { act: 'state', factIds: ['receipt'], text: 'Sí, la recepción quedó registrada.' }; }));
     const input = conversation();
     const memory = remember(input.memory, ['hidden', 'receipt'], 'state');
     const result = await service.converse({ ...input, memory, facts: [...facts, { id: 'hidden', text: 'PRIVATE_SENTINEL' }] }, options);
@@ -84,8 +84,8 @@ describe('Conocimiento y memoria NPC', () => {
     expect(prompt).not.toContain('PRIVATE_SENTINEL');
     expect(prompt).not.toContain('hidden');
     expect(prompt).not.toContain('La caja está');
-    expect(result.narrative.text).toBe('La recepción fue registrada.');
-    expect(result.memory.turns.at(-1)).toEqual({ act: 'state', factIds: ['receipt'], you: '¿Qué consta en recepción?', npc: 'La recepción fue registrada.' });
+    expect(result.narrative.text).toBe('Sí, la recepción quedó registrada.');
+    expect(result.memory.turns.at(-1)).toEqual({ act: 'state', factIds: ['receipt'], you: '¿Qué consta en recepción?', npc: 'Sí, la recepción quedó registrada.' });
     expect(input.memory.turns).toEqual([]);
   });
   it('no revela hechos cuando el expediente solo permite negativa', async () => {
@@ -123,8 +123,8 @@ describe('Inés Valera responde desde lo que sabe y solo se niega a declarar', (
     return { runId: 'run-a', text, npc: ines, facts: inesFacts,
       memory: emptyMemory('run-a', 'ines'), allowedActs: ['state', 'acknowledge', 'decline', 'silence'] as const };
   }
-  it('una pregunta de identidad se responde con su hecho', async () => {
-    const result = await director({ act: 'state', factIds: ['truth'], text: '' })
+  it('una pregunta de identidad se responde con su hecho, redactado por el modelo', async () => {
+    const result = await director({ act: 'state', factIds: ['truth'], text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' })
       .converse(inesConversation('¿Cómo te llamas?'), options);
     expect(result.narrative).toMatchObject({ act: 'state', source: 'model', factIds: ['truth'] });
     expect(result.narrative.text).toBe('Soy Inés Valera, restauradora contratada para el traslado del astrolabio.');
@@ -223,7 +223,7 @@ describe('Permisos de conversación y cancelación tardía', () => {
   });
   it('restaura la memoria, conserva trato y retira hechos cuyo permiso ha cambiado', async () => {
     const initial = { ...emptyMemory('run-a', 'clerk'), treatment: 'hostile' as const };
-    const first = await director({ act: 'state', factIds: ['receipt'], text: '' }).converse({ ...conversation(), memory: initial }, options);
+    const first = await director({ act: 'state', factIds: ['receipt'], text: 'Sí, la recepción quedó registrada.' }).converse({ ...conversation(), memory: initial }, options);
     const memory = restoreMemory(JSON.parse(JSON.stringify(first.memory)), 'run-a', 'clerk');
     let captured: AiRequest | undefined;
     const service = createDirector(createMockProvider(request => { captured = request; return { act: 'silence', factIds: [], text: '' }; }));
@@ -231,7 +231,7 @@ describe('Permisos de conversación y cancelación tardía', () => {
       ...conversation(), text: '¿Recuerdas lo que dijiste?', memory,
       npc: { ...npc, revealableFactIds: [] }, allowedActs: ['silence'],
     }, options);
-    expect(captured?.context.memory).toEqual({ treatment: 'hostile', turns: [{ act: 'state', factIds: [], you: '¿Qué consta en recepción?', npc: 'La recepción fue registrada.' }] });
+    expect(captured?.context.memory).toEqual({ treatment: 'hostile', turns: [{ act: 'state', factIds: [], you: '¿Qué consta en recepción?', npc: 'Sí, la recepción quedó registrada.' }] });
     expect(captured?.context.facts).toEqual([]);
     expect(second.memory.treatment).toBe('hostile');
     expect(second.memory.turns).toHaveLength(2);
@@ -260,9 +260,15 @@ describe('Conversación natural: la charla la escribe el modelo, lo probatorio l
     expect(result.narrative.text).toBe('Buenos días, hoy hace sol.');
     expect(result.memory.turns.at(-1)).toEqual({ act: 'acknowledge', factIds: [], you: '¿Qué día hace hoy?', npc: 'Buenos días, hoy hace sol.' });
   });
-  it('state muestra los textos factuales autorizados, nunca texto libre del modelo', async () => {
-    const result = await director({ act: 'state', factIds: ['receipt'], text: 'El culpable es X, lo vi yo.' }).converse(conversation(), options);
+  it('state devuelve el texto escrito por el modelo, apoyado en los hechos citados', async () => {
+    const result = await director({ act: 'state', factIds: ['receipt'], text: 'Sí, la recepción quedó registrada esta mañana.' }).converse(conversation(), options);
     expect(result.narrative).toMatchObject({ act: 'state', source: 'model', factIds: ['receipt'] });
+    expect(result.narrative.text).toBe('Sí, la recepción quedó registrada esta mañana.');
+    expect(result.memory.turns.at(-1)).toEqual({ act: 'state', factIds: ['receipt'], you: '¿Qué consta en recepción?', npc: 'Sí, la recepción quedó registrada esta mañana.' });
+  });
+  it('state sin texto es salida inválida: el respaldo autorizado muestra los hechos, no texto del modelo', async () => {
+    const result = await director({ act: 'state', factIds: ['receipt'], text: '' }).converse(conversation(), options);
+    expect(result.narrative).toMatchObject({ act: 'state', source: 'fallback', factIds: ['receipt'] });
     expect(result.narrative.text).toBe('La recepción fue registrada.');
   });
   it('acknowledge sin texto es salida inválida y no escribe diálogo', async () => {
@@ -282,9 +288,9 @@ describe('Conversación natural: la charla la escribe el modelo, lo probatorio l
   it('el segundo turno ve lo ya dicho y no repite el hecho', async () => {
     let captured: AiRequest | undefined;
     const service = createDirector(createMockProvider(request => { captured = request; return { act: 'acknowledge', factIds: [], text: 'Hoy hace sol, sí.' }; }));
-    const first = await director({ act: 'state', factIds: ['receipt'], text: '' }).converse(conversation(), options);
+    const first = await director({ act: 'state', factIds: ['receipt'], text: 'Sí, la recepción quedó registrada.' }).converse(conversation(), options);
     await service.converse({ ...conversation(), text: '¿Qué día hace hoy?', memory: first.memory, facts: [], allowedActs: ['acknowledge'] }, options);
     const memory = (captured?.context as { memory?: { turns?: Array<{ act?: string; factIds?: string[]; you?: string; npc?: string }> } }).memory;
-    expect(memory?.turns?.at(-1)).toEqual({ act: 'state', factIds: [], you: '¿Qué consta en recepción?', npc: 'La recepción fue registrada.' });
+    expect(memory?.turns?.at(-1)).toEqual({ act: 'state', factIds: [], you: '¿Qué consta en recepción?', npc: 'Sí, la recepción quedó registrada.' });
   });
 });

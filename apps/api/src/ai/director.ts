@@ -39,29 +39,44 @@ function factSelection(value: unknown, facts: readonly PublicFact[], acts: reado
   return { act, factIds: [...value.factIds] };
 }
 /** Selección de conversación libre: como factSelection más el texto
- * escrito por el modelo. El texto solo se muestra cuando el acto es
- * `acknowledge` (charla o desvío no probatorio, GDD §7: el LLM expresa
- * conversaciones). Para `state` el servidor muestra los textos factuales
- * autorizados y para `decline`/`silence` sus líneas fijas: el contrato no
- * acepta texto probatorio libre (CONVERSACIONES.md), así que el texto del
- * modelo en esos actos se ignora y solo se acota su longitud. Un
- * `acknowledge` sin texto no es una respuesta. */
+ * escrito por el modelo. El texto se muestra cuando el acto es `state`
+ * (redacción natural de los hechos citados, GDD §7: el LLM expresa
+ * conversaciones; lo probatorio sigue siendo los factIds, validados
+ * contra los hechos autorizados) o `acknowledge` (charla o desvío no
+ * probatorio). Para `decline`/`silence` valen sus líneas fijas: el
+ * contrato no acepta texto probatorio libre (CONVERSACIONES.md), así que
+ * el texto del modelo en esos actos se ignora y solo se acota su
+ * longitud. Un `state` o un `acknowledge` sin texto no es una respuesta.
+ * El respaldo ante fallo del proveedor sigue mostrando los textos
+ * factuales autorizados (factualFallback), no texto del modelo. */
+function converseTextValid(act: SpeechAct, text: string): boolean {
+  if (act !== 'state' && act !== 'acknowledge') return true;
+  return text.trim().length > 0;
+}
+function converseFactIds(value: unknown, facts: readonly PublicFact[], act: SpeechAct): string[] | null {
+  if (!strings(value, 16)) return null;
+  if (new Set(value).size !== value.length) return null;
+  if (value.some(id => !facts.some(fact => fact.id === id))) return null;
+  if ((act === 'state') !== (value.length > 0)) return null;
+  return [...value];
+}
 function converseSelection(value: unknown, facts: readonly PublicFact[], acts: readonly SpeechAct[]) {
   if (!record(value) || !exactKeys(value, ['act', 'factIds', 'text'])) return null;
   if (typeof value.text !== 'string' || value.text.length > MAX_CONVERSE_TEXT_LENGTH) return null;
-  if (!strings(value.factIds, 16)) return null;
   const act = acts.find(item => item === value.act);
-  if (!act || new Set(value.factIds).size !== value.factIds.length) return null;
-  if (value.factIds.some(id => !facts.some(fact => fact.id === id))) return null;
-  if ((act === 'state') !== (value.factIds.length > 0)) return null;
-  if (act === 'acknowledge' && value.text.trim().length === 0) return null;
-  return { act, factIds: [...value.factIds], text: value.text };
+  if (!act) return null;
+  const factIds = converseFactIds(value.factIds, facts, act);
+  if (factIds === null || !converseTextValid(act, value.text)) return null;
+  return { act, factIds, text: value.text };
 }
 function render(facts: readonly PublicFact[], ids: readonly string[], act: SpeechAct): string {
   if (act === 'acknowledge') return 'He registrado tu consulta.';
   if (act === 'decline') return 'No puedo responder a esa consulta.';
   if (act === 'silence') return 'El interlocutor guarda silencio.';
   return facts.filter(fact => ids.includes(fact.id)).map(fact => fact.text).join('\n');
+}
+function showsModelText(act: SpeechAct): boolean {
+  return act === 'state' || act === 'acknowledge';
 }
 function errorCode(error: unknown, signal?: AbortSignal): AiErrorCode {
   if (signal?.aborted) return 'cancelled';
@@ -131,9 +146,11 @@ export function createDirector(provider: AiProvider) {
       }
       const selection = converseSelection(response.payload, facts, acts);
       if (!selection) throw new AiError('invalid_response');
-      // Solo `acknowledge` muestra texto del modelo (charla o desvío no
-      // probatorio); `state` muestra los textos factuales autorizados.
-      const text = selection.act === 'acknowledge'
+      // `state` y `acknowledge` muestran el texto escrito por el modelo
+      // (redacción de los hechos citados, o charla no probatoria);
+      // `decline` y `silence` muestran sus líneas fijas. narrateResult
+      // sigue siendo determinista: renderiza los textos factuales.
+      const text = showsModelText(selection.act)
         ? selection.text : render(facts, selection.factIds, selection.act);
       return { act: selection.act, factIds: selection.factIds, text, source: 'model' };
     } catch (error) {

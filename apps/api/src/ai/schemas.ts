@@ -18,10 +18,12 @@ export const factualSchema = {
 export const MAX_CONVERSE_TEXT_LENGTH = 600;
 
 /** Conversación libre: como factualSchema más el texto escrito por el
- * modelo, que solo se muestra cuando el acto es `acknowledge` (charla o
- * desvío no probatorio, 1-3 frases). Para `state` el servidor muestra los
- * textos factuales autorizados; para `decline` y `silence`, sus líneas
- * fijas (CONVERSACIONES.md: no se acepta texto probatorio libre). */
+ * modelo, que se muestra cuando el acto es `state` (redacción natural de
+ * los hechos citados, GDD §7) o `acknowledge` (charla o desvío no
+ * probatorio, 1-3 frases). Para `decline` y `silence`, sus líneas fijas
+ * (CONVERSACIONES.md: no se acepta texto probatorio libre; lo probatorio
+ * sigue siendo los factIds, que el servidor valida). El respaldo ante
+ * fallo del proveedor sigue mostrando los textos factuales autorizados. */
 export const converseSchema = {
   type: 'object', additionalProperties: false, required: ['act', 'factIds', 'text'],
   properties: {
