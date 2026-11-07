@@ -12,6 +12,7 @@ import type { AppConfig } from './config.ts';
 import type { Database } from './database/connection.ts';
 import { createReadiness } from './database/readiness.ts';
 import { registerLocalAuth } from './auth/routes.ts';
+import { registerDetectiveProfile } from './auth/profile-routes.ts';
 import { registerPublicAuth } from './auth/public-auth.ts';
 import type { Mailer } from './auth/mailer.ts';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -56,6 +57,7 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
       return reply.code(available ? 200 : 503).send({ status: available ? 'ready' : 'not_ready' });
     });
     registerLocalAuth(app, options.config, options.database);
+    registerDetectiveProfile(app, options.config, options.database);
     // Registro público solo cuando la configuración lo activa (producción).
     // La sesión local de desarrollo no se registra en producción porque
     // config.localAuth es false allí (fail-closed en config.ts).
