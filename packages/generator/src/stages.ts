@@ -771,6 +771,13 @@ function checkRoutesDistinct(output: Record<string, unknown>, errors: string[]):
   if (shared.length > 0) {
     errors.push(`Las dos rutas piden la orden con las mismas evidencias (${shared.join(', ')}): la ruta alternativa debe usar otra combinación de orden, sin compartir evidencias con la dorada.`);
   }
+  // EV-11 es el objeto de la recuperación, no una evidencia de orden: si
+  // va en una request_warrant, la orden se concede (la selección cubre la
+  // combinación) pero la recuperación falla después por falta de acceso.
+  // Decirlo aquí evita que la reparación adivine otra combinación.
+  if (golden.includes('EV-11') || alternative.includes('EV-11')) {
+    errors.push('EV-11 va en una request_warrant: EV-11 es el objeto de la recuperación y NUNCA va en una orden; quítala de evidenceIds y usa solo evidencias de la combinación (EV-01..EV-10).');
+  }
 }
 
 function validateClueWorld(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {

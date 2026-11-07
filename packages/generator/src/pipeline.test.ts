@@ -1223,6 +1223,17 @@ describe('puerta de varias rutas (GDD §4/§18)', () => {
     expect(result.errors.some(error => error.includes('mismas evidencias'))).toBe(true);
   });
 
+  it('la etapa 4b rechaza EV-11 en una orden', () => {
+    const { outputs, base } = stage4bFixture();
+    const rules = structuredClone(outputs.cluesRules) as unknown as { alternativePath: Array<{ type: string; params: Record<string, unknown> }> };
+    const warrant = rules.alternativePath.find(action => action.type === 'request_warrant');
+    if (!warrant) throw new Error('Sin orden en la ruta alternativa del doble.');
+    warrant.params = { ...warrant.params, evidenceIds: [...(warrant.params.evidenceIds as string[]), 'EV-11'] };
+    const result = validateStagePart('b', rules, { ...base, arrestType: 'interactive' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(error => error.includes('EV-11'))).toBe(true);
+  });
+
   it('la etapa 4b rechaza una alternativa sin detención', () => {
     const { outputs, base } = stage4bFixture();
     const rules = structuredClone(outputs.cluesRules) as Record<string, unknown>;
