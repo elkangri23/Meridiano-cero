@@ -83,6 +83,8 @@ Todos maduran a +30 minutos. Hablar con Lucía sobre topicId=caja revela EV-09 s
 
 Solicitar orden requiere evidenceIds explícitos. Inés: EV-03/04 o EV-06/07/08; Tomás: EV-09/10. La orden de acceso exige además EV-05 u EV-08 incluida en esa selección, conocida y admisible. Se distingue prueba poseída de prueba ofrecida al juzgado.
 
+Las dos rutas del caso fijo (A técnica con la combinación EV-03/04 y EV-05 como acceso; B documental con EV-06/07/08) son el modelo de referencia para la puerta de varias rutas del generador (SPEC-007, «Varias rutas»): cada ruta completa el caso por su propia cadena, sin las evidencias exclusivas de la otra.
+
 Las simulaciones actuales encadenan ambas rutas sin insertar pistas en CaseRun, incluso eliminando las evidencias exclusivas de la otra ruta. Esto verifica obtención, solicitudes, autoridad y desenlace, **no cierra ACC-008/009**: todavía faltan los costes materiales y confirmaciones de esta spec. Los 470/500 minutos y máximos de retraso anteriores siguen siendo objetivos, no duraciones acreditadas por v3. Las semillas sintéticas ensayadas no sustituyen el ensayo de todos los extremos del retraso. [Resultados y límites](../quality/T2-evidencias-ordenes-v3.md).
 
 ## Verificación de costes en ejecución v4
