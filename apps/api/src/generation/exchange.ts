@@ -6,7 +6,7 @@
 // La IA no viaja en el fichero: el expediente es autocontenido y cada
 // jugador pone su propio proveedor (configuración por usuario).
 import { randomBytes } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { validateCaseDefinition, crimeAllowedForRating, GDD_CRIME_TYPES, type CaseDefinition } from '@meridiano/case-schema';
 import { hashDefinition } from '@meridiano/case-schema/server';
 import { createExport, validateImport, type CaseExport } from '@meridiano/generator';
@@ -158,6 +158,11 @@ async function resolveImportTarget(orm: Orm, ownerId: string, typed: CaseDefinit
   if (found && found.createdBy === ownerId && found.definitionHash === definitionHash) {
     return { caseId: found.caseId, title: found.title };
   }
+  // Reimportar la misma copia (título distinto, id reasignado en la
+  // primera importación): el catálogo ya tiene esa definición con otro
+  // identificador; no duplicar.
+  const ownCopy = await findOwnImportedCopy(orm, ownerId, typed);
+  if (ownCopy) return ownCopy;
   if (found) {
     const freshId = `importado-${randomBytes(4).toString('hex')}`;
     warnings.push(`El identificador ${typed.id} ya existe en el catálogo; se ha importado como ${freshId}.`);
@@ -167,6 +172,25 @@ async function resolveImportTarget(orm: Orm, ownerId: string, typed: CaseDefinit
     const freshId = `importado-${randomBytes(4).toString('hex')}`;
     warnings.push(`El identificador ${typed.id} es el del expediente fijo; se ha importado como ${freshId}.`);
     typed.id = freshId;
+  }
+  return null;
+}
+
+/** Busca entre los expedientes importados por el usuario uno con la misma
+ * definición que el fichero, alineando el identificador: la copia
+ * importada guarda el contenido del fichero con un id reasignado, así que
+ * la huella se calcula con el id de cada fila candidata. Solo se miran las
+ * 50 importaciones más recientes; importar es raro y la cuota diaria es
+ * de 10. */
+async function findOwnImportedCopy(orm: Orm, ownerId: string, typed: CaseDefinition): Promise<{ caseId: string; title: string } | null> {
+  const rows = await orm.select({ caseId: generatedCases.caseId, title: generatedCases.title, definitionHash: generatedCases.definitionHash })
+    .from(generatedCases)
+    .where(and(eq(generatedCases.createdBy, ownerId), sql`${generatedCases.jobId} IS NULL`))
+    .orderBy(desc(generatedCases.createdAt)).limit(50);
+  for (const row of rows) {
+    if (hashDefinition({ ...typed, id: row.caseId }) === row.definitionHash) {
+      return { caseId: row.caseId, title: row.title };
+    }
   }
   return null;
 }
