@@ -97,6 +97,27 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(report).not.toContainText('obj-recuperar');
     await expect(report).not.toContainText('complete ·');
     await expect(report).not.toContainText('finished');
+    // Informe final completo (GDD §12): verdad, cronología, pruebas,
+    // detenciones y puntuación con su desglose.
+    await expect(report).toContainText('La verdad del caso');
+    await expect(report).toContainText('Responsable: Inés Valera');
+    await expect(report).toContainText('Objeto sustraído: el astrolabio original');
+    await expect(report).toContainText('El registro firmado asigna la herramienta HV-17 a Inés Valera.');
+    await expect(report).toContainText('Cronología');
+    await expect(report).toContainText('[min 10] Inspección en Sala de embalaje.');
+    await expect(report).toContainText('[min 455] La investigación ha concluido.');
+    await expect(report).toContainText('Pruebas halladas');
+    await expect(report).toContainText('La caja está a la vista. Su etiqueta remite al archivo de París.');
+    await expect(report).toContainText('Pruebas omitidas');
+    await expect(report).toContainText('La caja guarda una copia del manifiesto, con sello y firma verificables.');
+    await expect(report).toContainText('Detenciones');
+    await expect(report).toContainText('Inés Valera — correcta · con orden');
+    await expect(report).toContainText('Puntuación');
+    await expect(report).toContainText('Objetivos logrados: +50');
+    await expect(report).toContainText('Pruebas halladas: +14');
+    await expect(report).toContainText('Detención correcta: +15');
+    await expect(report).toContainText('Tiempo restante: +8');
+    await expect(report).toContainText('Total: 87 / 100');
     // La consola narró cada acción: recoger con su hallazgo (no el ID),
     // consultas y orden con su vencimiento, orden concedida, detención y cierre.
     const console = page.locator('.game-console');

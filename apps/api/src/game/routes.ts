@@ -14,6 +14,7 @@ import { GDD_CRIME_TYPES } from '@meridiano/case-schema';
 import type { ContentRating, CrimeType } from '@meridiano/contracts';
 import { commitAction, commitLoad } from './transitions.ts';
 import { playerViewDto } from './player-view.ts';
+import { loadRunTimeline } from './timeline.ts';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { manualSaves, operationRecords } from '../database/schema.ts';
 import type { CaseRun } from '@meridiano/case-schema';
@@ -284,7 +285,12 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     // (dificultad y plazo elegidos al crearla), no con los del catálogo.
     const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes);
     const manualCount = await available(() => saveCount(database, run.id));
-    return playerViewDto(definition, run, manualCount);
+    // La cronología del informe final solo existe en partidas cerradas: se
+    // reconstruye desde los registros de operaciones de la rama actual.
+    const timeline = run.status === 'closed'
+      ? await available(() => loadRunTimeline((sql, params) => database.pool.query(sql, params), run.id, run.branchId))
+      : [];
+    return playerViewDto(definition, run, manualCount, timeline);
   });
 
   // POST /api/v1/runs/:runId/action - Preview (confirm=false) o confirmación.

@@ -1,6 +1,6 @@
 import { hashDefinition } from '@meridiano/case-schema/server';
 import { describe, expect, it } from 'vitest';
-import { astrolabioDefinition, createInitialRun, projectToPlayerView } from './index.js';
+import { astrolabioDefinition, buildFinalReport, createInitialRun, projectToPlayerView } from './index.js';
 
 function example() {
   return createInitialRun(astrolabioDefinition, 'owner-synthetic', 'run-synthetic', hashDefinition(astrolabioDefinition));
@@ -25,7 +25,7 @@ describe('proyección pública antes de conectar HTTP', () => {
 
   it('no muestra un informe antiguo al restaurar una rama activa', () => {
     const run = example();
-    run.finalReport = { result: 'complete', objectivesAchieved: ['secret-objective'], reason: 'finished', minute: 50 };
+    run.finalReport = buildFinalReport(astrolabioDefinition, { ...run, detentions: ['ines'], recoveredObjects: ['astrolabio-original'] }, 'finished');
     expect(projectToPlayerView(astrolabioDefinition, run).finalReport).toBeNull();
   });
 
@@ -33,7 +33,7 @@ describe('proyección pública antes de conectar HTTP', () => {
     const run = example();
     run.status = 'closed';
     run.pendingRequests = [{ id: 'request-public', dueMinute: 300, type: 'analysis', payload: {} }];
-    run.finalReport = { result: 'complete', objectivesAchieved: ['objective-public'], reason: 'finished', minute: 50 };
+    run.finalReport = buildFinalReport(astrolabioDefinition, { ...run, detentions: ['ines'], recoveredObjects: ['astrolabio-original'] }, 'finished');
     Object.assign(run.finalReport, { privateMarker: 'SECRET_REPORT' });
     const before = structuredClone(run);
     const view = projectToPlayerView(astrolabioDefinition, run);

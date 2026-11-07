@@ -9,11 +9,11 @@ import { requestWarrant, matureSelectedWarrant } from './warrants.js';
 export { canIssueWarrant, knownSuspect } from './warrants.js';
 export { knowsEvidence } from './fixed-evidence.js';
 export { availableOffers } from './offers.js';
-export { liveObjectives } from './final-report.js';
+export { liveObjectives, completeFinalReport, scoreForReport, SCORE_MAX, buildFinalReport } from './final-report.js';
 export type { ActionOffer } from './offers.js';
 import { EngineStateError } from './state-error.js';
 export { EngineStateError } from './state-error.js';
-import { buildFinalReport } from './final-report.js';
+import { buildFinalReport, completeFinalReport } from './final-report.js';
 import { advanceMinute, hasExpired, seededDelay } from './clock.js';
 import type {
   CaseDefinition,
@@ -33,14 +33,8 @@ export type { Action, ActionType, ActionResult, EngineEvent, ActionPreview, Batc
 
 // ── Hash ──────────────────────────────────────────────────────────────────────
 
-function publicFinalReport(run: CaseRun): FinalReport | null {
-  if (run.status !== 'closed' || !run.finalReport) return null;
-  return {
-    result: run.finalReport.result,
-    objectivesAchieved: [...run.finalReport.objectivesAchieved],
-    reason: run.finalReport.reason,
-    minute: run.finalReport.minute,
-  };
+function publicFinalReport(def: CaseDefinition, run: CaseRun): FinalReport | null {
+  return completeFinalReport(def, run);
 }
 
 export function projectToPlayerView(def: CaseDefinition, run: CaseRun): PlayerView {
@@ -70,7 +64,7 @@ export function projectToPlayerView(def: CaseDefinition, run: CaseRun): PlayerVi
     pendingRequests: run.pendingRequests.map(request => ({ id: request.id, dueMinute: request.dueMinute })),
     warrants: [...run.warrants],
     detentions: [...run.detentions],
-    finalReport: publicFinalReport(run),
+    finalReport: publicFinalReport(def, run),
   };
 }
 

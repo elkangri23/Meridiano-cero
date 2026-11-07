@@ -4,21 +4,23 @@
 import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
 import { evidenceText } from '@meridiano/case-schema';
 import { isPublicBatchStep, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
-import { availableOffers, ENGINE_VERSION, liveObjectives, type EngineEvent } from '@meridiano/engine';
+import { availableOffers, completeFinalReport, ENGINE_VERSION, liveObjectives, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
 import { briefingForDefinition, metaForDefinition } from './catalog.ts';
 import { npcChatForDefinition } from './npc-chat.ts';
 
 type FullRun = StoredRun & CaseRun;
 
-export function publicFinalReport(run: CaseRun): FinalReport | null {
-  if (run.status !== 'closed' || !run.finalReport) return null;
-  return {
-    result: run.finalReport.result,
-    objectivesAchieved: [...run.finalReport.objectivesAchieved],
-    reason: run.finalReport.reason,
-    minute: run.finalReport.minute,
-  };
+export function publicFinalReport(definition: CaseDefinition, run: CaseRun, timeline: PublicEvent[] = []): FinalReport | null {
+  const report = completeFinalReport(definition, run);
+  if (!report) return null;
+  // La cronología no vive en el estado del motor: la API la reconstruye
+  // desde los registros de operaciones al proyectar una partida cerrada.
+  // La entrada del informe es FinalReportTimelineEntry (sin el id opaco
+  // del evento público): si se colara el id, el validador del cliente
+  // (isActionResponseDto) rechazaría la respuesta y la vista no se
+  // actualizaría al cerrar.
+  return { ...report, timeline: timeline.map(entry => ({ sequence: entry.sequence, minute: entry.minute, type: entry.type, summary: entry.summary })) };
 }
 
 type PublicBatchStep = NonNullable<PlayerViewDto['batch']>['steps'][number];
@@ -41,8 +43,10 @@ function batchSteps(raw: unknown): PlayerViewDto['batch'] {
   return { steps };
 }
 
-/** Vista completa de una partida v14. Para motores antiguos, usar initialPlayerView. */
-export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number): PlayerViewDto {
+/** Vista completa de una partida v14. Para motores antiguos, usar initialPlayerView.
+ * `timeline` es la cronología de la rama actual (registros de operaciones);
+ * solo se rellena en partidas cerradas, donde el informe final la enseña. */
+export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number, timeline: PublicEvent[] = []): PlayerViewDto {
   if (run.engineVersion !== ENGINE_VERSION) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
   const city = definition.cities.find(item => item.id === run.position.cityId);
   const location = definition.locations.find(item => item.id === run.position.locationId);
@@ -111,7 +115,7 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     warrants: [...run.warrants],
     detentions: [...run.detentions],
     batch: batchSteps(run.pendingBatch),
-    finalReport: publicFinalReport(run),
+    finalReport: publicFinalReport(definition, run, timeline),
     officialResult: null,
     objectives: definition.objectives.map(objective => ({
       id: objective.id,

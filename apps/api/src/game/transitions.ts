@@ -8,11 +8,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { confirmAction, ENGINE_VERSION, resolveAction, type Action, type ActionResult } from '@meridiano/engine';
 import type { CaseRun } from '@meridiano/case-schema';
-import { isIdempotencyKey, type ActionResponseDto, type SaveLoadResponseDto } from '@meridiano/contracts';
+import { isIdempotencyKey, type ActionResponseDto, type PublicEvent, type SaveLoadResponseDto } from '@meridiano/contracts';
 import type { Database } from '../database/connection.ts';
 import { assertRunShape, inSession, pureRun, runColumns, RunStoreError, type StoredRun } from './runs.ts';
 import { findDefinitionById, definitionForRun } from './catalog.ts';
 import { playerViewDto, projectEvents } from './player-view.ts';
+import { loadRunTimeline } from './timeline.ts';
 
 type FullRun = StoredRun & CaseRun;
 type Definition = Awaited<ReturnType<typeof findDefinitionById>>;
@@ -118,12 +119,25 @@ function previewActionResponse(definition: Definition, run: FullRun, manualCount
   return { ...toResponse(definition, run, manualCount, preview), requiresConfirmation: preview.status === 'confirmation_required' };
 }
 
-function replayActionResponse(definition: Definition, run: FullRun, manualCount: number, stored: StoredActionResult): ActionResponseDto {
-  const view = playerViewDto(definition, run, manualCount);
+/** Cronología de la rama actual para proyectar una partida cerrada: vacía
+ * mientras la partida sigue activa (el informe final no existe todavía). */
+async function closedRunTimeline(
+  query: (sql: string, params: unknown[]) => Promise<{ rows: Array<{ result_public: unknown }> }>,
+  run: FullRun,
+): Promise<PublicEvent[]> {
+  return run.status === 'closed' ? loadRunTimeline(query, run.id, run.branchId) : [];
+}
+
+function replayActionResponse(definition: Definition, run: FullRun, manualCount: number, stored: StoredActionResult, timeline: PublicEvent[] = []): ActionResponseDto {
+  const view = playerViewDto(definition, run, manualCount, timeline);
   const { outcome, events, operationId, report, pausedAt, reason } = stored;
+  // El informe que se enseña es el de la vista (completo y con cronología),
+  // no el guardado en el registro de la acción, que es el del motor sin
+  // cronología.
+  const fullReport = view.finalReport ?? report;
   return {
     ...view, outcome, events, operationId, replayed: true,
-    ...(report ? { report } : {}),
+    ...(fullReport ? { report: fullReport } : {}),
     ...(pausedAt !== undefined ? { pausedAt, reason } : {}),
   };
 }
@@ -136,11 +150,13 @@ function isNoTransition(result: ActionResult): result is Extract<ActionResult, {
 function appliedActionResponse(
   definition: Definition, newRun: FullRun, manualCount: number, result: AppliedResult,
   operationId: string, events: ActionResponseDto['events'], stored: StoredActionResult,
+  timeline: PublicEvent[] = [],
 ): ActionResponseDto {
-  const view = playerViewDto(definition, newRun, manualCount);
+  const view = playerViewDto(definition, newRun, manualCount, timeline);
+  const fullReport = view.finalReport ?? stored.report;
   return {
     ...view, outcome: result.status, events, operationId,
-    ...(stored.report ? { report: stored.report } : {}),
+    ...(fullReport ? { report: fullReport } : {}),
     ...(stored.pausedAt !== undefined ? { pausedAt: stored.pausedAt, reason: stored.reason } : {}),
   };
 }
@@ -168,7 +184,10 @@ export async function commitAction(
     // Replay por idempotencia ANTES de rechazar una revisión vieja (GUARDADOS.md).
     if (input.idempotencyKey) {
       const stored = await findActionReplay(client, runId, input.idempotencyKey, actionDigest(input.action, input.expectedVersion));
-      if (stored) return replayActionResponse(definition, run, manualCount, stored);
+      if (stored) {
+        const timeline = await closedRunTimeline((sql, params) => client.query(sql, params), run);
+        return replayActionResponse(definition, run, manualCount, stored, timeline);
+      }
     }
     if (input.expectedVersion !== undefined && input.expectedVersion !== run.revision) {
       throw new RunStoreError('VERSION_CONFLICT');
@@ -182,7 +201,10 @@ export async function commitAction(
     const { operationId, events, newRun, stored } = await persistAction(
       client, ownerId, run, definition, result,
       input.idempotencyKey ?? randomUUID(), actionDigest(input.action, input.expectedVersion));
-    return appliedActionResponse(definition, newRun, manualCount, result, operationId, events, stored);
+    // La cronología se carga tras persistir, así la acción de cierre ya
+    // está en los registros y el informe la incluye desde el primer momento.
+    const timeline = await closedRunTimeline((sql, params) => client.query(sql, params), newRun);
+    return appliedActionResponse(definition, newRun, manualCount, result, operationId, events, stored, timeline);
   });
 }
 

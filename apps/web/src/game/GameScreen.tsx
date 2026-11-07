@@ -1167,18 +1167,50 @@ function SettingsContent({ identity, textScale, highContrast, palette, onScale, 
   </div>;
 }
 
+// El informe final completo (GDD §12, REQ-G12-05/T2-05): resultado y motivo
+// en español, verdad completa, cronología, pruebas halladas y omitidas,
+// detenciones y puntuación con su desglose. El motor y la API ya resuelven
+// los identificadores a frases; la pantalla solo los enseña. Los objetivos
+// se resuelven con la descripción que trae la vista (en los casos generados
+// el catálogo fijo no los conoce y enseñaría el ID crudo).
+function ReportList({ items, empty }: { items: string[]; empty: string }) {
+  return items.length === 0
+    ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{empty}</p></div>
+    : <ul className="game-report-objectives">{items.map((item, index) => <li key={index}>{item}</li>)}</ul>;
+}
+
 function ReportContent({ view }: { view: PlayerViewDto }) {
   if (!view.finalReport) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>El informe final estará disponible al cerrar el caso.</p></div>;
-  // El motor devuelve el resultado, el motivo y los objetivos como
-  // identificadores en inglés; la pantalla los traduce a frases. La nota
-  // anterior prometía un «informe completo (verdad y omisiones)» que no
-  // existe (REQ-G12-05, T2-05, en curso): se retira para no prometerlo.
+  const report = view.finalReport;
+  const objectiveDescription = (id: string) =>
+    view.objectives.find(objective => objective.id === id)?.description ?? objectiveText(id);
   return <div>
-    <p className="game-report-result">Resultado: <strong>{reportResultText(view.finalReport.result)}</strong> · Motivo: {reportReasonText(view.finalReport.reason)} · Minuto: {view.finalReport.minute}</p>
+    <p className="game-report-result">Resultado: <strong>{reportResultText(report.result)}</strong> · Motivo: {reportReasonText(report.reason)} · Minuto: {report.minute}</p>
+    <h4>La verdad del caso</h4>
+    <p>Responsable: <strong>{report.truth.culpritName}</strong></p>
+    {report.truth.objectLabel && <p>Objeto sustraído: {report.truth.objectLabel}</p>}
+    <h4>Pruebas decisivas</h4>
+    <ReportList items={report.truth.keyEvidence.map(entry => entry.text)} empty="Sin pruebas decisivas registradas." />
+    {report.timeline.length > 0 && <>
+      <h4>Cronología</h4>
+      <ul className="game-report-objectives">{report.timeline.map(entry =>
+        <li key={entry.sequence}>[min {entry.minute}] {entry.summary}</li>)}</ul>
+    </>}
+    <h4>Pruebas halladas</h4>
+    <ReportList items={report.evidenceFound.map(entry => entry.text)} empty="No se halló ninguna prueba." />
+    <h4>Pruebas omitidas</h4>
+    <ReportList items={report.evidenceMissed.map(entry => entry.text)} empty="No quedó ninguna prueba por descubrir." />
+    <h4>Detenciones</h4>
+    <ReportList
+      items={report.detentions.map(detention =>
+        `${detention.suspectName} — ${detention.correct ? 'correcta' : 'errónea'}${detention.withWarrant ? ' · con orden' : ' · sin orden'}`)}
+      empty="No se detuvo a nadie." />
+    <h4>Puntuación</h4>
+    <ul className="game-report-objectives">{report.score.breakdown.map(entry =>
+      <li key={entry.label}>{entry.label}: {entry.points > 0 ? `+${entry.points}` : entry.points}</li>)}</ul>
+    <p>Total: <strong>{report.score.total} / {report.score.max}</strong></p>
     <h4>Objetivos logrados</h4>
-    {view.finalReport.objectivesAchieved.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Ningún objetivo registrado.</p></div>
-      : <ul className="game-report-objectives">{view.finalReport.objectivesAchieved.map((item, index) => <li key={index}>{objectiveText(item)}</li>)}</ul>}
+    <ReportList items={report.objectivesAchieved.map(objectiveDescription)} empty="Ningún objetivo registrado." />
   </div>;
 }
 

@@ -12,11 +12,48 @@ export interface PublicPendingRequest {
   dueMinute: number;
 }
 
+/** Prueba del informe final con su texto ya resuelto por el motor (desde el
+ * catálogo del expediente); la web no enseña identificadores crudos. */
+export interface FinalReportEvidenceEntry { id: string; text: string; }
+/** Entrada de la cronología del informe: minuto, tipo y resumen factual de
+ * la acción (la API la reconstruye desde los registros de operaciones). */
+export interface FinalReportTimelineEntry { sequence: number; minute: number; type: string; summary: string; }
+/** Detención del informe: quién, si era la persona responsable y si había
+ * orden válida contra ella. */
+export interface FinalReportDetention { suspectId: string; suspectName: string; correct: boolean; withWarrant: boolean; }
+/** Una línea de la puntuación: qué se valora y cuántos puntos aporta. */
+export interface FinalReportScoreEntry { label: string; points: number; }
+/** Puntuación del informe: total sobre el máximo, con su desglose visible.
+ * Las reglas viven en el motor (`scoreForReport`); la carrera sigue siendo
+ * un paso posterior (DEC-020) y no se alimenta de esta puntuación. */
+export interface FinalReportScore { total: number; max: number; breakdown: FinalReportScoreEntry[]; }
+/** La verdad completa del caso (GDD §12): quién es la persona responsable,
+ * qué objeto se sustrajo y qué pruebas lo demuestran. Solo usa lo que la
+ * definición del expediente establece; nada inventado. */
+export interface FinalReportTruth {
+  culpritId: string;
+  culpritName: string;
+  objectId: string | null;
+  objectLabel: string | null;
+  keyEvidence: FinalReportEvidenceEntry[];
+}
+
+/** Informe final completo (GDD §12): resultado, objetivos, motivo y minuto,
+ * más verdad completa, cronología, pruebas halladas y omitidas, detenciones
+ * y puntuación. El motor construye todas las secciones salvo la cronología,
+ * que la API rellena desde los registros de operaciones al proyectar una
+ * partida cerrada (el motor no tiene acceso a ese registro). */
 export interface FinalReport {
   result: 'complete' | 'partial' | 'incorrect' | 'unresolved';
   objectivesAchieved: string[];
   reason: 'finished' | 'deadline';
   minute: number;
+  truth: FinalReportTruth;
+  timeline: FinalReportTimelineEntry[];
+  evidenceFound: FinalReportEvidenceEntry[];
+  evidenceMissed: FinalReportEvidenceEntry[];
+  detentions: FinalReportDetention[];
+  score: FinalReportScore;
 }
 
 /** Delito de un expediente (GDD §3). Tres cosas distintas que no hay que
@@ -536,11 +573,64 @@ function publicBatch(value: unknown): value is PlayerViewDto['batch'] {
   if (!dtoRecord(value, 'steps') || !Array.isArray(value.steps) || value.steps.length > 8) return false;
   return value.steps.every(isPublicBatchStep);
 }
-function publicFinalReport(value: unknown): value is FinalReport {
-  if (!dtoRecord(value, 'minute,objectivesAchieved,reason,result')) return false;
+function publicReportText(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 2000;
+}
+function publicReportEvidence(value: unknown): value is FinalReportEvidenceEntry {
+  if (!dtoRecord(value, 'id,text')) return false;
+  return publicId(value.id) && publicReportText(value.text);
+}
+function publicReportEvidenceList(value: unknown): value is FinalReportEvidenceEntry[] {
+  return Array.isArray(value) && value.length <= 1000 && value.every(publicReportEvidence) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
+function publicReportTimelineEntry(value: unknown): value is FinalReportTimelineEntry {
+  if (!dtoRecord(value, 'minute,sequence,summary,type')) return false;
+  return nonNegativeInteger(value.sequence) && nonNegativeInteger(value.minute) &&
+    typeof value.type === 'string' && value.type.length > 0 && value.type.length <= 128 &&
+    publicReportText(value.summary);
+}
+function publicReportTimeline(value: unknown): value is FinalReportTimelineEntry[] {
+  return Array.isArray(value) && value.length <= 1000 && value.every(publicReportTimelineEntry) &&
+    new Set(value.map(item => item.sequence)).size === value.length;
+}
+function publicReportDetention(value: unknown): value is FinalReportDetention {
+  if (!dtoRecord(value, 'correct,suspectId,suspectName,withWarrant')) return false;
+  return publicId(value.suspectId) && boundedString(value.suspectName, 200) &&
+    typeof value.correct === 'boolean' && typeof value.withWarrant === 'boolean';
+}
+function publicReportDetentions(value: unknown): value is FinalReportDetention[] {
+  return Array.isArray(value) && value.length <= 64 && value.every(publicReportDetention) &&
+    new Set(value.map(item => item.suspectId)).size === value.length;
+}
+function publicReportScoreEntry(value: unknown): value is FinalReportScoreEntry {
+  if (!dtoRecord(value, 'label,points')) return false;
+  return boundedString(value.label, 200) && typeof value.points === 'number' &&
+    Number.isSafeInteger(value.points) && value.points >= -100 && value.points <= 100;
+}
+function publicReportScore(value: unknown): value is FinalReportScore {
+  if (!dtoRecord(value, 'breakdown,max,total')) return false;
+  return value.max === 100 && typeof value.total === 'number' && Number.isSafeInteger(value.total) &&
+    value.total >= 0 && value.total <= 100 && Array.isArray(value.breakdown) &&
+    value.breakdown.length <= 16 && value.breakdown.every(publicReportScoreEntry);
+}
+function publicReportTruth(value: unknown): value is FinalReportTruth {
+  if (!dtoRecord(value, 'culpritId,culpritName,keyEvidence,objectId,objectLabel')) return false;
+  return publicId(value.culpritId) && boundedString(value.culpritName, 200) &&
+    (value.objectId === null || publicId(value.objectId)) &&
+    (value.objectLabel === null || boundedString(value.objectLabel, 200)) &&
+    publicReportEvidenceList(value.keyEvidence);
+}
+function publicReportHead(value: Record<string, unknown>): boolean {
   return ['complete', 'partial', 'incorrect', 'unresolved'].includes(value.result as string) &&
     ['finished', 'deadline'].includes(value.reason as string) && nonNegativeInteger(value.minute) &&
     stringList(value.objectivesAchieved, 100, 128);
+}
+function publicFinalReport(value: unknown): value is FinalReport {
+  if (!dtoRecord(value, 'detentions,evidenceFound,evidenceMissed,minute,objectivesAchieved,reason,result,score,timeline,truth')) return false;
+  return publicReportHead(value) && publicReportTruth(value.truth) && publicReportTimeline(value.timeline) &&
+    publicReportEvidenceList(value.evidenceFound) && publicReportEvidenceList(value.evidenceMissed) &&
+    publicReportDetentions(value.detentions) && publicReportScore(value.score);
 }
 function generalClock(value: unknown): boolean {
   return dtoRecord(value, 'deadlineMinutes,minute') && nonNegativeInteger(value.minute) &&
