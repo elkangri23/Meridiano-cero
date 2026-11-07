@@ -48,27 +48,10 @@ function batchSteps(raw: unknown): PlayerViewDto['batch'] {
   return { steps };
 }
 
-/** Vista completa de una partida v14. Para motores antiguos, usar initialPlayerView.
- * `timeline` es la cronología de la rama actual (registros de operaciones);
- * solo se rellena en partidas cerradas, donde el informe final la enseña. */
-export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number, timeline: PublicEvent[] = []): PlayerViewDto {
-  if (run.engineVersion !== ENGINE_VERSION) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-  const city = definition.cities.find(item => item.id === run.position.cityId);
-  const location = definition.locations.find(item => item.id === run.position.locationId);
-  if (!city || !location || location.cityId !== city.id) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-
-  const visibleCities = definition.explorationMode === 'guided'
-    ? definition.cities
-    : run.discoveries.includes('map') ? definition.cities : [city];
-  // Objetivos en vivo (lote 2): la misma evaluación que el informe final,
-  // pero en esta revisión. La descripción es la del expediente; el estado
-  // sale de las detenciones y los objetos recuperados del motor.
-  const achievedObjectives = new Set(liveObjectives(definition, run));
-  const discoveredIds = new Set(run.discoveries);
-  const locations = definition.locations
-    .filter(item => item.id === location.id || discoveredIds.has(item.id))
-    .map(item => ({ id: item.id, name: item.name, description: item.description }));
-  const objects = run.inventory.flatMap(id => {
+/** Evidencias en poder del jugador, con su tipo, procedencia, minuto y
+ * admisibilidad: lo revelado por vía irregular figura como no admisible. */
+function viewObjects(definition: CaseDefinition, run: FullRun): PlayerViewDto['objects'] {
+  return run.inventory.flatMap(id => {
     const evidence = definition.evidence.find(item => item.id === id);
     if (!evidence) return [];
     const record = run.evidenceRecords?.[id];
@@ -83,6 +66,34 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
       admissible,
     }];
   });
+}
+
+/** Ciudades que la vista enseña: en modo guiado todas; en libre, solo la
+ * actual hasta que se descubre el mapa. */
+function visibleCitiesFor(definition: CaseDefinition, run: FullRun, city: CaseDefinition['cities'][number]): CaseDefinition['cities'] {
+  if (definition.explorationMode === 'guided') return definition.cities;
+  return run.discoveries.includes('map') ? definition.cities : [city];
+}
+
+/** Vista completa de una partida v14. Para motores antiguos, usar initialPlayerView.
+ * `timeline` es la cronología de la rama actual (registros de operaciones);
+ * solo se rellena en partidas cerradas, donde el informe final la enseña. */
+export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number, timeline: PublicEvent[] = []): PlayerViewDto {
+  if (run.engineVersion !== ENGINE_VERSION) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  const city = definition.cities.find(item => item.id === run.position.cityId);
+  const location = definition.locations.find(item => item.id === run.position.locationId);
+  if (!city || !location || location.cityId !== city.id) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+
+  const visibleCities = visibleCitiesFor(definition, run, city);
+  // Objetivos en vivo (lote 2): la misma evaluación que el informe final,
+  // pero en esta revisión. La descripción es la del expediente; el estado
+  // sale de las detenciones y los objetos recuperados del motor.
+  const achievedObjectives = new Set(liveObjectives(definition, run));
+  const discoveredIds = new Set(run.discoveries);
+  const locations = definition.locations
+    .filter(item => item.id === location.id || discoveredIds.has(item.id))
+    .map(item => ({ id: item.id, name: item.name, description: item.description }));
+  const objects = viewObjects(definition, run);
 
   return {
     schemaVersion: 1,
@@ -107,10 +118,13 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     // Historial de la central (GDD §10): ausente en partidas anteriores a
     // la central; se enseña vacío hasta el primer envío.
     communications: communicationsOf(run),
+    // Acciones irregulares (GDD §14): ausentes en partidas anteriores;
+    // se enseñan vacías hasta el primer acto.
+    misconduct: [...(run.misconduct ?? [])],
     // Datos de charla libre de cada personaje del expediente: sin ellos la
     // web solo conocía el catálogo fijo y un NPC generado llegaba al
     // director sin hechos ni persona.
-    npcChat: npcChatForDefinition(definition),
+    npcChat: npcChatForDefinition(definition, run),
     // Textos legibles de las evidencias del expediente, por id: sin ellos
     // la web traducía los hallazgos con el catálogo fijo y el dossier de
     // un expediente generado enseñaba los textos del astrolabio.
@@ -162,6 +176,20 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
 // Resumen factual sin spoilers: solo nombres que el jugador ya conoce (ciudades,
 // lugares, NPC y evidencias descubiertas) y magnitudes. El payload del motor no
 // se serializa: contiene factIds, reglas internas y resultados no autorizados.
+/** Verbo del acto irregular en la cronología, según su tipo. */
+function irregularKindLabel(kind: string): string {
+  if (kind === 'force_entry') return 'Forzaste el acceso a';
+  if (kind === 'bribe') return 'Sobornaste a';
+  if (kind === 'impersonate') return 'Suplantaste a alguien hablando con';
+  return 'Acción irregular contra';
+}
+
+/** Objetivo del acto por su nombre conocido (personaje o lugar), sin IDs. */
+function irregularTarget(definition: CaseDefinition, targetId: string): string {
+  return definition.npcs.find(item => item.id === targetId)?.name
+    ?? definition.locations.find(item => item.id === targetId)?.name ?? targetId;
+}
+
 type EventPayload = Record<string, unknown>;
 type EventNamer = (definition: CaseDefinition, payload: EventPayload) => string;
 const eventSummaries: Record<string, EventNamer> = {
@@ -221,6 +249,16 @@ const eventSummaries: Record<string, EventNamer> = {
     const npc = definition.npcs.find(item => item.id === payload.suspectId)?.name ?? String(payload.suspectId ?? '');
     return 'Detención de ' + npc + '.';
   },
+  irregular: (definition, payload) => {
+    // El acto queda en la cronología con su tipo y su objetivo; si te
+    // vieron, se dice (la advertencia está en el dossier). Sin spoilers:
+    // solo nombres que el jugador ya conoce.
+    const kindLabel = irregularKindLabel(String(payload.kind ?? ''));
+    const target = irregularTarget(definition, String(payload.targetId ?? ''));
+    const seen = Array.isArray(payload.seenBy) && payload.seenBy.length > 0;
+    return `${kindLabel} ${target}.` + (seen ? ' Te han visto.' : ' Nadie te ha visto.');
+  },
+  case_withdrawn: () => 'A.C.M.E. ha retirado el caso por tu conducta.',
   recover: () => 'Objeto original recuperado.',
   finish: () => 'La investigación ha concluido.',
   batch_paused: () => 'Lote en pausa: un paso no se pudo aplicar.',

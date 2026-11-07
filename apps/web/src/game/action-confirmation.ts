@@ -13,6 +13,7 @@ const IRREVERSIBLE_ACTION_TYPES: ReadonlySet<string> = new Set([
   'detain', // Una detención errónea deja el resultado en «incorrecto».
   'recover', // Recuperar el objeto original logra un objetivo.
   'request_warrant', // Compromete la evidencia conocida contra un sospechoso.
+  'irregular', // Queda registrado para siempre y puede acabar retirando el caso.
 ]);
 
 /** ¿Pide esta acción diálogo de confirmación? Irreversible, siempre; si no,

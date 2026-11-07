@@ -20,7 +20,7 @@ import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, discoveryText, FORENSIC_TYPE_LABELS, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
+import { caseLabel, conversationRecordText, discoveryText, FORENSIC_TYPE_LABELS, getNPC, IRREGULAR_KIND_TEXT, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
 import type { CaseTexts, DiscoveryLookup, ForensicType, PaletteMode } from '@meridiano/case-schema';
 import './game.css';
 
@@ -791,7 +791,7 @@ function DossierContent({ view }: { view: PlayerViewDto }) {
     <h4>Conversación registrada</h4>
     {view.conversation.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin conversaciones registradas.</p></div>
-      : <ul className="game-destination-list">{view.conversation.map((entry, index) => <li key={index}><span>{conversationRecordText(entry, npcName)}</span></li>)}</ul>}
+      : <ul className="game-destination-list">{view.conversation.map((entry, index) => <li key={index}><span>{conversationRecordText(entry, npcName, undefined, id => lookup.locationName(id))}</span></li>)}</ul>}
   </div>;
 }
 
@@ -1342,6 +1342,11 @@ function ReportContent({ view }: { view: PlayerViewDto }) {
       items={report.detentions.map(detention =>
         `${detention.suspectName} — ${detention.correct ? 'correcta' : 'errónea'}${detention.withWarrant ? ' · con orden' : ' · sin orden'}`)}
       empty="No se detuvo a nadie." />
+    <h4>Conducta irregular</h4>
+    <ReportList
+      items={(report.irregularActs ?? []).map(act =>
+        `${IRREGULAR_KIND_TEXT[act.kind] ?? act.kind} — ${act.targetName} · min ${act.minute}${act.seen ? ' · te vieron' : ' · nadie te vio'}`)}
+      empty="Sin acciones irregulares registradas." />
     <h4>Puntuación</h4>
     <ul className="game-report-objectives">{report.score.breakdown.map(entry =>
       <li key={entry.label}>{entry.label}: {entry.points > 0 ? `+${entry.points}` : entry.points}</li>)}</ul>

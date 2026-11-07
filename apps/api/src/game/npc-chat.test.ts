@@ -5,7 +5,8 @@
 // desde la definición del caso en curso.
 import { describe, expect, it } from 'vitest';
 import type { CaseDefinition } from '@meridiano/case-schema';
-import { astrolabioDefinition } from '@meridiano/engine';
+import { hashDefinition } from '@meridiano/case-schema/server';
+import { astrolabioDefinition, createInitialRun } from '@meridiano/engine';
 import { npcChatForDefinition } from './npc-chat.ts';
 
 function generatedDefinition(): CaseDefinition {
@@ -85,5 +86,27 @@ describe('datos de conversación de los NPC (npcChat)', () => {
     expect(lucia?.channels).toEqual(['email', 'fax']);
     const tomas = entries.find(entry => entry.id === 'tomas');
     expect(tomas?.channels).toEqual(['call', 'whatsapp', 'sms']);
+  });
+
+  it('con conducta irregular, cada personaje lleva solo lo que sabe de verdad', () => {
+    const run = createInitialRun(astrolabioDefinition, 'owner-1', '22222222-2222-4222-8222-222222222222',
+      hashDefinition(astrolabioDefinition));
+    const withMisconduct = { ...run, misconduct: [
+      { id: 'irr-1', kind: 'bribe' as const, targetId: 'lucia', minute: 30, seenBy: ['tomas'] },
+      { id: 'irr-2', kind: 'force_entry' as const, targetId: 'LIS-ALM', minute: 150, seenBy: ['marta', 'ines'] },
+    ] };
+    const entries = npcChatForDefinition(astrolabioDefinition, withMisconduct);
+    const lucia = entries.find(entry => entry.id === 'lucia');
+    expect(lucia?.knowledge).toContainEqual({ id: 'misconduct:irr-1', text: 'El detective intentó sobornarme en el minuto 30.' });
+    const tomas = entries.find(entry => entry.id === 'tomas');
+    expect(tomas?.knowledge).toContainEqual({ id: 'misconduct:irr-1', text: 'Vi al detective sobornar a Lucía en el minuto 30.' });
+    const marta = entries.find(entry => entry.id === 'marta');
+    expect(marta?.knowledge).toContainEqual({ id: 'misconduct:irr-2', text: 'Vi al detective forzar el acceso a Almacén de depósito en el minuto 150.' });
+    // Émile no sabe nada de esto: no estaba ni fue objetivo.
+    const emile = entries.find(entry => entry.id === 'emile');
+    expect(emile?.knowledge.some(fact => fact.id.startsWith('misconduct:'))).toBe(false);
+    // Sin partida no hay hechos de conducta.
+    expect(npcChatForDefinition(astrolabioDefinition).every(entry =>
+      entry.knowledge.every(fact => !fact.id.startsWith('misconduct:')))).toBe(true);
   });
 });

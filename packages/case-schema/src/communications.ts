@@ -3,7 +3,7 @@
 // usar con él; el resto no se ofrece ni se acepta.
 import { LEGACY_ASTROLABIO_ID } from './legacy-astrolabio.js';
 import { getNPC, REMOTE_CHANNELS, type CommunicationChannel, type RemoteChannel } from './npc-catalog.js';
-import type { CaseDefinition, CommunicationRecord, NPC } from './types.js';
+import type { CaseDefinition, CommunicationRecord, IrregularKind, MisconductRecord, NPC } from './types.js';
 
 export type { RemoteChannel };
 
@@ -109,4 +109,38 @@ export function isCommunicationRecord(value: unknown): value is CommunicationRec
   if (!communicationRecordIds(value)) return false;
   if (!communicationRecordTextFields(value) || !communicationRecordMinutes(value)) return false;
   return true;
+}
+
+// ── Acciones irregulares (GDD §14) ───────────────────────────────────────────
+
+/** Coste en minutos de una acción irregular: es un trámite con riesgo
+ * (GDD §9/§14), el mismo que enviar un documento o una consulta (30 min).
+ * El coste no es el castigo: las consecuencias (advertencia, cooperación,
+ * admisibilidad, retirada, puntuación) las aplica el motor. */
+export const IRREGULAR_MINUTES = 30;
+
+export const IRREGULAR_KINDS: readonly IrregularKind[] = ['force_entry', 'bribe', 'impersonate'];
+
+export function isIrregularKind(value: unknown): value is IrregularKind {
+  return typeof value === 'string' && (IRREGULAR_KINDS as readonly string[]).includes(value);
+}
+
+/** Validador de un registro de conducta irregular persistido (misma forma
+ * estricta que `isCommunicationRecord`): claves exactas, tipo válido,
+ * identificadores acotados, minuto no negativo y testigos sin duplicados. */
+/** Identificadores de expediente: letras, dígitos y `.` `_` `:` `-`,
+ * como los parámetros de acción del motor. */
+const IRREGULAR_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+
+function isIrregularId(value: unknown): value is string {
+  return typeof value === 'string' && IRREGULAR_ID.test(value);
+}
+
+export function isMisconductRecord(value: unknown): value is MisconductRecord {
+  if (!isRecord(value)) return false;
+  if (Object.keys(value).sort().join(',') !== 'id,kind,minute,seenBy,targetId') return false;
+  if (!isIrregularId(value.id) || !isIrregularKind(value.kind) || !isIrregularId(value.targetId)) return false;
+  if (!isNonNegativeInteger(value.minute)) return false;
+  if (!Array.isArray(value.seenBy) || value.seenBy.length > 64) return false;
+  return value.seenBy.every(isIrregularId) && new Set(value.seenBy).size === value.seenBy.length;
 }

@@ -35,6 +35,8 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 10. Hasta 10 guardados manuales por partida, además del autoguardado; no se borran automáticamente al alcanzar el límite.
 11. Cargar un guardado manual permite regresar a un punto anterior del mismo caso y probar otras decisiones.
 12. Los lotes admiten pausa, continuación confirmada y cancelación; el plazo interrumpe sin aplicar el resto ni efecto terminal.
+13. Las acciones irregulares (forzar un acceso, sobornar, suplantar) cuestan 30 min, siempre piden confirmación con los riesgos, y lo obtenido por esa vía no es admisible como prueba. Solo te pueden ver los personajes de la misma ciudad; a la tercera vez que te ven, A.C.M.E. retira el caso. Cada acto descuenta 10 puntos en el informe final. Ninguna acción irregular revela la solución.
+14. Ninguna consecuencia reescribe la verdad del caso.
 
 ## Costes y tiempos
 
@@ -43,8 +45,15 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - Comunicaciones al equipo: envío gratuito, acuse a +30 del reloj interno.
 - Laboratorio programado: +90 al reloj interno.
 - Consultas paralelas: +30 al reloj interno.
+- Acciones irregulares: +30 al reloj interno cada una.
 
 ## FAQ
+
+**¿Qué pasa si me ven en una acción irregular?**
+A.C.M.E. te advierte y los testigos dejan de cooperar contigo. A la tercera vez que te ven, retiran el caso y la partida se cierra. El informe final descuenta 10 puntos por acto.
+
+**¿Puede una acción irregular resolver el caso?**
+No. Nunca revela la solución ni sustituye las pruebas: lo obtenido por esa vía no es admisible y no puede sostener una orden.
 
 **¿Puedo jugar el mismo caso varias veces?**
 Sí. El primer resultado es el oficial; las repeticiones son práctica y no duplican recompensas.

@@ -36,6 +36,7 @@ No hay multijugador: cada partida pertenece a un único usuario propietario.
 - **Ordenar:** solicitar mandamientos/órdenes con admisibilidad.
 - **Comunicar:** enviar mensajes al equipo (copia privada, acuse a +30 del reloj interno).
 - **Detener/Recuperar:** intervenciones con confirmación.
+- **Acciones irregulares:** forzar un acceso, sobornar o suplantar. Cuestan 30 min cada una, siempre piden confirmación con los riesgos, y lo obtenido por esa vía no es admisible como prueba (ver «Acciones irregulares» más abajo).
 - **Cerrar:** finalizar el caso tras confirmación.
 
 ## Lotes (secuencias)
@@ -49,6 +50,17 @@ El plazo interrumpe el lote sin aplicar el resto ni efecto terminal; reanudar no
 - Hasta 10 guardados manuales por partida.
 - Cargar un guardado permite regresar a un punto anterior del mismo caso y probar otras decisiones.
 - El primer resultado oficial no se sustituye por cargas posteriores.
+
+## Acciones irregulares
+
+Puedes intentar forzar el acceso al lugar de recuperación cuando exige orden y no la tienes, o sobornar o suplantar a un personaje presente que aún tenga algo que contar. No son un atajo: nunca revelan la solución ni sustituyen las pruebas.
+
+- Cada acto cuesta **30 min** y siempre pide **confirmación**: antes de actuar verás quién puede verte y qué está en juego.
+- **Testigos:** solo te pueden ver los personajes que están en esa ciudad. Forzar un acceso lo ven los de la ciudad; sobornar lo ven los demás personajes de la ciudad; suplantar lo acaba descubriendo además la propia víctima.
+- **Si te ven:** A.C.M.E. te advierte (queda en el dossier) y los testigos dejan de cooperar contigo. A la **tercera vez que te ven, A.C.M.E. retira el caso** y la partida se cierra.
+- **Lo obtenido no es admisible:** lo que recuperes tras forzar el acceso y lo que te cuenten sobornado o suplantado no puede sostener una orden. El informe final descuenta **10 puntos por acto** y lista cada acto con su minuto y si te vieron.
+- Sobornar o suplantar revela exactamente lo que revelaría una conversación normal con ese personaje; si ya no coopera contigo, es la única vía para que te cuente lo que sabe (sin restaurar la cooperación).
+- «Entrar sin permiso» no tiene acción propia: no hay ubicaciones inaccesibles en los expedientes; el acceso restringido es el del lugar de recuperación y se fuerza con «Forzar el acceso».
 
 ## Errores y conexión
 

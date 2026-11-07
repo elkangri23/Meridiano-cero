@@ -111,6 +111,7 @@ describe('informe final completo (GDD §12)', () => {
         { label: 'Pruebas halladas', points: 25 },
         { label: 'Detención correcta', points: 15 },
         { label: 'Detenciones erróneas', points: 0 },
+        { label: 'Conducta irregular', points: 0 },
         { label: 'Tiempo restante', points: 8 },
       ],
     });
@@ -130,6 +131,7 @@ describe('informe final completo (GDD §12)', () => {
       { label: 'Pruebas halladas', points: 0 },
       { label: 'Detención correcta', points: 0 },
       { label: 'Detenciones erróneas', points: 0 },
+      { label: 'Conducta irregular', points: 0 },
       { label: 'Tiempo restante', points: 0 },
     ]);
   });

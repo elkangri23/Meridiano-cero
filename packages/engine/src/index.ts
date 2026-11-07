@@ -1,4 +1,5 @@
 import { submitCommunication, matureCommunication } from './communications.js';
+import { submitIrregular, irregularPreview } from './irregular.js';
 import { startBatch, decideBatch } from './batch.js';
 import { materialMinutes, confirmation } from './timed-action.js';
 import { appendRequest, pendingEvidence } from './requests.js';
@@ -8,6 +9,7 @@ import { generatedAnalysis, generatedQueryRule, generatedSuspect, matureGenerate
 import { requestWarrant, matureSelectedWarrant } from './warrants.js';
 export { canIssueWarrant, knownSuspect } from './warrants.js';
 export { knowsEvidence } from './fixed-evidence.js';
+export { misconductFactsForNpc } from './irregular.js';
 export { availableOffers } from './offers.js';
 export { liveObjectives, completeFinalReport, scoreForReport, SCORE_MAX, buildFinalReport } from './final-report.js';
 export type { ActionOffer } from './offers.js';
@@ -110,6 +112,14 @@ export function confirmAction(def: CaseDefinition, run: CaseRun, action: Action)
 }
 
 function previewAction(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  // La acción irregular siempre pide confirmación con los riesgos
+  // conocidos (testigos, advertencia, retirada): su descripción no es la
+  // genérica de `confirmation`, nombra quién puede verte y qué está en juego.
+  if (action.type === 'irregular') {
+    const preview = irregularPreview(def, run, action);
+    if (!preview) return { status: 'impossible', run, events: [], reason: 'Acción irregular no disponible.' };
+    return { status: 'confirmation_required', run, events: [], preview };
+  }
   const result = resolvePreview(def, run, action);
   requireTransitionVersion(run, result.run);
   if (result.status === 'impossible') return result;
@@ -431,6 +441,10 @@ function resolveCommunication(def: CaseDefinition, run: CaseRun, action: Action)
   return submitCommunication(def, run, action.params);
 }
 
+function resolveIrregular(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  return submitIrregular(def, run, action.params);
+}
+
 function detentionAuthorized(run: CaseRun, suspect: { id: string; cityId: string; locationId: string }, params: Record<string, unknown>): boolean {
   const known = run.discoveries.includes('identity:' + suspect.id) && run.discoveries.includes('location:' + suspect.id);
   const present = run.position.cityId === suspect.cityId && run.position.locationId === suspect.locationId;
@@ -506,6 +520,7 @@ const handlers: Readonly<Record<Action['type'], Handler>> = Object.freeze({
   request_warrant: (def, run, action) => requestWarrant(def, run, action.params),
   batch: resolveBatch, batch_decision: resolveBatchDecision, wait: resolveWait,
   communicate: resolveCommunication, detain: resolveDetention, recover: resolveRecovery, finish: resolveFinish,
+  irregular: resolveIrregular,
 });
 
 // ── Confirmación de acciones con coste ─────────────────────────────────────────
@@ -517,13 +532,20 @@ function confirmActionInternal(def: CaseDefinition, run: CaseRun, action: Action
     case 'analyze': return requestAnalysis(def, run, action);
     case 'inspect':
     case 'detain':
-    case 'recover': return applyMaterial(def, run, action);
+    case 'recover':
+    case 'irregular': return applyMaterial(def, run, action);
     // Enviar un documento avanza el reloj (trámite) antes de enviarlo;
     // escribir un mensaje no cuesta tiempo y va directo.
-    case 'communicate': return typeof action.params.documentId === 'string'
-      ? applyMaterial(def, run, action) : resolveActionInternal(def, run, action);
+    case 'communicate': return applyCommunication(def, run, action);
     default: return resolveActionInternal(def, run, action);
   }
+}
+
+/** Confirmar un envío de la central: el documento es un trámite con
+ * coste de tiempo; el mensaje va directo, sin avanzar el reloj. */
+function applyCommunication(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+  return typeof action.params.documentId === 'string'
+    ? applyMaterial(def, run, action) : resolveActionInternal(def, run, action);
 }
 
 function travelPosition(def: CaseDefinition, run: CaseRun, toCityId: string, expired: boolean): CaseRun['position'] {

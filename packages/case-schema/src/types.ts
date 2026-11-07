@@ -86,6 +86,21 @@ export interface CommunicationRecord {
   receivedMinute?: number;
 }
 
+/** Una acción irregular cometida por el jugador (GDD §14): forzar un
+ * acceso, sobornar o suplantar. `seenBy` son los personajes que pudieron
+ * verla (testigos con conocimiento plausible, nunca un detector
+ * omnisciente): vacío si nadie la vio. El registro nunca se borra; el
+ * informe final lo enseña y lo descuenta en la puntuación. */
+export type IrregularKind = 'force_entry' | 'bribe' | 'impersonate';
+
+export interface MisconductRecord {
+  id: string;
+  kind: IrregularKind;
+  targetId: string;
+  minute: number;
+  seenBy: string[];
+}
+
 /**
  * Mecánica declarativa de un expediente generado (T4-08). El motor del caso
  * fijo tiene esta misma mecánica hardcodeada en `fixed-evidence.ts`,
@@ -245,6 +260,10 @@ export interface CaseRun {
    * partidas anteriores a la central no lo traen y se comportan como si
    * estuviera vacío. */
   communications?: CommunicationRecord[];
+  /** Acciones irregulares cometidas en la partida (GDD §14). Opcional:
+   * las partidas anteriores no lo traen y se comportan como si estuviera
+   * vacío. */
+  misconduct?: MisconductRecord[];
   pendingRequests: ScheduledResult[];
   warrants: string[];
   detentions: string[];

@@ -71,6 +71,21 @@ describe('textos legibles del caso fijo', () => {
     expect(conversationRecordText('algo-raro', lookup.npcName)).toBe('algo-raro');
   });
 
+  it('los marcadores de conducta irregular se leen como frases, nunca como claves crudas', () => {
+    expect(discoveryText('forced-entry', lookup)).toBe('Acceso forzado: entraste sin permiso ni orden de acceso.');
+    expect(discoveryText('warning', lookup)).toContain('Advertencia de A.C.M.E.');
+    expect(discoveryText('warning', lookup)).toContain('retirarán el caso');
+    expect(conversationRecordText('irregular:force_entry:LIS-ALM@150', lookup.npcName, undefined, lookup.locationName))
+      .toBe('Forzaste el acceso a Almacén de depósito (min 150).');
+    expect(conversationRecordText('irregular:bribe:lucia@30', lookup.npcName)).toBe('Sobornaste a Lucía (min 30).');
+    expect(conversationRecordText('irregular:impersonate:tomas@60', lookup.npcName))
+      .toBe('Suplantaste a alguien hablando con Tomás Ríos (min 60).');
+    expect(conversationRecordText('warning:irr-1@150', lookup.npcName))
+      .toBe('Advertencia de A.C.M.E. (min 150): te han visto en una acción irregular.');
+    expect(conversationRecordText('irregular:bribe:desconocido@30', lookup.npcName))
+      .toBe('irregular:bribe:desconocido@30');
+  });
+
   it('solo Inés tiene negativa en personaje, y negarse no revela la solución', () => {
     expect(Object.keys(NPC_REFUSALS)).toEqual(['ines']);
     expect(npcRefusal('ines')).toBe('No voy a declarar sobre el robo.');
@@ -105,9 +120,10 @@ describe('textos legibles del caso fijo', () => {
     expect(reportResultText('partial')).toBe('parcial');
     expect(reportResultText('incorrect')).toBe('incorrecto');
     expect(reportResultText('unresolved')).toBe('sin resolver');
-    expect(Object.keys(REPORT_REASON_TEXT).sort()).toEqual(['deadline', 'finished']);
+    expect(Object.keys(REPORT_REASON_TEXT).sort()).toEqual(['deadline', 'finished', 'withdrawn']);
     expect(reportReasonText('finished')).toBe('finalizado');
     expect(reportReasonText('deadline')).toBe('plazo agotado');
+    expect(reportReasonText('withdrawn')).toBe('retirado por A.C.M.E.');
     expect(Object.keys(OBJECTIVE_TEXT).sort()).toEqual(['obj-detener', 'obj-recuperar']);
     expect(objectiveText('obj-detener')).toBe('Detener a Inés con orden válida');
     expect(objectiveText('obj-recuperar')).toBe('Recuperar el astrolabio original');

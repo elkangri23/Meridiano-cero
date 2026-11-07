@@ -23,6 +23,8 @@ Intentar forzar acceso, suplantar, sobornar o entrar sin permiso es una intenci�
 
 Consecuencias definidas por expediente: evidencia inadmisible, cooperación reducida, advertencia, pérdida de confianza, retirada del caso o suspensión de carrera. No hay salud, combate, lesiones controlables ni muerte permanente. Una suspensión no destruye guardados; su alcance/duración se fija en reglas de carrera y permite recuperación.
 
+Valores de playtest implementados (GDD §14, pendientes de calibración por SPEC-008): cada acto cuesta 30 min; ser visto es advertencia + cooperación de los testigos a 0; a la 3.ª vez que te ven, retirada del caso; el informe final descuenta 10 puntos por acto (línea «Conducta irregular» siempre en el desglose, también a 0). Lo revelado sobornando o suplantando se marca inadmisible; lo recuperado tras forzar el acceso ya era inadmisible por `recover`. La retirada cierra la partida con motivo `withdrawn` y sin puntos de tiempo restante.
+
 Preservar rutas alternativas aun con cooperación reducida, salvo pérdida legítima por plazo/retirada definida. Ninguna consecuencia reescribe la verdad.
 
 ## Guardado y archivo

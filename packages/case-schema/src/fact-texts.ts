@@ -81,6 +81,7 @@ export const REPORT_RESULT_TEXT: Record<string, string> = {
 export const REPORT_REASON_TEXT: Record<string, string> = {
   finished: 'finalizado',
   deadline: 'plazo agotado',
+  withdrawn: 'retirado por A.C.M.E.',
 };
 
 /** Frase de un resultado del informe final. */
@@ -92,6 +93,13 @@ export function reportResultText(result: string): string {
 export function reportReasonText(reason: string): string {
   return REPORT_REASON_TEXT[reason] ?? reason;
 }
+
+/** Etiqueta legible de cada tipo de acción irregular (GDD §14). */
+export const IRREGULAR_KIND_TEXT: Record<string, string> = {
+  force_entry: 'Acceso forzado',
+  bribe: 'Soborno',
+  impersonate: 'Suplantación',
+};
 
 /** Objetivos del caso fijo, como frases: la descripción es la que trae la
  * definición del expediente (nada inventado). Un identificador desconocido
@@ -262,6 +270,14 @@ function travelDiscovery(id: string, lookup: DiscoveryLookup): string | undefine
 
 /** Frase para un marcador del motor (análisis, identidad, ubicación,
  * respuesta recibida u orden denegada); undefined si no es un marcador. */
+/** Marcadores de conducta irregular en el dossier: el acceso forzado y
+ * la advertencia de A.C.M.E. se leen como frases, nunca como claves. */
+function irregularMarker(id: string): string | undefined {
+  if (id === 'forced-entry') return 'Acceso forzado: entraste sin permiso ni orden de acceso.';
+  if (id === 'warning') return 'Advertencia de A.C.M.E.: te han visto en una acción irregular. Si te ven otra vez, retirarán el caso.';
+  return undefined;
+}
+
 function markerDiscovery(id: string, lookup: DiscoveryLookup, texts?: CaseTexts): string | undefined {
   const travel = travelDiscovery(id, lookup);
   if (travel) return travel;
@@ -279,7 +295,7 @@ function markerDiscovery(id: string, lookup: DiscoveryLookup, texts?: CaseTexts)
   }
   if (id.startsWith('communication_received:')) return 'Llegó la respuesta a tu solicitud.';
   if (id.startsWith('warrant-denied:')) return 'Una orden solicitada ha sido denegada.';
-  return undefined;
+  return irregularMarker(id);
 }
 
 /** Frase narrativa de un viaje confirmado: de la ciudad de origen a la de
@@ -332,12 +348,41 @@ function sentRecordText(record: string, npcName: (id: string) => string | undefi
     : `Enviaste un mensaje a ${name} por ${channel} (min ${sent[4]}).`;
 }
 
-export function conversationRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined): string {
+/** Frase legible para un registro de conducta irregular
+ * (`irregular:<tipo>:<objetivo>@<minuto>`, GDD §14): el objetivo es un
+ * personaje (soborno, suplantación) o un lugar (acceso forzado). Sin
+ * nombre conocido se devuelve el registro tal cual: nunca se oculta. */
+function irregularRecordText(
+  record: string,
+  npcName: (id: string) => string | undefined,
+  locationName?: (id: string) => string | undefined,
+): string | null {
+  const match = /^irregular:(force_entry|bribe|impersonate):([A-Za-z0-9._:-]+)@(\d+)$/.exec(record);
+  if (!match) return null;
+  const kind = match[1];
+  const target = match[2] ?? '';
+  const minute = match[3] ?? '';
+  if (kind === 'force_entry') {
+    const place = locationName?.(target) ?? target;
+    return `Forzaste el acceso a ${place} (min ${minute}).`;
+  }
+  const name = npcName(target);
+  if (!name) return record;
+  return kind === 'bribe'
+    ? `Sobornaste a ${name} (min ${minute}).`
+    : `Suplantaste a alguien hablando con ${name} (min ${minute}).`;
+}
+
+export function conversationRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined, locationName?: (id: string) => string | undefined): string {
   const talk = talkRecordText(record, npcName);
   if (talk !== null) return talk;
   const sent = sentRecordText(record, npcName, documentText);
   if (sent !== null) return sent;
   const received = /^communication_received:[A-Za-z0-9._:-]+@(\d+)$/.exec(record);
   if (received) return `Respuesta recibida (min ${received[1]}).`;
+  const irregular = irregularRecordText(record, npcName, locationName);
+  if (irregular !== null) return irregular;
+  const warning = /^warning:([A-Za-z0-9._:-]+)@(\d+)$/.exec(record);
+  if (warning) return `Advertencia de A.C.M.E. (min ${warning[2]}): te han visto en una acción irregular.`;
   return record;
 }

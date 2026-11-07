@@ -7,6 +7,7 @@
 import { evidenceText } from '@meridiano/case-schema';
 import { fixedSuspect, isFixedCase, ORIGINAL_OBJECT, ORIGINAL_OBJECT_LABEL } from './fixed-case.js';
 import { knowsEvidence } from './fixed-evidence.js';
+import { irregularActsForReport, misconductOf, IRREGULAR_SCORE_PENALTY } from './misconduct.js';
 import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
 
 // Alias históricos del caso fijo, no inferidos de nombres visibles o substrings.
@@ -120,7 +121,8 @@ function detentionEntries(def: CaseDefinition, run: CaseRun): FinalReport['deten
 // Reglas transparentes, documentadas en el propio informe (desglose) y en
 // docs/plan: objetivos hasta 50 (proporcional a los logrados), pruebas
 // halladas hasta 25 (proporcional a las descubiertas), detención correcta
-// +15, cada detención errónea −20, tiempo restante hasta +10 (proporcional
+// +15, cada detención errónea −20, cada acción irregular −10 (GDD §14,
+// valor inicial para playtest), tiempo restante hasta +10 (proporcional
 // al plazo que queda, solo al cerrar por decisión propia). Máximo 100;
 // el total nunca baja de 0. Es la puntuación del informe, no de la carrera:
 // la carrera sigue pendiente de calibración (DEC-020) y no se alimenta de
@@ -144,12 +146,14 @@ export function scoreForReport(
   const wrongDetentions = run.detentions.filter(suspect => canonicalSuspect(def, suspect) !== def.solution).length;
   const detentionPoints = correctDetention ? 15 : 0;
   const wrongPoints = wrongDetentions === 0 ? 0 : -20 * wrongDetentions;
+  const irregularCount = misconductOf(run).length;
+  const irregularPoints = irregularCount === 0 ? 0 : -IRREGULAR_SCORE_PENALTY * irregularCount;
   const timePoints = reason === 'finished' && def.deadlineMinutes > 0
     ? Math.round((10 * (def.deadlineMinutes - run.minute)) / def.deadlineMinutes)
     : 0;
   const total = Math.min(
     SCORE_MAX,
-    Math.max(0, objectivesPoints + evidencePoints + detentionPoints + wrongPoints + timePoints),
+    Math.max(0, objectivesPoints + evidencePoints + detentionPoints + wrongPoints + irregularPoints + timePoints),
   );
   return {
     total,
@@ -159,6 +163,7 @@ export function scoreForReport(
       { label: 'Pruebas halladas', points: evidencePoints },
       { label: 'Detención correcta', points: detentionPoints },
       { label: 'Detenciones erróneas', points: wrongPoints },
+      { label: 'Conducta irregular', points: irregularPoints },
       { label: 'Tiempo restante', points: timePoints },
     ],
   };
@@ -177,6 +182,7 @@ export function buildFinalReport(def: CaseDefinition, run: CaseRun, reason: Fina
     timeline: [],
     ...evidenceLists(def, run),
     detentions: detentionEntries(def, run),
+    irregularActs: irregularActsForReport(def, run),
     score: scoreForReport(def, run, achieved, reason),
   };
 }
@@ -206,6 +212,7 @@ function copyFinalReport(report: FinalReport): FinalReport {
     evidenceFound: report.evidenceFound.map(entry => ({ ...entry })),
     evidenceMissed: report.evidenceMissed.map(entry => ({ ...entry })),
     detentions: report.detentions.map(entry => ({ ...entry })),
+    irregularActs: [...(report.irregularActs ?? [])],
     score: { total: report.score.total, max: report.score.max, breakdown: report.score.breakdown.map(entry => ({ ...entry })) },
   };
 }
@@ -220,7 +227,15 @@ export function completeFinalReport(def: CaseDefinition, run: CaseRun): FinalRep
   // El informe guardado puede ser el antiguo de 4 campos: el tipo lo
   // declara completo, así que se comprueba en runtime sobre `unknown`.
   const stored: unknown = run.finalReport;
-  if (isCompleteFinalReport(stored)) return copyFinalReport(stored);
+  if (isCompleteFinalReport(stored)) {
+    const copied = copyFinalReport(stored);
+    // Informes guardados antes de las acciones irregulares no traen la
+    // sección: se deriva del estado congelado de la partida, no se inventa.
+    if (!Array.isArray((stored as { irregularActs?: unknown }).irregularActs)) {
+      copied.irregularActs = irregularActsForReport(def, run);
+    }
+    return copied;
+  }
   const reason = (stored as { reason?: unknown }).reason === 'deadline' ? 'deadline' as const : 'finished' as const;
   return buildFinalReport(def, run, reason);
 }

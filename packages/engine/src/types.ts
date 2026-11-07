@@ -12,6 +12,7 @@ export type ActionType =
   | 'request_warrant'
   | 'detain'
   | 'recover'
+  | 'irregular'
   | 'finish'
   | 'batch'
   | 'batch_decision';

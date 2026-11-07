@@ -53,6 +53,18 @@ describe('resúmenes de eventos de la consola', () => {
     ]);
   });
 
+  it('una acción irregular deja resumen legible y la retirada se nombra', () => {
+    expect(summaries([
+      { type: 'irregular', payload: { kind: 'force_entry', targetId: 'LIS-ALM', seenBy: ['marta', 'ines'] } },
+      { type: 'irregular', payload: { kind: 'bribe', targetId: 'lucia', seenBy: [] } },
+      { type: 'case_withdrawn', payload: { reason: 'withdrawn' } },
+    ])).toEqual([
+      'Forzaste el acceso a Almacén de depósito. Te han visto.',
+      'Sobornaste a Lucía. Nadie te ha visto.',
+      'A.C.M.E. ha retirado el caso por tu conducta.',
+    ]);
+  });
+
   it('ningún resumen del caso fijo enseña IDs crudos ni el genérico sin motivo', () => {
     const all = summaries([
       { type: 'inspect', payload: { targetId: 'MAD-SALA' } },
@@ -96,9 +108,22 @@ describe('objetivos en vivo de la vista del jugador', () => {
       { id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: true },
       { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: true },
     ]);
+    expect(isPlayerViewDto(view)).toBe(true);
     // Detener a otro no logra nada.
     const wrong = playerViewDto(astrolabioDefinition, fullRun({ detentions: ['tomas'] }), 0);
     expect(wrong.objectives.every(objective => !objective.achieved)).toBe(true);
+  });
+
+  it('la conducta irregular viaja en la vista y valida el contrato', () => {
+    const misconduct = [
+      { id: 'irr-1', kind: 'bribe', targetId: 'lucia', minute: 30, seenBy: ['tomas'] },
+      { id: 'irr-2', kind: 'force_entry', targetId: 'LIS-ALM', minute: 150, seenBy: [] },
+    ];
+    const view = playerViewDto(astrolabioDefinition, fullRun({ misconduct }), 0);
+    expect(view.misconduct).toEqual(misconduct);
+    expect(isPlayerViewDto(view)).toBe(true);
+    // Sin actos, el campo va vacío (las partidas anteriores no lo traen).
+    expect(playerViewDto(astrolabioDefinition, fullRun(), 0).misconduct).toEqual([]);
   });
 
   it('la vista lleva los datos de charla de cada personaje y valida el contrato', () => {

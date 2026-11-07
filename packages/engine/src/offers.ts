@@ -1,9 +1,10 @@
-import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
+import type { CaseDefinition, CaseRun, NPC } from '@meridiano/case-schema';
 import { FORENSIC_TYPE_LABELS, forensicTypeForAnalysis } from '@meridiano/case-schema';
 import type { Action } from './types.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
 import { knowsEvidence, canCollect, queryRule, inspectedEvidence, listQueryIds, listInspectableElements, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
 import { canIssueWarrant, knownSuspect } from './warrants.js';
+import { irregularPlan, hasUnrevealedTalkFacts } from './irregular.js';
 import { generatedAnalysis, generatedDetentionAvailable, generatedInspectLabel, generatedQueryRule, isGeneratedCase, listGeneratedInspectableElements } from './generated-mechanics.js';
 
 /**
@@ -208,6 +209,55 @@ function recoverOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
     action: { type: 'recover', params: { objectId: ORIGINAL_OBJECT } } }];
 }
 
+/** Acciones irregulares (GDD §14): forzar el acceso al lugar de
+ * recuperación cuando exige orden y no la hay, y sobornar o suplantar a
+ * un personaje presente que aún tenga algo que contar. No se ofrecen si
+ * no hay nada que ganar con ellas (acceso ya forzado o con orden, o el
+ * personaje ya lo ha contado todo): son intentos con riesgo, no botones
+ * decorativos. La confirmación con los riesgos la pone el motor. */
+/** Lugar de recuperación con orden de acceso del expediente, si lo exige. */
+function forceEntryTarget(def: CaseDefinition): { locationId: string; cityId: string } | undefined {
+  if (isFixedCase(def)) return { locationId: 'LIS-ALM', cityId: 'lisboa' };
+  const recovery = def.mechanics?.recovery;
+  return recovery?.requiresAccessWarrant ? { locationId: recovery.locationId, cityId: recovery.cityId } : undefined;
+}
+
+/** Oferta de forzar el acceso al lugar de recuperación, solo cuando se
+ * está en ese lugar y aún no hay orden ni acceso forzado. */
+function forceEntryOffer(def: CaseDefinition, run: CaseRun): ActionOffer | undefined {
+  const forceTarget = forceEntryTarget(def);
+  if (!forceTarget || run.position.locationId !== forceTarget.locationId) return undefined;
+  if (!irregularPlan(def, run, 'force_entry', forceTarget.locationId).ok) return undefined;
+  const place = def.locations.find(location => location.id === forceTarget.locationId)?.name ?? forceTarget.locationId;
+  return { id: `irregular:force_entry:${forceTarget.locationId}`, label: `Forzar el acceso a ${place}`,
+    detail: '30 min · pueden verte · lo obtenido no será admisible',
+    action: { type: 'irregular', params: { kind: 'force_entry', targetId: forceTarget.locationId } } };
+}
+
+/** Ofertas de sobornar o suplantar a un personaje presente que aún tenga
+ * algo que contar. Sin nada que revelar, no hay intento con sentido. */
+function npcIrregularOffers(def: CaseDefinition, run: CaseRun, npc: NPC): ActionOffer[] {
+  if (!hasUnrevealedTalkFacts(def, run, npc.id)) return [];
+  const offers: ActionOffer[] = [];
+  for (const kind of ['bribe', 'impersonate'] as const) {
+    if (!irregularPlan(def, run, kind, npc.id).ok) continue;
+    offers.push({ id: `irregular:${kind}:${npc.id}`,
+      label: kind === 'bribe' ? `Sobornar a ${npc.name}` : `Suplantar a alguien hablando con ${npc.name}`,
+      detail: '30 min · lo que diga no será admisible',
+      action: { type: 'irregular', params: { kind, targetId: npc.id } } });
+  }
+  return offers;
+}
+
+function irregularOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
+  const force = forceEntryOffer(def, run);
+  return [
+    ...(force ? [force] : []),
+    ...def.npcs.filter(item => item.cityId === run.position.cityId)
+      .flatMap(npc => npcIrregularOffers(def, run, npc)),
+  ];
+}
+
 export function availableOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   if (run.status !== 'active') return [];
   return [
@@ -221,6 +271,7 @@ export function availableOffers(def: CaseDefinition, run: CaseRun): ActionOffer[
     ...warrantOffers(def, run),
     ...detainOffers(def, run),
     ...recoverOffer(def, run),
+    ...irregularOffers(def, run),
     { id: 'finish', label: 'Cerrar el caso y presentar el informe', action: { type: 'finish', params: {} } },
   ];
 }

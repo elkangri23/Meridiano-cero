@@ -1,5 +1,5 @@
 import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
-import { DOCUMENT_SEND_MINUTES } from '@meridiano/case-schema';
+import { DOCUMENT_SEND_MINUTES, IRREGULAR_MINUTES } from '@meridiano/case-schema';
 import type { Action, ActionResult } from './types.js';
 import { isFixedCase } from './fixed-case.js';
 import { inspectedEvidence, knowsEvidence } from './fixed-evidence.js';
@@ -21,6 +21,10 @@ export function materialMinutes(def: CaseDefinition, run: CaseRun, action: Actio
     // sin documento no cuesta tiempo (conversar o leer no cuesta tiempo).
     return typeof action.params.documentId === 'string' ? DOCUMENT_SEND_MINUTES : 0;
   }
+  // Una acción irregular es un trámite con riesgo (GDD §14): 30 min, como
+  // enviar un documento o una consulta. El castigo no es el tiempo, son
+  // sus consecuencias (advertencia, cooperación, admisibilidad, retirada).
+  if (action.type === 'irregular') return IRREGULAR_MINUTES;
   if (!isFixedCase(def)) {
     // Expediente generado (T4-08): los mismos costes que el caso fijo.
     return inspectMinutes(run, action, (targetId, element) => generatedInspectEvidence(def, targetId, element)?.evidenceId);

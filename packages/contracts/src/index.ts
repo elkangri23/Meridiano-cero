@@ -23,6 +23,10 @@ export interface FinalReportTimelineEntry { sequence: number; minute: number; ty
 export interface FinalReportDetention { suspectId: string; suspectName: string; correct: boolean; withWarrant: boolean; }
 /** Una línea de la puntuación: qué se valora y cuántos puntos aporta. */
 export interface FinalReportScoreEntry { label: string; points: number; }
+/** Una acción irregular del informe (GDD §14): qué se hizo, contra quién
+ * o dónde, cuándo y si te vieron. Los nombres ya vienen resueltos por el
+ * motor; la vista no re-deriva nada. */
+export interface FinalReportIrregularAct { kind: string; targetName: string; minute: number; seen: boolean; }
 /** Puntuación del informe: total sobre el máximo, con su desglose visible.
  * Las reglas viven en el motor (`scoreForReport`); la carrera sigue siendo
  * un paso posterior (DEC-020) y no se alimenta de esta puntuación. */
@@ -46,13 +50,18 @@ export interface FinalReportTruth {
 export interface FinalReport {
   result: 'complete' | 'partial' | 'incorrect' | 'unresolved';
   objectivesAchieved: string[];
-  reason: 'finished' | 'deadline';
+  /** Motivo de cierre: por decisión propia, por agotar el plazo o porque
+   * A.C.M.E. retiró el caso tras verte en acciones irregulares (GDD §14). */
+  reason: 'finished' | 'deadline' | 'withdrawn';
   minute: number;
   truth: FinalReportTruth;
   timeline: FinalReportTimelineEntry[];
   evidenceFound: FinalReportEvidenceEntry[];
   evidenceMissed: FinalReportEvidenceEntry[];
   detentions: FinalReportDetention[];
+  /** Acciones irregulares cometidas en la partida, en orden. Vacío en
+   * partidas limpias y en informes guardados antes de esta entrega. */
+  irregularActs: FinalReportIrregularAct[];
   score: FinalReportScore;
 }
 
@@ -423,6 +432,16 @@ export interface CommunicationRecordDto {
   receivedMinute?: number;
 }
 
+/** Una acción irregular cometida en la partida (GDD §14): qué se hizo,
+ * contra quién o dónde, cuándo y quiénes la vieron (vacío si nadie). */
+export interface MisconductRecordDto {
+  id: string;
+  kind: string;
+  targetId: string;
+  minute: number;
+  seenBy: string[];
+}
+
 export interface NpcChatEntry {
   id: string;
   name: string;
@@ -464,6 +483,10 @@ export interface PlayerViewDto {
    * un contacto, en orden de envío. La web lo enseña en la ventana de
    * comunicaciones junto con los contactos y sus canales. */
   communications: CommunicationRecordDto[];
+  /** Acciones irregulares cometidas en la partida (GDD §14), en orden.
+   * La web las enseña en el dossier (registro de conversación) y el
+   * informe final las lista con su descuento en la puntuación. */
+  misconduct: MisconductRecordDto[];
   /** Datos de conversación de cada personaje del expediente (ver
    * NpcChatEntry): la charla libre los usa para construir la petición
    * converse. Sin esta lista, la web solo conocía el catálogo fijo. */
@@ -669,14 +692,22 @@ function publicReportTruth(value: unknown): value is FinalReportTruth {
 }
 function publicReportHead(value: Record<string, unknown>): boolean {
   return ['complete', 'partial', 'incorrect', 'unresolved'].includes(value.result as string) &&
-    ['finished', 'deadline'].includes(value.reason as string) && nonNegativeInteger(value.minute) &&
+    ['finished', 'deadline', 'withdrawn'].includes(value.reason as string) && nonNegativeInteger(value.minute) &&
     stringList(value.objectivesAchieved, 100, 128);
 }
+function publicReportIrregularAct(value: unknown): value is FinalReportIrregularAct {
+  if (!dtoRecord(value, 'kind,minute,seen,targetName')) return false;
+  return ['force_entry', 'bribe', 'impersonate'].includes(value.kind as string) &&
+    boundedString(value.targetName, 200) && nonNegativeInteger(value.minute) && typeof value.seen === 'boolean';
+}
+function publicReportIrregularActs(value: unknown): value is FinalReportIrregularAct[] {
+  return Array.isArray(value) && value.length <= 64 && value.every(publicReportIrregularAct);
+}
 function publicFinalReport(value: unknown): value is FinalReport {
-  if (!dtoRecord(value, 'detentions,evidenceFound,evidenceMissed,minute,objectivesAchieved,reason,result,score,timeline,truth')) return false;
+  if (!dtoRecord(value, 'detentions,evidenceFound,evidenceMissed,irregularActs,minute,objectivesAchieved,reason,result,score,timeline,truth')) return false;
   return publicReportHead(value) && publicReportTruth(value.truth) && publicReportTimeline(value.timeline) &&
     publicReportEvidenceList(value.evidenceFound) && publicReportEvidenceList(value.evidenceMissed) &&
-    publicReportDetentions(value.detentions) && publicReportScore(value.score);
+    publicReportDetentions(value.detentions) && publicReportIrregularActs(value.irregularActs) && publicReportScore(value.score);
 }
 function generalClock(value: unknown): boolean {
   return dtoRecord(value, 'deadlineMinutes,minute') && nonNegativeInteger(value.minute) &&
@@ -810,6 +841,20 @@ function publicCommunications(value: unknown): value is CommunicationRecordDto[]
   return Array.isArray(value) && value.length <= 100 && value.every(publicCommunicationRecord) &&
     new Set(value.map(item => item.id)).size === value.length;
 }
+function publicMisconductRecord(value: unknown): value is MisconductRecordDto {
+  if (!isPlainRecord(value)) return false;
+  if (Object.keys(value).sort().join(',') !== 'id,kind,minute,seenBy,targetId') return false;
+  if (!boundedString(value.id, 128) || !boundedString(value.targetId, 128)) return false;
+  if (!['force_entry', 'bribe', 'impersonate'].includes(value.kind as string)) return false;
+  if (!nonNegativeInteger(value.minute)) return false;
+  return Array.isArray(value.seenBy) && value.seenBy.length <= 64 &&
+    value.seenBy.every(item => typeof item === 'string' && item.length > 0 && item.length <= 128) &&
+    new Set(value.seenBy).size === value.seenBy.length;
+}
+function publicMisconduct(value: unknown): value is MisconductRecordDto[] {
+  return Array.isArray(value) && value.length <= 64 && value.every(publicMisconductRecord) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
 function generalChatCollections(value: Record<string, unknown>): boolean {
   if (!publicNpcChat(value.npcChat)) return false;
   if (!publicCommunications(value.communications)) return false;
@@ -821,6 +866,7 @@ function generalCollections(value: Record<string, unknown>): boolean {
   if (!stringList(value.dossier, 1000, 128) || !stringList(value.conversation, 1000, 16000)) return false;
   if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
   if (!stringList(value.analysisResults, 100, 128)) return false;
+  if (!publicMisconduct(value.misconduct)) return false;
   if (!publicObjectives(value.objectives)) return false;
   return generalChatCollections(value);
 }
@@ -856,7 +902,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'analysisResults,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'analysisResults,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,misconduct,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;

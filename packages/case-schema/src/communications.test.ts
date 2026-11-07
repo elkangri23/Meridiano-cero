@@ -3,8 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { LEGACY_ASTROLABIO_ID } from './legacy-astrolabio.js';
 import {
-  channelsForNpc, isCommunicationRecord, isRemoteChannel, normalizeRemoteChannels,
-  DOCUMENT_SEND_MINUTES, LEGACY_REMOTE_CHANNELS,
+  channelsForNpc, isCommunicationRecord, isMisconductRecord, isRemoteChannel, normalizeRemoteChannels,
+  DOCUMENT_SEND_MINUTES, IRREGULAR_MINUTES, LEGACY_REMOTE_CHANNELS,
 } from './communications.js';
 import type { CaseDefinition, NPC } from './types.js';
 
@@ -55,6 +55,26 @@ describe('canales remotos de la central', () => {
 
   it('enviar un documento cuesta 30 min, como una consulta', () => {
     expect(DOCUMENT_SEND_MINUTES).toBe(30);
+  });
+});
+
+describe('registro de conducta irregular', () => {
+  const base = { id: 'irr-1', kind: 'bribe', targetId: 'lucia', minute: 30, seenBy: ['tomas'] };
+  it('acepta actos con y sin testigos', () => {
+    expect(IRREGULAR_MINUTES).toBe(30);
+    expect(isMisconductRecord(base)).toBe(true);
+    expect(isMisconductRecord({ ...base, seenBy: [] })).toBe(true);
+    expect(isMisconductRecord({ ...base, kind: 'force_entry', targetId: 'LIS-ALM', seenBy: ['marta', 'ines'] })).toBe(true);
+    expect(isMisconductRecord({ ...base, kind: 'impersonate' })).toBe(true);
+  });
+
+  it('rechaza tipos ajenos, minutos negativos, testigos duplicados o claves extra', () => {
+    expect(isMisconductRecord({ ...base, kind: 'robar' })).toBe(false);
+    expect(isMisconductRecord({ ...base, minute: -1 })).toBe(false);
+    expect(isMisconductRecord({ ...base, seenBy: ['tomas', 'tomas'] })).toBe(false);
+    expect(isMisconductRecord({ ...base, seenBy: 'tomas' })).toBe(false);
+    expect(isMisconductRecord({ ...base, extra: 1 })).toBe(false);
+    expect(isMisconductRecord({ ...base, targetId: 'a b' })).toBe(false);
   });
 });
 

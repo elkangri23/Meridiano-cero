@@ -118,6 +118,7 @@ describe('informe final completo por HTTP (GDD §12)', () => {
         { label: 'Pruebas halladas', points: 14 },
         { label: 'Detención correcta', points: 15 },
         { label: 'Detenciones erróneas', points: 0 },
+        { label: 'Conducta irregular', points: 0 },
         { label: 'Tiempo restante', points: 8 },
       ],
     });
