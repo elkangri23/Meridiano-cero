@@ -15,7 +15,7 @@
 // resto de etapas (geografía, ensamblaje, validación, simulación,
 // persistencia) son deterministas.
 
-import { FORENSIC_TYPES, GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type ForensicType, type KnowledgeContentAnchors, type RemoteChannel } from '@meridiano/case-schema';
+import { FORENSIC_TYPES, GEOGRAPHIC_CATALOG, arrestTypeForCaseId, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type ArrestType, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type ForensicType, type KnowledgeContentAnchors, type RemoteChannel } from '@meridiano/case-schema';
 import type { GenerationParams, GenerationStage } from './pipeline.js';
 
 /** Delitos generables (lista canónica sin 'aleatorio', que es modo de
@@ -138,7 +138,10 @@ const CONTENT_RULES: Record<ContentRating, string> = {
 
 /** Contexto que se envía al modelo para cada etapa LLM. `prior` trae las
  * salidas de las etapas anteriores (premisa, NPC…); `feedback` trae los
- * errores de la última validación/simulación cuando se repara la etapa 4. */
+ * errores de la última validación/simulación cuando se repara la etapa 4.
+ * `caseId` es el id del expediente que se está generando: la etapa 4b lo
+ * usa para fijar el tipo de detención (GDD §12) antes de escribir la
+ * mecánica y la ruta dorada. */
 export function buildStageContext(
   stage: GenerationStage,
   choice: ResolvedChoice,
@@ -147,6 +150,7 @@ export function buildStageContext(
   prior: Record<string, unknown>,
   feedback?: string[],
   part?: 'a' | 'b',
+  caseId?: string,
 ): StageContext {
   const base: StageContext = {
     stage,
@@ -162,19 +166,23 @@ export function buildStageContext(
   };
   if (stage === 1) return base;
   if (stage === 3) return { ...base, premise: prior.premise };
-  if (stage === 4) return { ...stage4Context(base, prior, part), startCityId: geography.cities[0]?.id ?? '' };
+  if (stage === 4) return { ...stage4Context(base, prior, part, caseId), startCityId: geography.cities[0]?.id ?? '' };
   if (stage === 7) return { ...base, definition: prior.definition, goldenPath: prior.goldenPath, budgetMinutes: prior.budgetMinutes };
   return base;
 }
 
 // La etapa 4 se genera en dos llamadas (4a mundo, 4b reglas): la segunda
 // trae los ids exactos de lugares y evidencias de la primera, así que la
-// mecánica y la ruta dorada no tienen que adivinarlos.
-function stage4Context(base: StageContext, prior: Record<string, unknown>, part?: 'a' | 'b'): StageContext {
+// mecánica y la ruta dorada no tienen que adivinarlos. La 4b trae además el
+// tipo de detención del caso (GDD §12), fijado por el id del expediente,
+// para que la ruta dorada use el modo correcto y sepa si debe viajar a
+// detener en persona o coordinar desde donde esté.
+function stage4Context(base: StageContext, prior: Record<string, unknown>, part?: 'a' | 'b', caseId?: string): StageContext {
   if (part === 'a') return { ...base, part, premise: prior.premise, npcs: prior.npcs };
   if (part === 'b') {
     const world = prior.world as Record<string, unknown> | undefined;
-    return { ...base, part, premise: prior.premise, npcs: prior.npcs, locations: world?.locations, evidence: world?.evidence };
+    return { ...base, part, premise: prior.premise, npcs: prior.npcs, locations: world?.locations, evidence: world?.evidence,
+      ...(caseId ? { arrestType: arrestTypeForCaseId(caseId) } : {}) };
   }
   return { ...base, premise: prior.premise, npcs: prior.npcs };
 }
@@ -561,19 +569,25 @@ const GOLDEN_PARAM_STRINGS: Array<{ type: string; fields: string[] }> = [
   { type: 'collect', fields: ['evidenceId'] },
   { type: 'analyze', fields: ['evidenceId'] },
   { type: 'talk', fields: ['npcId', 'topicId'] },
-  { type: 'detain', fields: ['suspectId', 'warrantId'] },
+  { type: 'detain', fields: ['suspectId', 'warrantId', 'locationId', 'mode'] },
   { type: 'recover', fields: ['objectId'] },
 ];
 
-function checkGoldenSpecialParams(action: Record<string, unknown>, index: number, errors: string[]): void {
+function checkGoldenSpecialParams(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType): void {
   if (!isRecord(action.params) || typeof action.type !== 'string') return;
   if (action.type === 'request_warrant') {
     if (!isNonEmptyString(action.params.suspectId) || !Array.isArray(action.params.evidenceIds)) errors.push(`goldenPath[${index}] (request_warrant) debe tener suspectId y evidenceIds.`);
   }
   if (action.type === 'wait' && typeof action.params.minutes !== 'number') errors.push(`goldenPath[${index}] (wait) debe tener minutes.`);
+  // El modo de la detención es el del expediente (GDD §12): la automática
+  // se coordina con las autoridades y la interactiva detiene en persona.
+  // Un modo distinto lo rechaza el motor con «Intervención no disponible».
+  if (action.type === 'detain' && arrestType !== undefined && action.params.mode !== arrestType) {
+    errors.push(`goldenPath[${index}] (detain) usa mode '${String(action.params.mode)}' pero el caso es '${arrestType}': la detención automática se coordina desde cualquier ciudad y la interactiva exige estar en la ciudad del sospechoso.`);
+  }
 }
 
-function checkGoldenActionParams(action: Record<string, unknown>, index: number, errors: string[]): void {
+function checkGoldenActionParams(action: Record<string, unknown>, index: number, errors: string[], arrestType?: ArrestType): void {
   if (!isRecord(action.params) || typeof action.type !== 'string') return;
   const spec = GOLDEN_PARAM_STRINGS.find(item => item.type === action.type);
   if (spec) {
@@ -581,44 +595,46 @@ function checkGoldenActionParams(action: Record<string, unknown>, index: number,
       if (!isNonEmptyString(action.params[field])) errors.push(`goldenPath[${index}] (${action.type}) debe tener ${field}.`);
     }
   }
-  checkGoldenSpecialParams(action, index, errors);
+  checkGoldenSpecialParams(action, index, errors, arrestType);
 }
 
-function checkGoldenActions(output: Record<string, unknown>, errors: string[]): string[] {
+function checkGoldenActions(output: Record<string, unknown>, errors: string[], arrestType?: ArrestType): string[] {
   if (!Array.isArray(output.goldenPath)) return [];
   for (const action of output.goldenPath) {
     if (!isRecord(action) || !isNonEmptyString(action.type) || !isRecord(action.params)) errors.push('Una acción de goldenPath no tiene type/params.');
   }
   for (const [index, action] of (output.goldenPath as unknown[]).entries()) {
-    if (isRecord(action)) checkGoldenActionParams(action, index, errors);
+    if (isRecord(action)) checkGoldenActionParams(action, index, errors, arrestType);
   }
   return output.goldenPath.map((action: unknown) => isRecord(action) && typeof action.type === 'string' ? action.type : '');
 }
 
-function checkGoldenPath(output: Record<string, unknown>, startCityId: string, errors: string[]): void {
+function checkGoldenPath(output: Record<string, unknown>, startCityId: string, errors: string[], arrestType?: ArrestType): void {
   if (!Array.isArray(output.goldenPath) || output.goldenPath.length < 10 || output.goldenPath.length > 40) errors.push('goldenPath debe tener entre 10 y 40 acciones.');
   if (!Array.isArray(output.goldenPath)) return;
-  const types = checkGoldenActions(output, errors);
+  const types = checkGoldenActions(output, errors, arrestType);
   if (!types.includes('detain')) errors.push('goldenPath debe incluir una detención.');
   if (!types.includes('recover')) errors.push('goldenPath debe incluir una recuperación.');
   const last = output.goldenPath[output.goldenPath.length - 1];
   if (!isRecord(last) || last.type !== 'finish') errors.push('goldenPath debe terminar con el cierre del caso.');
   checkGoldenCollects(output, errors);
-  checkGoldenPositions(output, startCityId, errors);
+  checkGoldenPositions(output, startCityId, errors, arrestType);
 }
 
 // La ruta empieza en la ciudad de inicio y cada acción ocurre en la ciudad
 // donde se está en ese momento: un viaje a la ciudad actual no existe (no
 // hay ruta de una ciudad a sí misma) y no se puede inspeccionar, consultar
-// ni detener en una ciudad distinta. Se sigue la posición por la ruta.
-function checkGoldenPositions(output: Record<string, unknown>, startCityId: string, errors: string[]): void {
+// ni detener en una ciudad distinta. Se sigue la posición por la ruta. La
+// detención automática es la excepción (GDD §12): se coordina con las
+// autoridades desde donde esté el detective, así que no ata a la ciudad.
+function checkGoldenPositions(output: Record<string, unknown>, startCityId: string, errors: string[], arrestType?: ArrestType): void {
   if (!Array.isArray(output.goldenPath)) return;
   const cityOfLocation = cityOfLocations(output);
   const cityOfQuery = cityOfQueries(output);
   let currentCity = startCityId;
   output.goldenPath.forEach((action: unknown, index: number) => {
     if (!isRecord(action)) return;
-    currentCity = checkGoldenPosition(action, index, currentCity, cityOfLocation, cityOfQuery, errors);
+    currentCity = checkGoldenPosition(action, index, currentCity, cityOfLocation, cityOfQuery, errors, arrestType);
   });
 }
 
@@ -652,6 +668,7 @@ function checkGoldenPosition(
   cityOfLocation: Map<string, string>,
   cityOfQuery: Map<string, string>,
   errors: string[],
+  arrestType?: ArrestType,
 ): string {
   if (!isRecord(action.params)) return currentCity;
   if (action.type === 'travel') {
@@ -660,16 +677,18 @@ function checkGoldenPosition(
     if (toCityId === currentCity) errors.push(`goldenPath[${index}] (travel) viaja a ${toCityId}, la ciudad actual: la ruta empieza en la ciudad de inicio y cada viaje va a una ciudad distinta.`);
     return toCityId;
   }
-  const city = actionCity(action, cityOfLocation, cityOfQuery);
+  const city = actionCity(action, cityOfLocation, cityOfQuery, arrestType);
   if (city && city !== currentCity) errors.push(`goldenPath[${index}] (${action.type}) ocurre en ${city} estando en ${currentCity}: cada acción ocurre en la ciudad donde estás en ese momento de la ruta.`);
   return currentCity;
 }
 
 // Ciudad donde ocurre una acción de la ruta (sin viajar): inspeccionar y
-// detener por el lugar, consultar por la ciudad de la consulta.
-function actionCity(action: Record<string, unknown>, cityOfLocation: Map<string, string>, cityOfQuery: Map<string, string>): string | undefined {
+// detener por el lugar, consultar por la ciudad de la consulta. La
+// detención automática no tiene ciudad: se coordina desde donde se esté.
+function actionCity(action: Record<string, unknown>, cityOfLocation: Map<string, string>, cityOfQuery: Map<string, string>, arrestType?: ArrestType): string | undefined {
   const params = action.params;
   if (!isRecord(params)) return undefined;
+  if (action.type === 'detain' && (arrestType === 'automatic' || params.mode === 'automatic')) return undefined;
   if (action.type === 'inspect' || action.type === 'detain') {
     const locationId = action.type === 'inspect' ? params.targetId : params.locationId;
     return typeof locationId === 'string' ? cityOfLocation.get(locationId) : undefined;
@@ -709,7 +728,7 @@ function validateClueWorld(output: unknown, geography: SelectedGeography, castId
   checkClueTexts(output, castIds, knowledgeIds, errors, geography);
 }
 
-function validateClueRules(output: unknown, world: unknown, geography: SelectedGeography, errors: string[]): void {
+function validateClueRules(output: unknown, world: unknown, geography: SelectedGeography, errors: string[], arrestType?: ArrestType): void {
   if (!isRecord(output)) { errors.push('La red de pistas debe ser un objeto.'); return; }
   checkKeys(output, ['mechanics', 'goldenPath'], errors);
   // Las comprobaciones de la mecánica leen las evidencias del mundo (4a)
@@ -717,7 +736,7 @@ function validateClueRules(output: unknown, world: unknown, geography: SelectedG
   const merged = isRecord(world) ? { ...world, ...output } : output;
   checkClueMechanics(merged, errors);
   checkEvidenceObtainable(merged, errors);
-  checkGoldenPath(merged, geography.cities[0]?.id ?? '', errors);
+  checkGoldenPath(merged, geography.cities[0]?.id ?? '', errors, arrestType);
 }
 
 // Cada evidencia (salvo EV-11, el objeto de la recuperación, que se obtiene
@@ -790,21 +809,21 @@ function evidenceSource(id: string, type: string, granted: GrantedSets): { grant
   return { granted: false, reason: 'tipo de evidencia desconocido' };
 }
 
-function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[]): void {
+function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[], arrestType?: ArrestType): void {
   validateClueWorld(output, geography, castIds, knowledgeIds, errors);
-  validateClueRules(output, output, geography, errors);
+  validateClueRules(output, output, geography, errors, arrestType);
 }
 
 /** Valida una de las dos mitades de la etapa 4 (a = mundo, b = reglas). */
 export function validateStagePart(
   part: 'a' | 'b',
   output: unknown,
-  context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[]; world?: unknown },
+  context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[]; world?: unknown; arrestType?: ArrestType },
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (checkSchemaEcho(output, errors)) return { valid: false, errors };
   if (part === 'a') validateClueWorld(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors);
-  else validateClueRules(output, context.world, context.geography, errors);
+  else validateClueRules(output, context.world, context.geography, errors, context.arrestType);
   return { valid: errors.length === 0, errors };
 }
 
@@ -818,12 +837,12 @@ function validateReview(output: unknown, errors: string[]): void {
 /** Valida la forma de la salida del modelo para una etapa LLM. El fondo
  * (coherencia, referencias cruzadas, jugabilidad) lo comprueban el
  * validador v1.5 y el simulador en las etapas 6 y 8. */
-export function validateStageOutput(stage: GenerationStage, output: unknown, context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[] }): { valid: boolean; errors: string[] } {
+export function validateStageOutput(stage: GenerationStage, output: unknown, context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[]; arrestType?: ArrestType }): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (checkSchemaEcho(output, errors)) return { valid: false, errors };
   if (stage === 1) validatePremise(output, context.geography.cities, errors);
   else if (stage === 3) validateNpcs(output, context.castIds, errors);
-  else if (stage === 4) validateClues(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors);
+  else if (stage === 4) validateClues(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors, context.arrestType);
   else if (stage === 7) validateReview(output, errors);
   return { valid: errors.length === 0, errors };
 }
@@ -875,6 +894,9 @@ export function assembleDefinition(input: AssemblyInput): CaseDefinition {
     catalogVersion: params.catalogVersion ?? '1.0',
     deadlineMinutes: DEADLINE_BY_DURATION[params.duration],
     solution: String((premise.solution as Record<string, unknown>).id),
+    /** Tipo de detención del caso (GDD §12): fijado por el id del
+     * expediente, ~30 % automáticos y el resto interactivos. */
+    arrestType: arrestTypeForCaseId(caseId),
     objectives: [
       { id: 'obj-detener', description: String((premise.objectives as Record<string, unknown>).detain), achieved: false },
       { id: 'obj-recuperar', description: String((premise.objectives as Record<string, unknown>).recover), achieved: false },

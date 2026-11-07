@@ -11,7 +11,7 @@
 // sigue sin pasar, se rechaza con motivo. Ningún expediente entra en el
 // catálogo sin pasar la puerta.
 
-import { createValidationReport, validateCaseDefinition, validateGeneratedContent } from '@meridiano/case-schema';
+import { createValidationReport, validateCaseDefinition, validateGeneratedContent, arrestTypeForCaseId } from '@meridiano/case-schema';
 import type { CaseDefinition } from '@meridiano/case-schema';
 import type { CaseRun } from '@meridiano/case-schema';
 import {
@@ -276,6 +276,15 @@ export class StageOutputError extends Error {
   }
 }
 
+/** Id del expediente que se está generando: el que fija la API para que
+ * sea único, o el derivado del delito y la semilla. Del id depende el
+ * tipo de detención del caso (GDD §12), así que es el mismo en el
+ * contexto de la etapa 4b, en la validación de la ruta dorada y en el
+ * ensamblaje: tres sitios distintos no pueden derivarlo por separado. */
+export function draftCaseId(draft: CaseDraft, choice: ResolvedChoice, config: PipelineConfig): string {
+  return config.caseId ?? `generado-${choice.crimeType}-${draft.params.seed ?? 0}`;
+}
+
 function stageOutput(draft: CaseDraft, stage: GenerationStage): unknown {
   return draft.stages[stage - 1]?.output;
 }
@@ -334,11 +343,12 @@ async function runLlmStage(
   part?: 'a' | 'b',
 ): Promise<unknown> {
   const llm = requireLlm(config);
-  const stageContext = buildStageContext(stage, choice, draft.params, geography, prior, feedback, part);
+  const caseId = draftCaseId(draft, choice, config);
+  const stageContext = buildStageContext(stage, choice, draft.params, geography, prior, feedback, part, caseId);
   const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage, context: stageContext, schema: stageOutputSchema(stage, part), signal }));
   const validation = part
-    ? validateStagePart(part, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft), world: prior.world })
-    : validateStageOutput(stage, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft) });
+    ? validateStagePart(part, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft), world: prior.world, arrestType: arrestTypeForCaseId(caseId) })
+    : validateStageOutput(stage, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft), arrestType: arrestTypeForCaseId(caseId) });
   if (!validation.valid) throw new StageOutputError(`Etapa ${stage} inválida: ${validation.errors.join('; ')}`, output);
   return output;
 }
@@ -374,7 +384,8 @@ async function runSplitStage4(
   draft.stage4World = world as Record<string, unknown>;
   const rules = await runLlmStage(4, draft, choice, geography, config, { ...prior, world }, feedback, 'b');
   const merged = { ...(world as Record<string, unknown>), ...(rules as Record<string, unknown>) };
-  const validation = validateStageOutput(4, merged, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft) });
+  const validation = validateStageOutput(4, merged, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft),
+    arrestType: arrestTypeForCaseId(draftCaseId(draft, choice, config)) });
   if (!validation.valid) {
     // El mundo sigue siendo válido: el reintento solo rehace 4b.
     if (!validation.errors.every(isStage4bError)) delete draft.stage4World;
@@ -420,7 +431,7 @@ function assembleDefinitionOrFail(
 ): ReturnType<typeof assembleDefinition> {
   try {
     return assembleDefinition({
-      caseId: config.caseId ?? `generado-${choice.crimeType}-${draft.params.seed ?? 0}`,
+      caseId: draftCaseId(draft, choice, config),
       choice,
       params: draft.params,
       geography,
@@ -440,7 +451,7 @@ function assembleStage(draft: CaseDraft, choice: ResolvedChoice, geography: Sele
   const clues = stageOutput(draft, 4) as Record<string, unknown>;
   if (!premise || !npcs || !clues) throw new Error('Faltan salidas de etapa para ensamblar.');
   const definition = assembleDefinition({
-    caseId: config.caseId ?? `generado-${choice.crimeType}-${draft.params.seed ?? 0}`,
+    caseId: draftCaseId(draft, choice, config),
     choice,
     params: draft.params,
     geography,

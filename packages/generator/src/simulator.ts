@@ -11,6 +11,7 @@
 // borrador se rechaza o se repara, nunca se publica.
 
 import { hashDefinition } from '@meridiano/case-schema/server';
+import { arrestTypeOf } from '@meridiano/case-schema';
 import { canIssueWarrant, confirmAction, createInitialRun, knowsEvidence, knownSuspect, resolveAction } from '@meridiano/engine';
 import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
 
@@ -237,10 +238,18 @@ function diagnoseDetain(definition: CaseDefinition, run: CaseRun, action: Golden
   if (paramId(action, 'locationId') !== suspect.locationId) {
     return `${step}: la detención debe hacerse en ${locationLabel(definition, suspect.locationId)}, no en «${paramId(action, 'locationId')}».`;
   }
+  // El modo de la ruta dorada es el del expediente (GDD §12): la
+  // automática se coordina con las autoridades y la interactiva detiene en
+  // persona. Con el modo equivocado el motor rechaza la detención.
+  const arrestType = arrestTypeOf(definition);
+  if (paramId(action, 'mode') !== arrestType) {
+    return `${step}: el modo de la detención es «${paramId(action, 'mode') || '(sin modo)'}» pero el caso es «${arrestType}»: pon mode: '${arrestType}' en el detain.`;
+  }
   if (!run.discoveries.includes(`identity:${suspectId}`) || !run.discoveries.includes(`location:${suspectId}`)) {
     return `${step}: el sospechoso aún no es conocido: falta hablar con él con topicId «identidad» (es el único tema que revela identity:${suspectId} y location:${suspectId}) antes de detenerlo.`;
   }
-  if (run.position.cityId !== suspect.cityId || run.position.locationId !== suspect.locationId) {
+  // La automática no exige presencia: se coordina desde cualquier ciudad.
+  if (arrestType === 'interactive' && (run.position.cityId !== suspect.cityId || run.position.locationId !== suspect.locationId)) {
     return `${step}: el sospechoso está en ${cityLabel(definition, suspect.cityId)} / ${locationLabel(definition, suspect.locationId)} y estás en ${positionLabel(definition, run)}. Viaja antes a esa ciudad.`;
   }
   if (!run.warrants.includes(`warrant:${suspectId}`)) {
@@ -443,7 +452,7 @@ function checkDetainWithoutWarrant(definition: CaseDefinition): SimulationCheck 
   const suspect = definition.mechanics?.suspects.find(entry => entry.id === definition.solution);
   if (!suspect) return { name: 'detain-without-warrant', passed: false, detail: 'La mecánica no declara al sospechoso solución.' };
   const run = freshRun(definition);
-  const result = apply(definition, run, { type: 'detain', params: { suspectId: suspect.id, warrantId: 'warrant:' + suspect.id, locationId: suspect.locationId, mode: 'interactive' } });
+  const result = apply(definition, run, { type: 'detain', params: { suspectId: suspect.id, warrantId: 'warrant:' + suspect.id, locationId: suspect.locationId, mode: arrestTypeOf(definition) } });
   if (result.status !== 'impossible') {
     return { name: 'detain-without-warrant', passed: false, detail: `Detener sin orden devolvió ${result.status}.` };
   }

@@ -70,6 +70,43 @@ describe('simulateCase (T4-08)', () => {
   });
 });
 
+describe('detenciones automáticas (GDD §12)', () => {
+  it('la ruta dorada automática detiene desde otra ciudad, sin viajar a detener', () => {
+    const definition = { ...generadoFraudeDefinition, arrestType: 'automatic' as const };
+    // Hablar con Carmen en Valencia, viajar a Barcelona, coordinar la
+    // detención desde allí y volver a Valencia a recuperar: en interactivo
+    // el detain desde Barcelona sería imposible por falta de presencia.
+    const path: GoldenPathAction[] = [];
+    for (const action of GOLDEN_PATH) {
+      if (action.type === 'talk' && action.params.npcId === 'carmen') {
+        path.push(action, { type: 'travel', params: { toCityId: 'barcelona' } });
+      } else if (action.type === 'detain') {
+        path.push({ type: 'detain', params: { ...action.params, mode: 'automatic' } },
+          { type: 'travel', params: { toCityId: 'valencia' } });
+      } else path.push(action);
+    }
+    const result = simulateCase(definition, path, 1440);
+    expect(result.playable).toBe(true);
+    expect(result.result).toBe('complete');
+    expect(result.objectivesAchieved).toEqual(['obj-detener', 'obj-recuperar']);
+    expect(result.diagnosis).toBeNull();
+  });
+
+  it('el simulador diagnostica el modo de detención equivocado', () => {
+    const definition = { ...generadoFraudeDefinition, arrestType: 'automatic' as const };
+    const result = simulateCase(definition, GOLDEN_PATH, 1440);
+    expect(result.playable).toBe(false);
+    expect(result.diagnosis).toContain('automatic');
+    expect(result.diagnosis).toContain("mode: 'automatic'");
+  });
+
+  it('detener sin orden sigue siendo imposible en un caso automático', () => {
+    const definition = { ...generadoFraudeDefinition, arrestType: 'automatic' as const };
+    const result = simulateCase(definition, GOLDEN_PATH, 1440);
+    expect(result.checks.find(check => check.name === 'detain-without-warrant')?.passed).toBe(true);
+  });
+});
+
 describe('diagnoseGoldenPathFailure', () => {
   it('explica una consulta antes de su requisito (EV-03)', () => {
     // Sin el análisis de EV-02 no hay EV-03, así que registro-facturas

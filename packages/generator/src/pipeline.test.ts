@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { validateCaseDefinition } from '@meridiano/case-schema';
 import { createInMemoryCheckpointStore } from './checkpoint.js';
 import { createGeneratorService, runPipeline, type GenerationParams, type PipelineConfig, type StageLlm } from './pipeline.js';
-import { assembleDefinition, resolveGenerationChoice, selectGeography, stageOutputSchema, validateStageOutput, type SelectedGeography } from './stages.js';
+import { assembleDefinition, buildStageContext, resolveGenerationChoice, selectGeography, stageOutputSchema, validateStageOutput, validateStagePart, type SelectedGeography } from './stages.js';
 
 // Doble del modelo: construye las salidas de etapa a partir del contexto que
 // recibe (las ciudades elegidas), con el mismo esqueleto que el fixture del
@@ -1443,5 +1443,98 @@ describe('validación de la etapa 3 (canales remotos de la central, GDD §10)', 
     expect(definition.npcs.find(npc => npc.id === 'carmen')?.channels).toEqual([]);
     expect(definition.npcs.find(npc => npc.id === 'jorge')?.channels).toEqual(['email', 'call']);
     expect(validateCaseDefinition(definition).valid).toBe(true);
+  });
+});
+
+describe('detenciones automáticas (GDD §12)', () => {
+  // 'generado-fraude-7' cae en el ~30 % automático del hash djb2;
+  // 'generado-fraude-test' es interactivo, como los 11 casos del catálogo.
+  const AUTO_CASE_ID = 'generado-fraude-7';
+  function stage4bContext(caseId: string) {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const choice = resolveGenerationChoice(PARAMS);
+    return { geography, outputs, context: buildStageContext(4, choice, PARAMS, geography,
+      { premise: outputs.premise, npcs: outputs.npcs, world: outputs.cluesWorld }, undefined, 'b', caseId) };
+  }
+  // Ruta dorada automática: hablar con Carmen en la tercera ciudad,
+  // volver a la segunda, coordinar la detención desde allí y regresar a
+  // recuperar. En interactivo ese detain sería imposible por presencia.
+  function automaticRules(outputs: ReturnType<typeof fakeOutputs>, geography: SelectedGeography) {
+    const rules = structuredClone(outputs.cluesRules) as Record<string, unknown>;
+    const path = rules.goldenPath as Array<{ type: string; params: Record<string, unknown> }>;
+    const [, second, third] = geography.cities;
+    if (!second || !third) throw new Error('Geografía incompleta.');
+    const rewritten: typeof path = [];
+    for (const action of path) {
+      if (action.type === 'talk' && action.params.npcId === 'carmen') {
+        rewritten.push(action, { type: 'travel', params: { toCityId: second.id } });
+      } else if (action.type === 'detain') {
+        rewritten.push({ type: 'detain', params: { ...action.params, mode: 'automatic' } },
+          { type: 'travel', params: { toCityId: third.id } });
+      } else rewritten.push(action);
+    }
+    rules.goldenPath = rewritten;
+    return rules;
+  }
+
+  it('el contexto de la etapa 4b trae el tipo de detención fijado por el id', () => {
+    expect(stage4bContext(AUTO_CASE_ID).context.arrestType).toBe('automatic');
+    expect(stage4bContext('generado-fraude-test').context.arrestType).toBe('interactive');
+  });
+
+  it('el ensamblado fija el tipo de detención por el id del expediente', () => {
+    const { geography, outputs } = stage4bContext(AUTO_CASE_ID);
+    const definition = assembleDefinition({ caseId: AUTO_CASE_ID, choice: resolveGenerationChoice(PARAMS),
+      params: PARAMS, geography, premise: outputs.premise, npcs: outputs.npcs, clues: outputs.clues as Record<string, unknown> });
+    expect(definition.arrestType).toBe('automatic');
+    expect(validateCaseDefinition(definition).valid).toBe(true);
+  });
+
+  it('la validación de la etapa 4b exige el modo del expediente en el detain', () => {
+    const { geography, outputs } = stage4bContext(AUTO_CASE_ID);
+    const base = { geography, castIds: ['carmen', 'jorge', 'pablo'], world: outputs.cluesWorld };
+    const auto = automaticRules(outputs, geography);
+    expect(validateStagePart('b', auto, { ...base, arrestType: 'automatic' }).valid).toBe(true);
+    // La ruta interactiva original no vale para un caso automático…
+    const wrongMode = validateStagePart('b', outputs.cluesRules, { ...base, arrestType: 'automatic' });
+    expect(wrongMode.valid).toBe(false);
+    expect(wrongMode.errors.some(error => error.includes("mode 'interactive'"))).toBe(true);
+    // …y la automática no vale para uno interactivo.
+    expect(validateStagePart('b', auto, { ...base, arrestType: 'interactive' }).valid).toBe(false);
+    // Sin locationId ni mode, la ruta dorada no pasa la puerta.
+    const incomplete = structuredClone(auto) as Record<string, unknown>;
+    const path = incomplete.goldenPath as Array<{ type: string; params: Record<string, unknown> }>;
+    const detain = path.find(action => action.type === 'detain');
+    if (!detain) throw new Error('Sin detain en la ruta dorada.');
+    delete detain.params.locationId; delete detain.params.mode;
+    expect(validateStagePart('b', incomplete, { ...base, arrestType: 'automatic' }).valid).toBe(false);
+  });
+
+  it('el pipeline completo genera un caso automático jugable con detención remota', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          if ((context as Record<string, unknown>).part === 'a') return outputs.cluesWorld;
+          return (context as Record<string, unknown>).arrestType === 'automatic'
+            ? automaticRules(outputs, geography) : outputs.cluesRules;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config: PipelineConfig = { ...configWith(llm), caseId: AUTO_CASE_ID };
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(result.definition?.id).toBe(AUTO_CASE_ID);
+    expect(result.definition?.arrestType).toBe('automatic');
+    expect(result.draft.simulation?.playable).toBe(true);
+    expect(result.draft.simulation?.result).toBe('complete');
   });
 });
