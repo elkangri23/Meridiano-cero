@@ -11,6 +11,7 @@ describe('preferences', () => {
     expect(p.fontMode).toBe('retro');
     expect(p.textScale).toBe(100);
     expect(p.palette).toBe('default');
+    expect(p.highContrast).toBe(false);
     expect(p.language).toBe('es');
     expect(p.audio.muted).toBe(false);
     expect(p.tts.enabled).toBe(false);
@@ -47,7 +48,7 @@ describe('preferences', () => {
 
   it('normalizePreferences conserva valores validos', () => {
     const p = normalizePreferences({
-      fontMode: 'accessible', textScale: 140, palette: 'protanopia', language: 'en',
+      fontMode: 'accessible', textScale: 140, palette: 'protanopia', language: 'en', highContrast: true,
       audio: { musicVolume: 10, effectsVolume: 20, narrationVolume: 30, muted: true },
       tts: { enabled: true, voice: 'v1', rate: 1.5, autoRead: true },
       accessibility: { reducedMotion: true, focusVisible: false, skipNav: false, announceNarration: false },
@@ -55,10 +56,28 @@ describe('preferences', () => {
     expect(p.fontMode).toBe('accessible');
     expect(p.textScale).toBe(140);
     expect(p.palette).toBe('protanopia');
+    expect(p.highContrast).toBe(true);
     expect(p.language).toBe('en');
     expect(p.audio.muted).toBe(true);
     expect(p.tts.rate).toBe(1.5);
     expect(p.accessibility.focusVisible).toBe(false);
+  });
+
+  it('normalizePreferences activa el alto contraste con la paleta high-contrast', () => {
+    expect(normalizePreferences({ palette: 'high-contrast' }).highContrast).toBe(true);
+    expect(normalizePreferences({ palette: 'protanopia' }).highContrast).toBe(false);
+    expect(normalizePreferences({ palette: 'protanopia', highContrast: true }).highContrast).toBe(true);
+  });
+
+  it('createPreferenceStore guarda y carga el alto contraste', () => {
+    const store = createPreferenceStore();
+    const p = createDefaultPreferences();
+    p.highContrast = true;
+    p.palette = 'deuteranopia';
+    expect(store.save(p)).toBe(true);
+    const loaded = store.load();
+    expect(loaded.highContrast).toBe(true);
+    expect(loaded.palette).toBe('deuteranopia');
   });
 
   it('normalizePreferences sobre null/undefined devuelve defaults', () => {

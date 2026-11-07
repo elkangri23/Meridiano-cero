@@ -165,6 +165,35 @@ export function isSessionDto(value: unknown): value is SessionDto {
   return dtoRecord(value, 'csrfToken,profile') && profile(value.profile) &&
     typeof value.csrfToken === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value.csrfToken);
 }
+
+/** Perfil de detective (§13): alias y avatar pixel art por jugador. El alias
+ * es el nombre que se enseña donde hoy sale el nombre del detective; null
+ * significa «sin alias» y entonces se enseña el displayName de la cuenta.
+ * El avatar es una elección cerrada (sin subida de imágenes). */
+export const DETECTIVE_AVATARS = [
+  { id: 'detective', label: 'Detective' },
+  { id: 'archivista', label: 'Archivista' },
+  { id: 'forense', label: 'Forense' },
+  { id: 'inspector', label: 'Inspector' },
+  { id: 'rastreador', label: 'Rastreador' },
+] as const;
+export type DetectiveAvatar = (typeof DETECTIVE_AVATARS)[number]['id'];
+export function isDetectiveAvatar(value: unknown): value is DetectiveAvatar {
+  return typeof value === 'string' && DETECTIVE_AVATARS.some(entry => entry.id === value);
+}
+export interface DetectiveProfileDto {
+  /** Alias del detective; null si nunca se puso uno. */
+  alias: string | null;
+  avatar: DetectiveAvatar;
+  /** Nombre de la cuenta (respaldo cuando no hay alias). */
+  displayName: string;
+}
+export function isDetectiveProfileDto(value: unknown): value is DetectiveProfileDto {
+  if (!dtoRecord(value, 'alias,avatar,displayName')) return false;
+  const record = value as Record<string, unknown>;
+  return (record.alias === null || shortText(record.alias)) && isDetectiveAvatar(record.avatar) &&
+    shortText(record.displayName);
+}
 function isoDate(value: unknown): boolean {
   if (typeof value !== 'string' || value.length !== 24) return false;
   const date = new Date(value);

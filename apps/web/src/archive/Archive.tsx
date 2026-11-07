@@ -5,7 +5,10 @@ import { GenerationPanel } from './GenerationPanel';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChangeEvent } from 'react';
 import { caseLabel } from '@meridiano/case-schema';
+import type { DetectiveProfileDto, SessionDto } from '@meridiano/contracts';
 import { archiveApi } from './client';
+import { profileApi } from '../auth/client';
+import { avatarLabel, ProfileSection } from '../auth/ProfileSection';
 import { createArchiveModel } from './model';
 import type { ArchiveState, ConnectionStatus } from './model';
 import './archive.css';
@@ -75,12 +78,20 @@ function UnverifiedHint({ profile }: { profile: { emailVerified: boolean } | nul
   return <p>Correo sin verificar. Revisa tu bandeja de entrada.</p>;
 }
 
-function SessionBar({ state, model }: { state: any; model: any }) {
+/** Resumen del detective para la barra de sesión: alias si lo hay, si no el
+ * nombre de la cuenta, y la etiqueta del avatar. */
+function detectiveSessionLine(profile: { displayName: string } | null, detectiveProfile: DetectiveProfileDto | null): string {
+  if (!profile) return 'Sin sesión iniciada. Regístrate o entra para jugar.';
+  const alias = detectiveProfile?.alias ?? profile.displayName;
+  return detectiveProfile ? `Detective: ${alias} · Avatar: ${avatarLabel(detectiveProfile.avatar)}` : `Detective: ${alias}`;
+}
+
+function SessionBar({ state, model, detectiveProfile }: { state: any; model: any; detectiveProfile: DetectiveProfileDto | null }) {
   const busy = state.phase === 'loading';
   const isOffline = state.connectionStatus !== 'online';
   return (
     <section className="archive-session" aria-label="Sesión">
-      <p>{state.profile ? 'Detective: ' + state.profile.displayName : 'Sin sesión iniciada. Regístrate o entra para jugar.'}</p>
+      <p>{detectiveSessionLine(state.profile, detectiveProfile)}</p>
       <UnverifiedHint profile={state.profile} />
       <div className="archive-actions">
         {!state.profile && <><Link to="/registro">Crear cuenta</Link><Link to="/login">Entrar</Link></>}
@@ -102,6 +113,22 @@ function Archive() {
   const verified = searchParams.get('verified') === '1';
   const state = useSyncExternalStore(model.subscribe, model.getSnapshot);
   useEffect(() => { void model.refresh(); return model.dispose; }, [model]);
+  // Perfil de detective (§13): la sesión (con csrfToken) se lee aparte
+  // porque el modelo del archivo solo expone el perfil sin el token.
+  const [identity, setIdentity] = useState<SessionDto | null>(null);
+  const [detectiveProfile, setDetectiveProfile] = useState<DetectiveProfileDto | null>(null);
+  useEffect(() => {
+    if (!state.profile) { setIdentity(null); setDetectiveProfile(null); return; }
+    const controller = new AbortController();
+    (async () => {
+      const session = await archiveApi.me(controller.signal).catch(() => null);
+      if (controller.signal.aborted || !session) return;
+      setIdentity(session);
+      const profile = await profileApi.get(controller.signal).catch(() => null);
+      if (!controller.signal.aborted && profile) setDetectiveProfile(profile);
+    })();
+    return () => controller.abort();
+  }, [state.profile]);
   const opener = useRef<HTMLButtonElement | null>(null);
   const restoreFocus = useRef(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -122,7 +149,7 @@ function Archive() {
       <a className="skip-link" href="#command-input">Ir a la entrada de órdenes</a>
       <header className="archive-header"><span className="archive-mark" aria-hidden="true">M<span>0</span></span><div><p>Meridiano-cero · Agencia de investigación internacional</p><h1>Archivo de partidas</h1></div></header>
       <p className="archive-banner">Consulta del archivo · Aquí empiezas tus investigaciones y retomas las que tienes a medias.</p>
-      <SessionBar state={state} model={model} />
+      <SessionBar state={state} model={model} detectiveProfile={detectiveProfile} />
       {verified && <p role="status" className="archive-notice">Correo verificado. Ya puedes jugar.</p>}
       <p role="status" aria-live="polite" className="archive-notice">{state.notice}</p>
       {state.openingRunId && <button type="button" onClick={closeRun}>Cancelar consulta de ficha</button>}
@@ -130,6 +157,11 @@ function Archive() {
       {state.profile && <NewRun key={state.profile.id} state={state} model={model} />}
       {state.profile && <GenerationPanel key={state.profile.id + '-generation'} state={state} model={model} />}
       {state.profile && renderArchiveList(state, model, busy, filter, opener, closeRun, deleteTarget, setDeleteTarget)}
+      {state.profile && identity && <section className="archive-list" aria-label="Mi perfil de detective">
+        <p className="archive-overline">Perfil</p>
+        <h2>Mi perfil de detective</h2>
+        <ProfileSection identity={identity} profile={detectiveProfile} onSaved={setDetectiveProfile} />
+      </section>}
       <footer><Link to="/glosario">Glosario y reglas</Link> · Un detective por partida · Las consultas del archivo no avanzan el reloj del caso.</footer>
     </main>
   );

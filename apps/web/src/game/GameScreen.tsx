@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent, RefObject } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { archiveApi } from '../archive/client';
+import { profileApi } from '../auth/client';
+import { avatarLabel, ProfileSection } from '../auth/ProfileSection';
+import { paletteLabels, usePreferences } from '../preferences';
+import { resumeSummary } from './resume-summary';
 import { aiApi, AiError } from '../ai/client';
 import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
 import type { AiConnection, ConnectionsResponse, ConnectionTestResult, ProviderCatalogEntry } from '../ai/connections';
@@ -14,8 +18,9 @@ import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
+import type { DetectiveProfileDto } from '@meridiano/contracts';
 import { caseLabel, conversationRecordText, discoveryText, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
-import type { DiscoveryLookup } from '@meridiano/case-schema';
+import type { DiscoveryLookup, PaletteMode } from '@meridiano/case-schema';
 import './game.css';
 
 type OrderPhase =
@@ -43,6 +48,33 @@ const evidenceTypeLabels: Record<string, string> = { object: 'objeto', observati
 const difficultyLabels: Record<PlayerViewDto['difficulty'], string> = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' };
 function difficultyLabel(difficulty: PlayerViewDto['difficulty']): string {
   return difficultyLabels[difficulty];
+}
+
+/** Nombre del detective que se enseña en la cabecera: el alias si lo hay,
+ * si no el nombre de la cuenta. */
+function detectiveDisplayName(profile: DetectiveProfileDto | null, identity: SessionDto | null): string {
+  return profile?.alias ?? identity?.profile.displayName ?? '—';
+}
+
+/** Etiqueta del avatar que se enseña en la cabecera. */
+function detectiveAvatarName(profile: DetectiveProfileDto | null): string {
+  return profile ? avatarLabel(profile.avatar) : 'Detective';
+}
+
+/** Si la partida admite el resumen al retomar (en curso y ya empezada). */
+function resumeAvailable(view: PlayerViewDto): boolean {
+  return view.status === 'active' && view.clock.minute > 0;
+}
+
+/** Selector de paleta de daltonismo (§15): la paleta 'high-contrast' de la
+ * librería se enseña como 'Predeterminada' porque el alto contraste tiene
+ * su propio interruptor. */
+function PaletteSetting({ palette, onPalette }: { palette: PaletteMode; onPalette: (value: PaletteMode) => void }) {
+  return <label className="game-setting"><span>Paleta de daltonismo</span>
+    <select value={palette === 'high-contrast' ? 'default' : palette} onChange={event => onPalette(event.target.value as PaletteMode)}>
+      {(['default', 'protanopia', 'deuteranopia', 'tritanopia'] as const).map(mode => <option key={mode} value={mode}>{paletteLabels[mode]}</option>)}
+    </select>
+  </label>;
 }
 
 const gameErrorMessages: Record<GameErrorKind, string> = {
@@ -283,7 +315,7 @@ function SceneHourglass({ delta, animKey }: { delta: number; animKey: number }) 
   </span>;
 }
 
-function HeaderSection({ view, caseTitle, detective, clockPulse, onLogout }: { view: PlayerViewDto; caseTitle: string | null; detective: string; clockPulse: { key: number; delta: number } | null; onLogout: (() => void) | null }) {
+function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, onLogout }: { view: PlayerViewDto; caseTitle: string | null; detective: string; avatar: string; clockPulse: { key: number; delta: number } | null; onLogout: (() => void) | null }) {
   return <header className="game-header">
     <div className="game-agency">
       <div className="game-brand">
@@ -291,7 +323,7 @@ function HeaderSection({ view, caseTitle, detective, clockPulse, onLogout }: { v
         <div><p className="game-overline">Agencia de investigación internacional</p><h1>Meridiano cero</h1></div>
       </div>
       <div className="game-detective">
-        <span className="game-avatar" aria-hidden="true">{detective.slice(0, 1).toUpperCase()}</span>
+        <span className="game-avatar" title={`Avatar: ${avatar}`} aria-hidden="true">{avatar.slice(0, 1).toUpperCase()}</span>
         <div><strong>Detective: {detective}</strong><small>Referencia: {view.runId.slice(0, 8)} · Revisión {view.version}</small></div>
       </div>
       <div className="game-header-actions">
@@ -680,6 +712,32 @@ function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void
   return <button type="button" onClick={onOpen}>Introducción</button>;
 }
 
+/** Resumen al retomar la partida (§13): se abre solo al entrar en una
+ * partida en curso (minuto > 0, activa) salvo que ya se haya descartado en
+ * esta pestaña; queda recuperable desde la barra de herramientas. Los datos
+ * salen de `resumeSummary` (vista del jugador + estado del motor). */
+function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boolean; onDismiss: () => void }) {
+  if (!open) return null;
+  const summary = resumeSummary(view, lookupFromView(view), discoveryText);
+  return <section className="game-briefing" data-testid="resume-panel" aria-label="Resumen al retomar">
+    <p className="game-overline">Resumen al retomar</p>
+    <h2>Así quedó la investigación</h2>
+    <p>Minuto {summary.minute} de {summary.deadlineMinutes} · quedan {summary.remainingMinutes} min · Estás en {summary.currentCity}, {summary.currentLocation}.</p>
+    <h4>Objetivos</h4>
+    <ul>{summary.objectives.map(objective => <li key={objective.description}>{objective.achieved ? '✓' : '○'} {objective.description}</li>)}</ul>
+    <h4>Ciudades visitadas</h4>
+    <p>{summary.visitedCities.join(', ')}</p>
+    <h4>Últimos hallazgos</h4>
+    {summary.lastDiscoveries.length === 0
+      ? <p>Sin hallazgos todavía.</p>
+      : <ul>{summary.lastDiscoveries.map((discovery, index) => <li key={index}>{discovery}</li>)}</ul>}
+    <p>Detenciones: {summary.detentions} · Órdenes: {summary.warrants} · Solicitudes pendientes: {summary.pendingRequests.length === 0
+      ? 'ninguna'
+      : summary.pendingRequests.map(request => `${requestTypeLabels[request.type] ?? request.type} (min ${request.dueMinute})`).join(', ')}.</p>
+    <button type="button" onClick={onDismiss}>Seguir investigando</button>
+  </section>;
+}
+
 function DossierContent({ view }: { view: PlayerViewDto }) {
   const lookup = lookupFromView(view);
   const npcName = (id: string) => lookup.npcName(id);
@@ -993,8 +1051,10 @@ function AddConnectionForm({ catalog, csrfToken, onSaved, formMessage, formError
   </form>;
 }
 
-function SettingsContent({ identity, textScale, highContrast, onScale, onContrast }: {
-  identity: SessionDto | null; textScale: number; highContrast: boolean; onScale: (value: number) => void; onContrast: (value: boolean) => void;
+function SettingsContent({ identity, textScale, highContrast, palette, onScale, onContrast, onPalette, profile, onProfileSaved }: {
+  identity: SessionDto | null; textScale: number; highContrast: boolean; palette: PaletteMode;
+  onScale: (value: number) => void; onContrast: (value: boolean) => void; onPalette: (value: PaletteMode) => void;
+  profile: DetectiveProfileDto | null; onProfileSaved: (profile: DetectiveProfileDto) => void;
 }) {
   const [data, setData] = useState<ConnectionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1101,7 +1161,9 @@ function SettingsContent({ identity, textScale, highContrast, onScale, onContras
       </select>
     </label>
     <label className="game-setting"><span>Alto contraste</span><input type="checkbox" checked={highContrast} onChange={event => onContrast(event.target.checked)} /></label>
-    <p className="game-panel-note">Estos ajustes afectan solo a la presentación. También puedes usar el zoom de tu navegador.</p>
+    <PaletteSetting palette={palette} onPalette={onPalette} />
+    <p className="game-panel-note">Estos ajustes se guardan en este navegador y afectan solo a la presentación. También puedes usar el zoom de tu navegador.</p>
+    <ProfileSection identity={identity} profile={profile} onSaved={onProfileSaved} />
   </div>;
 }
 
@@ -1162,8 +1224,11 @@ export function GameScreen() {
   const [saveName, setSaveName] = useState('');
   const [replaceTarget, setReplaceTarget] = useState<SaveListItem | null>(null);
   const [loadTarget, setLoadTarget] = useState<SaveListItem | null>(null);
-  const [textScale, setTextScale] = useState(100);
-  const [highContrast, setHighContrast] = useState(false);
+  // Preferencias persistentes (§15): escala, contraste y paleta se guardan
+  // en localStorage y se aplican en <html>/<main> al cambiar.
+  const { preferences, updatePreferences } = usePreferences();
+  const [detectiveProfile, setDetectiveProfile] = useState<DetectiveProfileDto | null>(null);
+  const [resumeOpen, setResumeOpen] = useState(false);
   const [commRecipient, setCommRecipient] = useState('');
   const [commChannel, setCommChannel] = useState('call');
   const [commText, setCommText] = useState('');
@@ -1188,6 +1253,19 @@ export function GameScreen() {
   function dismissIntro() {
     if (runId) sessionStorage.setItem('meridiano:intro-seen:' + runId, '1');
     setIntroOpen(false);
+  }
+
+  // El resumen se abre solo al entrar en una partida en curso (minuto > 0,
+  // activa) salvo que ya se haya descartado en esta pestaña. Queda
+  // recuperable desde la barra de herramientas.
+  useEffect(() => {
+    if (view && view.status === 'active' && view.clock.minute > 0 && runId &&
+      !sessionStorage.getItem('meridiano:resume-seen:' + runId)) setResumeOpen(true);
+  }, [view, runId]);
+
+  function dismissResume() {
+    if (runId) sessionStorage.setItem('meridiano:resume-seen:' + runId, '1');
+    setResumeOpen(false);
   }
 
   const contacts = useMemo(() => (view ? contactsFromView(view) : []), [view]);
@@ -1227,6 +1305,11 @@ export function GameScreen() {
     if (generation.current !== ticket) return;
     if (!session) { setPhase('signed_out'); setNotice('No hay sesión iniciada.'); return; }
     setIdentity(session);
+    // El perfil de detective (alias/avatar) se carga con la sesión; si aún
+    // no hay fila, la API devuelve el avatar por defecto y sin alias.
+    const profile = await profileApi.get(controller.signal).catch(() => null);
+    if (generation.current !== ticket) return;
+    if (profile) setDetectiveProfile(profile);
     const [fresh, catalog] = await Promise.all([gameApi.view(runId, controller.signal), gameApi.catalog(controller.signal)]);
     if (generation.current !== ticket) return;
     setView(fresh);
@@ -1558,17 +1641,20 @@ export function GameScreen() {
     onMoveBy: windows.moveBy, onMinimize: windows.minimize, onRestore: windows.restore, onClose: windows.close,
   };
 
-  return <main className={`game${highContrast ? ' game-high-contrast' : ''}`} data-testid="game-screen" style={{ fontSize: `${16 * textScale / 100}px` }}>
-    <HeaderSection view={view} caseTitle={caseTitle} detective={identity?.profile.displayName ?? '—'} clockPulse={timeFeedback.clockPulse} onLogout={identity ? () => {
+  return <main className="game" data-testid="game-screen" style={{ fontSize: `${16 * preferences.textScale / 100}px` }}>
+    <HeaderSection view={view} caseTitle={caseTitle} detective={detectiveDisplayName(detectiveProfile, identity)}
+      avatar={detectiveAvatarName(detectiveProfile)} clockPulse={timeFeedback.clockPulse} onLogout={identity ? () => {
       void archiveApi.logout(identity.csrfToken, new AbortController().signal).finally(() => navigate('/'));
     } : null} />
 
     <p className="game-notice" role="status">{notice}</p>
 
     <IntroPanel view={view} open={introOpen} onDismiss={dismissIntro} />
+    <ResumePanel view={view} open={resumeOpen} onDismiss={dismissResume} />
 
     <div className="game-toolbar" role="toolbar" aria-label="Herramientas">
       <IntroButton view={view} onOpen={() => setIntroOpen(true)} />
+      {resumeAvailable(view) && <button type="button" onClick={() => setResumeOpen(true)}>Resumen</button>}
       {(Object.keys(windowLabels) as WindowId[]).map(id => (
         <button key={id} type="button" aria-pressed={windows.windows[id].open}
           onClick={event => windows.open(id, event.currentTarget)}>{windowLabels[id]}</button>
@@ -1607,7 +1693,10 @@ export function GameScreen() {
         onReplace={setReplaceTarget} onConfirmLoad={() => void confirmLoad()} onCancelLoad={() => setLoadTarget(null)} />
     </GameWindow>
     <GameWindow id="settings" title="Ajustes" state={windows.windows.settings} {...windowProps}>
-      <SettingsContent identity={identity} textScale={textScale} highContrast={highContrast} onScale={setTextScale} onContrast={setHighContrast} />
+      <SettingsContent identity={identity} textScale={preferences.textScale} highContrast={preferences.highContrast}
+        palette={preferences.palette} onScale={value => updatePreferences({ textScale: value })}
+        onContrast={value => updatePreferences({ highContrast: value })} onPalette={value => updatePreferences({ palette: value })}
+        profile={detectiveProfile} onProfileSaved={setDetectiveProfile} />
     </GameWindow>
     <GameWindow id="report" title="Informe final" state={windows.windows.report} {...windowProps}>
       <ReportContent view={view} />

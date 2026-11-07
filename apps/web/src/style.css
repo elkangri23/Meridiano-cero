@@ -6,3 +6,36 @@ h1 { line-height: 1.2; font-size: clamp(2rem, 6vw, 3rem); }
 button { font: inherit; padding: .7rem 1rem; background: #b3e5bf; color: #102219; border: 0; cursor: pointer; }
 button:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
 button:disabled { opacity: .65; cursor: wait; }
+
+/* Paletas de daltonismo (§15): anulan las variables del juego y del archivo
+ * (las reglas .game/.archive las definen con menos especificidad, así que
+ * estas ganan). Lo mismo para el alto contraste: su regla vivía solo en
+ * game.css y no llegaba al archivo; aquí cubre ambas pantallas. --teal solo
+ * se usa como fondo o borde (botón activo de la barra, tierra del atlas,
+ * borde del chat), nunca como texto: lo que se verifica de él es texto
+ * blanco sobre teal, no teal sobre negro. Pares verificados con script
+ * (WCAG AA >= 4.5): papel sobre panel, dorado sobre negro y sobre panel,
+ * apagado sobre negro y sobre panel, blanco sobre teal, cielo/óxido/error
+ * sobre negro y negro sobre dorado. La paleta por defecto no se toca: el
+ * botón activo blanco sobre teal #00aaaa (2,86) ya estaba así y cambiarlo
+ * alteraría el aspecto por defecto; queda como resto conocido. */
+html.game-high-contrast .game, html.game-high-contrast .archive {
+  --panel:#000000; --ink:#000000; --edge:#ffffff; --muted:#ffffff;
+}
+html.palette-protanopia .game, html.palette-protanopia .archive {
+  --panel:#0000aa; --gold:#ffe14d; --teal:#0077aa; --sky:#66bbff; --rust:#cc7700; --error:#ff8800;
+}
+html.palette-deuteranopia .game, html.palette-deuteranopia .archive {
+  --panel:#0000aa; --gold:#ffe14d; --teal:#006699; --sky:#66ccff; --rust:#b36b00; --error:#ff8800;
+}
+html.palette-tritanopia .game, html.palette-tritanopia .archive {
+  --panel:#4a0096; --gold:#ffd400; --teal:#007a99; --sky:#33cc99; --rust:#cc5500; --error:#ff5522;
+}
+
+/* Perfil de detective (§13): filas del formulario, con el mismo lenguaje
+ * que los ajustes del juego; viven aquí (global) porque el formulario se
+ * usa en la partida y en el archivo, y cada pantalla carga solo su CSS. */
+.profile-setting { display:flex; justify-content:space-between; align-items:center; gap:16px; border-bottom:1px solid var(--edge); padding:18px 0; font-size:.9em; min-height:48px; }
+.profile-setting input, .profile-setting select { box-sizing:border-box; background:#ffffff; color:#000000; font:inherit; padding:8px; }
+.profile-setting input[type="text"] { width:100%; max-width:22rem; }
+.profile-note { margin-top:20px; font-size:.7em; color:var(--muted); }

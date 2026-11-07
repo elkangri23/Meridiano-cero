@@ -31,6 +31,10 @@ export interface PresentationPreferences {
   fontMode: FontMode;
   textScale: number; // 100-200
   palette: PaletteMode;
+  /** Alto contraste como interruptor propio (la paleta 'high-contrast' del
+   * catálogo también lo activa al normalizar): la web lo enseñaba como
+   * `useState` local sin persistir, y la librería no lo cubría. */
+  highContrast: boolean;
   language: Language;
   audio: AudioSettings;
   tts: TTSSettings;
@@ -44,6 +48,7 @@ const DEFAULTS: PresentationPreferences = {
   fontMode: 'retro',
   textScale: 100,
   palette: 'default',
+  highContrast: false,
   language: 'es',
   audio: { musicVolume: 60, effectsVolume: 70, narrationVolume: 80, muted: false },
   tts: { enabled: false, voice: 'auto', rate: 1, autoRead: false },
@@ -69,6 +74,12 @@ export function clampRate(value: number): number {
   return Math.min(2, Math.max(0.5, Math.round(value * 100) / 100));
 }
 
+/** Alto contraste de unas preferencias en bruto: el interruptor propio o la
+ * paleta 'high-contrast' del catálogo. */
+function resolveHighContrast(input: Partial<PresentationPreferences>): boolean {
+  return input.highContrast === true || input.palette === 'high-contrast';
+}
+
 export function normalizePreferences(input: Partial<PresentationPreferences> | null | undefined): PresentationPreferences {
   const base = createDefaultPreferences();
   if (!input || typeof input !== 'object') return base;
@@ -85,6 +96,7 @@ export function normalizePreferences(input: Partial<PresentationPreferences> | n
     fontMode,
     textScale: clampScale(input.textScale ?? base.textScale),
     palette,
+    highContrast: resolveHighContrast(input),
     language,
     audio: {
       musicVolume: clampVolume(input.audio?.musicVolume ?? base.audio.musicVolume),

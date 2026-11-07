@@ -1,5 +1,5 @@
-import { isSessionDto } from '@meridiano/contracts';
-import type { SessionDto } from '@meridiano/contracts';
+import { isDetectiveAvatar, isDetectiveProfileDto, isSessionDto } from '@meridiano/contracts';
+import type { DetectiveAvatar, DetectiveProfileDto, SessionDto } from '@meridiano/contracts';
 
 /** Sesión que devuelven registro e inicio de sesión: incluye si el correo está verificado. */
 export interface AuthSession {
@@ -154,6 +154,31 @@ export const authApi: AuthApi = {
     if (response.status === 401) { await response.body?.cancel(); return null; }
     const body = await read(response);
     if (!isSessionDto(body)) throw new AuthError('invalid');
+    return body;
+  },
+};
+
+/** Perfil de detective (§13): alias y avatar. La sesión (AuthSession o
+ * SessionDto) aporta el csrfToken; el alias es null cuando aún no hay fila
+ * de detective (entonces se enseña el displayName de la cuenta). */
+export interface DetectiveProfileApi {
+  get(signal: AbortSignal): Promise<DetectiveProfileDto>;
+  update(identity: { csrfToken: string }, patch: { alias?: string; avatar?: DetectiveAvatar }, signal: AbortSignal): Promise<DetectiveProfileDto>;
+}
+
+export const profileApi: DetectiveProfileApi = {
+  async get(signal: AbortSignal): Promise<DetectiveProfileDto> {
+    const body = await read(await request('/api/v1/profile/detective', signal));
+    if (!isDetectiveProfileDto(body)) throw new AuthError('invalid');
+    return body;
+  },
+
+  async update(identity: { csrfToken: string }, patch: { alias?: string; avatar?: DetectiveAvatar }, signal: AbortSignal): Promise<DetectiveProfileDto> {
+    if (patch.alias !== undefined && (patch.alias.trim().length === 0 || patch.alias.length > 160)) throw new AuthError('invalid');
+    if (patch.avatar !== undefined && !isDetectiveAvatar(patch.avatar)) throw new AuthError('invalid');
+    const body = await read(await request('/api/v1/profile/detective', signal,
+      { method: 'PATCH', headers: { ...jsonHeaders(), 'x-csrf-token': identity.csrfToken }, body: JSON.stringify(patch) }));
+    if (!isDetectiveProfileDto(body)) throw new AuthError('invalid');
     return body;
   },
 };
