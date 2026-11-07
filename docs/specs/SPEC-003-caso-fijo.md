@@ -47,15 +47,15 @@ Las solicitudes tienen coste de envío 0 y resultados según el reloj interno. E
 
 Orden de Inés: suficiente con EV-03 + EV-04 (ruta técnica), o EV-06 + EV-07 + EV-08 (ruta documental). No consultar culpabilidad para concederla. Orden de Tomás: EV-09 + EV-10 satisface el umbral ficticio de indicios, pero no acredita el robo. Esto permite ensayar una detención errónea basada en hechos veraces. La orden de acceso a L-7 se emite junto a orden de Inés una vez EV-05 o EV-08 vincula el depósito.
 
-Inés se localiza mediante EV-05 o EV-08. Tomás permanece en Madrid. Detención en presencia: 15 minutos para cualquiera; request_warrant tarda 30 minutos como solicitud programada. Una vez orden y ubicación conocidas, nadie se fuga.
+Inés se localiza mediante EV-05 o EV-08. Tomás permanece en Madrid. Detención automática (GDD §12): el caso fijo se coordina con las autoridades, 30 minutos, sin exigir presencia; la detención en persona (15 minutos) solo existe en los expedientes interactivos. request_warrant tarda 30 minutos como solicitud programada. Una vez orden y ubicación conocidas, nadie se fuga.
 
 ## Costes y rutas de aceptación
 
 Viajes directos simétricos de prueba: Madrid–París 180 min; París–Lisboa 150 min; Madrid–Lisboa 120 min. No son horarios ni tarifas reales. Fixture base sin retraso; variantes seeded aplican +45 min a cada tramo para probar margen máximo. Inspección repetida ya resuelta no cobra de nuevo salvo nueva acción material distinta. No hay coste por leer o dialogar.
 
-Ruta A, sin EV-06/07/08: general 10 + cerradura 20 + viaje París 180 (EV-03 madura en trayecto) + consulta herramienta y traslado paralelas, espera 30 + orden espera 30 + viaje Lisboa 150 + detención 15 + recuperación 20 = 455 min. Con retrasos máximos en dos tramos: 545 min.
+Ruta A, sin EV-06/07/08: general 10 + cerradura 20 + viaje París 180 (EV-03 madura en trayecto) + consulta herramienta y traslado paralelas, espera 30 + orden espera 30 + viaje Lisboa 150 + detención automática 30 + recuperación 20 = 470 min. Con retrasos máximos en dos tramos: 560 min.
 
-Ruta B, sin EV-02/03/04/05: general 10 + caja 20 + viaje París 180 + verificación firma espera 30 + viaje Lisboa 150 + custodia espera 30 + orden espera 30 + detención 15 + recuperación 20 = 485 min; con retrasos máximos: 575 min.
+Ruta B, sin EV-02/03/04/05: general 10 + caja 20 + viaje París 180 + verificación firma espera 30 + viaje Lisboa 150 + custodia espera 30 + orden espera 30 + detención automática 30 + recuperación 20 = 500 min; con retrasos máximos: 590 min.
 
 Ambas rutas son independientes en pruebas decisivas, comparten ciudades/objetivo y terminan antes de 2.880. Consultas y orden se explicitan en guiones de prueba, no como ayuda al jugador. Un test elimina las evidencias exclusivas de la otra ruta y sigue completando el caso.
 
@@ -83,11 +83,11 @@ Todos maduran a +30 minutos. Hablar con Lucía sobre topicId=caja revela EV-09 s
 
 Solicitar orden requiere evidenceIds explícitos. Inés: EV-03/04 o EV-06/07/08; Tomás: EV-09/10. La orden de acceso exige además EV-05 u EV-08 incluida en esa selección, conocida y admisible. Se distingue prueba poseída de prueba ofrecida al juzgado.
 
-Las simulaciones actuales encadenan ambas rutas sin insertar pistas en CaseRun, incluso eliminando las evidencias exclusivas de la otra ruta. Esto verifica obtención, solicitudes, autoridad y desenlace, **no cierra ACC-008/009**: todavía faltan los costes materiales y confirmaciones de esta spec. Los 455/485 minutos y máximos de retraso anteriores siguen siendo objetivos, no duraciones acreditadas por v3. Las semillas sintéticas ensayadas no sustituyen el ensayo de todos los extremos del retraso. [Resultados y límites](../quality/T2-evidencias-ordenes-v3.md).
+Las simulaciones actuales encadenan ambas rutas sin insertar pistas en CaseRun, incluso eliminando las evidencias exclusivas de la otra ruta. Esto verifica obtención, solicitudes, autoridad y desenlace, **no cierra ACC-008/009**: todavía faltan los costes materiales y confirmaciones de esta spec. Los 470/500 minutos y máximos de retraso anteriores siguen siendo objetivos, no duraciones acreditadas por v3. Las semillas sintéticas ensayadas no sustituyen el ensayo de todos los extremos del retraso. [Resultados y límites](../quality/T2-evidencias-ordenes-v3.md).
 
 ## Verificación de costes en ejecución v4
 
-Las rutas encadenadas ahora cobran las inspecciones, detención y recuperación de esta spec y solicitan aprobación antes del coste. Sin pruebas exclusivas de la otra ruta, semilla sintética 1: A=455 minutos, B=485; semilla original 42: A=482, B=512 por retraso determinista. El laboratorio madura a minuto 120 en la ruta A: se envía después de los primeros 30 minutos de inspección, con demora de 90. No cambia la semilla del expediente existente.
+Las rutas encadenadas ahora cobran las inspecciones, detención y recuperación de esta spec y solicitan aprobación antes del coste. Sin pruebas exclusivas de la otra ruta, semilla sintética 1: A=470 minutos, B=500; semilla original 42: A=497, B=527 por retraso determinista. El laboratorio madura a minuto 120 en la ruta A: se envía después de los primeros 30 minutos de inspección, con demora de 90. No cambia la semilla del expediente existente.
 
 Esto acredita los tiempos base y las variantes ensayadas, pero no cierra por sí solo ACC-008/009 ni la fase: faltan los extremos de retraso, validador y demás puertas de calidad. El generador seeded heredado no acredita la variante máxima de +45 por tramo; no se redefine el equilibrio silenciosamente para hacer pasar ese objetivo. [Registro v4](../quality/T2-costes-confirmaciones-v4.md).
 
@@ -97,7 +97,7 @@ Se ejecutan ambas rutas agrupando inspección/recogida/laboratorio y consultas/e
 
 ## Aceptación temporal de motor v8
 
-La variante sintética seed=14194 produce +45 minutos reales en cada uno de los dos tramos mediante el mezclador normal; no se altera travelDurations ni se usa un resolver simulado. Ruta A sin pruebas exclusivas B completa en 545; B sin pruebas exclusivas A, en 575. Semillas 1 y original 42 completan ahora en 455/485, por la política v8 versionada; las cifras previas de seed=42 son evidencia histórica de otros motores.
+La variante sintética seed=14194 produce +45 minutos reales en cada uno de los dos tramos mediante el mezclador normal; no se altera travelDurations ni se usa un resolver simulado. Ruta A sin pruebas exclusivas B completa en 560; B sin pruebas exclusivas A, en 590. Semillas 1 y original 42 completan ahora en 470/500, por la política v8 versionada; las cifras previas de seed=42 son evidencia histórica de otros motores.
 
 Las rutas agrupadas y las individuales coinciden en hechos, procedencia y desenlace. Con deadline=545/575, recuperar empata con el plazo y no materializa el original: resultado partial con Inés detenida. Con Lucía a cooperación cero, su conversación no revela EV-09 y ambas rutas materiales siguen resolviéndose incluso con los dos máximos.
 

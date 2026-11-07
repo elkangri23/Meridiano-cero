@@ -16,6 +16,8 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - **Lote (secuencia):** agrupación de acciones con pausa, continuación confirmada y cancelación.
 - **Autoguardado:** guardado automático continuo.
 - **Guardado manual:** hasta 10 por partida; permite regresar a un punto anterior.
+- **Detención automática:** detención coordinada con las autoridades por orden de A.C.M.E., sin que el detective viaje a detener en persona. Cuesta 30 min y exige orden válida e identidad y ubicación conocidas.
+- **Detención en persona:** detención que hace el detective en la ciudad y el lugar del sospechoso. Cuesta 15 min y exige lo mismo que la automática, más la presencia.
 - **Primer resultado oficial:** primer cierre de caso que cuenta para carrera y reputación.
 - **Carrera / reputación:** progreso del detective; idempotente, sin duplicación por repeticiones.
 - **Archivo:** listado de partidas propias con filtros y paginación.
@@ -29,14 +31,14 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 4. El plazo gana en caso de empate con una acción.
 5. Las órdenes ambiguas piden aclaración antes de actuar; no se elige una interpretación ni se ejecuta parcialmente.
 6. La detención no cierra el caso por sí misma.
-7. No se filtra la verdad antes del informe final.
-8. Ningún compañero sugiere la siguiente pista.
+7. No se filtra la verdad antes del informe final.8. Ningún compañero sugiere la siguiente pista.
 9. Las pruebas excluyentes de cada ruta se mantienen sin inyectar conocimiento.
 10. Hasta 10 guardados manuales por partida, además del autoguardado; no se borran automáticamente al alcanzar el límite.
 11. Cargar un guardado manual permite regresar a un punto anterior del mismo caso y probar otras decisiones.
 12. Los lotes admiten pausa, continuación confirmada y cancelación; el plazo interrumpe sin aplicar el resto ni efecto terminal.
 13. Las acciones irregulares (forzar un acceso, sobornar, suplantar) cuestan 30 min, siempre piden confirmación con los riesgos, y lo obtenido por esa vía no es admisible como prueba. Solo te pueden ver los personajes de la misma ciudad; a la tercera vez que te ven, A.C.M.E. retira el caso. Cada acto descuenta 10 puntos en el informe final. Ninguna acción irregular revela la solución.
 14. Ninguna consecuencia reescribe la verdad del caso.
+15. Cada expediente fija su tipo de detención (en persona o automática) al generarse; la automática se coordina con las autoridades desde cualquier ciudad (30 min) y la en persona exige presencia (15 min). Ambas exigen orden válida e identidad y ubicación conocidas, y una detención errónea penaliza igual en el informe final. Ninguna detención ocurre sin que el jugador la pida.
 
 ## Costes y tiempos
 
@@ -46,11 +48,15 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - Laboratorio programado: +90 al reloj interno.
 - Consultas paralelas: +30 al reloj interno.
 - Acciones irregulares: +30 al reloj interno cada una.
+- Detención en persona: +15 al reloj interno; detención automática (coordinación con las autoridades): +30.
 
 ## FAQ
 
 **¿Qué pasa si me ven en una acción irregular?**
 A.C.M.E. te advierte y los testigos dejan de cooperar contigo. A la tercera vez que te ven, retiran el caso y la partida se cierra. El informe final descuenta 10 puntos por acto.
+
+**¿Qué es una detención automática?**
+En algunos expedientes (unas tres de cada diez, y en el caso fijo siempre), la detención no la haces tú en persona: la coordinas con las autoridades. Hacen falta lo mismo que en persona —orden válida e identidad y ubicación conocidas— pero no tienes que viajar a la ciudad del sospechoso; cuesta 30 min de coordinación. La consola dice que actúan las autoridades, y una detención errónea penaliza igual que una manual.
 
 **¿Puede una acción irregular resolver el caso?**
 No. Nunca revela la solución ni sustituye las pruebas: lo obtenido por esa vía no es admisible y no puede sostener una orden.

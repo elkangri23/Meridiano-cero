@@ -35,7 +35,7 @@ No hay multijugador: cada partida pertenece a un único usuario propietario.
 - **Consultar:** pedir análisis al laboratorio (coste de tiempo).
 - **Ordenar:** solicitar mandamientos/órdenes con admisibilidad.
 - **Comunicar:** enviar mensajes al equipo (copia privada, acuse a +30 del reloj interno).
-- **Detener/Recuperar:** intervenciones con confirmación.
+- **Detener/Recuperar:** intervenciones con confirmación. Cada expediente fija su tipo de detención: en persona (15 min, hay que estar en la ciudad del sospechoso) o automática (30 min de coordinación: actúan las autoridades y no hace falta viajar). En ambos casos hacen falta orden válida e identidad y ubicación conocidas (ver «Detenciones automáticas» más abajo).
 - **Acciones irregulares:** forzar un acceso, sobornar o suplantar. Cuestan 30 min cada una, siempre piden confirmación con los riesgos, y lo obtenido por esa vía no es admisible como prueba (ver «Acciones irregulares» más abajo).
 - **Cerrar:** finalizar el caso tras confirmación.
 
@@ -61,6 +61,17 @@ Puedes intentar forzar el acceso al lugar de recuperación cuando exige orden y 
 - **Lo obtenido no es admisible:** lo que recuperes tras forzar el acceso y lo que te cuenten sobornado o suplantado no puede sostener una orden. El informe final descuenta **10 puntos por acto** y lista cada acto con su minuto y si te vieron.
 - Sobornar o suplantar revela exactamente lo que revelaría una conversación normal con ese personaje; si ya no coopera contigo, es la única vía para que te cuente lo que sabe (sin restaurar la cooperación).
 - «Entrar sin permiso» no tiene acción propia: no hay ubicaciones inaccesibles en los expedientes; el acceso restringido es el del lugar de recuperación y se fuerza con «Forzar el acceso».
+
+## Detenciones automáticas
+
+Cada expediente fija su tipo de detención al generarse (en el caso fijo, automática): unas tres de cada diez son automáticas y el resto, en persona. El tipo no se elige ni se cambia durante la partida.
+
+- **Automática:** cuando tienes la orden válida y conoces la identidad y la ubicación del sospechoso, puedes coordinar la detención con las autoridades **desde cualquier ciudad**, sin viajar a detener en persona. Cuesta **30 min** de coordinación y siempre pide confirmación. La consola lo dice claro: «Las autoridades han detenido a X por orden de A.C.M.E.».
+- **En persona:** cuesta **15 min** y exige estar en la ciudad y en el lugar exactos del sospechoso.
+- **Nunca es una sorpresa:** la detención solo ocurre cuando tú la pides (con la orden ya concedida); nadie detiene por ti sin que lo ordenes, y el sospechoso no se fuga mientras tienes orden y ubicación conocidas.
+- **Los testigos reaccionan:** los personajes de la ciudad del detenido —y el propio detenido— saben que ocurrió y pueden hablar de ello si les preguntas.
+- **Una detención errónea penaliza igual en ambos modos:** el informe final la valora como incorrecta (−20 puntos) y el resultado es «incorrecto».
+- **Las pruebas inadmisibles no sirven:** una orden pedida con pruebas obtenidas por una acción irregular se deniega al madurar, así que nunca puede sostener una detención, ni automática ni en persona.
 
 ## Errores y conexión
 
