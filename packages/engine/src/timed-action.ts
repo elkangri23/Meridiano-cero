@@ -1,4 +1,5 @@
 import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
+import { DOCUMENT_SEND_MINUTES } from '@meridiano/case-schema';
 import type { Action, ActionResult } from './types.js';
 import { isFixedCase } from './fixed-case.js';
 import { inspectedEvidence, knowsEvidence } from './fixed-evidence.js';
@@ -15,6 +16,11 @@ function inspectMinutes(run: CaseRun, action: Action, resolve: (targetId: string
 }
 
 export function materialMinutes(def: CaseDefinition, run: CaseRun, action: Action): number {
+  if (action.type === 'communicate') {
+    // Enviar un documento es un trámite (GDD §9/§10); escribir un mensaje
+    // sin documento no cuesta tiempo (conversar o leer no cuesta tiempo).
+    return typeof action.params.documentId === 'string' ? DOCUMENT_SEND_MINUTES : 0;
+  }
   if (!isFixedCase(def)) {
     // Expediente generado (T4-08): los mismos costes que el caso fijo.
     return inspectMinutes(run, action, (targetId, element) => generatedInspectEvidence(def, targetId, element)?.evidenceId);

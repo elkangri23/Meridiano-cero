@@ -60,6 +60,14 @@ describe('textos legibles del caso fijo', () => {
     expect(conversationRecordText('talk:tomas@0', lookup.npcName)).toBe('Hablaste con Tomás Ríos (min 0).');
     expect(conversationRecordText('talk:lucia@30', lookup.npcName)).toBe('Hablaste con Lucía (min 30).');
     expect(conversationRecordText('communication_received:req-2@30', lookup.npcName)).toBe('Respuesta recibida (min 30).');
+    expect(conversationRecordText('communication_sent:req-2:email:lucia@10', lookup.npcName))
+      .toBe('Enviaste un mensaje a Lucía por correo (min 10).');
+    expect(conversationRecordText('communication_sent:req-3:call:tomas:EV-02@40', lookup.npcName, id => id === 'EV-02' ? 'La cerradura de la vitrina tiene residuo de herramienta.' : undefined))
+      .toBe('Enviaste a Tomás Ríos por llamada el documento «La cerradura de la vitrina tiene residuo de herramienta.» (min 40).');
+    expect(conversationRecordText('communication_sent:req-3:call:tomas:EV-02@40', lookup.npcName))
+      .toBe('Enviaste a Tomás Ríos por llamada el documento «EV-02» (min 40).');
+    expect(conversationRecordText('communication_sent:req-2:email:desconocido@10', lookup.npcName))
+      .toBe('communication_sent:req-2:email:desconocido@10');
     expect(conversationRecordText('algo-raro', lookup.npcName)).toBe('algo-raro');
   });
 

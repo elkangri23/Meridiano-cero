@@ -27,6 +27,16 @@ function npc(value: DataRecord, errors: string[]) {
   check(text(value.name), 'npcs.name', errors);
   check(integer(value.cooperation, 0) && Number(value.cooperation) <= 10, 'npcs.cooperation', errors);
   strings(value.knowledge, 'npcs.knowledge', errors);
+  // Canales remotos opcionales (central de comunicaciones, GDD §10): si
+  // están, 0-5 canales válidos sin repetir; una lista vacía declara
+  // explícitamente que el personaje solo habla en persona (sin ella, el
+  // motor hereda los del catálogo en el caso fijo o llamada y correo en
+  // un generado). Si no están, el motor hereda como antes.
+  if (value.channels !== undefined) {
+    check(Array.isArray(value.channels) && value.channels.length <= 5 &&
+      value.channels.every(channel => typeof channel === 'string' && ['call', 'whatsapp', 'sms', 'email', 'fax'].includes(channel)) &&
+      new Set(value.channels as unknown[]).size === (value.channels as unknown[]).length, 'npcs.channels', errors);
+  }
 }
 
 function evidence(value: DataRecord, errors: string[]) {

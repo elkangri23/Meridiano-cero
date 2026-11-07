@@ -37,7 +37,7 @@ type ScreenPhase = 'loading' | 'ready' | 'signed_out' | 'not_found' | 'error';
 type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
 
 const windowLabels: Record<WindowId, string> = {
-  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio y comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia',
+  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio', comms: 'Central de comunicaciones', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia',
 };
 const channelLabels: Record<string, string> = { call: 'Llamada', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Correo', fax: 'Fax' };
 const requestTypeLabels: Record<string, string> = { analysis: 'Análisis', query: 'Consulta', request: 'Solicitud' };
@@ -95,7 +95,17 @@ function errorMessage(error: unknown): string {
   return 'Error inesperado.';
 }
 
-function contactsFromView(view: PlayerViewDto): Array<{ id: string; name: string }> {
+/** Contacto de la central (GDD §10): un personaje con el que ya se habló
+ * en persona, con los canales que tiene. La regla es la de siempre: el
+ * motor exige relación previa (`talk:<id>@` en la conversación); los
+ * canales salen de los datos de charla de la vista, nunca inventados. */
+export interface Contact {
+  id: string;
+  name: string;
+  channels: string[];
+}
+
+function contactsFromView(view: PlayerViewDto): Contact[] {
   // Solo contactos con los que ya se habló: el motor exige relación previa.
   const met = new Set<string>();
   for (const record of view.conversation) {
@@ -103,7 +113,11 @@ function contactsFromView(view: PlayerViewDto): Array<{ id: string; name: string
     if (id) met.add(id);
   }
   const names = npcNamesFromView(view);
-  return [...met].map(id => ({ id, name: names.get(id) ?? id }));
+  return [...met].map(id => ({
+    id,
+    name: names.get(id) ?? id,
+    channels: view.npcChat.find(entry => entry.id === id)?.channels ?? [],
+  }));
 }
 
 /** Nombres de los personajes a partir de las etiquetas de las ofertas de
@@ -837,10 +851,9 @@ function LabAnalysisItem({ offer, view, pendingAnalysis, disabled, onAnalyze }: 
   </li>;
 }
 
-function LabContent({ view, contacts, recipient, channel, text, busy, labOffers, disabled, onRecipient, onChannel, onText, onSend, onAnalyze, onOpenIntel }: {
-  view: PlayerViewDto; contacts: Array<{ id: string; name: string }>; recipient: string; channel: string; text: string; busy: boolean;
+function LabContent({ view, labOffers, disabled, onAnalyze, onOpenIntel }: {
+  view: PlayerViewDto;
   labOffers: PublicActionOffer[]; disabled: boolean;
-  onRecipient: (value: string) => void; onChannel: (value: string) => void; onText: (value: string) => void; onSend: (event: FormEvent) => void;
   onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenIntel: () => void;
 }) {
   // Un solo análisis por expediente: una solicitud de tipo análisis en
@@ -863,21 +876,87 @@ function LabContent({ view, contacts, recipient, channel, text, busy, labOffers,
     {view.pendingRequests.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin solicitudes pendientes. Las consultas tardan 30 min de juego; cada análisis indica su propio tiempo.</p></div>
       : <ul className="game-destination-list">{view.pendingRequests.map(item => <li key={item.id}><span><strong>{requestTypeLabels[item.type] ?? item.type}</strong><small>Responde en el minuto {item.dueMinute} (ahora {view.clock.minute})</small></span></li>)}</ul>}
-    <h4>Contactar</h4>
-    {contacts.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Habla primero con alguien en persona para poder contactarlo después.</p></div>
-      : <form onSubmit={onSend}>
-        <label>Destinatario <select value={recipient} onChange={event => onRecipient(event.target.value)}>
-          <option value="">Elige…</option>
-          {contacts.map(contact => <option key={contact.id} value={contact.id}>{contact.name}</option>)}
-        </select></label>
-        <label>Canal <select value={channel} onChange={event => onChannel(event.target.value)}>
-          {Object.entries(channelLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select></label>
-        <label>Mensaje <input type="text" value={text} onChange={event => onText(event.target.value)} maxLength={4000} /></label>
-        <button type="submit" disabled={!recipient || !text.trim() || busy}>Enviar mensaje</button>
-      </form>}
     <p className="game-panel-note">Consultar este panel no consume tiempo.</p>
+  </div>;
+}
+
+/** Central de comunicaciones (GDD §10): contactos con sus canales, envío
+ * de mensajes y documentos del dossier, e historial de lo comunicado. Solo
+ * se ofrece lo que el contacto tiene: un canal que no tiene no aparece, y
+ * un documento solo se puede enviar si está en poder del jugador
+ * (`view.objects` son las pruebas recogidas, nunca la solución ni pruebas
+ * no halladas). */
+function CommsContactList({ contacts }: { contacts: Contact[] }) {
+  if (contacts.length === 0) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Habla primero con alguien en persona para poder contactarlo después.</p></div>;
+  return <ul className="game-destination-list">{contacts.map(contact => <li key={contact.id}>
+    <span><strong>{contact.name}</strong><small>{contact.channels.length > 0
+      ? contact.channels.map(item => channelLabels[item] ?? item).join(', ')
+      : 'Sin canales remotos: solo en persona'}</small></span>
+  </li>)}</ul>;
+}
+
+function CommsSendForm({ view, contacts, recipient, channel, channels, documentId, text, busy, onRecipient, onChannel, onDocument, onText, onSend }: {
+  view: PlayerViewDto; contacts: Contact[]; recipient: string; channel: string; channels: string[]; documentId: string; text: string; busy: boolean;
+  onRecipient: (value: string) => void; onChannel: (value: string) => void; onDocument: (value: string) => void; onText: (value: string) => void;
+  onSend: (event: FormEvent) => void;
+}) {
+  return <form onSubmit={onSend} data-testid="comms-form">
+    <label>Destinatario <select data-testid="comms-recipient" value={recipient} onChange={event => onRecipient(event.target.value)}>
+      <option value="">Elige…</option>
+      {contacts.map(contact => <option key={contact.id} value={contact.id}>{contact.name}</option>)}
+    </select></label>
+    <label>Canal <select data-testid="comms-channel" value={channel} onChange={event => onChannel(event.target.value)} disabled={channels.length === 0}>
+      {channels.map(item => <option key={item} value={item}>{channelLabels[item] ?? item}</option>)}
+    </select></label>
+    <label>Mensaje <input type="text" data-testid="comms-text" value={text} onChange={event => onText(event.target.value)} maxLength={4000} /></label>
+    <label>Documento <select data-testid="comms-document" value={documentId} onChange={event => onDocument(event.target.value)}>
+      <option value="">Sin documento</option>
+      {view.objects.map(item => <option key={item.id} value={item.id}>{view.evidenceTexts[item.id] ?? item.id}</option>)}
+    </select></label>
+    <button type="submit" data-testid="comms-send" disabled={!recipient || channels.length === 0 || !text.trim() || busy}>
+      {documentId ? 'Enviar documento' : 'Enviar mensaje'}</button>
+  </form>;
+}
+
+function CommsHistoryItem({ view, contacts, record, onAskReply }: {
+  view: PlayerViewDto; contacts: Contact[]; record: PlayerViewDto['communications'][number];
+  onAskReply: (record: PlayerViewDto['communications'][number]) => void;
+}) {
+  const name = contacts.find(contact => contact.id === record.recipientId)?.name
+    ?? view.npcChat.find(entry => entry.id === record.recipientId)?.name ?? record.recipientId;
+  return <li>
+    <span><strong>A {name} por {channelLabels[record.channel] ?? record.channel}</strong>
+      <small>{record.requestText}</small>
+      {record.documentId && <small>Documento: {view.evidenceTexts[record.documentId] ?? record.documentId}</small>}
+      <small>Enviado min {record.sentMinute} · {record.receivedMinute !== undefined
+        ? `Acuse recibido min ${record.receivedMinute}` : `Acuse sobre el min ${record.dueMinute}`}</small></span>
+    {record.receivedMinute !== undefined && <span> <button type="button" data-testid={`comms-ask-${record.id}`}
+      onClick={() => onAskReply(record)}>Preguntar por la respuesta</button></span>}
+  </li>;
+}
+
+function CommsContent({ view, contacts, recipient, channel, documentId, text, busy, onRecipient, onChannel, onDocument, onText, onSend, onAskReply }: {
+  view: PlayerViewDto; contacts: Contact[]; recipient: string; channel: string; documentId: string; text: string; busy: boolean;
+  onRecipient: (value: string) => void; onChannel: (value: string) => void; onDocument: (value: string) => void; onText: (value: string) => void;
+  onSend: (event: FormEvent) => void;
+  onAskReply: (record: PlayerViewDto['communications'][number]) => void;
+}) {
+  const selected = contacts.find(contact => contact.id === recipient);
+  const channels = selected?.channels ?? [];
+  return <div>
+    <h4>Contactos</h4>
+    <CommsContactList contacts={contacts} />
+    <h4>Enviar</h4>
+    {contacts.length === 0 ? null : <CommsSendForm view={view} contacts={contacts} recipient={recipient} channel={channel}
+      channels={channels} documentId={documentId} text={text} busy={busy} onRecipient={onRecipient} onChannel={onChannel}
+      onDocument={onDocument} onText={onText} onSend={onSend} />}
+    {documentId && <p className="game-panel-note">Enviar un documento es un trámite: cuesta 30 min de juego.</p>}
+    <h4>Historial</h4>
+    {view.communications.length === 0
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin envíos todavía. Lo que envíes quedará aquí registrado.</p></div>
+      : <ul className="game-destination-list" data-testid="comms-history">{view.communications.map(record =>
+        <CommsHistoryItem key={record.id} view={view} contacts={contacts} record={record} onAskReply={onAskReply} />)}</ul>}
+    <p className="game-panel-note">Escribir un mensaje no cuesta tiempo; enviar un documento cuesta 30 min. El acuse llega a su hora, incluso mientras viajas.</p>
   </div>;
 }
 
@@ -1322,6 +1401,10 @@ export function GameScreen() {
   const [commRecipient, setCommRecipient] = useState('');
   const [commChannel, setCommChannel] = useState('call');
   const [commText, setCommText] = useState('');
+  const [commDocument, setCommDocument] = useState('');
+  /** Hechos autorizados extra para la próxima pregunta de chat: el texto
+   * del documento enviado a ese personaje, para poder preguntarle por él. */
+  const [chatExtraFacts, setChatExtraFacts] = useState<{ npcId: string; facts: Array<{ id: string; text: string }> } | null>(null);
   const [introOpen, setIntroOpen] = useState(false);
   const [chatNpc, setChatNpc] = useState<{ id: string; name: string } | null>(null);
   const [chatTurns, setChatTurns] = useState<ChatTurn[]>([]);
@@ -1516,8 +1599,13 @@ export function GameScreen() {
     const text = chatDraft.trim();
     if (!text || !runId || !identity || !chatNpc || chatBusy) return null;
     const npcId = chatNpc.id;
+    // Hechos extra de la central: si la pregunta viene de preguntar por
+    // un documento enviado, su texto entra como hecho autorizado de esa
+    // pregunta (el personaje lo recibió y puede comentarlo); sin él, la
+    // pregunta por el documento saldría como «He registrado tu consulta.».
+    const extra = chatExtraFacts && chatExtraFacts.npcId === npcId ? chatExtraFacts.facts : [];
     return { runId, csrfToken: identity.csrfToken, npcId, name: chatNpc.name, text,
-      facts: chatFacts(findChatEntry(view, npcId), npcKnowledgeFacts(npcId)),
+      facts: [...chatFacts(findChatEntry(view, npcId), npcKnowledgeFacts(npcId)), ...extra],
       memory: chatMemory ?? { schemaVersion: 1, runId, npcId, treatment: 'neutral', turns: [] } };
   }
 
@@ -1525,6 +1613,8 @@ export function GameScreen() {
     event.preventDefault();
     const question = chatQuestion();
     if (!question) return;
+    // Los hechos extra solo valen para esta pregunta.
+    setChatExtraFacts(null);
     const factIds = question.facts.map(fact => fact.id);
     const turns: ChatTurn[] = [...chatTurns, { from: 'you', text: question.text }];
     setChatTurns(turns);
@@ -1815,13 +1905,42 @@ export function GameScreen() {
     }
   }
 
+  /** Al elegir destinatario, el canal pasa al primero de los suyos: la
+   * central solo ofrece los canales de cada contacto, nunca todos. */
+  function handleCommRecipient(value: string) {
+    setCommRecipient(value);
+    const contact = contacts.find(item => item.id === value);
+    setCommChannel(contact?.channels[0] ?? '');
+  }
+
+  /** Preguntar a un contacto por un envío ya recibido: abre su conversación
+   * con la pregunta preparada (el jugador la envía cuando quiera) y, si
+   * era un documento, su texto como hecho autorizado de esa pregunta. La
+   * respuesta sigue las reglas de la conversación: solo hechos autorizados,
+   * sin inventar; el turno queda en la memoria de chat del personaje. */
+  function askAboutCommunication(record: PlayerViewDto['communications'][number]) {
+    if (!view) return;
+    const name = contacts.find(contact => contact.id === record.recipientId)?.name
+      ?? view.npcChat.find(entry => entry.id === record.recipientId)?.name ?? record.recipientId;
+    const documentText = record.documentId ? view.evidenceTexts[record.documentId] : undefined;
+    setChatExtraFacts({ npcId: record.recipientId,
+      facts: record.documentId && documentText ? [{ id: record.documentId, text: documentText }] : [] });
+    openChat(record.recipientId, name);
+    setChatDraft(documentText
+      ? `Te envié «${documentText}». ¿Qué me puedes decir de eso?`
+      : `Te escribí «${record.requestText}». ¿Qué me respondes?`);
+  }
+
   async function sendCommunication(event: FormEvent) {
     event.preventDefault();
     if (!runId || !identity || !view || !commRecipient || !commText.trim()) return;
+    const name = contacts.find(contact => contact.id === commRecipient)?.name ?? commRecipient;
     const offer: PublicActionOffer = { id: `communicate:${commRecipient}:${commChannel}`,
-      label: `Contactar con ${commRecipient} por ${channelLabels[commChannel] ?? commChannel}`,
-      action: { type: 'communicate', params: { channel: commChannel, recipientId: commRecipient, requestText: commText.trim() } } };
+      label: `Contactar con ${name} por ${channelLabels[commChannel] ?? commChannel}`,
+      action: { type: 'communicate', params: { channel: commChannel, recipientId: commRecipient, requestText: commText.trim(),
+        ...(commDocument ? { documentId: commDocument } : {}) } } };
     setCommText('');
+    setCommDocument('');
     await startPreview(offer, null);
   }
 
@@ -1878,11 +1997,14 @@ export function GameScreen() {
     <GameWindow id="dossier" title="Dossier" state={windows.windows.dossier} {...windowProps}>
       <DossierContent view={view} />
     </GameWindow>
-    <GameWindow id="lab" title="Laboratorio y comunicaciones" state={windows.windows.lab} {...windowProps}>
-      <LabContent view={view} contacts={contacts} recipient={commRecipient} channel={commChannel} text={commText} busy={busy}
-        labOffers={groupOffers(view.offers).lab} disabled={busy}
-        onRecipient={setCommRecipient} onChannel={setCommChannel} onText={setCommText} onSend={sendCommunication}
+    <GameWindow id="lab" title="Laboratorio" state={windows.windows.lab} {...windowProps}>
+      <LabContent view={view} labOffers={groupOffers(view.offers).lab} disabled={busy}
         onAnalyze={(offer, trigger) => void startPreview(offer, trigger)} onOpenIntel={openIntel} />
+    </GameWindow>
+    <GameWindow id="comms" title="Central de comunicaciones" state={windows.windows.comms} {...windowProps}>
+      <CommsContent view={view} contacts={contacts} recipient={commRecipient} channel={commChannel} documentId={commDocument}
+        text={commText} busy={busy} onRecipient={handleCommRecipient} onChannel={setCommChannel} onDocument={setCommDocument}
+        onText={setCommText} onSend={sendCommunication} onAskReply={askAboutCommunication} />
     </GameWindow>
     <GameWindow id="saves" title="Guardados" state={windows.windows.saves} {...windowProps}>
       <SavesContent view={view} saves={saves} savePhase={savePhase} saveName={saveName} replaceTarget={replaceTarget} loadTarget={loadTarget}

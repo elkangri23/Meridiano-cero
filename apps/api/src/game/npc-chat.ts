@@ -5,7 +5,7 @@
 // «He registrado tu consulta.». La vista del jugador lleva ahora estos
 // datos, construidos aquí desde la definición del caso en curso.
 import type { CaseDefinition, NPC } from '@meridiano/case-schema';
-import { getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal } from '@meridiano/case-schema';
+import { channelsForNpc, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal } from '@meridiano/case-schema';
 import type { NpcChatEntry } from '@meridiano/contracts';
 
 /** Hecho de identidad sintético (solo expedientes generados): los textos
@@ -21,7 +21,7 @@ function identityFact(npc: NPC): { id: string; text: string } {
   return { id: 'identity', text: npc.role ? `Soy ${npc.name}, ${npc.role}.` : `Soy ${npc.name}.` };
 }
 
-function generatedEntry(npc: NPC, texts: NonNullable<CaseDefinition['texts']>): NpcChatEntry {
+function generatedEntry(definition: CaseDefinition, npc: NPC, texts: NonNullable<CaseDefinition['texts']>): NpcChatEntry {
   const knowledge = npc.knowledge.flatMap(id => {
     const text = texts.knowledge[id];
     return text ? [{ id, text }] : [];
@@ -36,10 +36,13 @@ function generatedEntry(npc: NPC, texts: NonNullable<CaseDefinition['texts']>): 
     knowledge: npc.knowledge.includes('identity') ? knowledge : [identityFact(npc), ...knowledge],
     ...(greeting ? { greeting } : {}),
     ...(refusal ? { refusal } : {}),
+    // Canales remotos de la central (GDD §10): los de la definición del
+    // personaje o, si no los trae, los heredados de su medio.
+    channels: channelsForNpc(definition, npc),
   };
 }
 
-function fixedEntry(npc: NPC): NpcChatEntry {
+function fixedEntry(definition: CaseDefinition, npc: NPC): NpcChatEntry {
   const profile = getNPC(npc.id);
   const greeting = npcGreeting(npc.id);
   const refusal = npcRefusal(npc.id);
@@ -51,6 +54,9 @@ function fixedEntry(npc: NPC): NpcChatEntry {
     knowledge: npcKnowledgeFacts(npc.id),
     ...(greeting ? { greeting } : {}),
     ...(refusal ? { refusal } : {}),
+    // Canales remotos de la central (GDD §10): los de la definición del
+    // personaje o, si no los trae, los del catálogo fijo.
+    channels: channelsForNpc(definition, npc),
   };
 }
 
@@ -58,5 +64,5 @@ function fixedEntry(npc: NPC): NpcChatEntry {
  * su definición. El caso fijo usa el catálogo (mismos valores que la web
  * calculaba antes); el generado usa su definición. */
 export function npcChatForDefinition(definition: CaseDefinition): NpcChatEntry[] {
-  return definition.npcs.map(npc => definition.texts ? generatedEntry(npc, definition.texts) : fixedEntry(npc));
+  return definition.npcs.map(npc => definition.texts ? generatedEntry(definition, npc, definition.texts) : fixedEntry(definition, npc));
 }

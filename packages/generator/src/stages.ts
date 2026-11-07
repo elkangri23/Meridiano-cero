@@ -15,7 +15,7 @@
 // resto de etapas (geografía, ensamblaje, validación, simulación,
 // persistencia) son deterministas.
 
-import { FORENSIC_TYPES, GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type ForensicType, type KnowledgeContentAnchors } from '@meridiano/case-schema';
+import { FORENSIC_TYPES, GEOGRAPHIC_CATALOG, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type ForensicType, type KnowledgeContentAnchors, type RemoteChannel } from '@meridiano/case-schema';
 import type { GenerationParams, GenerationStage } from './pipeline.js';
 
 /** Delitos generables (lista canónica sin 'aleatorio', que es modo de
@@ -330,6 +330,16 @@ function checkNpc(npc: unknown, castIds: string[], ids: Set<string>, errors: str
   ids.add(String(npc.id));
   if (!isNonEmptyString(npc.persona)) errors.push(`NPC ${String(npc.id)} sin persona.`);
   checkNpcKnowledge(npc, errors);
+  // Canales remotos de la central (GDD §10): si los trae, 0-5 canales
+  // válidos sin repetir; una lista vacía declara que solo habla en
+  // persona. Misma regla que el validador v1.5 del expediente.
+  if (npc.channels !== undefined) {
+    const channels = npc.channels;
+    const valid = Array.isArray(channels) && channels.length <= 5 &&
+      channels.every(channel => typeof channel === 'string' && ['call', 'whatsapp', 'sms', 'email', 'fax'].includes(channel)) &&
+      new Set(channels as unknown[]).size === (channels as unknown[]).length;
+    if (!valid) errors.push(`NPC ${String(npc.id)} con canales inválidos: deben ser 0-5 de call, whatsapp, sms, email, fax, sin repetir.`);
+  }
 }
 
 function validateNpcs(output: unknown, castIds: string[], errors: string[]): void {
@@ -887,6 +897,9 @@ export function assembleDefinition(input: AssemblyInput): CaseDefinition {
         cooperation: Number(detail.cooperation),
         role: String(member.role),
         persona: String(detail.persona),
+        // Canales remotos de la central (GDD §10): los de la etapa 3, ya
+        // validados; sin ellos, el motor hereda llamada y correo.
+        ...(Array.isArray(detail.channels) ? { channels: [...(detail.channels as RemoteChannel[])] } : {}),
       };
     }),
     facts: [...evidenceIds, ...knowledgeTokens],

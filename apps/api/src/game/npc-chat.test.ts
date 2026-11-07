@@ -51,6 +51,8 @@ describe('datos de conversación de los NPC (npcChat)', () => {
       { id: 'mercado-negro', text: 'Conocimiento del mercado de antigüedades y canales de venta.' },
       { id: 'movimiento-objeto', text: 'Información sobre traslados y movimientos de objetos valiosos.' },
     ]);
+    // Sin canales declarados ni entrada en el catálogo: llamada y correo.
+    expect(marcos?.channels).toEqual(['call', 'email']);
   });
 
   it('un hecho de conocimiento sin texto no se ofrece (y no rompe la entrada)', () => {
@@ -77,5 +79,11 @@ describe('datos de conversación de los NPC (npcChat)', () => {
     expect(ines?.knowledge).toEqual([
       { id: 'truth', text: 'Soy Inés Valera, restauradora contratada para el traslado del astrolabio.' },
     ]);
+    // Inés no tiene ningún canal remoto: la central no la ofrece.
+    expect(ines?.channels).toEqual([]);
+    const lucia = entries.find(entry => entry.id === 'lucia');
+    expect(lucia?.channels).toEqual(['email', 'fax']);
+    const tomas = entries.find(entry => entry.id === 'tomas');
+    expect(tomas?.channels).toEqual(['call', 'whatsapp', 'sms']);
   });
 });

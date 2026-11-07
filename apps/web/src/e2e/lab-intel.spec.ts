@@ -27,7 +27,7 @@ async function collectLockEvidence(page: Page) {
 /** Abre el laboratorio desde la pista de la escena. */
 async function openLab(page: Page) {
   await page.getByTestId('open-lab').click();
-  await expect(page.getByRole('dialog', { name: 'Laboratorio y comunicaciones' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Laboratorio' })).toBeVisible();
 }
 
 /** Pregunta en la terminal y espera su respuesta. */
@@ -49,7 +49,7 @@ test.describe('E2E laboratorio forense + terminal de inteligencia', () => {
     await expect(page.getByTestId('offer-analyze:EV-02')).toBeHidden();
     await openLab(page);
     // El laboratorio enseña el tipo, la prueba con su frase y la nota de procedimiento.
-    const lab = page.getByRole('dialog', { name: 'Laboratorio y comunicaciones' });
+    const lab = page.getByRole('dialog', { name: 'Laboratorio' });
     await expect(lab).toContainText('Huellas y marcas');
     await expect(lab).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
     await expect(lab).toContainText('la ausencia de registro no demuestra inocencia');
@@ -67,8 +67,8 @@ test.describe('E2E laboratorio forense + terminal de inteligencia', () => {
       await page.getByTestId('offer-wait:30').click();
       await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
     }
-    await page.click('button:has-text("Laboratorio y comunicaciones")');
-    await expect(page.getByRole('dialog', { name: 'Laboratorio y comunicaciones' })).toBeVisible();
+    await page.click('button:has-text("Laboratorio")');
+    await expect(page.getByRole('dialog', { name: 'Laboratorio' })).toBeVisible();
     await expect(lab).toContainText('Resultado: La huella técnica es compatible con una herramienta de la serie HV-17. No acusa a nadie por sí sola.');
     await page.keyboard.press('Escape');
     // El dossier enseña el resultado con su frase, no con el ID crudo.

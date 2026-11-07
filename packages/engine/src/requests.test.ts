@@ -12,8 +12,10 @@ describe('BOR-051: admisión de solicitudes de juego', () => {
     }
     run.npcRelations.lucia = 7;
     // Estado controlado de unidad para saturar; no es una ruta de aceptación.
+    // El canal debe ser uno de Lucía (correo) para que la solicitud sea
+    // válida y llegue al cupo; un canal que no tiene se rechaza antes.
     const before = structuredClone(run);
-    expect(() => resolveAction(def, run, { type: 'communicate', params: { channel: 'call', recipientId: 'lucia', requestText: 'sintético' } }))
+    expect(() => resolveAction(def, run, { type: 'communicate', params: { channel: 'email', recipientId: 'lucia', requestText: 'sintético' } }))
       .toThrow(EngineStateError);
     expect(run).toEqual(before);
   });

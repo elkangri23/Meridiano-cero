@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { validateCaseDefinition } from '@meridiano/case-schema';
 import { createInMemoryCheckpointStore } from './checkpoint.js';
 import { createGeneratorService, runPipeline, type GenerationParams, type PipelineConfig, type StageLlm } from './pipeline.js';
-import { selectGeography, stageOutputSchema, validateStageOutput, type SelectedGeography } from './stages.js';
+import { assembleDefinition, resolveGenerationChoice, selectGeography, stageOutputSchema, validateStageOutput, type SelectedGeography } from './stages.js';
 
 // Doble del modelo: construye las salidas de etapa a partir del contexto que
 // recibe (las ciudades elegidas), con el mismo esqueleto que el fixture del
@@ -1415,5 +1415,33 @@ describe('validación del expediente completo (textos de conocimiento decibles)'
     const check = validateCaseDefinition(paraphrase);
     expect(check.valid).toBe(false);
     expect(check.errors.some(error => error.includes('elemento concreto'))).toBe(true);
+  });
+});
+
+describe('validación de la etapa 3 (canales remotos de la central, GDD §10)', () => {
+  const castIds = ['carmen', 'jorge', 'pablo'];
+  function stage3(channels: Record<string, unknown>) {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const npcs = outputs.npcs.npcs.map(npc => ({ ...npc, ...(Object.hasOwn(channels, npc.id) ? { channels: channels[npc.id] } : {}) }));
+    return validateStageOutput(3, { npcs, timeline: outputs.npcs.timeline }, { geography, castIds });
+  }
+  it('acepta canales válidos por personaje y la lista vacía (solo en persona)', () => {
+    expect(stage3({ carmen: [], jorge: ['email', 'call'], pablo: ['email', 'fax'] }).valid).toBe(true);
+  });
+  it('rechaza un canal ajeno, uno repetido o más de cinco', () => {
+    expect(stage3({ jorge: ['paloma'] }).valid).toBe(false);
+    expect(stage3({ jorge: ['email', 'email'] }).valid).toBe(false);
+    expect(stage3({ jorge: ['call', 'whatsapp', 'sms', 'email', 'fax', 'call'] }).valid).toBe(false);
+  });
+  it('el ensamblado pasa los canales a la definición del expediente', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const npcs = { npcs: outputs.npcs.npcs.map(npc => ({ ...npc, channels: npc.id === 'carmen' ? [] : ['email', 'call'] })), timeline: outputs.npcs.timeline };
+    const definition = assembleDefinition({ caseId: 'generado-test-canales', choice: resolveGenerationChoice(PARAMS),
+      params: PARAMS, geography, premise: outputs.premise, npcs, clues: outputs.clues as Record<string, unknown> });
+    expect(definition.npcs.find(npc => npc.id === 'carmen')?.channels).toEqual([]);
+    expect(definition.npcs.find(npc => npc.id === 'jorge')?.channels).toEqual(['email', 'call']);
+    expect(validateCaseDefinition(definition).valid).toBe(true);
   });
 });

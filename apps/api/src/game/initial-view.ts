@@ -28,7 +28,7 @@ export async function initialPlayerView(db: Database['orm'], run: StoredRun): Pr
     status: 'active', difficulty: run.difficulty, clock: { minute: 0, deadlineMinutes: run.deadlineMinutes },
     position: { city: { id: city.id, name: city.name, country: city.country }, location: { ...publicLocation } },
     cities: cities.map(item => ({ id: item.id, name: item.name, country: item.country })),
-    locations: [publicLocation], objects: [], dossier: [], conversation: [], pendingRequests: [],
+    locations: [publicLocation], objects: [], dossier: [], conversation: [], communications: [], pendingRequests: [],
     warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
     // Objetivos en vivo (lote 2): al empezar, todos pendientes (la partida
     // inicial no tiene detenciones ni objetos recuperados).

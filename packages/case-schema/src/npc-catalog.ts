@@ -19,6 +19,17 @@ export interface NPCProfile {
 
 export type CommunicationChannel = 'verbal' | 'escrito' | 'telefonico' | 'digital';
 
+/** Canales remotos de la central de comunicaciones (GDD §10): los que
+ * entiende la acción `communicate` del motor. Son un vocabulario distinto
+ * del de `CommunicationChannel` del catálogo (verbal/escrito/telefonico/
+ * digital): el catálogo dice CÓMO se relaciona cada personaje y estos
+ * dicen POR DÓNDE se le puede escribir o llamar. */
+export type RemoteChannel = 'call' | 'whatsapp' | 'sms' | 'email' | 'fax';
+export const REMOTE_CHANNELS: readonly RemoteChannel[] = ['call', 'whatsapp', 'sms', 'email', 'fax'];
+export const REMOTE_CHANNEL_LABELS: Record<RemoteChannel, string> = {
+  call: 'llamada', whatsapp: 'WhatsApp', sms: 'SMS', email: 'correo', fax: 'fax',
+};
+
 export interface QueryType {
   id: string;
   label: string;

@@ -15,9 +15,10 @@ const entityFields: Readonly<Record<keyof EntityGroups, string>> = {
   scheduledResults: 'dueMinute,id,payload,type',
 };
 /** Campos opcionales por entidad (T4-08): `role` y `persona` solo los traen
- * los NPC de los expedientes generados. */
+ * los NPC de los expedientes generados; `channels` trae los canales
+ * remotos de la central (GDD §10), declarados o no según el expediente. */
 const entityOptionalFields: Partial<Readonly<Record<keyof EntityGroups, string>>> = {
-  npcs: 'persona,role',
+  npcs: 'channels,persona,role',
 };
 function exactFields(value: DataRecord, expected: string): boolean {
   const actual = Object.keys(value).sort();

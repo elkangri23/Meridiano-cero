@@ -2,8 +2,8 @@
 // públicos a partir de la definición del caso y el estado del motor.
 // No serializa nunca EngineEvent.payload ni CaseRun internos.
 import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
-import { evidenceText } from '@meridiano/case-schema';
-import { isPublicBatchStep, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
+import { evidenceText, REMOTE_CHANNEL_LABELS } from '@meridiano/case-schema';
+import { isPublicBatchStep, type CommunicationRecordDto, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
 import { availableOffers, completeFinalReport, ENGINE_VERSION, liveObjectives, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
 import { briefingForDefinition, metaForDefinition } from './catalog.ts';
@@ -30,6 +30,11 @@ function parseBatchStep(item: unknown): PublicBatchStep | null {
   let parsed: unknown;
   try { parsed = JSON.parse(item) as unknown; } catch { return null; }
   return isPublicBatchStep(parsed) ? parsed : null;
+}
+
+/** Historial de la central: ausente en partidas anteriores a la central. */
+function communicationsOf(run: FullRun): CommunicationRecordDto[] {
+  return [...(run.communications ?? [])];
 }
 
 function batchSteps(raw: unknown): PlayerViewDto['batch'] {
@@ -99,6 +104,9 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     objects,
     dossier: [...run.discoveries],
     conversation: [...run.conversationRecords],
+    // Historial de la central (GDD §10): ausente en partidas anteriores a
+    // la central; se enseña vacío hasta el primer envío.
+    communications: communicationsOf(run),
     // Datos de charla libre de cada personaje del expediente: sin ellos la
     // web solo conocía el catálogo fijo y un NPC generado llegaba al
     // director sin hechos ni persona.
@@ -174,6 +182,19 @@ const eventSummaries: Record<string, EventNamer> = {
   talk: (definition, payload) => {
     const npc = definition.npcs.find(item => item.id === payload.npcId)?.name ?? String(payload.npcId ?? '');
     return 'Conversación con ' + npc + '.';
+  },
+  communicate: (definition, payload) => {
+    // El envío queda en la cronología con su destinatario y su canal; el
+    // texto libre no se narra (T2) y el documento se nombra por su texto,
+    // nunca por el ID crudo.
+    const npc = definition.npcs.find(item => item.id === payload.recipientId)?.name ?? String(payload.recipientId ?? '');
+    const channel = typeof payload.channel === 'string'
+      ? (REMOTE_CHANNEL_LABELS as Record<string, string>)[payload.channel] ?? payload.channel
+      : '';
+    const what = typeof payload.documentId === 'string'
+      ? 'Documento enviado a ' + npc
+      : 'Mensaje enviado a ' + npc;
+    return channel ? what + ' por ' + channel + '.' : what + '.';
   },
   request_warrant: (definition, payload) => {
     // Antes no tenía resumen propio y caía en el genérico «La investigación

@@ -1,4 +1,5 @@
 import type { ContentRating, CrimeType, FinalReport } from '@meridiano/contracts';
+import type { RemoteChannel } from './npc-catalog.js';
 export type { FinalReport, PlayerView } from '@meridiano/contracts';
 
 // Tipos puros del expediente. Sin secretos de solución en PlayerView.
@@ -28,6 +29,11 @@ export interface NPC {
   cityId: string;
   knowledge: string[];
   cooperation: number;
+  /** Canales remotos por los que se puede contactar a este personaje
+   * (vocabulario de la acción `communicate`: call/whatsapp/sms/email/
+   * fax). Opcional: el caso fijo los resuelve por catálogo y un generado
+   * sin ellos hereda llamada y correo. */
+  channels?: RemoteChannel[];
   /** Rol visible en la escena y el chat (p. ej. «Transportista»). Solo lo
    * traen los expedientes generados; el caso fijo lo resuelve por catálogo. */
   role?: string;
@@ -62,6 +68,22 @@ export interface ScheduledResult {
   dueMinute: number;
   type: string;
   payload: unknown;
+}
+
+/** Un envío de la central de comunicaciones (GDD §10): el mensaje tal
+ * como lo escribió el jugador, el documento adjunto si lo hay (solo una
+ * evidencia en su poder) y sus minutos de envío y de respuesta. El texto
+ * libre del jugador vive aquí, no en `conversationRecords`: los registros
+ * de conversación nunca llevan texto libre (T2). */
+export interface CommunicationRecord {
+  id: string;
+  channel: RemoteChannel;
+  recipientId: string;
+  requestText: string;
+  documentId?: string;
+  sentMinute: number;
+  dueMinute: number;
+  receivedMinute?: number;
 }
 
 /**
@@ -219,6 +241,10 @@ export interface CaseRun {
   admissibility: Record<string, boolean>;
   npcRelations: Record<string, number>;
   conversationRecords: string[];
+  /** Historial de envíos de la central de comunicaciones. Opcional: las
+   * partidas anteriores a la central no lo traen y se comportan como si
+   * estuviera vacío. */
+  communications?: CommunicationRecord[];
   pendingRequests: ScheduledResult[];
   warrants: string[];
   detentions: string[];

@@ -518,6 +518,10 @@ function confirmActionInternal(def: CaseDefinition, run: CaseRun, action: Action
     case 'inspect':
     case 'detain':
     case 'recover': return applyMaterial(def, run, action);
+    // Enviar un documento avanza el reloj (trámite) antes de enviarlo;
+    // escribir un mensaje no cuesta tiempo y va directo.
+    case 'communicate': return typeof action.params.documentId === 'string'
+      ? applyMaterial(def, run, action) : resolveActionInternal(def, run, action);
     default: return resolveActionInternal(def, run, action);
   }
 }

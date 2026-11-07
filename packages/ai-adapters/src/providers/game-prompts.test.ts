@@ -78,3 +78,13 @@ describe('validación de salida de conversación', () => {
     expect(() => validateGameOutput('narrateResult', { act: 'state', factIds: ['x'] })).not.toThrow();
   });
 });
+
+describe('prompt de generación', () => {
+  it('la etapa 3 pide los canales remotos de cada NPC (GDD §10)', () => {
+    const prompt = buildGameFunctionPrompt('generateCase');
+    expect(prompt).toContain('Etapa 3');
+    expect(prompt).toContain('channels');
+    expect(prompt).toContain('call');
+    expect(prompt).toContain('solo habla en persona');
+  });
+});

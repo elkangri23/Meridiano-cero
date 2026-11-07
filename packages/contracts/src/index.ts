@@ -138,6 +138,7 @@ export interface InitialPlayerViewDto {
   objects: never[];
   dossier: never[];
   conversation: never[];
+  communications: never[];
   pendingRequests: never[];
   warrants: never[];
   detentions: never[];
@@ -363,7 +364,7 @@ function initialCapabilities(value: Record<string, unknown>): boolean {
     recovery.creationLookup === true && recovery.operationLookup === false && recovery.retryCreationWithSameKey === true;
 }
 function initialEmptyCollections(value: Record<string, unknown>): boolean {
-  return ['objects', 'dossier', 'conversation', 'pendingRequests', 'warrants', 'detentions'].every(key =>
+  return ['objects', 'dossier', 'conversation', 'communications', 'pendingRequests', 'warrants', 'detentions'].every(key =>
     Array.isArray(value[key]) && value[key].length === 0) &&
     ['batch', 'finalReport', 'officialResult'].every(key => value[key] === null);
 }
@@ -387,7 +388,7 @@ function initialHeader(value: Record<string, unknown>): boolean {
 }
 /** Solo GET inicial: no acepta replay de creación, progreso o campos privados adicionales. */
 export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerViewDto {
-  if (!dtoRecord(value, 'batch,branchId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,finalReport,locations,objectives,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
+  if (!dtoRecord(value, 'batch,branchId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,finalReport,locations,objectives,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
   if (!initialHeader(value) || !publicCaseMeta(value.caseMeta) || !validDifficulty(value.difficulty)) return false;
   return initialClock(value.clock) && initialCapabilities(value) && initialEmptyCollections(value) && initialGeography(value) && publicObjectives(value.objectives);
 }
@@ -400,6 +401,28 @@ export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerVi
  * conocimiento, saludos y negativas si las trae). Sin esto, un NPC generado
  * llegaba al director sin hechos ni persona y cada pregunta salía como
  * «He registrado tu consulta.». */
+/** Canal remoto de la central de comunicaciones (GDD §10): los mismos
+ * cinco canales del motor (`communications.ts`). No todos los contactos
+ * tienen todos los canales; la vista solo ofrece los de cada uno. */
+export type RemoteChannel = 'call' | 'whatsapp' | 'sms' | 'email' | 'fax';
+
+/** Un envío de la central: mensaje o documento a un contacto. Es el
+ * historial que enseña la ventana de comunicaciones: quién, por dónde,
+ * qué documento (si lo hay) y cuándo se envió y cuándo llegó el acuse.
+ * El texto libre viaja aquí porque lo escribió el propio jugador y la
+ * ventana lo enseña; el dossier (`conversation`) solo guarda el registro
+ * `communication_sent:…` sin el texto (T2). */
+export interface CommunicationRecordDto {
+  id: string;
+  channel: RemoteChannel;
+  recipientId: string;
+  requestText: string;
+  documentId?: string;
+  sentMinute: number;
+  dueMinute: number;
+  receivedMinute?: number;
+}
+
 export interface NpcChatEntry {
   id: string;
   name: string;
@@ -408,6 +431,9 @@ export interface NpcChatEntry {
   knowledge: Array<{ id: string; text: string }>;
   greeting?: string;
   refusal?: string;
+  /** Canales remotos de este contacto (GDD §10): solo estos se ofrecen
+   * en la central. Vacío si el personaje no tiene ninguno (Inés). */
+  channels: RemoteChannel[];
 }
 
 /** Vista general del jugador (Fase A): proyección completa de una partida en
@@ -434,6 +460,10 @@ export interface PlayerViewDto {
   objects: Array<{ id: string; type: string; origin: string; minute: number; admissible: boolean }>;
   dossier: string[];
   conversation: string[];
+  /** Historial de la central de comunicaciones (GDD §10): cada envío a
+   * un contacto, en orden de envío. La web lo enseña en la ventana de
+   * comunicaciones junto con los contactos y sus canales. */
+  communications: CommunicationRecordDto[];
   /** Datos de conversación de cada personaje del expediente (ver
    * NpcChatEntry): la charla libre los usa para construir la petición
    * converse. Sin esta lista, la web solo conocía el catálogo fijo. */
@@ -713,10 +743,16 @@ function publicNpcChatFact(value: unknown): value is NpcChatEntry['knowledge'][n
   if (!dtoRecord(value, 'id,text')) return false;
   return boundedString(value.id, 128) && typeof value.text === 'string' && value.text.length > 0 && value.text.length <= 2000;
 }
+const REMOTE_CHANNELS: RemoteChannel[] = ['call', 'whatsapp', 'sms', 'email', 'fax'];
+function publicChannels(value: unknown): value is RemoteChannel[] {
+  return Array.isArray(value) && value.length <= 5 &&
+    value.every(item => typeof item === 'string' && (REMOTE_CHANNELS as string[]).includes(item)) &&
+    new Set(value).size === value.length;
+}
 function npcChatKeys(value: Record<string, unknown>): boolean {
   const keys = Object.keys(value);
-  if (!['id', 'name', 'persona', 'knowledge'].every(key => keys.includes(key))) return false;
-  return keys.every(key => ['id', 'name', 'role', 'persona', 'knowledge', 'greeting', 'refusal'].includes(key));
+  if (!['id', 'name', 'persona', 'knowledge', 'channels'].every(key => keys.includes(key))) return false;
+  return keys.every(key => ['id', 'name', 'role', 'persona', 'knowledge', 'greeting', 'refusal', 'channels'].includes(key));
 }
 function npcChatStrings(value: Record<string, unknown>): boolean {
   if (!boundedString(value.id, 128)) return false;
@@ -724,6 +760,7 @@ function npcChatStrings(value: Record<string, unknown>): boolean {
   if (typeof value.persona !== 'string' || value.persona.length > 2000) return false;
   if (value.role !== undefined && !boundedString(value.role, 128)) return false;
   if (!optionalBoundedString(value.greeting, 2000)) return false;
+  if (!publicChannels(value.channels)) return false;
   return optionalBoundedString(value.refusal, 200);
 }
 function npcChatKnowledge(value: unknown): value is NpcChatEntry['knowledge'] {
@@ -748,15 +785,44 @@ function publicEvidenceTexts(value: unknown): value is Record<string, string> {
   return entries.every(([key, text]) => boundedString(key, 128)
     && typeof text === 'string' && text.length > 0 && text.length <= 2000);
 }
+function communicationRecordKeys(keys: string[]): boolean {
+  if (!['id', 'channel', 'recipientId', 'requestText', 'sentMinute', 'dueMinute'].every(key => keys.includes(key))) return false;
+  return keys.every(key => ['id', 'channel', 'recipientId', 'requestText', 'documentId', 'sentMinute', 'dueMinute', 'receivedMinute'].includes(key));
+}
+function communicationRecordText(value: Record<string, unknown>): boolean {
+  if (!boundedString(value.id, 128) || !boundedString(value.recipientId, 128)) return false;
+  if (typeof value.channel !== 'string' || !(REMOTE_CHANNELS as string[]).includes(value.channel)) return false;
+  if (typeof value.requestText !== 'string' || value.requestText.trim().length === 0 || value.requestText.length > 4000) return false;
+  return value.documentId === undefined || boundedString(value.documentId, 128);
+}
+function communicationRecordMinutes(value: Record<string, unknown>): boolean {
+  if (!nonNegativeInteger(value.sentMinute) || !nonNegativeInteger(value.dueMinute)) return false;
+  if (value.receivedMinute !== undefined && !nonNegativeInteger(value.receivedMinute)) return false;
+  return value.dueMinute >= value.sentMinute;
+}
+function publicCommunicationRecord(value: unknown): value is CommunicationRecordDto {
+  if (!isPlainRecord(value)) return false;
+  if (!communicationRecordKeys(Object.keys(value))) return false;
+  if (!communicationRecordText(value)) return false;
+  return communicationRecordMinutes(value);
+}
+function publicCommunications(value: unknown): value is CommunicationRecordDto[] {
+  return Array.isArray(value) && value.length <= 100 && value.every(publicCommunicationRecord) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
+function generalChatCollections(value: Record<string, unknown>): boolean {
+  if (!publicNpcChat(value.npcChat)) return false;
+  if (!publicCommunications(value.communications)) return false;
+  if (!publicEvidenceTexts(value.evidenceTexts)) return false;
+  return publicOffers(value.offers);
+}
 function generalCollections(value: Record<string, unknown>): boolean {
   if (!publicObjects(value.objects) || !publicRequests(value.pendingRequests)) return false;
   if (!stringList(value.dossier, 1000, 128) || !stringList(value.conversation, 1000, 16000)) return false;
   if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
   if (!stringList(value.analysisResults, 100, 128)) return false;
   if (!publicObjectives(value.objectives)) return false;
-  if (!publicNpcChat(value.npcChat)) return false;
-  if (!publicEvidenceTexts(value.evidenceTexts)) return false;
-  return publicOffers(value.offers);
+  return generalChatCollections(value);
 }
 function generalReports(value: Record<string, unknown>): boolean {
   if (!publicBatch(value.batch)) return false;
@@ -790,7 +856,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'analysisResults,batch,branchId,briefing,caseId,caseMeta,cities,clock,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
+const playerViewKeys = 'analysisResults,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;

@@ -10,7 +10,7 @@
 // `CaseDefinition.texts`: las funciones de este módulo aceptan un `texts`
 // opcional y, cuando está presente, lo usan en vez del catálogo fijo. Sin
 // él, el comportamiento es el de siempre (caso fijo).
-import { RECURRENT_NPCS } from './npc-catalog.js';
+import { RECURRENT_NPCS, REMOTE_CHANNEL_LABELS } from './npc-catalog.js';
 import type { CaseTexts } from './types.js';
 
 /** Hecho revelado por cada evidencia (SPEC-003, tabla de evidencias). */
@@ -308,15 +308,35 @@ export function discoveryText(id: string, lookup: DiscoveryLookup, texts?: CaseT
   return id;
 }
 
-/** Frase legible para un registro de conversación (`talk:<npc>@<minuto>` o
+/** Frase legible para un registro de conversación (`talk:<npc>@<minuto>`,
+ * `communication_sent:<id>:<canal>:<npc>[:<documento>]@<minuto>` o
  * `communication_received:<id>@<minuto>`). Un registro desconocido se
- * devuelve tal cual. */
-export function conversationRecordText(record: string, npcName: (id: string) => string | undefined): string {
+ * devuelve tal cual. El documento se nombra por su texto cuando
+ * `documentText` lo resuelve; sin él, por su código. */
+function talkRecordText(record: string, npcName: (id: string) => string | undefined): string | null {
   const talk = /^talk:([A-Za-z0-9._:-]+)@(\d+)$/.exec(record);
-  if (talk) {
-    const name = npcName(talk[1] ?? '');
-    return name ? `Hablaste con ${name} (min ${talk[2]}).` : record;
-  }
+  if (!talk) return null;
+  const name = npcName(talk[1] ?? '');
+  return name ? `Hablaste con ${name} (min ${talk[2]}).` : record;
+}
+
+function sentRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined): string | null {
+  const sent = /^communication_sent:(?:[^:@]+):(call|whatsapp|sms|email|fax):([^:@]+)(?::([^:@]+))?@(\d+)$/.exec(record);
+  if (!sent) return null;
+  const name = npcName(sent[2] ?? '');
+  if (!name) return record;
+  const channel = REMOTE_CHANNEL_LABELS[sent[1] as keyof typeof REMOTE_CHANNEL_LABELS] ?? sent[1];
+  const document = sent[3] ? (documentText?.(sent[3]) ?? sent[3]) : '';
+  return document
+    ? `Enviaste a ${name} por ${channel} el documento «${document}» (min ${sent[4]}).`
+    : `Enviaste un mensaje a ${name} por ${channel} (min ${sent[4]}).`;
+}
+
+export function conversationRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined): string {
+  const talk = talkRecordText(record, npcName);
+  if (talk !== null) return talk;
+  const sent = sentRecordText(record, npcName, documentText);
+  if (sent !== null) return sent;
   const received = /^communication_received:[A-Za-z0-9._:-]+@(\d+)$/.exec(record);
   if (received) return `Respuesta recibida (min ${received[1]}).`;
   return record;

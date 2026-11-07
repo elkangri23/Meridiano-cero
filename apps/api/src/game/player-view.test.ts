@@ -138,9 +138,27 @@ describe('objetivos en vivo de la vista del jugador', () => {
           { id: 'mercado-negro', text: 'Conocimiento del mercado de antigüedades y canales de venta.' },
         ],
         greeting: 'Buenos días, soy Marcos. Me dedico al comercio de antigüedades.',
+        channels: ['call', 'email'],
       },
     ]);
     expect(isPlayerViewDto(view)).toBe(true);
+  });
+
+  it('la vista lleva el historial de la central y el envío queda en la consola', () => {
+    const record = { id: 'comm-1', channel: 'email', recipientId: 'lucia', requestText: 'Te envío la cerradura.',
+      documentId: 'EV-02', sentMinute: 60, dueMinute: 90, receivedMinute: 90 };
+    const view = playerViewDto(astrolabioDefinition, fullRun({ communications: [record] }), 0);
+    expect(view.communications).toEqual([record]);
+    expect(isPlayerViewDto(view)).toBe(true);
+    // Sin historial (partidas anteriores a la central): vacío, no ausente.
+    expect(playerViewDto(astrolabioDefinition, fullRun(), 0).communications).toEqual([]);
+    expect(summaries([
+      { type: 'communicate', payload: { recipientId: 'lucia', channel: 'email', documentId: 'EV-02' } },
+      { type: 'communicate', payload: { recipientId: 'tomas', channel: 'call' } },
+    ])).toEqual([
+      'Documento enviado a Lucía por correo.',
+      'Mensaje enviado a Tomás Ríos por llamada.',
+    ]);
   });
 
   it('la vista lleva los textos de evidencia del expediente, no los del caso fijo', () => {

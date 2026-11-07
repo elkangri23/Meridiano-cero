@@ -8,7 +8,7 @@ export const initialView: PlayerViewDto = {
     location: { id: 'synthetic-room', name: 'Sala sintética', description: 'Descripción pública de prueba.' } },
   cities: [{ id: 'synthetic-city', name: 'Ciudad sintética', country: 'País de prueba' }],
   locations: [{ id: 'synthetic-room', name: 'Sala sintética', description: 'Descripción pública de prueba.' }],
-  objects: [], dossier: [], conversation: [], pendingRequests: [], warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
+  objects: [], dossier: [], conversation: [], communications: [], pendingRequests: [], warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
   npcChat: [],
   evidenceTexts: {},
   analysisResults: [],
