@@ -10,6 +10,11 @@ export interface AudioSettings {
   effectsVolume: number; // 0-100
   narrationVolume: number; // 0-100
   muted: boolean;
+  /** Interruptores propios de música y efectos (GDD §15): el volumen 0 ya
+   * los silencia, pero el bucle de música necesita un arranque/parada
+   * explícito y no debe intentar sonar solo al cargar la página. */
+  musicEnabled: boolean;
+  effectsEnabled: boolean;
 }
 
 export interface TTSSettings {
@@ -50,7 +55,7 @@ const DEFAULTS: PresentationPreferences = {
   palette: 'default',
   highContrast: false,
   language: 'es',
-  audio: { musicVolume: 60, effectsVolume: 70, narrationVolume: 80, muted: false },
+  audio: { musicVolume: 60, effectsVolume: 70, narrationVolume: 80, muted: false, musicEnabled: true, effectsEnabled: true },
   tts: { enabled: false, voice: 'auto', rate: 1, autoRead: false },
   accessibility: { reducedMotion: false, focusVisible: true, skipNav: true, announceNarration: true },
 };
@@ -95,6 +100,11 @@ function normalizeAudio(input: Partial<PresentationPreferences>, base: Presentat
     effectsVolume: clampVolume(input.audio?.effectsVolume ?? base.audio.effectsVolume),
     narrationVolume: clampVolume(input.audio?.narrationVolume ?? base.audio.narrationVolume),
     muted: Boolean(input.audio?.muted),
+    // Las preferencias guardadas antes de este lote no traen los
+    // interruptores: se encienden por defecto (la música sigue sin sonar
+    // hasta el primer gesto del usuario, por la política de autoplay).
+    musicEnabled: input.audio?.musicEnabled !== false,
+    effectsEnabled: input.audio?.effectsEnabled !== false,
   };
 }
 

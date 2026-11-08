@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent, RefObject } from 'react';
+import type { FormEvent, KeyboardEvent, ReactNode, RefObject } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { archiveApi } from '../archive/client';
 import { profileApi } from '../auth/client';
@@ -15,6 +15,7 @@ import { chatFacts, chatGreeting, chatNpcName, chatPersona, chatRefusal, chatRol
 import { SceneArt } from './scene-art';
 import { Portrait } from './portrait';
 import { portraitSeed, teamPortraitSeed } from './portraits';
+import { createMusicEngine, type EffectKind } from './music';
 import { groupOffers } from './scene-offers';
 import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
 import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_LABELS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
@@ -24,8 +25,8 @@ import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
 import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, discoveryText, FORENSIC_TYPE_LABELS, getNPC, IRREGULAR_KIND_TEXT, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
-import type { CaseTexts, DiscoveryLookup, ForensicType, PaletteMode } from '@meridiano/case-schema';
+import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_LABELS, getNPC, IRREGULAR_KIND_TEXT, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
+import type { CaseTexts, DiscoveryLookup, ForensicType, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/case-schema';
 import './game.css';
 
 type OrderPhase =
@@ -534,7 +535,7 @@ function ConsoleLogItem({ entry, isLast, summaryTyped, detailTyped, typing }: { 
     {isLast && typing && <span className="game-typing-cursor" aria-hidden="true">▌</span>}</li>;
 }
 
-function ConsoleSection({ log, orderHistory }: { log: LogEntry[]; orderHistory: string[] }) {
+function ConsoleSection({ log, orderHistory, readBar }: { log: LogEntry[]; orderHistory: string[]; readBar?: ReactNode }) {
   const listRef = useRef<HTMLOListElement>(null);
   const last = log[log.length - 1];
   // La última entrada se escribe progresivamente: primero el resumen y,
@@ -549,6 +550,7 @@ function ConsoleSection({ log, orderHistory }: { log: LogEntry[]; orderHistory: 
   return <section className="game-console" aria-labelledby="console-heading">
     <p className="game-overline">Cuaderno de campo</p>
     <h2 id="console-heading">Consola narrativa</h2>
+    {readBar}
     <ol ref={listRef} aria-live="polite">
       {log.length === 0 && <li>La investigación comienza. Inspecciona la escena o elige una acción.</li>}
       {log.map((entry, index) => <ConsoleLogItem key={index} entry={entry} isLast={index === log.length - 1}
@@ -557,6 +559,207 @@ function ConsoleSection({ log, orderHistory }: { log: LogEntry[]; orderHistory: 
     <span className="game-narrative-cursor" aria-hidden="true">_</span>
     {orderHistory.length > 0 && <details><summary>Historial de órdenes</summary><ol>{orderHistory.map((item, index) => <li key={index}>{item}</li>)}</ol></details>}
   </section>;
+}
+
+/** Barra de lectura en voz alta de la consola (GDD §15): leer la última
+ * entrada, repetirla, pausar/reanudar y detener. Solo se habilita cuando
+ * el TTS está activado y no silenciado; el texto siempre sigue visible. */
+function ReadAloudBar({ text, canRead, speaking, paused, hasLast, onRead, onRepeat, onPauseResume, onStop }: {
+  text: string; canRead: boolean; speaking: boolean; paused: boolean; hasLast: boolean;
+  onRead: () => void; onRepeat: () => void; onPauseResume: () => void; onStop: () => void;
+}) {
+  return <div className="game-read-bar" role="group" aria-label="Lectura en voz alta">
+    <button type="button" data-testid="tts-read" disabled={!canRead || !text} onClick={onRead}>Leer</button>
+    <button type="button" data-testid="tts-repeat" disabled={!canRead || !hasLast} onClick={onRepeat}>Repetir</button>
+    <button type="button" data-testid="tts-pause" disabled={!speaking && !paused} onClick={onPauseResume}>{paused ? 'Reanudar' : 'Pausar'}</button>
+    <button type="button" data-testid="tts-stop" disabled={!speaking && !paused} onClick={onStop}>Detener</button>
+  </div>;
+}
+
+/** Lectura automática de la última entrada de la consola cuando llega una
+ * nueva (GDD §15): solo si el TTS está activado, con autoRead y sin
+ * silenciar. El texto ya está en pantalla; la voz solo lo acompaña. */
+function useAutoReadLog(log: LogEntry[], enabled: boolean, speak: (text: string) => boolean): void {
+  const seenRef = useRef(0);
+  useEffect(() => {
+    const last = log[log.length - 1];
+    const isNew = log.length > seenRef.current;
+    seenRef.current = log.length;
+    if (!isNew || !last || !enabled) return;
+    speak(last.detail ? `${last.summary} ${last.detail}` : last.summary);
+  }, [log, enabled, speak]);
+}
+
+/** Lectura automática de la última respuesta de un personaje (chat o
+ * terminal): misma condición que la narración, solo turnos del NPC. */
+function useAutoReadTurns(turns: ChatTurn[], enabled: boolean, speak: (text: string) => boolean): void {
+  const seenRef = useRef(0);
+  useEffect(() => {
+    const last = turns[turns.length - 1];
+    const isNew = turns.length > seenRef.current;
+    seenRef.current = turns.length;
+    if (!isNew || !last || last.from !== 'npc' || !enabled) return;
+    speak(last.text);
+  }, [turns, enabled, speak]);
+}
+
+/** Texto de la última entrada de la consola (resumen + detalle). */
+function lastLogTextOf(log: LogEntry[]): string {
+  const last = log[log.length - 1];
+  if (!last) return '';
+  return last.detail ? `${last.summary} ${last.detail}` : last.summary;
+}
+
+/** Controlador TTS del navegador, o el nulo si no hay síntesis de voz. */
+function createTtsControllerForWindow(): TTSController {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) return createTTSController();
+  return createNoopTTSController();
+}
+
+/** Voces del sistema: pueden llegar vacías hasta `voiceschanged`, y la
+ * lista se refresca cuando el sistema las ofrece. */
+function useTtsVoices(controller: TTSController): TTSVoice[] {
+  const [voices, setVoices] = useState<TTSVoice[]>(() => controller.getVoices());
+  useEffect(() => {
+    const synth = (window as unknown as { speechSynthesis?: SpeechSynthesis }).speechSynthesis;
+    const refresh = () => setVoices(controller.getVoices());
+    refresh();
+    if (!synth) return undefined;
+    synth.addEventListener('voiceschanged', refresh);
+    return () => synth.removeEventListener('voiceschanged', refresh);
+  }, [controller]);
+  return voices;
+}
+
+interface TtsSpeaker {
+  speaking: boolean;
+  paused: boolean;
+  lastText: string;
+  speak: (text: string) => boolean;
+  pauseOrResume: () => void;
+  stop: () => void;
+}
+
+/** Lectura en voz alta: hablar, pausar/reanudar y detener, con el volumen
+ * y la voz de las preferencias. Cambiar de voz o de velocidad en mitad de
+ * una lectura cancela la anterior para no dejar el sintetizador colgado, y
+ * el mute cancela la narración en curso. */
+function useTtsSpeaker(preferences: PresentationPreferences, controller: TTSController): TtsSpeaker {
+  const [speaking, setSpeaking] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [lastText, setLastText] = useState('');
+
+  const speak = useCallback((text: string): boolean => {
+    if (!preferences.tts.enabled || preferences.audio.muted || !text.trim()) return false;
+    controller.cancel();
+    // `exactOptionalPropertyTypes`: la voz solo se pasa si no es 'auto'.
+    const options: TTSOptions = { rate: preferences.tts.rate, volume: preferences.audio.narrationVolume / 100 };
+    if (preferences.tts.voice !== 'auto') options.voice = preferences.tts.voice;
+    const ok = controller.speak(text, options);
+    if (ok) {
+      setLastText(text);
+      setSpeaking(true);
+      setPaused(false);
+    }
+    return ok;
+  }, [preferences, controller]);
+
+  useEffect(() => {
+    if (!preferences.audio.muted) return;
+    controller.cancel();
+    setSpeaking(false);
+    setPaused(false);
+  }, [preferences.audio.muted, controller]);
+
+  function pauseOrResume(): void {
+    if (paused) {
+      controller.resume();
+      setPaused(false);
+    } else if (speaking) {
+      controller.pause();
+      setPaused(true);
+    }
+  }
+
+  function stop(): void {
+    controller.cancel();
+    setSpeaking(false);
+    setPaused(false);
+  }
+
+  return { speaking, paused, lastText, speak, pauseOrResume, stop };
+}
+
+/** Motor de música y efectos: volúmenes y mute de las preferencias, y
+ * arranque solo tras el primer gesto del usuario (autoplay). */
+function useMusicEngine(audio: PresentationPreferences['audio']): { playEffect: (kind: EffectKind) => void } {
+  const engineRef = useRef<ReturnType<typeof createMusicEngine> | null>(null);
+  if (engineRef.current === null) engineRef.current = createMusicEngine();
+  const [interacted, setInteracted] = useState(false);
+
+  useEffect(() => {
+    if (interacted) return undefined;
+    const mark = () => setInteracted(true);
+    window.addEventListener('pointerdown', mark);
+    window.addEventListener('keydown', mark);
+    return () => {
+      window.removeEventListener('pointerdown', mark);
+      window.removeEventListener('keydown', mark);
+    };
+  }, [interacted]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setMusicVolume(audio.musicVolume);
+    engine.setEffectsVolume(audio.effectsVolume);
+    engine.setMuted(audio.muted);
+    if (audio.musicEnabled && !audio.muted && audio.musicVolume > 0 && interacted) engine.start();
+    else engine.stop();
+  }, [audio, interacted]);
+
+  useEffect(() => () => engineRef.current?.dispose(), []);
+
+  const playEffect = useCallback((kind: EffectKind) => engineRef.current?.playEffect(kind), []);
+  return { playEffect };
+}
+
+interface GameAudio {
+  voices: TTSVoice[];
+  speaking: boolean;
+  paused: boolean;
+  lastText: string;
+  canRead: boolean;
+  autoReadOn: boolean;
+  ttsSupported: boolean;
+  speak: (text: string) => boolean;
+  pauseOrResume: () => void;
+  stop: () => void;
+  playEffect: (kind: EffectKind) => void;
+}
+
+/** Audio y TTS de la pantalla de juego (GDD §15): compone el controlador
+ * TTS, sus voces y su lector con el motor de música y efectos. */
+function useGameAudio(preferences: PresentationPreferences): GameAudio {
+  const controllerRef = useRef<TTSController | null>(null);
+  if (controllerRef.current === null) controllerRef.current = createTtsControllerForWindow();
+  const controller = controllerRef.current;
+  const voices = useTtsVoices(controller);
+  const speaker = useTtsSpeaker(preferences, controller);
+  const music = useMusicEngine(preferences.audio);
+  return {
+    voices,
+    speaking: speaker.speaking,
+    paused: speaker.paused,
+    lastText: speaker.lastText,
+    canRead: preferences.tts.enabled && !preferences.audio.muted,
+    autoReadOn: preferences.tts.enabled && preferences.tts.autoRead && !preferences.audio.muted,
+    ttsSupported: controller.getStatus().supported,
+    speak: speaker.speak,
+    pauseOrResume: speaker.pauseOrResume,
+    stop: speaker.stop,
+    playEffect: music.playEffect,
+  };
 }
 
 function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSubmit, onKeyDown, onCancel, onRecover }: {
@@ -782,7 +985,7 @@ function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boo
   </section>;
 }
 
-function DossierContent({ view }: { view: PlayerViewDto }) {
+function DossierContent({ view, onRead, canRead }: { view: PlayerViewDto; onRead?: (text: string) => void; canRead?: boolean }) {
   const lookup = lookupFromView(view);
   const npcName = (id: string) => lookup.npcName(id);
   return <div>
@@ -796,7 +999,12 @@ function DossierContent({ view }: { view: PlayerViewDto }) {
     <h4>Hallazgos</h4>
     {view.dossier.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin hallazgos todavía.</p></div>
-      : view.dossier.map((entry, index) => <article key={index} className="game-evidence-card"><span className="game-evidence-kind">Hallazgo</span><p>{discoveryText(entry, lookup, textsFromView(view))}</p></article>)}
+      : view.dossier.map((entry, index) => {
+        const text = discoveryText(entry, lookup, textsFromView(view));
+        return <article key={index} className="game-evidence-card"><span className="game-evidence-kind">Hallazgo</span><p>{text}</p>
+          {canRead && onRead && <p><button type="button" data-testid={`dossier-read-${index}`} onClick={() => onRead(text)}>Leer</button></p>}
+        </article>;
+      })}
     <p className="game-panel-note">Nota de procedimiento: la ausencia de registro no demuestra inocencia.</p>
     <h4>Conversación registrada</h4>
     {view.conversation.length === 0
@@ -813,10 +1021,10 @@ type ChatTurn = { from: 'you' | 'npc'; text: string };
  * partida y personaje; la memoria del servidor no se persiste (límite
  * documentado: al recargar la página la conversación sigue en esta pestaña,
  * pero una sesión nueva empieza de cero). */
-function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, placeholder, note }: {
+function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, placeholder, note, onRead, canRead }: {
   npc: { id: string; name: string } | null; view: PlayerViewDto; turns: ChatTurn[]; draft: string; busy: boolean; error: string;
   onDraft: (value: string) => void; onSend: (event: FormEvent) => void;
-  placeholder?: string; note?: string;
+  placeholder?: string; note?: string; onRead?: (text: string) => void; canRead?: boolean;
 }) {
   if (!npc) {
     return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span>
@@ -829,6 +1037,7 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
       {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
         <span className="game-chat-speaker">{turn.from === 'you' ? 'Tú' : npc.name}</span>
         <span>{turn.text}</span>
+        {turn.from === 'npc' && canRead && onRead && <button type="button" data-testid={`chat-read-${index}`} onClick={() => onRead(turn.text)}>Leer</button>}
       </li>)}
     </ol>
     <form onSubmit={onSend} className="game-chat-form">
@@ -1274,10 +1483,48 @@ function AddConnectionForm({ catalog, csrfToken, onSaved, formMessage, formError
   </form>;
 }
 
-function SettingsContent({ identity, textScale, highContrast, palette, onScale, onContrast, onPalette, profile, onProfileSaved }: {
+/** Sección de audio y voz de los Ajustes (GDD §15): interruptores y
+ * volúmenes independientes de música, efectos y narración, mute general, y
+ * TTS con voz, velocidad y lectura automática. Sin voz compatible, la
+ * lectura queda deshabilitada y explicada, y el texto sigue disponible. */
+function AudioSettingsSection({ audio, tts, voices, ttsSupported, onAudio, onTTS }: {
+  audio: PresentationPreferences['audio']; tts: PresentationPreferences['tts']; voices: TTSVoice[]; ttsSupported: boolean;
+  onAudio: (patch: Partial<PresentationPreferences['audio']>) => void;
+  onTTS: (patch: Partial<PresentationPreferences['tts']>) => void;
+}) {
+  const voiceValue = voices.some(voice => voice.name === tts.voice) ? tts.voice : 'auto';
+  return <>
+    <label className="game-setting"><span>Silenciar todo</span><input type="checkbox" data-testid="audio-muted" checked={audio.muted} onChange={event => onAudio({ muted: event.target.checked })} /></label>
+    <label className="game-setting"><span>Música retro</span><input type="checkbox" data-testid="audio-music-enabled" checked={audio.musicEnabled} onChange={event => onAudio({ musicEnabled: event.target.checked })} /></label>
+    <label className="game-setting"><span>Volumen de música</span><input type="range" data-testid="audio-music-volume" min={0} max={100} value={audio.musicVolume} onChange={event => onAudio({ musicVolume: Number(event.target.value) })} /></label>
+    <label className="game-setting"><span>Efectos de sonido</span><input type="checkbox" data-testid="audio-effects-enabled" checked={audio.effectsEnabled} onChange={event => onAudio({ effectsEnabled: event.target.checked })} /></label>
+    <label className="game-setting"><span>Volumen de efectos</span><input type="range" data-testid="audio-effects-volume" min={0} max={100} value={audio.effectsVolume} onChange={event => onAudio({ effectsVolume: Number(event.target.value) })} /></label>
+    <label className="game-setting"><span>Volumen de narración</span><input type="range" data-testid="audio-narration-volume" min={0} max={100} value={audio.narrationVolume} onChange={event => onAudio({ narrationVolume: Number(event.target.value) })} /></label>
+    {!ttsSupported
+      ? <p className="game-panel-note" data-testid="tts-unsupported">Tu navegador no ofrece síntesis de voz: la lectura en voz alta no está disponible, pero todo el texto sigue aquí.</p>
+      : <>
+        <label className="game-setting"><span>Leer en voz alta</span><input type="checkbox" data-testid="tts-enabled" checked={tts.enabled} onChange={event => onTTS({ enabled: event.target.checked })} /></label>
+        <label className="game-setting"><span>Voz</span>
+          <select data-testid="tts-voice" value={voiceValue} disabled={!tts.enabled} onChange={event => onTTS({ voice: event.target.value })}>
+            <option value="auto">Automática (español si la hay)</option>
+            {voices.map(voice => <option key={voice.name} value={voice.name}>{voice.name} ({voice.lang})</option>)}
+          </select>
+        </label>
+        {voices.length === 0 && <p className="game-panel-note">Aún no hay voces cargadas: se completan solas cuando el sistema las ofrece.</p>}
+        <label className="game-setting"><span>Velocidad</span><input type="range" data-testid="tts-rate" min={0.5} max={2} step={0.1} value={tts.rate} disabled={!tts.enabled} onChange={event => onTTS({ rate: Number(event.target.value) })} /></label>
+        <label className="game-setting"><span>Leer automáticamente la narración y los diálogos</span><input type="checkbox" data-testid="tts-autoread" checked={tts.autoRead} disabled={!tts.enabled} onChange={event => onTTS({ autoRead: event.target.checked })} /></label>
+      </>}
+    <p className="game-panel-note">La música y los efectos son decorativos: nada importante se comunica solo por sonido. La música empieza tras tu primer gesto en la página, nunca sola al cargar.</p>
+  </>;
+}
+
+function SettingsContent({ identity, textScale, highContrast, palette, onScale, onContrast, onPalette, profile, onProfileSaved, audio, tts, voices, ttsSupported, onAudio, onTTS }: {
   identity: SessionDto | null; textScale: number; highContrast: boolean; palette: PaletteMode;
   onScale: (value: number) => void; onContrast: (value: boolean) => void; onPalette: (value: PaletteMode) => void;
   profile: DetectiveProfileDto | null; onProfileSaved: (profile: DetectiveProfileDto) => void;
+  audio: PresentationPreferences['audio']; tts: PresentationPreferences['tts']; voices: TTSVoice[]; ttsSupported: boolean;
+  onAudio: (patch: Partial<PresentationPreferences['audio']>) => void;
+  onTTS: (patch: Partial<PresentationPreferences['tts']>) => void;
 }) {
   const [data, setData] = useState<ConnectionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1386,6 +1633,8 @@ function SettingsContent({ identity, textScale, highContrast, palette, onScale, 
     <label className="game-setting"><span>Alto contraste</span><input type="checkbox" checked={highContrast} onChange={event => onContrast(event.target.checked)} /></label>
     <PaletteSetting palette={palette} onPalette={onPalette} />
     <p className="game-panel-note">Estos ajustes se guardan en este navegador y afectan solo a la presentación. También puedes usar el zoom de tu navegador.</p>
+    <h4>Audio y voz</h4>
+    <AudioSettingsSection audio={audio} tts={tts} voices={voices} ttsSupported={ttsSupported} onAudio={onAudio} onTTS={onTTS} />
     <ProfileSection identity={identity} profile={profile} onSaved={onProfileSaved} />
   </div>;
 }
@@ -1517,6 +1766,13 @@ export function GameScreen() {
   // Preferencias persistentes (§15): escala, contraste y paleta se guardan
   // en localStorage y se aplican en <html>/<main> al cambiar.
   const { preferences, updatePreferences } = usePreferences();
+  // Audio y TTS (GDD §15): todo el cableado vive en `useGameAudio` (ver
+  // abajo): el motor de música en ./music (WebAudio puro, sin imports de
+  // paquetes) y el controlador TTS en case-schema (importado aquí, donde
+  // ya existe la vía a case-schema). La música no arranca hasta el primer
+  // gesto del usuario (autoplay) y el mute silencia música, efectos y
+  // narración a la vez.
+  const audioTts = useGameAudio(preferences);
   const [detectiveProfile, setDetectiveProfile] = useState<DetectiveProfileDto | null>(null);
   const [resumeOpen, setResumeOpen] = useState(false);
   const [commRecipient, setCommRecipient] = useState('');
@@ -1557,6 +1813,12 @@ export function GameScreen() {
   const [careerLoaded, setCareerLoaded] = useState(false);
   // Lote 1 de jugabilidad: reloj de arena y animación de viaje (ver hook).
   const timeFeedback = useTimeFeedback();
+
+  // Lectura automática (GDD §15): narración nueva y respuestas de los
+  // personajes, solo con TTS activado, autoRead y sin silenciar.
+  useAutoReadLog(log, audioTts.autoReadOn, audioTts.speak);
+  useAutoReadTurns(chatTurns, audioTts.autoReadOn, audioTts.speak);
+  useAutoReadTurns(intelTurns, audioTts.autoReadOn, audioTts.speak);
 
   // La intro se abre sola al entrar en una partida nueva (versión 1, minuto
   // 0, activa) salvo que ya se haya descartado en esta pestaña. Queda
@@ -1612,8 +1874,9 @@ export function GameScreen() {
 
   const handleActionError = useCallback((error: unknown) => {
     setNotice(errorMessage(error));
+    audioTts.playEffect('error');
     if (error instanceof GameError && error.kind === 'version_conflict') void refresh();
-  }, [refresh]);
+  }, [refresh, audioTts]);
 
   const loadInitial = useCallback(async (ticket: number, controller: AbortController) => {
     if (!runId) return;
@@ -1691,6 +1954,10 @@ export function GameScreen() {
     setLog(current => [...current, ...entries]);
     setNotice(noticeForOutcome(response, offerLabel));
     timeFeedback.apply(previous, response, offer);
+    // Efecto de interfaz (GDD §15): el viaje suena con arpegio y el resto
+    // de acciones con una confirmación; con efectos apagados o silenciados
+    // no suena nada.
+    audioTts.playEffect(offer?.action.type === 'travel' ? 'travel' : 'confirm');
     const target = talkTarget(offer, lookupFromView(previous ?? response));
     if (target) openChat(target.id, target.name);
   }
@@ -2222,6 +2489,9 @@ export function GameScreen() {
     onMoveBy: windows.moveBy, onMinimize: windows.minimize, onRestore: windows.restore, onClose: windows.close,
   };
 
+  // Texto de la última entrada de la consola, para la barra de lectura.
+  const lastLogText = lastLogTextOf(log);
+
   return <main className="game" data-testid="game-screen" style={{ fontSize: `${16 * preferences.textScale / 100}px` }}>
     <HeaderSection view={view} caseTitle={caseTitle} detective={detectiveDisplayName(detectiveProfile, identity)}
       avatar={detectiveAvatarName(detectiveProfile)} clockPulse={timeFeedback.clockPulse} onLogout={identity ? () => {
@@ -2246,7 +2516,9 @@ export function GameScreen() {
 
     <ObjectivesSection view={view} />
     <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} onOpenLab={() => windows.open('lab', null)} />
-    <ConsoleSection log={log} orderHistory={orderHistory} />
+    <ConsoleSection log={log} orderHistory={orderHistory} readBar={<ReadAloudBar text={lastLogText} canRead={audioTts.canRead}
+      speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} onRead={() => void audioTts.speak(lastLogText)}
+      onRepeat={() => void audioTts.speak(audioTts.lastText)} onPauseResume={audioTts.pauseOrResume} onStop={audioTts.stop} />} />
     <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
       onDraft={setDraft} onSubmit={interpretOrder} onKeyDown={onOrderKeyDown} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
 
@@ -2262,7 +2534,7 @@ export function GameScreen() {
       <MapContent view={view} busy={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
     </GameWindow>
     <GameWindow id="dossier" title="Dossier" state={windows.windows.dossier} {...windowProps}>
-      <DossierContent view={view} />
+      <DossierContent view={view} onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} />
     </GameWindow>
     <GameWindow id="lab" title="Laboratorio" state={windows.windows.lab} {...windowProps}>
       <LabContent view={view} labOffers={groupOffers(view.offers).lab} disabled={busy}
@@ -2288,18 +2560,24 @@ export function GameScreen() {
       <SettingsContent identity={identity} textScale={preferences.textScale} highContrast={preferences.highContrast}
         palette={preferences.palette} onScale={value => updatePreferences({ textScale: value })}
         onContrast={value => updatePreferences({ highContrast: value })} onPalette={value => updatePreferences({ palette: value })}
-        profile={detectiveProfile} onProfileSaved={setDetectiveProfile} />
+        profile={detectiveProfile} onProfileSaved={setDetectiveProfile}
+        audio={preferences.audio} tts={preferences.tts} voices={audioTts.voices}
+        ttsSupported={audioTts.ttsSupported}
+        onAudio={patch => updatePreferences({ audio: { ...preferences.audio, ...patch } })}
+        onTTS={patch => updatePreferences({ tts: { ...preferences.tts, ...patch } })} />
     </GameWindow>
     <GameWindow id="report" title="Informe final" state={windows.windows.report} {...windowProps}>
       <ReportContent view={view} />
     </GameWindow>
     <GameWindow id="chat" title="Conversación" state={windows.windows.chat} {...windowProps}>
       <ChatContent npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
-        onDraft={setChatDraft} onSend={event => void sendChatMessage(event)} />
+        onDraft={setChatDraft} onSend={event => void sendChatMessage(event)}
+        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} />
     </GameWindow>
     <GameWindow id="intel" title="Terminal de inteligencia" state={windows.windows.intel} {...windowProps}>
       <ChatContent npc={{ id: INTEL_ID, name: INTEL_NAME }} view={view} turns={intelTurns} draft={intelDraft} busy={intelBusy} error={intelError}
         onDraft={setIntelDraft} onSend={event => void sendIntelMessage(event)}
+        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead}
         placeholder="Pregunta por lo investigado: un sospechoso, una prueba, un lugar…"
         note="La terminal solo responde con lo que consta en los registros de la partida. Sin registro, lo dice: la ausencia de registro no demuestra inocencia. Preguntar aquí no consume tiempo." />
     </GameWindow>

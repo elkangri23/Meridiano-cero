@@ -16,7 +16,7 @@ function prefs(patch: { palette?: Palette; highContrast?: boolean }) {
     palette: 'default' as Palette,
     highContrast: false,
     language: 'es' as const,
-    audio: { musicVolume: 60, effectsVolume: 70, narrationVolume: 80, muted: false },
+    audio: { musicVolume: 60, effectsVolume: 70, narrationVolume: 80, muted: false, musicEnabled: true, effectsEnabled: true },
     tts: { enabled: false, voice: 'auto', rate: 1, autoRead: false },
     accessibility: { reducedMotion: false, focusVisible: true, skipNav: true, announceNarration: true },
     ...patch,

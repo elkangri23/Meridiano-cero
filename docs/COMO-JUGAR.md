@@ -96,6 +96,14 @@ Tu progreso como detective vive en el **archivo**: rango, puntos, casos cerrados
 
 Las cifras (puntos por resultado, deltas y umbrales de rango) son valores iniciales para playtest, documentados en SPEC-008; no son un equilibrio definitivo y se afinarán tras jugar.
 
+## Audio y voz
+
+El juego tiene **música retro sintetizada** (melodía y bajo en bucle, generados en tu navegador, sin archivos de audio) y **efectos discretos** al confirmar acciones, viajar o fallar. Todo es decorativo: **nada importante se comunica solo por sonido**.
+
+- **Dónde se ajusta:** en la ventana **Ajustes** de la pantalla de juego: silenciar todo, música (interruptor y volumen), efectos (interruptor y volumen) y volumen de narración. Los ajustes se guardan en tu navegador y se mantienen al cargar un guardado.
+- **La música no suena sola:** por la política de autoplay del navegador, empieza tras tu primer clic o tecla en la página, nunca al cargar.
+- **Lectura en voz alta (TTS):** en Ajustes puedes activar la lectura con la voz de tu sistema o navegador. Elige voz (automática en español si la hay) y velocidad, y si quieres lectura automática de la narración y los diálogos. En la consola tienes **Leer**, **Repetir**, **Pausar** y **Detener**; en el chat y en los hallazgos del dossier, un botón **Leer** en cada texto. Si tu navegador no ofrece síntesis de voz, la opción queda deshabilitada y explicada, y todo el texto sigue disponible.
+
 ## Errores y conexión
 
 - Si pierdes la conexión, la UI muestra estado offline y permite reconectar manualmente.

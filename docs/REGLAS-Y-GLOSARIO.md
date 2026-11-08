@@ -23,6 +23,8 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - **Primer resultado oficial:** primer cierre de caso que cuenta para carrera y reputación. Las repeticiones del mismo caso son práctica y no cambian la carrera ni duplican recompensas.
 - **Carrera / reputación:** progreso del detective (rango, puntos, medallas, países y lugares, reputación con etiquetas); idempotente, sin duplicación por repeticiones. El rango es honorífico y no bloquea herramientas. Una suspensión por retirada se resuelve con el primer caso limpio posterior y no destruye guardados.
 - **Archivo:** listado de partidas propias con filtros y paginación.
+- **Música retro:** banda sonora sintetizada en el navegador (melodía y bajo en bucle, sin archivos de audio); decorativa, nunca la única vía de información. Empieza tras el primer gesto del usuario, nunca sola al cargar.
+- **Lectura en voz alta (TTS):** lectura de narración, diálogos y documentos con la voz del sistema o navegador; con voz, velocidad, lectura manual/automática, repetir, pausar y detener. Si no hay voz compatible, la opción queda deshabilitada y el texto sigue disponible.
 - **Localizador de creación:** mecanismo para recuperar una creación perdida por conexión sin duplicar partida.
 
 ## Reglas fundamentales
@@ -67,6 +69,9 @@ A Margaret, que te recuerde el encargo y tus objetivos; a Richter, que te expliq
 
 **¿El equipo me dice si voy bien?**
 No. Nunca indica si vas bien, ni señala al culpable ni sugiere la siguiente pista: solo resume lo que ya consta en tu expediente. Si preguntas por algo sin registro, te dice que no consta.
+
+**¿Puedo escuchar el juego en vez de leerlo?**
+Sí. En Ajustes, activa «Leer en voz alta» y elige voz y velocidad; con la lectura automática, la narración y los diálogos se leen solos. También puedes pulsar «Leer» en la consola, en cada respuesta de un personaje y en cada hallazgo del dossier, y «Repetir», «Pausar» o «Detener» en la consola. La música y los efectos son solo decoración: nada del caso depende de oírlos, y el botón de silenciar lo apaga todo a la vez.
 
 **¿Puede una acción irregular resolver el caso?**
 No. Nunca revela la solución ni sustituye las pruebas: lo obtenido por esa vía no es admisible y no puede sostener una orden.

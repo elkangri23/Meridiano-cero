@@ -43,6 +43,17 @@ describe('audio-tts', () => {
     expect(c.getVoices()).toEqual([]);
   });
 
+  it('createTTSController con speechSynthesis undefined reporta no soportado', () => {
+    const globals = testGlobals();
+    // `exactOptionalPropertyTypes`: la asignación directa de undefined no
+    // compila; se simula la propiedad presente pero sin valor.
+    (globals as unknown as Record<string, unknown>).speechSynthesis = undefined;
+    const c = createTTSController();
+    expect(c.speak('hola')).toBe(false);
+    expect(c.getStatus().supported).toBe(false);
+    delete globals.speechSynthesis;
+  });
+
   it('createTTSController con stub global funciona', () => {
     const voices = [{ name: 'Voz ES', lang: 'es-ES', localService: true, default: true }];
     const calls: SpeechSynthesisUtterance[] = [];

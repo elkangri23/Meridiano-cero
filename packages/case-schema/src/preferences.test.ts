@@ -14,6 +14,8 @@ describe('preferences', () => {
     expect(p.highContrast).toBe(false);
     expect(p.language).toBe('es');
     expect(p.audio.muted).toBe(false);
+    expect(p.audio.musicEnabled).toBe(true);
+    expect(p.audio.effectsEnabled).toBe(true);
     expect(p.tts.enabled).toBe(false);
     expect(p.accessibility.focusVisible).toBe(true);
   });
@@ -49,7 +51,7 @@ describe('preferences', () => {
   it('normalizePreferences conserva valores validos', () => {
     const p = normalizePreferences({
       fontMode: 'accessible', textScale: 140, palette: 'protanopia', language: 'en', highContrast: true,
-      audio: { musicVolume: 10, effectsVolume: 20, narrationVolume: 30, muted: true },
+      audio: { musicVolume: 10, effectsVolume: 20, narrationVolume: 30, muted: true, musicEnabled: false, effectsEnabled: false },
       tts: { enabled: true, voice: 'v1', rate: 1.5, autoRead: true },
       accessibility: { reducedMotion: true, focusVisible: false, skipNav: false, announceNarration: false },
     });
@@ -59,8 +61,17 @@ describe('preferences', () => {
     expect(p.highContrast).toBe(true);
     expect(p.language).toBe('en');
     expect(p.audio.muted).toBe(true);
+    expect(p.audio.musicEnabled).toBe(false);
+    expect(p.audio.effectsEnabled).toBe(false);
     expect(p.tts.rate).toBe(1.5);
     expect(p.accessibility.focusVisible).toBe(false);
+  });
+
+  it('normalizePreferences enciende música y efectos si la preferencia guardada no los trae', () => {
+    const p = normalizePreferences({ audio: { musicVolume: 40 } } as unknown as Partial<PresentationPreferences>);
+    expect(p.audio.musicVolume).toBe(40);
+    expect(p.audio.musicEnabled).toBe(true);
+    expect(p.audio.effectsEnabled).toBe(true);
   });
 
   it('normalizePreferences activa el alto contraste con la paleta high-contrast', () => {

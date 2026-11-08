@@ -37,7 +37,9 @@ export interface TTSController {
 }
 
 function isSpeechSynthesisSupported(): boolean {
-  return typeof globalThis !== 'undefined' && 'speechSynthesis' in globalThis;
+  // No basta con que exista la propiedad: en algunos entornos está
+  // presente pero es `undefined`, y entonces no hay voz que usar.
+  return getSpeechSynthesis() !== null;
 }
 
 function getSpeechSynthesis(): SpeechSynthesis | null {
