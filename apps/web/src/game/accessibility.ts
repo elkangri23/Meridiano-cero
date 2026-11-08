@@ -2,6 +2,7 @@
 // Sin imports de paquetes: la web no puede importar case-schema (aislamiento).
 import type { KeyboardEvent } from 'react';
 import { useEffect, useState } from 'react';
+import type { TranslateFn } from '@meridiano/contracts';
 
 /** Luminancia relativa WCAG de un color #rrggbb (o #rgb). */
 export function relativeLuminance(hex: string): number {
@@ -48,8 +49,8 @@ export function useSystemReducedMotion(): boolean {
 
 /** Equivalente textual del estado de un objetivo (no depender solo de
  * ✓/○ ni del color): lo que oye un lector de pantalla. */
-export function objectiveStateText(achieved: boolean): string {
-  return achieved ? 'Logrado' : 'Pendiente';
+export function objectiveStateText(achieved: boolean, t: TranslateFn): string {
+  return achieved ? t('objectives.achieved') : t('objectives.pending');
 }
 
 /** Atrapa el Tab dentro de un diálogo modal: al tabular desde el último

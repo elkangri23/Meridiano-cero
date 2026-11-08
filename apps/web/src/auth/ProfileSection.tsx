@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { DETECTIVE_AVATARS } from '@meridiano/contracts';
-import type { DetectiveAvatar, DetectiveProfileDto, SessionDto } from '@meridiano/contracts';
+import type { DetectiveAvatar, DetectiveProfileDto, SessionDto, TranslateFn } from '@meridiano/contracts';
 import { profileApi } from './client';
+import { useTranslation } from '../i18n';
 
 /** Etiqueta del avatar elegido (su inicial es la que se enseña en el
  * cuadrado de la cabecera y del archivo). */
-export function avatarLabel(avatar: DetectiveAvatar): string {
-  return DETECTIVE_AVATARS.find(entry => entry.id === avatar)?.label ?? 'Detective';
+export function avatarLabel(avatar: DetectiveAvatar, t: TranslateFn): string {
+  const key = DETECTIVE_AVATARS.find(entry => entry.id === avatar)?.label;
+  return key ? t(key) : t('labels.avatar.detective');
 }
 
 /** Parche para guardar el perfil: si el alias queda vacío, no se toca el
@@ -22,9 +24,9 @@ async function saveDetectiveProfile(identity: SessionDto, alias: string, avatar:
 }
 
 /** Resumen del perfil actual para la cabecera del formulario. */
-function profileSummary(profile: DetectiveProfileDto): string {
-  const aliasNote = profile.alias === null ? ' (todavía sin alias: se enseña el nombre de la cuenta)' : '';
-  return `Alias actual: ${profile.alias ?? profile.displayName} · Avatar: ${avatarLabel(profile.avatar)}${aliasNote}.`;
+function profileSummary(profile: DetectiveProfileDto, t: TranslateFn): string {
+  const aliasNote = profile.alias === null ? t('profile.noAliasNote') : '';
+  return t('profile.summary', { alias: profile.alias ?? profile.displayName, avatar: avatarLabel(profile.avatar, t), aliasNote });
 }
 
 /** Alias inicial del formulario: el del perfil, si lo hay. */
@@ -44,6 +46,7 @@ function initialAvatar(profile: DetectiveProfileDto | null): DetectiveAvatar {
 export function ProfileSection({ identity, profile, onSaved }: {
   identity: SessionDto | null; profile: DetectiveProfileDto | null; onSaved: (profile: DetectiveProfileDto) => void;
 }) {
+  const t = useTranslation();
   const [alias, setAlias] = useState(initialAlias(profile));
   const [avatar, setAvatar] = useState<DetectiveAvatar>(initialAvatar(profile));
   const [saving, setSaving] = useState(false);
@@ -63,29 +66,29 @@ export function ProfileSection({ identity, profile, onSaved }: {
     setError('');
     try {
       onSaved(await saveDetectiveProfile(identity, alias, avatar));
-      setMessage('Perfil de detective guardado.');
+      setMessage(t('profile.saved'));
     } catch {
-      setError('No se pudo guardar el perfil de detective.');
+      setError(t('profile.saveError'));
     } finally {
       setSaving(false);
     }
   }
 
   return <div>
-    <h4>Mi perfil de detective</h4>
-    {profile && <p className="profile-note">{profileSummary(profile)}</p>}
+    <h4>{t('profile.title')}</h4>
+    {profile && <p className="profile-note">{profileSummary(profile, t)}</p>}
     <form onSubmit={event => void save(event)}>
-      <label className="profile-setting"><span>Alias</span>
-        <input type="text" value={alias} maxLength={160} placeholder={profile?.displayName ?? 'Alias del detective'}
+      <label className="profile-setting"><span>{t('profile.alias')}</span>
+        <input type="text" value={alias} maxLength={160} placeholder={profile?.displayName ?? t('profile.aliasPlaceholder')}
           onChange={event => setAlias(event.target.value)} disabled={disabled} />
       </label>
-      <label className="profile-setting"><span>Avatar</span>
+      <label className="profile-setting"><span>{t('profile.avatar')}</span>
         <select value={avatar} onChange={event => setAvatar(event.target.value as DetectiveAvatar)} disabled={disabled}>
-          {DETECTIVE_AVATARS.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+          {DETECTIVE_AVATARS.map(entry => <option key={entry.id} value={entry.id}>{t(entry.label)}</option>)}
         </select>
       </label>
-      <p className="profile-note">El alias se enseña en la cabecera de la partida y en el archivo. Si dejas el alias vacío, se mantiene el actual.</p>
-      <p><button type="submit" disabled={disabled}>{saving ? 'Guardando…' : 'Guardar perfil'}</button></p>
+      <p className="profile-note">{t('profile.help')}</p>
+      <p><button type="submit" disabled={disabled}>{saving ? t('profile.saving') : t('profile.save')}</button></p>
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
     </form>

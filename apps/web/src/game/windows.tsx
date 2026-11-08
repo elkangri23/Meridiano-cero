@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import type { LocaleKey } from '@meridiano/contracts';
+import { useTranslation } from '../i18n';
 
 export type WindowId = 'map' | 'dossier' | 'lab' | 'comms' | 'team' | 'saves' | 'settings' | 'report' | 'chat' | 'intel';
 
@@ -21,6 +23,14 @@ const initialPositions: Record<WindowId, { x: number; y: number }> = {
   report: { x: 300, y: 160 },
   chat: { x: 180, y: 260 },
   intel: { x: 260, y: 300 },
+};
+
+/** Claves i18n de los títulos de ventana (el texto vive en `locales/es.ts`). */
+export const WINDOW_KEYS: Record<WindowId, LocaleKey> = {
+  map: 'windows.map', dossier: 'windows.dossier', lab: 'windows.lab',
+  comms: 'windows.comms', team: 'windows.team', saves: 'windows.saves',
+  settings: 'windows.settings', report: 'windows.report', chat: 'windows.chat',
+  intel: 'windows.intel',
 };
 
 export function useWindows() {
@@ -113,6 +123,7 @@ interface GameWindowProps {
  * En pantalla estrecha se apila a ancho completo (sin coordenadas).
  */
 export function GameWindow({ id, title, state, moving, focusSeqs, onMoveStart, onMoveEnd, onMoveBy, onMinimize, onRestore, onClose, children }: GameWindowProps) {
+  const t = useTranslation();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; baseX: number; baseY: number } | null>(null);
   const isMoving = moving === id;
@@ -159,15 +170,15 @@ export function GameWindow({ id, title, state, moving, focusSeqs, onMoveStart, o
       <h3 ref={titleRef} tabIndex={-1}
         onPointerDown={onTitlePointerDown} onPointerMove={onTitlePointerMove} onPointerUp={onTitlePointerUp}
         onKeyDown={onTitleKeyDown}
-        title="Arrastra para mover o usa el botón Mover para mover con el teclado">{title}</h3>
+        title={t('windows.dragHint')}>{title}</h3>
       <div className="game-window-controls">
         {isMoving
-          ? <span className="game-window-moving">Moviendo: flechas, Enter termina, Esc cancela</span>
-          : <button type="button" onClick={() => onMoveStart(id)}>Mover</button>}
+          ? <span className="game-window-moving">{t('windows.moving')}</span>
+          : <button type="button" onClick={() => onMoveStart(id)}>{t('windows.move')}</button>}
         {state.minimized
-          ? <button type="button" onClick={() => onRestore(id)}>Restaurar</button>
-          : <button type="button" onClick={() => onMinimize(id)} aria-label={`Minimizar ${title}`}>_</button>}
-        <button type="button" onClick={() => onClose(id)} aria-label={`Cerrar ${title}`}>×</button>
+          ? <button type="button" onClick={() => onRestore(id)}>{t('windows.restore')}</button>
+          : <button type="button" onClick={() => onMinimize(id)} aria-label={t('windows.minimizeTitle', { title })}>_</button>}
+        <button type="button" onClick={() => onClose(id)} aria-label={t('windows.closeTitle', { title })}>×</button>
       </div>
     </div>
     {!state.minimized && <div className="game-window-body">{children}</div>}
@@ -175,14 +186,14 @@ export function GameWindow({ id, title, state, moving, focusSeqs, onMoveStart, o
 }
 
 export function MinimizedBar({ windows, lastMinimized, onRestore }: { windows: Record<WindowId, WindowState>; lastMinimized: WindowId | null; onRestore: (id: WindowId) => void }) {
+  const t = useTranslation();
   const minimized = (Object.keys(windows) as WindowId[]).filter(id => windows[id].open && windows[id].minimized);
   // Al minimizar, el foco sigue al botón «Restaurar» de esa ventana.
   useEffect(() => {
     if (lastMinimized) document.querySelector<HTMLElement>(`[data-testid="minimized-restore-${lastMinimized}"]`)?.focus();
   }, [lastMinimized]);
   if (!minimized.length) return null;
-  const labels: Record<WindowId, string> = { map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio', comms: 'Central de comunicaciones', team: 'Equipo A.C.M.E.', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia' };
-  return <div className="game-minimized-bar" role="group" aria-label="Ventanas minimizadas">
-    {minimized.map(id => <button key={id} type="button" data-testid={`minimized-restore-${id}`} onClick={() => onRestore(id)}>Restaurar {labels[id]}</button>)}
+  return <div className="game-minimized-bar" role="group" aria-label={t('windows.minimizedBar')}>
+    {minimized.map(id => <button key={id} type="button" data-testid={`minimized-restore-${id}`} onClick={() => onRestore(id)}>{t('windows.restoreTitle', { title: t(WINDOW_KEYS[id]) })}</button>)}
   </div>;
 }

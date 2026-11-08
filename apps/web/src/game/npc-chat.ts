@@ -8,6 +8,7 @@
 // la precedencia (entrada de la vista > respaldo) y es testeable sin
 // montar el componente.
 import type { NpcChatEntry, PlayerViewDto } from '@meridiano/contracts';
+import type { TranslateFn } from '@meridiano/contracts';
 
 export function findChatEntry(view: PlayerViewDto | null | undefined, npcId: string): NpcChatEntry | undefined {
   return view?.npcChat.find(entry => entry.id === npcId);
@@ -23,8 +24,8 @@ export function chatPersona(entry: NpcChatEntry | undefined, fallback: string): 
   return entry?.persona ?? fallback;
 }
 
-export function chatGreeting(entry: NpcChatEntry | undefined, fallback: string | undefined, npcName: string): string {
-  return entry?.greeting ?? fallback ?? `Soy ${npcName}. ¿Qué quieres saber?`;
+export function chatGreeting(entry: NpcChatEntry | undefined, fallback: string | undefined, npcName: string, t: TranslateFn): string {
+  return entry?.greeting ?? fallback ?? t('chat.fallbackGreeting', { name: npcName });
 }
 
 export function chatRefusal(entry: NpcChatEntry | undefined, fallback: string | undefined): string | undefined {

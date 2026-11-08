@@ -5,6 +5,9 @@
 // >= 4.5 en texto normal y >= 3 en indicadores de foco.
 import { describe, expect, it } from 'vitest';
 import { contrastRatio, effectiveReducedMotion, objectiveStateText, relativeLuminance } from './accessibility';
+import { createTranslator } from '@meridiano/contracts';
+
+const t = createTranslator('es').t;
 
 const BLACK = '#000000';
 const WHITE = '#ffffff';
@@ -71,7 +74,7 @@ describe('Movimiento reducido (§15)', () => {
 
 describe('Equivalente textual de estados (§15)', () => {
   it('un objetivo logrado o pendiente se dice con palabras, no solo con ✓/○', () => {
-    expect(objectiveStateText(true)).toBe('Logrado');
-    expect(objectiveStateText(false)).toBe('Pendiente');
+    expect(objectiveStateText(true, t)).toBe('Logrado');
+    expect(objectiveStateText(false, t)).toBe('Pendiente');
   });
 });

@@ -37,6 +37,47 @@ export const ES_MESSAGES = {
   'common.minute': 'min {minute}',
   'common.unknown': 'Desconocido',
 
+  // Objetivos y chat.
+  'objectives.achieved': 'Logrado',
+  'objectives.pending': 'Pendiente',
+  'chat.fallbackGreeting': 'Soy {name}. ¿Qué quieres saber?',
+  'sceneArt.paris': 'Ilustración pixel-art de un archivo de conservación: estanterías con cajas y legajos, ventana con tejados y mesa con papeles y lámpara.',
+  'sceneArt.lisbon': 'Ilustración pixel-art de un almacén de depósito: rejilla de taquillas de custodia, lámpara colgante y una caja grande en primer plano.',
+  'sceneArt.madrid': 'Ilustración pixel-art de una sala de embalaje: ventana con vistas a la ciudad, mesa con una caja y un cuadro en la pared.',
+
+  // Ventanas de herramienta.
+  'windows.map': 'Mapa',
+  'windows.dossier': 'Dossier',
+  'windows.lab': 'Laboratorio',
+  'windows.comms': 'Central de comunicaciones',
+  'windows.team': 'Equipo A.C.M.E.',
+  'windows.saves': 'Guardados',
+  'windows.settings': 'Ajustes',
+  'windows.report': 'Informe final',
+  'windows.chat': 'Conversación',
+  'windows.intel': 'Terminal de inteligencia',
+  'windows.move': 'Mover',
+  'windows.restore': 'Restaurar',
+  'windows.minimizedBar': 'Ventanas minimizadas',
+  'windows.dragHint': 'Arrastra para mover o usa el botón Mover para mover con el teclado',
+  'windows.moving': 'Moviendo: flechas, Enter termina, Esc cancela',
+  'windows.minimizeTitle': 'Minimizar {title}',
+  'windows.closeTitle': 'Cerrar {title}',
+  'windows.restoreTitle': 'Restaurar {title}',
+
+  // Perfil de detective.
+  'profile.title': 'Mi perfil de detective',
+  'profile.alias': 'Alias',
+  'profile.avatar': 'Avatar',
+  'profile.aliasPlaceholder': 'Alias del detective',
+  'profile.help': 'El alias se enseña en la cabecera de la partida y en el archivo. Si dejas el alias vacío, se mantiene el actual.',
+  'profile.saving': 'Guardando…',
+  'profile.save': 'Guardar perfil',
+  'profile.saved': 'Perfil de detective guardado.',
+  'profile.saveError': 'No se pudo guardar el perfil de detective.',
+  'profile.summary': 'Alias actual: {alias} · Avatar: {avatar}{aliasNote}.',
+  'profile.noAliasNote': ' (todavía sin alias: se enseña el nombre de la cuenta)',
+
   // Ajustes: presentación, accesibilidad, audio y voz, idioma.
   'settings.language': 'Idioma',
   'settings.languageHelp': 'El idioma de la interfaz. Hoy solo está traducida la interfaz al español: elegir otro idioma lo deja todo en español hasta que llegue su traducción.',

@@ -13,6 +13,9 @@
 
 export type SceneArtId = 'madrid-sala' | 'paris-archivo' | 'lisboa-almacen';
 
+import { useTranslation } from '../i18n';
+import type { TranslateFn } from '@meridiano/contracts';
+
 export function locationArtId(locationId: string): SceneArtId {
   if (locationId === 'PAR-ARCH') return 'paris-archivo';
   if (locationId === 'LIS-ALM') return 'lisboa-almacen';
@@ -139,15 +142,20 @@ function LisbonDepositArt() {
 
 /** Descripción accesible del fondo (§15): lo que dibuja, sin spoilers del
  * caso. Las pruebas se descubren jugando; el arte no las nombra. */
-export function sceneArtDescription(art: SceneArtId): string {
-  if (art === 'paris-archivo') return 'Ilustración pixel-art de un archivo de conservación: estanterías con cajas y legajos, ventana con tejados y mesa con papeles y lámpara.';
-  if (art === 'lisboa-almacen') return 'Ilustración pixel-art de un almacén de depósito: rejilla de taquillas de custodia, lámpara colgante y una caja grande en primer plano.';
-  return 'Ilustración pixel-art de una sala de embalaje: ventana con vistas a la ciudad, mesa con una caja y un cuadro en la pared.';
+export const SCENE_ART_KEYS: Record<SceneArtId, 'sceneArt.paris' | 'sceneArt.lisbon' | 'sceneArt.madrid'> = {
+  'paris-archivo': 'sceneArt.paris',
+  'lisboa-almacen': 'sceneArt.lisbon',
+  'madrid-sala': 'sceneArt.madrid',
+};
+
+export function sceneArtDescription(art: SceneArtId, t: TranslateFn): string {
+  return t(SCENE_ART_KEYS[art]);
 }
 
 export function SceneArt({ locationId }: { locationId: string }) {
+  const t = useTranslation();
   const art = locationArtId(locationId);
-  return <div className="game-scene-art" data-testid="scene-art" data-location={locationId} role="img" aria-label={sceneArtDescription(art)}>
+  return <div className="game-scene-art" data-testid="scene-art" data-location={locationId} role="img" aria-label={sceneArtDescription(art, t)}>
     {art === 'paris-archivo' ? <ParisArchiveArt /> : art === 'lisboa-almacen' ? <LisbonDepositArt /> : <MadridPackingArt />}
   </div>;
 }
