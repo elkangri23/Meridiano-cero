@@ -76,37 +76,55 @@ interface RequestOptions {
  * «La IA no responde», aunque el servidor acababa respondiendo. */
 const AI_TIMEOUTS = { interpret: 15000, narrate: 45000, converse: 75000 } as const;
 
+async function fetchOnce(path: string, signal: AbortSignal, init: RequestInit, timeoutMs: number): Promise<Response> {
+  return fetch(path, {
+    ...init,
+    credentials: 'same-origin',
+    cache: 'no-store',
+    redirect: 'error',
+    signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+  });
+}
+
+function isCancelled(error: unknown, signal: AbortSignal): boolean {
+  return signal.aborted || (error instanceof AiError && error.kind === 'cancelled');
+}
+
+function retryDelay(baseDelayMs: number, attempt: number): Promise<void> {
+  const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 100;
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+/** Tras un intento fallido: el error a lanzar, o null para reintentar. */
+async function handleAttemptError(error: unknown, signal: AbortSignal, attempt: number, options: Required<RequestOptions>): Promise<AiError | null> {
+  if (isCancelled(error, signal)) return new AiError('cancelled');
+  const lastError = error instanceof AiError ? error : new AiError('unavailable');
+  if (attempt < options.retries && options.shouldRetry(lastError)) {
+    await retryDelay(options.baseDelayMs, attempt);
+    return null;
+  }
+  return lastError;
+}
+
 async function requestWithRetry(
   path: string,
   signal: AbortSignal,
-  init: RequestInit = {},
-  options: RequestOptions = {}
+  init: RequestInit,
+  options: Required<RequestOptions>
 ): Promise<Response> {
-  const { retries = 2, baseDelayMs = 500, timeoutMs = 8000, shouldRetry = () => false } = options;
   let attempt = 0;
   let lastError: AiError | undefined;
 
-  while (attempt <= retries) {
+  while (attempt <= options.retries) {
     try {
-      const response = await fetch(path, {
-        ...init,
-        credentials: 'same-origin',
-        cache: 'no-store',
-        redirect: 'error',
-        signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
-      });
-      return response;
+      return await fetchOnce(path, signal, init, options.timeoutMs);
     } catch (error) {
-      if (signal.aborted || error instanceof AiError && error.kind === 'cancelled') {
-        throw new AiError('cancelled');
-      }
-      lastError = error instanceof AiError ? error : new AiError('unavailable');
-      if (attempt < retries && shouldRetry(lastError)) {
-        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 100;
-        await new Promise(resolve => setTimeout(resolve, delay));
+      const handled = await handleAttemptError(error, signal, attempt, options);
+      if (handled === null) {
         attempt++;
         continue;
       }
+      lastError = handled;
       throw lastError;
     }
   }

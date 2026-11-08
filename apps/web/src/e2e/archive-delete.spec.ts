@@ -24,13 +24,14 @@ test('crear con dificultad difícil muestra la intro y se puede borrar desde el 
   const header = await page.locator('.game-detective small').textContent();
   const reference = /Referencia: ([a-f0-9]{8})/i.exec(header ?? '')?.[1];
   expect(reference).toBeTruthy();
+  if (!reference) throw new Error('Expected run reference in header');
   // Volver al archivo: la partida aparece con su dificultad y se puede borrar.
   await page.getByRole('link', { name: 'Archivo' }).click();
   await expect(page.getByRole('heading', { name: 'Mis partidas' })).toBeVisible();
-  const row = page.locator('tr', { hasText: reference! });
+  const row = page.locator('tr', { hasText: reference });
   await expect(row).toContainText('Difícil');
   await expect(row).toContainText('Robo internacional · Familiar');
   await row.getByRole('button', { name: 'Borrar' }).click();
   await row.getByRole('button', { name: 'Sí, borrar' }).click();
-  await expect(page.locator('tr', { hasText: reference! })).toHaveCount(0);
+  await expect(page.locator('tr', { hasText: reference })).toHaveCount(0);
 });

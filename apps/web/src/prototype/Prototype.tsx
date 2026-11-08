@@ -25,6 +25,26 @@ export function Prototype() {
     input.current?.focus();
   }
 
+  function applyInterpretation(result: AiInterpretation) {
+    if (result.kind === 'actions') {
+      const actionIds = result.actionIds ?? [];
+      setRequest(`Acción: ${actionIds.join(', ')}`);
+      setNotice('Orden interpretada. Revisa y confirma.');
+    } else if (result.kind === 'clarification') {
+      setRequest(null);
+      setNotice(`Aclaración: ${result.message ?? 'Orden ambigua'}`);
+    }
+  }
+
+  function applySubmitError(error: unknown) {
+    setRequest(null);
+    if (error instanceof AiError) {
+      setNotice(error.kind === 'budget_exceeded' ? 'Orden demasiado larga.' : error.kind === 'cancelled' ? 'Cancelado.' : 'Error de conexión con IA.');
+    } else {
+      setNotice('Error inesperado.');
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = draft.trim();
@@ -34,22 +54,9 @@ export function Prototype() {
     try {
       const result = await aiApi.interpret(text, { location: sampleView.position.cityId, description: sampleView.conversation[0] ?? 'Sin descripción' }, tools.map(t => ({ id: t.id, label: t.label })), controller.signal);
       setInterpretation(result);
-      if (result.kind === 'actions') {
-        const actionIds = result.actionIds ?? [];
-        setRequest(`Acción: ${actionIds.join(', ')}`);
-        setNotice('Orden interpretada. Revisa y confirma.');
-      } else if (result.kind === 'clarification') {
-        setRequest(null);
-        setNotice(`Aclaración: ${result.message ?? 'Orden ambigua'}`);
-      }
+      applyInterpretation(result);
     } catch (e) {
-      if (e instanceof AiError) {
-        setRequest(null);
-        setNotice(e.kind === 'budget_exceeded' ? 'Orden demasiado larga.' : e.kind === 'cancelled' ? 'Cancelado.' : 'Error de conexión con IA.');
-      } else {
-        setRequest(null);
-        setNotice('Error inesperado.');
-      }
+      applySubmitError(e);
     }
   }
 

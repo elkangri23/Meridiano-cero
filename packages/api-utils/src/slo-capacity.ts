@@ -172,26 +172,27 @@ export function evaluateLoadTest(result: LoadTestResult, slo: SLOConfig): { pass
   return { passed: issues.length === 0, issues };
 }
 
+const LOAD_TEST_DEFAULTS: Omit<LoadTestResult, 'scenario'> = {
+  concurrentUsers: 0,
+  durationSeconds: 0,
+  totalRequests: 0,
+  successfulRequests: 0,
+  failedRequests: 0,
+  avgLatencyMs: 0,
+  p95LatencyMs: 0,
+  p99LatencyMs: 0,
+  maxLatencyMs: 0,
+  throughputRps: 0,
+  errorRate: 0,
+  aiRequests: 0,
+  aiAvgLatencyMs: 0,
+  aiErrorRate: 0,
+  dbConnectionsUsed: 0,
+  memoryPeakMB: 0,
+  passed: false,
+  issues: [],
+};
+
 export function createLoadTestResult(scenario: string, data: Partial<LoadTestResult>): LoadTestResult {
-  return {
-    scenario,
-    concurrentUsers: data.concurrentUsers ?? 0,
-    durationSeconds: data.durationSeconds ?? 0,
-    totalRequests: data.totalRequests ?? 0,
-    successfulRequests: data.successfulRequests ?? 0,
-    failedRequests: data.failedRequests ?? 0,
-    avgLatencyMs: data.avgLatencyMs ?? 0,
-    p95LatencyMs: data.p95LatencyMs ?? 0,
-    p99LatencyMs: data.p99LatencyMs ?? 0,
-    maxLatencyMs: data.maxLatencyMs ?? 0,
-    throughputRps: data.throughputRps ?? 0,
-    errorRate: data.errorRate ?? 0,
-    aiRequests: data.aiRequests ?? 0,
-    aiAvgLatencyMs: data.aiAvgLatencyMs ?? 0,
-    aiErrorRate: data.aiErrorRate ?? 0,
-    dbConnectionsUsed: data.dbConnectionsUsed ?? 0,
-    memoryPeakMB: data.memoryPeakMB ?? 0,
-    passed: data.passed ?? false,
-    issues: data.issues ?? [],
-  };
+  return { ...LOAD_TEST_DEFAULTS, ...data, scenario, issues: data.issues ?? [] };
 }
