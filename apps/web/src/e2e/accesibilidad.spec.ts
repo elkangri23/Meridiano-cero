@@ -202,7 +202,9 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     await expect(map).toBeVisible();
     const atlas = map.locator('.game-atlas');
     await expect(atlas).toHaveAttribute('role', 'img');
-    await expect(atlas).toHaveAttribute('aria-label', /Madrid, París, Lisboa/);
+    // El atlas mundial nombra las ciudades admitidas del catálogo, con las
+    // tres del expediente entre ellas (GDD §5).
+    await expect(atlas).toHaveAttribute('aria-label', /Mapa mundial con las ciudades admitidas: Madrid, Barcelona, .*París, Lisboa\./);
   });
 
   test('a escala 200% no hay desbordamiento horizontal ni ventanas fuera de la pantalla', async ({ page }) => {
