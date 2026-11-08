@@ -6,6 +6,7 @@ import { deadlineMinutesForDifficulty, GDD_CRIME_TYPES, CRIME_TYPE_KEYS, CONTENT
 import type { ContentRating, CrimeType } from '@meridiano/contracts';
 import type { ArchiveState, createArchiveModel } from './model';
 import type { Difficulty } from './creation';
+import type { ExplorationMode } from './client';
 import { displayCaseTitle } from './case-title';
 import { useTranslation } from '../i18n';
 
@@ -14,6 +15,10 @@ const difficultyOptions: { id: Difficulty; labelKey: LocaleKey; noteKey: LocaleK
   { id: 'easy', labelKey: 'labels.difficulty.easy', noteKey: 'newRun.difficulty.easyNote' },
   { id: 'normal', labelKey: 'labels.difficulty.normal', noteKey: 'newRun.difficulty.normalNote' },
   { id: 'hard', labelKey: 'labels.difficulty.hard', noteKey: 'newRun.difficulty.hardNote' },
+];
+const explorationOptions: { id: ExplorationMode; labelKey: LocaleKey; noteKey: LocaleKey }[] = [
+  { id: 'guided', labelKey: 'labels.exploration.guided', noteKey: 'newRun.exploration.guidedNote' },
+  { id: 'free', labelKey: 'labels.exploration.free', noteKey: 'newRun.exploration.freeNote' },
 ];
 const hours = (minutes: number) => `${Math.round(minutes / 60)} h`;
 const difficulties: Difficulty[] = ['easy', 'normal', 'hard'];
@@ -79,6 +84,7 @@ function CreationContent({ state, model }: Props) {
   const t = useTranslation();
   const [content, setContent] = useState<ContentRating>('familiar');
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
+  const [exploration, setExploration] = useState<ExplorationMode>('guided');
   const [caseId, setCaseId] = useState<string | null>(null);
   const navigate = useNavigate();
   const previousPhase = useRef(state.creation.phase);
@@ -120,10 +126,11 @@ function CreationContent({ state, model }: Props) {
     previousPhase.current = state.creation.phase;
     openCreatedRun(previous, state.creation.phase, state.creation.runId, navigate);
   }, [state.creation.phase, state.creation.runId, navigate]);
-  function submit(event: FormEvent) { event.preventDefault(); if (selectedCase) void model.createCase(selectedCase.caseId, difficulty, { crimeType: resolvedCrime, contentRating: content }); }
-  if (state.creation.phase !== 'idle') return <CreationPhaseView state={state} model={model} busy={busy} onPrepareAnother={() => { choice.resetChoice(); setContent('familiar'); setDifficulty('normal'); setCaseId(null); model.prepareCreation(); }} />;
+  function submit(event: FormEvent) { event.preventDefault(); if (selectedCase) void model.createCase(selectedCase.caseId, difficulty, { crimeType: resolvedCrime, contentRating: content, explorationMode: exploration }); }
+  if (state.creation.phase !== 'idle') return <CreationPhaseView state={state} model={model} busy={busy} onPrepareAnother={() => { choice.resetChoice(); setContent('familiar'); setDifficulty('normal'); setExploration('guided'); setCaseId(null); model.prepareCreation(); }} />;
   return <form onSubmit={submit}>
     <DifficultyField busy={busy} difficulty={difficulty} selectedCase={selectedCase} onChange={setDifficulty} />
+    <ExplorationField busy={busy} exploration={exploration} onChange={setExploration} />
     <CrimeField playableCrimes={playableCrimes} crime={crime} resolvedCrime={resolvedCrime} busy={busy} surprised={surprised} selectedCase={selectedCase} onChoose={chooseCrimeAndReset} onSurprise={surprise} />
     <ContentField content={content} busy={busy} hasGeneral={hasGeneral} onChange={chooseContent} />
     {matchingCases.length > 1 && <CaseField cases={matchingCases} selectedCase={selectedCase} busy={busy} onChange={setCaseId} />}
@@ -142,6 +149,12 @@ function ExportOwnCaseButton({ model, selectedCase, busy }: { model: ReturnType<
 function DifficultyField({ busy, difficulty, selectedCase, onChange }: DifficultyFieldProps) {
   const t = useTranslation();
   return <fieldset disabled={busy} className="difficulty-field"><legend>{t('newRun.difficulty')}</legend><div className="difficulty-options">{difficultyOptions.map(option => <label key={option.id}><input type="radio" name="difficulty" value={option.id} checked={difficulty === option.id} onChange={() => onChange(option.id)} /> <span><strong>{t(option.labelKey)}{selectedCase ? t('newRun.deadline', { hours: hours(deadlineMinutesForDifficulty(selectedCase.deadlineMinutes, option.id)) }) : ''}</strong> — {t(option.noteKey)}</span></label>)}</div></fieldset>;
+}
+/** Modo de exploración (GDD §5): independiente de la dificultad; en libre
+ * las ciudades del expediente se descubren investigando. */
+function ExplorationField({ busy, exploration, onChange }: { busy: boolean; exploration: ExplorationMode; onChange: (next: ExplorationMode) => void }) {
+  const t = useTranslation();
+  return <fieldset disabled={busy} className="difficulty-field"><legend>{t('newRun.exploration')}</legend><div className="difficulty-options">{explorationOptions.map(option => <label key={option.id}><input type="radio" name="exploration" value={option.id} checked={exploration === option.id} onChange={() => onChange(option.id)} /> <span><strong>{t(option.labelKey)}</strong> — {t(option.noteKey)}</span></label>)}</div><p>{t('newRun.explorationHelp')}</p></fieldset>;
 }
 type PhaseViewProps = Props & { busy: boolean; onPrepareAnother: () => void };
 function CreationPhaseView({ state, model, busy, onPrepareAnother }: PhaseViewProps) {

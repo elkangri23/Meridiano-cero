@@ -1,6 +1,6 @@
 import { isIdempotencyKey } from '@meridiano/contracts';
 import type { SessionDto } from '@meridiano/contracts';
-import type { ArchiveApi, CreationParams } from './client';
+import type { ArchiveApi, CreationParams, ExplorationMode } from './client';
 import { ArchiveError } from './client';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
@@ -11,17 +11,21 @@ export const browserIntents: IntentStorage = {
   getItem: key => sessionStorage.getItem(key), setItem: (key, value) => sessionStorage.setItem(key, value), removeItem: key => sessionStorage.removeItem(key),
 };
 export class CreationBlocked extends Error { constructor() { super('CREATION_REFERENCE_UNAVAILABLE'); } }
-// La intención guarda también la dificultad elegida: sin ella, un reintento
-// tras cerrar la pestaña crearía la partida con la dificultad por defecto y
-// el usuario no sabría con cuál quedó. La forma antigua (sin difficulty) se
-// sigue aceptando y equivale a normal.
-type Intent = { schemaVersion: 1; profileId: string; caseId: string; idempotencyKey: string; difficulty?: Difficulty };
+// La intención guarda también la dificultad y el modo de exploración
+// elegidos: sin ellos, un reintento tras cerrar la pestaña crearía la
+// partida con los valores por defecto y el usuario no sabría con cuáles
+// quedó. La forma antigua (sin difficulty) se sigue aceptando y equivale a
+// normal; sin explorationMode equivale a guiada.
+type Intent = { schemaVersion: 1; profileId: string; caseId: string; idempotencyKey: string; difficulty?: Difficulty; explorationMode?: ExplorationMode };
 export type CreationView = { phase: 'idle' | 'sending' | 'uncertain' | 'created' | 'blocked'; caseId: string | null; runId: string | null };
 export type CreationOutcome = { phase: 'created'; runId: string } | { phase: 'uncertain'; reason?: string };
 const namespace = (profileId: string) => 'meridiano:create-run:v1:' + profileId;
 function hasIntentKeys(record: Record<string, unknown>): boolean {
   const keys = Object.keys(record).sort().join(',');
-  return keys === 'caseId,idempotencyKey,profileId,schemaVersion' || keys === 'caseId,difficulty,idempotencyKey,profileId,schemaVersion';
+  return keys === 'caseId,idempotencyKey,profileId,schemaVersion' ||
+    keys === 'caseId,difficulty,idempotencyKey,profileId,schemaVersion' ||
+    keys === 'caseId,explorationMode,idempotencyKey,profileId,schemaVersion' ||
+    keys === 'caseId,difficulty,explorationMode,idempotencyKey,profileId,schemaVersion';
 }
 function hasIntentIdentity(record: Record<string, unknown>, profileId: string): boolean {
   return record.schemaVersion === 1 && record.profileId === profileId &&
@@ -30,11 +34,30 @@ function hasIntentIdentity(record: Record<string, unknown>, profileId: string): 
 function isDifficulty(value: unknown): value is Difficulty {
   return typeof value === 'string' && (difficulties as readonly string[]).includes(value);
 }
+function isExplorationMode(value: unknown): value is ExplorationMode {
+  return value === 'guided' || value === 'free';
+}
 function validIntent(value: unknown, profileId: string): value is Intent {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return hasIntentKeys(record) && hasIntentIdentity(record, profileId) &&
-    (record.difficulty === undefined || isDifficulty(record.difficulty));
+    (record.difficulty === undefined || isDifficulty(record.difficulty)) &&
+    (record.explorationMode === undefined || isExplorationMode(record.explorationMode));
+}
+function freshIntent(profileId: string, caseId: string, difficulty: Difficulty, explorationMode: ExplorationMode): Intent {
+  return { schemaVersion: 1, profileId, caseId, difficulty, explorationMode, idempotencyKey: crypto.randomUUID() };
+}
+function creationParams(difficulty: Difficulty, intent: Intent, params?: Omit<CreationParams, 'difficulty'>): CreationParams {
+  // Delito y contenido no van en la intención: se derivan del expediente
+  // (caseId) y el servidor los valida al crear; un reintento tras recargar
+  // los vuelve a derivar igual. El modo, en cambio, sí viaja: un reintento
+  // sin params lo recuperaría como guiado.
+  return { difficulty, explorationMode: params?.explorationMode ?? intent.explorationMode ?? 'guided', ...params };
+}
+function sameIntent(previous: Intent | null, caseId: string, difficulty: Difficulty, explorationMode: ExplorationMode): boolean {
+  if (!previous) return true;
+  return previous.caseId === caseId && (previous.difficulty ?? 'normal') === difficulty &&
+    (previous.explorationMode ?? 'guided') === explorationMode;
 }
 export function createRunCoordinator(api: ArchiveApi, storage: IntentStorage) {
   function pending(profileId: string): Intent | null {
@@ -78,7 +101,8 @@ export function createRunCoordinator(api: ArchiveApi, storage: IntentStorage) {
     // creación falló por red tras crearse en el servidor, el ledger lo dirá.
     let reason: string | undefined;
     try {
-      await api.create(intent.caseId, intent.idempotencyKey, identity, signal, params ?? (intent.difficulty ? { difficulty: intent.difficulty } : undefined));
+      const fallback: CreationParams = { difficulty: intent.difficulty ?? 'normal', explorationMode: intent.explorationMode ?? 'guided' };
+      await api.create(intent.caseId, intent.idempotencyKey, identity, signal, params ?? fallback);
     } catch (error) {
       if (error instanceof ArchiveError) reason = error.detail;
     }
@@ -100,17 +124,15 @@ export function createRunCoordinator(api: ArchiveApi, storage: IntentStorage) {
     },
     async start(caseId: string, identity: SessionDto, signal: AbortSignal, difficulty: Difficulty = 'normal', params?: Omit<CreationParams, 'difficulty'>) {
       const previous = pending(identity.profile.id);
-      // Otra elección (caso o dificultad) no sobrescribe una intención
+      const mode = params?.explorationMode ?? 'guided';
+      // Otra elección (caso, dificultad o modo) no sobrescribe una intención
       // incierta: el usuario la resuelve (comprobar/reintentar) o la
       // descarta explícitamente. La forma antigua sin difficulty equivale a
       // normal, así que una intención guardada antes sigue siendo válida.
-      if (previous && (previous.caseId !== caseId || (previous.difficulty ?? 'normal') !== difficulty)) throw new CreationBlocked();
-      const intent = previous ?? { schemaVersion: 1, profileId: identity.profile.id, caseId, difficulty, idempotencyKey: crypto.randomUUID() };
+      if (!sameIntent(previous, caseId, difficulty, mode)) throw new CreationBlocked();
+      const intent = previous ?? freshIntent(identity.profile.id, caseId, difficulty, mode);
       if (!previous) remember(intent);
-      // Delito y contenido no van en la intención: se derivan del expediente
-      // (caseId) y el servidor los valida al crear; un reintento tras
-      // recargar los vuelve a derivar igual.
-      return send(intent, identity, signal, { difficulty, ...params });
+      return send(intent, identity, signal, creationParams(difficulty, intent, params));
     },
     async recover(identity: SessionDto, resend: boolean, signal: AbortSignal) {
       const intent = pending(identity.profile.id);

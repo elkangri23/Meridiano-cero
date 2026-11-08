@@ -6,7 +6,8 @@ export type Filter = 'all' | 'active' | 'closed';
 /** Parámetros de creación que el servidor valida contra el expediente
  * (delito y contenido deben corresponderle; un reintento sin ellos sigue
  * funcionando porque se derivan del expediente). */
-export interface CreationParams { difficulty?: 'easy' | 'normal' | 'hard'; crimeType?: CrimeType; contentRating?: ContentRating }
+export type ExplorationMode = 'guided' | 'free';
+export interface CreationParams { difficulty?: 'easy' | 'normal' | 'hard'; explorationMode?: ExplorationMode; crimeType?: CrimeType; contentRating?: ContentRating }
 
 export interface ArchiveApi {
   initial(runId: string, signal: AbortSignal): Promise<PlayerViewDto>;
@@ -156,6 +157,7 @@ function mutationHeaders(identity: SessionDto) {
 function creationBody(caseId: string, key: string, params?: CreationParams): Record<string, string> {
   const body: Record<string, string> = { caseId, idempotencyKey: key };
   if (params?.difficulty) body.difficulty = params.difficulty;
+  if (params?.explorationMode) body.explorationMode = params.explorationMode;
   if (params?.crimeType) body.crimeType = params.crimeType;
   if (params?.contentRating) body.contentRating = params.contentRating;
   return body;

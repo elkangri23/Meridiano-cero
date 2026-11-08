@@ -26,7 +26,7 @@ import type { WindowId } from './windows';
 import { effectiveReducedMotion, objectiveStateText, trapTabKey, useSystemReducedMotion } from './accessibility';
 import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto, TranslateFn } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_KEYS, getNPC, IRREGULAR_KIND_KEYS, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, SUPPORTED_LANGUAGES, travelText } from '@meridiano/contracts';
+import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_KEYS, GEOGRAPHIC_CATALOG, getNPC, getRoute, IRREGULAR_KIND_KEYS, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, searchCities, SUPPORTED_LANGUAGES, touristInfoFor, travelText } from '@meridiano/contracts';
 import type { CaseTexts, DiscoveryLookup, ForensicType, Language, LocaleKey, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/contracts';
 import { useTranslation } from '../i18n';
 import './game.css';
@@ -70,6 +70,13 @@ function channelLabel(channel: string, t: TranslateFn): string {
 const difficultyKeys: Record<PlayerViewDto['difficulty'], LocaleKey> = { easy: 'labels.difficulty.easy', normal: 'labels.difficulty.normal', hard: 'labels.difficulty.hard' };
 function difficultyLabel(difficulty: PlayerViewDto['difficulty'], t: TranslateFn): string {
   return t(difficultyKeys[difficulty]);
+}
+
+/** Modo de exploración de la partida (GDD §5), en la cabecera junto a la
+ * dificultad: en libre, las ciudades del expediente se descubren. */
+const explorationModeKeys: Record<PlayerViewDto['explorationMode'], LocaleKey> = { guided: 'labels.exploration.guided', free: 'labels.exploration.free' };
+function explorationModeLabel(mode: PlayerViewDto['explorationMode'], t: TranslateFn): string {
+  return t(explorationModeKeys[mode]);
 }
 
 /** Nombre del detective que se enseña en la cabecera: el alias si lo hay,
@@ -167,6 +174,9 @@ function npcNamesFromView(view: PlayerViewDto): Map<string, string> {
 function lookupFromView(view: PlayerViewDto): DiscoveryLookup {
   const locations = new Map(view.locations.map(location => [location.id, location.name]));
   const cities = new Map(view.cities.map(city => [city.id, city.name]));
+  // El atlas trae todas las ciudades admitidas, también las turísticas:
+  // sin él, un `travel:barcelona` caía en «Viaje realizado.».
+  for (const city of view.atlas) cities.set(city.id, city.name);
   const npcs = npcNamesFromView(view);
   return {
     locationName: id => locations.get(id),
@@ -395,6 +405,7 @@ function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, onLogou
       <div><p className="game-overline">{t('archive.col.crime')}</p><strong>{caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating, t)}</strong></div>
       <div><p className="game-overline">{t('game.currentCity')}</p><strong>{view.position.city.name}, {view.position.city.country}</strong></div>
       <div><p className="game-overline">{t('archive.col.difficulty')}</p><strong data-testid="difficulty">{t('game.difficultyLine', { label: difficultyLabel(view.difficulty, t), hours: Math.round(view.clock.deadlineMinutes / 60) })}</strong></div>
+      <div><p className="game-overline">{t('game.explorationModeLabel')}</p><strong data-testid="exploration-mode">{explorationModeLabel(view.explorationMode, t)}</strong></div>
       <div className={`game-clock${clockPulse ? ' game-clock-pulse' : ''}`} data-testid="clock" aria-label={t('game.clockAria', { minute: view.clock.minute, deadline: view.clock.deadlineMinutes })}>
         <p className="game-overline">{t('game.clockLabel')}</p>
         <strong>{view.clock.minute} min<span> / {view.clock.deadlineMinutes} min</span></strong>
@@ -964,42 +975,68 @@ function PreviewDialog({ phase, confirmRef, onConfirm, onCancel }: {
 
 // ── Contenidos de ventanas ──────────────────────────────────────────────────────
 
-// Coordenadas de presentación del atlas, tomadas de la maqueta
-// (apps/web/src/prototype/sample.ts): las tres ciudades del caso.
-const atlasPositions: Record<string, { x: number; y: number }> = {
-  madrid: { x: 43, y: 67 }, paris: { x: 59, y: 29 }, lisboa: { x: 23, y: 75 },
-};
-
 function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const t = useTranslation();
+  const [query, setQuery] = useState('');
   const travelOffers = view.offers.filter(offer => offer.action.type === 'travel');
+  const offerByCity = new Map(travelOffers.map(offer => [String(offer.action.params.toCityId), offer]));
+  // El atlas enseña las ciudades turísticas siempre y las del expediente
+  // solo cuando están descubiertas: en libre, una ciudad no descubierta no
+  // se lista (pero el buscador admite viajar a ella si se conoce su nombre).
+  const visibleAtlas = view.atlas.filter(city => city.kind === 'tourist' || city.discovered);
+  const byId = new Map(GEOGRAPHIC_CATALOG.map(city => [city.id, city]));
+  const currentId = view.position.city.id;
+  const results = query.trim() ? searchCities(query.trim()) : [];
+  const touristHere = touristInfoFor(currentId);
+  // Oferta de viaje a una ciudad: la de la escena si existe (manda la ruta
+  // del expediente), si no la del catálogo cuando hay ruta directa. Sin
+  // ruta directa no se ofrece el viaje: hay que pasar por otra ciudad.
+  function travelOfferFor(cityId: string, name: string): PublicActionOffer | null {
+    const offer = offerByCity.get(cityId);
+    if (offer) return offer;
+    const isCase = view.atlas.find(entry => entry.id === cityId)?.kind === 'case';
+    // Una ciudad del expediente no descubierta no tiene oferta en la escena,
+    // pero el buscador admite viajar a ella: el diálogo de confirmación
+    // enseña la duración real de la ruta del expediente.
+    if (isCase) return { id: 'travel:' + cityId, label: t('game.travelTo', { name }), detail: '', action: { type: 'travel', params: { toCityId: cityId } } };
+    const route = getRoute(currentId, cityId);
+    if (!route) return null;
+    return { id: 'travel:' + cityId, label: t('game.travelTo', { name }), detail: route.minutes + ' min', action: { type: 'travel', params: { toCityId: cityId } } };
+  }
   return <div>
     <p className="game-overline">{t('game.atlasOverline')}</p>
     <h4>{t('game.atlasTitle')}</h4>
-    <div className="game-atlas" role="img" aria-label={t('game.atlasAria', { cities: view.cities.map(city => city.name).join(', ') })}><div className="game-atlas-land" />{view.cities.map(city => {
-      const position = atlasPositions[city.id];
+    <div className="game-atlas" role="img" aria-label={t('game.atlasAria', { cities: visibleAtlas.map(city => city.name).join(', ') })}><div className="game-atlas-land" />{visibleAtlas.map(city => {
+      const position = byId.get(city.id)?.coordinates;
       if (!position) return null;
       return <span key={city.id} className="game-atlas-city" style={{ left: position.x + '%', top: position.y + '%' }}>{city.name}</span>;
     })}</div>
-    <label>{t('game.searchCity')} <input type="search" data-testid="map-search" placeholder={t('game.searchPlaceholder')}
-      onChange={event => {
-        const query = event.target.value.toLowerCase();
-        event.currentTarget.closest('div')?.querySelectorAll<HTMLElement>('[data-city]')?.forEach(el => {
-          el.hidden = query !== '' && !el.textContent?.toLowerCase().includes(query);
-        });
-      }} /></label>
+    <label>{t('game.searchCity')} <input type="search" data-testid="map-search" placeholder={t('game.searchPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></label>
+    {query.trim() !== '' && <ul className="game-destination-list" data-testid="map-search-results">
+      {results.length === 0
+        ? <li><span>{t('game.searchEmpty', { query: query.trim() })}</span></li>
+        : results.map(city => {
+          const current = city.id === currentId;
+          const atlasEntry = view.atlas.find(entry => entry.id === city.id);
+          const offer = current ? null : travelOfferFor(city.id, city.name);
+          return <li key={city.id} data-city={city.id}>
+            <span><strong>{city.name}, {city.countryName}</strong><small>{current ? t('game.youAreHere') : t(atlasEntry?.kind === 'case' ? 'game.atlasCase' : 'game.atlasTourist')}</small></span>
+            {offer && <button type="button" data-testid={`travel-search-${city.id}`} disabled={busy} onClick={event => onOffer(offer, event.currentTarget)}>{t('game.travelTo', { name: city.name })}</button>}
+            {!current && !offer && <small>{t('game.noDirectRoute', { from: view.position.city.name })}</small>}
+          </li>;
+        })}
+    </ul>}
     <ul className="game-destination-list">
-      {view.cities.map(city => {
-        const travel = travelOffers.find(offer => offer.action.params.toCityId === city.id);
-        const current = city.id === view.position.city.id;
+      {visibleAtlas.filter(city => city.id !== currentId).map(city => {
+        const offer = travelOfferFor(city.id, city.name);
         return <li key={city.id} data-city={city.id}>
-          <span><strong>{city.name}, {city.country}</strong><small>{current ? t('game.youAreHere') : t('game.knownDestination')}</small></span>
-          {travel && !current && <button type="button" data-testid={`travel-${city.id}`}
-            disabled={busy}
-            onClick={event => onOffer(travel, event.currentTarget)}>{t('game.travelButton', { detail: travel.detail ?? '' })}</button>}
+          <span><strong>{city.name}, {city.country}</strong><small>{t(city.kind === 'case' ? 'game.atlasCase' : 'game.atlasTourist')}</small></span>
+          {offer && <button type="button" data-testid={`travel-${city.id}`} disabled={busy} onClick={event => onOffer(offer, event.currentTarget)}>{offer.detail ? t('game.travelButton', { detail: offer.detail }) : t('game.travelTo', { name: city.name })}</button>}
+          {!offer && <small>{t('game.noDirectRoute', { from: view.position.city.name })}</small>}
         </li>;
       })}
     </ul>
+    {touristHere && <div><h4>{t('game.touristLandmarks')}</h4><p>{view.position.location.description}</p><ul>{touristHere.landmarks.map(landmark => <li key={landmark}>{landmark}</li>)}</ul></div>}
     <h4>{t('game.knownPlaces')}</h4>
     <ul className="game-destination-list">{view.locations.map(location => <li key={location.id}><span><strong>{location.name}</strong>{location.id === view.position.location.id ? t('game.hereSuffix') : ''}<small>{location.description}</small></span></li>)}</ul>
   </div>;
