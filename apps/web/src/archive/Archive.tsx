@@ -95,7 +95,10 @@ function SessionBar({ state, model, detectiveProfile }: { state: ArchiveState; m
   const isOffline = state.connectionStatus !== 'online';
   return (
     <section className="archive-session" aria-label={t('archive.session')}>
-      <p>{detectiveSessionLine(state.profile, detectiveProfile, t)}</p>
+      {/* Al cargar, el perfil aún es null y la línea enseñaba «Sin sesión
+        iniciada» un instante aunque la sesión se recuperara sola: mientras
+        se consulta, se dice que se está consultando. */}
+      <p>{busy ? t('archive.notice.loading') : detectiveSessionLine(state.profile, detectiveProfile, t)}</p>
       <UnverifiedHint profile={state.profile} />
       <div className="archive-actions">
         {!state.profile && <><Link to="/registro">{t('archive.createAccount')}</Link><Link to="/login">{t('archive.login')}</Link></>}

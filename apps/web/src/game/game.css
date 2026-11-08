@@ -22,7 +22,10 @@ body:has(.game) { background:#000000; color:#ffffff; }
 
 /* Botón base: gris con relieve blanco, como el prototipo (DOS). */
 .game button,.game select { border:2px outset #ffffff; background:#aaaaaa; color:#000000; padding:8px 12px; min-height:44px; }
-.game button:disabled { opacity:1; color:#555555; cursor:default; }
+/* Botón deshabilitado: el gris #555555 sobre el gris #aaaaaa del botón
+ * era 3,1:1 y se leía pálido (los botones Leer sin voces, por ejemplo);
+ * #333333 es 5,3:1 y sigue distinguiéndose del texto negro del activo. */
+.game button:disabled { opacity:1; color:#333333; cursor:default; }
 .game .game-primary-button { background:var(--gold); color:#000000; border:2px outset #ffffff; }
 .game .game-primary-button:disabled { opacity:.55; color:#555555; }
 
@@ -146,7 +149,11 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-preview { border:4px double #ffffff; box-shadow:8px 8px #000000; background:var(--panel); padding:30px; max-width:520px; width:100%; }
 .game-preview h2 { margin:8px 0 20px; }
 .game-preview > p { font-size:.9em; margin-top:8px; }
-.game-preview-facts { margin:20px 0; border-block:1px solid var(--edge); padding:12px 0; font-size:.75em; display:flex; justify-content:space-between; gap:15px; }
+/* Datos del diálogo de confirmación: cada dato entero en su línea (con el
+ * texto al 150 % «300 min» se partía en dos) y los dos datos apilados si no
+ * caben en una fila. */
+.game-preview-facts { margin:20px 0; border-block:1px solid var(--edge); padding:12px 0; font-size:.75em; display:flex; flex-wrap:wrap; justify-content:space-between; gap:15px; }
+.game-preview-facts span { white-space:nowrap; }
 .game-preview-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:25px; }
 
 /* Animación de viaje: ruta con el avión cruzando el mapa (Carmen Sandiego). */
@@ -184,10 +191,15 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-load-confirm button { margin-right:8px; }
 
 /* Atlas del prototipo: tierra teal y ciudades con ▪ dorado. */
-.game-atlas { height:140px; position:relative; background:var(--panel); border:1px solid var(--edge); margin:0 0 18px; }
+/* Mapa del atlas: más alto para que quepan las etiquetas separadas
+ * (antes, 140 px amontonaba Valencia/Zaragoza/Barcelona y
+ * Málaga/Sevilla/Lisboa). El marcador distingue el escenario investigable
+ * del destino turístico: rombo dorado frente a cuadrado cielo. */
+.game-atlas { height:200px; position:relative; background:var(--panel); border:1px solid var(--edge); margin:0 0 18px; }
 .game-atlas-land { position:absolute; inset:10px 15%; background:var(--teal); clip-path:polygon(30% 0,80% 0,80% 20%,100% 20%,100% 40%,80% 40%,80% 60%,60% 60%,60% 80%,50% 80%,50% 100%,20% 100%,20% 80%,10% 80%,10% 60%,20% 60%,20% 40%,10% 40%,10% 20%,30% 20%); }
 .game-atlas-city { position:absolute; font-size:.7em; color:#ffffff; text-shadow:1px 1px #000; }
-.game-atlas-city::before { content:"▪ "; color:var(--gold); }
+.game-atlas-city--case::before { content:"◆ "; color:var(--gold); }
+.game-atlas-city--tourist::before { content:"▪ "; color:var(--sky); }
 .game-destination-list { list-style:none; padding:0; margin:0; }
 .game-destination-list li { display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid var(--edge); padding:11px 0; }
 .game-destination-list small { display:block; font-size:.7em; color:var(--muted); }
@@ -296,4 +308,6 @@ html.game-reduced-motion .game *, html.game-reduced-motion .game *::before, html
 /* Enlace de salto (§15): invisible hasta recibir el foco con el teclado,
  * y entonces salta a la escena. Solo existe cuando skipNav está activo. */
 .game-skip-link { position:absolute; left:-9999px; top:0; z-index:60; background:var(--gold); color:#000000; padding:8px 12px; font-weight:700; }
-.game-skip-link:focus { left:8px; top:8px; }
+/* Al enfocarse aparece abajo a la izquierda del viewport: arriba tapaba el
+ * logo de la agencia (el bloque amarillo se superponía a la marca). */
+.game-skip-link:focus { position:fixed; left:8px; top:auto; bottom:8px; }

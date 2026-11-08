@@ -122,3 +122,65 @@ describe('ofertas disponibles (Fase A)', () => {
     expect(availableOffers(astrolabioDefinition, run)).toEqual([]);
   });
 });
+
+describe('ofertas disponibles (pulido cosmético)', () => {
+  /** Recorre la ruta B por ofertas hasta la maduración de la orden. */
+  function untilWarrant() {
+    const s = scenario();
+    const byId = () => new Map(availableOffers(astrolabioDefinition, s.read()).map(offer => [offer.id, offer.action]));
+    const doOffer = (id: string) => {
+      const action = byId().get(id);
+      if (!action) throw new Error('Oferta no disponible: ' + id);
+      s.step(action.type, action.params);
+    };
+    doOffer('inspect:MAD-SALA');
+    doOffer('inspect:MAD-SALA:caja');
+    doOffer('collect:EV-06');
+    doOffer('travel:paris');
+    doOffer('query:firma-sello');
+    doOffer('wait:30');
+    doOffer('travel:lisboa');
+    doOffer('query:custodia-envio');
+    doOffer('wait:30');
+    doOffer('request_warrant:ines');
+    doOffer('wait:30');
+    return { s, doOffer };
+  }
+
+  it('recoger y analizar nombran la evidencia por su texto, nunca por su ID crudo', () => {
+    const s = scenario();
+    s.step('inspect', { targetId: 'MAD-SALA' });
+    s.step('inspect', { targetId: 'MAD-SALA', elementId: 'caja' });
+    const collect = availableOffers(astrolabioDefinition, s.read()).find(item => item.id === 'collect:EV-06');
+    expect(collect?.label).toContain('La caja guarda una copia del manifiesto, con sello y firma verificables.');
+    expect(collect?.label).not.toContain('EV-06');
+    s.step('inspect', { targetId: 'MAD-SALA', elementId: 'cerradura' });
+    s.step('collect', { evidenceId: 'EV-02' });
+    const analyze = availableOffers(astrolabioDefinition, s.read()).find(item => item.id === 'analyze:EV-02');
+    expect(analyze?.label).toContain('La cerradura de la vitrina tiene residuo de herramienta.');
+    expect(analyze?.label).not.toContain('EV-02');
+  });
+
+  it('con la orden ya concedida no se vuelve a ofrecer «Solicitar orden»', () => {
+    const { s } = untilWarrant();
+    expect(s.read().warrants).toContain('warrant:ines');
+    expect(s.offers()).not.toContain('request_warrant:ines');
+    expect(s.offers()).toContain('detain:ines');
+  });
+
+  it('un detenido ya no aparece en la escena (ni para hablar ni para sobornar)', () => {
+    const { s, doOffer } = untilWarrant();
+    doOffer('talk:ines:identidad');
+    doOffer('detain:ines');
+    expect(s.read().detentions).toContain('ines');
+    expect(s.offers().filter(id => id.startsWith('talk:ines:'))).toEqual([]);
+    expect(s.offers().filter(id => id.startsWith('irregular:') && id.endsWith(':ines'))).toEqual([]);
+  });
+
+  it('forzar el acceso avisa de la alternativa legal (orden con una prueba de acceso)', () => {
+    const s = scenario();
+    s.step('travel', { toCityId: 'lisboa' });
+    const force = availableOffers(astrolabioDefinition, s.read()).find(item => item.id === 'irregular:force_entry:LIS-ALM');
+    expect(force?.detail).toContain('o pide una orden con una prueba de acceso');
+  });
+});

@@ -16,7 +16,8 @@ import { SceneArt } from './scene-art';
 import { Portrait } from './portrait';
 import { portraitSeed, teamPortraitSeed } from './portraits';
 import { createMusicEngine, type EffectKind } from './music';
-import { groupOffers } from './scene-offers';
+import { groupOffers, groupTalkOffers } from './scene-offers';
+import type { TalkGroup } from './scene-offers';
 import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
 import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
@@ -200,11 +201,13 @@ function textsFromView(view: PlayerViewDto): CaseTexts {
 
 /** Órdenes en la escena: `warrant:<npc>` nombra al sospechoso y
  * `warrant:access` es la orden de acceso. Sin esto la escena enseñaba los
- * IDs crudos (`warrant:ines`). */
-function warrantText(id: string): string {
+ * IDs crudos (`warrant:ines`). El nombre sale de la vista (casos
+ * generados) con el catálogo fijo como respaldo. */
+function warrantText(id: string, npcName?: (id: string) => string | undefined): string {
   if (id === 'warrant:access') return 'Orden de acceso';
   if (id.startsWith('warrant:')) {
-    const name = getNPC(id.slice('warrant:'.length))?.name ?? id.slice('warrant:'.length);
+    const suspectId = id.slice('warrant:'.length);
+    const name = npcName?.(suspectId) ?? getNPC(suspectId)?.name ?? suspectId;
     return `Orden contra ${name}`;
   }
   return id;
@@ -250,11 +253,11 @@ function submittedDetail(response: ActionResponseDto, previous: PlayerViewDto | 
 
 /** Órdenes concedidas al madurar: no dejan hallazgo en el dossier, así que
  * sin esta línea el jugador no sabría que ya tiene la orden. */
-function warrantDetail(response: ActionResponseDto, previous: PlayerViewDto | null, t: TranslateFn): string {
+function warrantDetail(response: ActionResponseDto, previous: PlayerViewDto | null, lookup: DiscoveryLookup, t: TranslateFn): string {
   const added = previous
     ? response.warrants.filter(item => !previous.warrants.includes(item))
     : [...response.warrants];
-  return added.map(item => t('game.detail.warrantGranted', { warrant: warrantText(item) })).join(' ');
+  return added.map(item => t('game.detail.warrantGranted', { warrant: warrantText(item, lookup.npcName) })).join(' ');
 }
 
 /** Detenciones nuevas: quedan registradas y el caso sigue abierto (la
@@ -321,7 +324,7 @@ function actionResultDetail(response: ActionResponseDto, previous: PlayerViewDto
     discoveryDetail(response, previous, lookup),
     talkDetail(offer, lookup, t),
     submittedDetail(response, previous, offer, lookup, t),
-    warrantDetail(response, previous, t),
+    warrantDetail(response, previous, lookup, t),
     detentionDetail(response, previous, lookup, t, offer),
     finishDetail(response, offer, t),
   ];
@@ -416,19 +419,23 @@ function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, onLogou
   </header>;
 }
 
-/** Fila de un personaje presente en la escena: nombre y rol, con su botón
- * de hablar. Nombre y rol salen de los datos de charla del caso en curso,
- * con el catálogo como respaldo (sin inventar nada). */
-function SceneNpcOffer({ offer, view, disabled, onOffer }: { offer: PublicActionOffer; view: PlayerViewDto; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
-  const npcId = typeof offer.action.params.npcId === 'string' ? offer.action.params.npcId : '';
+/** Fila de un personaje presente en la escena: nombre y rol una sola vez,
+ * con un botón por tema de conversación. Nombre y rol salen de los datos de
+ * charla del caso en curso, con el catálogo como respaldo (sin inventar
+ * nada). Antes había una fila por oferta y Lucía salía dos veces (su
+ * identidad y la caja). */
+function SceneNpcGroup({ group, view, disabled, onOffer }: { group: TalkGroup; view: PlayerViewDto; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+  const npcId = group.npcId;
   const entry = findChatEntry(view, npcId);
   const name = chatNpcName(entry, getNPC(npcId)?.name) ?? npcNamesFromView(view).get(npcId) ?? npcId;
   const role = chatRole(entry, getNPC(npcId)?.role ?? '');
   return <div className="game-scene-npc">
     <Portrait seed={portraitSeed(view.caseId, npcId)} name={name} size="small" />
     <span><strong>{name}</strong>{role ? ` · ${role}` : ''}</span>
-    <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
-      onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}</button>
+    {group.offers.map(offer => (
+      <button key={offer.id} type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
+        onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}</button>
+    ))}
   </div>;
 }
 
@@ -444,14 +451,16 @@ function SceneOfferList({ offers, disabled, onOffer }: { offers: PublicActionOff
 /** Estado de la escena: evidencias en poder, solicitudes, órdenes y
  * detenciones. Solo se muestra lo que hay. Los identificadores se traducen:
  * las órdenes y detenciones nombran a la persona, y cada evidencia lleva su
- * tipo en español (antes se veían `warrant:ines`, `ines` y `EV-06` solos). */
+ * texto legible y su tipo en español (antes se veían `warrant:ines`, `ines`
+ * y `EV-06` solos). */
 function SceneMeta({ view }: { view: PlayerViewDto }) {
   const t = useTranslation();
+  const lookup = lookupFromView(view);
   return <div className="game-scene-meta">
-    {view.objects.length > 0 && <p>{t('game.inPossession', { items: view.objects.map(item => `${item.id} (${evidenceTypeLabel(item.type, t)})`).join(', ') })}</p>}
+    {view.objects.length > 0 && <p>{t('game.inPossession', { items: view.objects.map(item => `${view.evidenceTexts[item.id] ?? item.id} (${evidenceTypeLabel(item.type, t)})`).join(', ') })}</p>}
     {view.pendingRequests.length > 0 && <p>{t('game.pendingRequests', { items: view.pendingRequests.map(item => `${requestTypeLabel(item.type, t)} (min ${item.dueMinute})`).join(', ') })}</p>}
-    {view.warrants.length > 0 && <p>{t('game.warrants', { items: view.warrants.map(warrantText).join(', ') })}</p>}
-    {view.detentions.length > 0 && <p>{t('game.detentions', { items: view.detentions.map(id => getNPC(id)?.name ?? id).join(', ') })}</p>}
+    {view.warrants.length > 0 && <p>{t('game.warrants', { items: view.warrants.map(item => warrantText(item, lookup.npcName)).join(', ') })}</p>}
+    {view.detentions.length > 0 && <p>{t('game.detentions', { items: view.detentions.map(id => lookup.npcName(id) ?? id).join(', ') })}</p>}
   </div>;
 }
 
@@ -463,8 +472,8 @@ function SceneActions({ view, grouped, disabled, onOffer, onOpenLab }: { view: P
   return <>
     {(grouped.talk.length > 0 || grouped.inspect.length > 0) && <div className="game-scene-group">
       <p className="game-overline">{t('game.inScene')}</p>
-      {grouped.talk.map(offer => (
-        <SceneNpcOffer key={offer.id} offer={offer} view={view} disabled={disabled} onOffer={onOffer} />
+      {groupTalkOffers(grouped.talk).map(group => (
+        <SceneNpcGroup key={group.npcId} group={group} view={view} disabled={disabled} onOffer={onOffer} />
       ))}
       {grouped.inspect.map(offer => (
         <p key={offer.id}><button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
@@ -879,10 +888,11 @@ function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSu
 }
 
 /** Animación de viaje estilo Carmen Sandiego (lote 1 de jugabilidad): al
- * confirmar un viaje, una ruta con el avión cruzando el mapa aparece unos
- * segundos sobre la pantalla mientras el reloj ya avanzó y la escena ya es
- * la de destino. No bloquea nada: los clics pasan por debajo salvo el botón
- * «Seguir», y se cierra sola. */
+ * confirmar un viaje, una ruta con el avión cruzando el mapa aparece sobre
+ * la pantalla mientras el reloj ya avanzó y la escena ya es la de destino.
+ * No bloquea nada: los clics pasan por debajo salvo el botón «Seguir», y
+ * solo se cierra al pulsarlo — antes se cerraba sola a los 2,8 s y el
+ * botón dejaba de responder si el jugador tardaba en leerla. */
 function TravelOverlay({ travel, onDismiss }: { travel: { from: string; to: string; detail: string }; onDismiss: () => void }) {
   const t = useTranslation();
   return <div className="game-travel" data-testid="travel-animation" role="status">
@@ -930,7 +940,6 @@ function useTimeFeedback() {
   const [clockPulse, setClockPulse] = useState<{ key: number; delta: number } | null>(null);
   const [travel, setTravel] = useState<{ from: string; to: string; detail: string; key: number } | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
-  const travelTimerRef = useRef<number | null>(null);
   const apply = useCallback((previous: PlayerViewDto | null, response: ActionResponseDto, offer?: PublicActionOffer) => {
     const delta = clockDelta(previous, response);
     if (delta > 0) {
@@ -938,14 +947,10 @@ function useTimeFeedback() {
       setClockPulse({ key: Date.now(), delta });
       pulseTimerRef.current = window.setTimeout(() => setClockPulse(null), 2600);
     }
-    if (offer?.action.type === 'travel') {
-      if (travelTimerRef.current !== null) window.clearTimeout(travelTimerRef.current);
-      setTravel(travelPayload(previous, response, offer));
-      travelTimerRef.current = window.setTimeout(() => setTravel(null), 2800);
-    }
+    // El aviso de viaje NO se cierra solo: se queda hasta pulsar «Seguir».
+    if (offer?.action.type === 'travel') setTravel(travelPayload(previous, response, offer));
   }, []);
   const dismissTravel = useCallback(() => {
-    if (travelTimerRef.current !== null) window.clearTimeout(travelTimerRef.current);
     setTravel(null);
   }, []);
   return { clockPulse, travel, apply, dismissTravel };
@@ -1010,7 +1015,7 @@ function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolea
     <div className="game-atlas" role="img" aria-label={t('game.atlasAria', { cities: visibleAtlas.map(city => city.name).join(', ') })}><div className="game-atlas-land" />{visibleAtlas.map(city => {
       const position = byId.get(city.id)?.coordinates;
       if (!position) return null;
-      return <span key={city.id} className="game-atlas-city" style={{ left: position.x + '%', top: position.y + '%' }}>{city.name}</span>;
+      return <span key={city.id} className={`game-atlas-city game-atlas-city--${city.kind}`} style={{ left: position.x + '%', top: position.y + '%' }}>{city.name}</span>;
     })}</div>
     <label>{t('game.searchCity')} <input type="search" data-testid="map-search" placeholder={t('game.searchPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></label>
     {query.trim() !== '' && <ul className="game-destination-list" data-testid="map-search-results">
@@ -1022,12 +1027,12 @@ function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolea
           const offer = current ? null : travelOfferFor(city.id, city.name);
           return <li key={city.id} data-city={city.id}>
             <span><strong>{city.name}, {city.countryName}</strong><small>{current ? t('game.youAreHere') : t(atlasEntry?.kind === 'case' ? 'game.atlasCase' : 'game.atlasTourist')}</small></span>
-            {offer && <button type="button" data-testid={`travel-search-${city.id}`} disabled={busy} onClick={event => onOffer(offer, event.currentTarget)}>{t('game.travelTo', { name: city.name })}</button>}
+            {offer && <button type="button" data-testid={`travel-search-${city.id}`} disabled={busy} onClick={event => onOffer(offer, event.currentTarget)}>{offer.detail ? t('game.travelButton', { detail: offer.detail }) : t('game.travelTo', { name: city.name })}</button>}
             {!current && !offer && <small>{t('game.noDirectRoute', { from: view.position.city.name })}</small>}
           </li>;
         })}
     </ul>}
-    <ul className="game-destination-list">
+    {query.trim() === '' && <ul className="game-destination-list">
       {visibleAtlas.filter(city => city.id !== currentId).map(city => {
         const offer = travelOfferFor(city.id, city.name);
         return <li key={city.id} data-city={city.id}>
@@ -1036,7 +1041,7 @@ function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolea
           {!offer && <small>{t('game.noDirectRoute', { from: view.position.city.name })}</small>}
         </li>;
       })}
-    </ul>
+    </ul>}
     {touristHere && <div><h4>{t('game.touristLandmarks')}</h4><p>{view.position.location.description}</p><ul>{touristHere.landmarks.map(landmark => <li key={landmark}>{landmark}</li>)}</ul></div>}
     <h4>{t('game.knownPlaces')}</h4>
     <ul className="game-destination-list">{view.locations.map(location => <li key={location.id}><span><strong>{location.name}</strong>{location.id === view.position.location.id ? t('game.hereSuffix') : ''}<small>{location.description}</small></span></li>)}</ul>
@@ -1114,8 +1119,8 @@ function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewD
     <h4>{t('game.evidenceOwned')}</h4>
     {view.objects.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noEvidence')}</p></div>
-      : <table><thead><tr><th>ID</th><th>{t('game.col.type')}</th><th>{t('game.col.origin')}</th><th>{t('game.col.minute')}</th><th>{t('game.col.admissible')}</th></tr></thead>
-        <tbody>{view.objects.map(item => <tr key={item.id}><td>{item.id}</td><td>{evidenceTypeLabel(item.type, t)}</td><td>{item.origin}</td><td>{item.minute}</td><td>{item.admissible ? t('common.yes') : t('common.no')}</td></tr>)}</tbody></table>}
+      : <table><thead><tr><th>{t('game.col.evidence')}</th><th>{t('game.col.type')}</th><th>{t('game.col.origin')}</th><th>{t('game.col.minute')}</th><th>{t('game.col.admissible')}</th></tr></thead>
+        <tbody>{view.objects.map(item => <tr key={item.id}><td>{view.evidenceTexts[item.id] ?? item.id}</td><td>{evidenceTypeLabel(item.type, t)}</td><td>{item.origin}</td><td>{item.minute}</td><td>{item.admissible ? t('common.yes') : t('common.no')}</td></tr>)}</tbody></table>}
     <h4>{t('game.findings')}</h4>
     {view.dossier.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noFindings')}</p></div>
@@ -1964,7 +1969,10 @@ export function GameScreen() {
   const [caseTitle, setCaseTitle] = useState<string | null>(null);
   const [phase, setPhase] = useState<ScreenPhase>('loading');
   const [notice, setNotice] = useState('Cargando la partida…');
-  const [log, setLog] = useState<LogEntry[]>([]);
+  // Consola narrativa guardada en esta pestaña por partida (como el
+  // borrador y la memoria de chat): sin esto, al recargar se perdía y la
+  // consola volvía al texto genérico «La investigación comienza…».
+  const [log, setLog] = useState<LogEntry[]>(() => loadStoredLog(runId));
   const [draft, setDraft] = useState(() => (runId ? sessionStorage.getItem('meridiano-draft:' + runId) ?? '' : ''));
   const [orderHistory, setOrderHistory] = useState<string[]>([]);
   const [orderPhase, setOrderPhase] = useState<OrderPhase>({ kind: 'idle' });
@@ -2130,6 +2138,11 @@ export function GameScreen() {
   }, [draft, runId]);
 
   useEffect(() => {
+    if (!runId) return;
+    try { sessionStorage.setItem('meridiano-log:' + runId, JSON.stringify(log.slice(-100))); } catch { /* sin almacenamiento */ }
+  }, [log, runId]);
+
+  useEffect(() => {
     if (orderPhase.kind === 'preview') confirmButtonRef.current?.focus();
   }, [orderPhase]);
 
@@ -2146,8 +2159,11 @@ export function GameScreen() {
     function onKeyDown(event: globalThis.KeyboardEvent) {
       if (event.key !== 'Escape' || windows.moving) return;
       if (orderPhase.kind === 'preview' || orderPhase.kind === 'clarification' || orderPhase.kind === 'error' || orderPhase.kind === 'recovering') {
+        // Cancelar con Escape es lo mismo que pulsar «Cancelar»: sin el
+        // aviso, «Preparando: Cerrar el caso…» se quedaba pegado.
         restoreFocusRef.current = lastTriggerRef.current;
         setOrderPhase({ kind: 'idle' });
+        setNotice(t('game.notice.cancelled'));
         return;
       }
       // La charla en escena se cierra con Escape antes que las ventanas:
@@ -2159,7 +2175,7 @@ export function GameScreen() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [orderPhase, windows.windows, windows.moving, windows.close, chatNpc, closeChat]);
+  }, [orderPhase, windows.windows, windows.moving, windows.close, chatNpc, closeChat, t]);
 
   function applyResponse(response: ActionResponseDto, offerLabel: string, offer?: PublicActionOffer) {
     const previous = view;
@@ -2178,6 +2194,20 @@ export function GameScreen() {
     audioTts.playEffect(offer?.action.type === 'travel' ? 'travel' : 'confirm');
     const target = talkTarget(offer, lookupFromView(previous ?? response));
     if (target) openChat(target.id, target.name);
+  }
+
+  /** Consola narrativa guardada en esta pestaña por partida: al recargar,
+   * la consola sigue donde se quedó en vez de volver al texto genérico. */
+  function loadStoredLog(id: string | null | undefined): LogEntry[] {
+    if (!id) return [];
+    try {
+      const stored = JSON.parse(sessionStorage.getItem('meridiano-log:' + id) ?? 'null') as unknown;
+      if (!Array.isArray(stored)) return [];
+      return stored
+        .filter((entry): entry is LogEntry => !!entry && typeof entry === 'object'
+          && typeof (entry as LogEntry).minute === 'number' && typeof (entry as LogEntry).summary === 'string')
+        .slice(-100);
+    } catch { return []; }
   }
 
   /** Turnos y memoria de una conversación guardados en esta pestaña. */
@@ -2561,6 +2591,9 @@ export function GameScreen() {
   function cancelOrder() {
     restoreFocusRef.current = lastTriggerRef.current;
     setOrderPhase({ kind: 'idle' });
+    // Sin esto, el aviso «Preparando: Cerrar el caso…» se quedaba pegado
+    // tras cancelar el diálogo de confirmación.
+    setNotice(t('game.notice.cancelled'));
   }
 
   async function interpretOrder(event: FormEvent) {

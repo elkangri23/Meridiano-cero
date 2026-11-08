@@ -10,7 +10,12 @@ export interface GeographicCity {
   coordinates: { x: number; y: number };
 }
 
-// Catálogo de ciudades reales con coordenadas de atlas (escala 0-100)
+// Catálogo de ciudades reales con coordenadas de atlas (escala 0-100).
+// El mapa es esquemático (el relieve es un polígono abstracto) y las
+// coordenadas están separadas para que las etiquetas no se solapen: las
+// ciudades del noreste (Bilbao, Valencia, Zaragoza, Barcelona, París) y
+// las del suroeste (Lisboa, Málaga, Sevilla) se amontonaban en el mapa
+// de 140 px. Solo las usa el atlas de la pantalla de juego.
 export const GEOGRAPHIC_CATALOG: GeographicCity[] = [
   {
     id: 'madrid', name: 'Madrid', country: 'ES', countryName: 'España',
@@ -18,35 +23,35 @@ export const GEOGRAPHIC_CATALOG: GeographicCity[] = [
   },
   {
     id: 'barcelona', name: 'Barcelona', country: 'ES', countryName: 'España',
-    region: 'barcelona', coordinates: { x: 47, y: 33 },
+    region: 'barcelona', coordinates: { x: 50, y: 42 },
   },
   {
     id: 'valencia', name: 'Valencia', country: 'ES', countryName: 'España',
-    region: 'valencia', coordinates: { x: 44, y: 25 },
+    region: 'valencia', coordinates: { x: 48, y: 14 },
   },
   {
     id: 'sevilla', name: 'Sevilla', country: 'ES', countryName: 'España',
-    region: 'sevilla', coordinates: { x: 28, y: 83 },
+    region: 'sevilla', coordinates: { x: 31, y: 90 },
   },
   {
     id: 'bilbao', name: 'Bilbao', country: 'ES', countryName: 'España',
-    region: 'bilbao', coordinates: { x: 38, y: 12 },
+    region: 'bilbao', coordinates: { x: 34, y: 8 },
   },
   {
     id: 'malaga', name: 'Málaga', country: 'ES', countryName: 'España',
-    region: 'malaga', coordinates: { x: 26, y: 78 },
+    region: 'malaga', coordinates: { x: 26, y: 79 },
   },
   {
     id: 'zaragoza', name: 'Zaragoza', country: 'ES', countryName: 'España',
-    region: 'zaragoza', coordinates: { x: 43, y: 30 },
+    region: 'zaragoza', coordinates: { x: 41, y: 30 },
   },
   {
     id: 'paris', name: 'París', country: 'FR', countryName: 'Francia',
-    region: 'paris', coordinates: { x: 59, y: 29 },
+    region: 'paris', coordinates: { x: 60, y: 26 },
   },
   {
     id: 'lisboa', name: 'Lisboa', country: 'PT', countryName: 'Portugal',
-    region: 'lisboa', coordinates: { x: 23, y: 75 },
+    region: 'lisboa', coordinates: { x: 20, y: 68 },
   },
 ];
 

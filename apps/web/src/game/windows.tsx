@@ -24,6 +24,42 @@ const initialPositions: Record<WindowId, { x: number; y: number }> = {
   intel: { x: 260, y: 300 },
 };
 
+const WINDOW_POSITIONS_KEY = 'meridiano-windows-v1';
+
+function clampPosition(value: number, max: number): number {
+  return Math.min(Math.max(0, value), Math.max(0, max));
+}
+
+function parseStoredPosition(value: unknown): { x: number; y: number } | null {
+  if (!value || typeof value !== 'object') return null;
+  const { x, y } = value as { x?: unknown; y?: unknown };
+  if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
+function loadStoredPositions(): Partial<Record<WindowId, { x: number; y: number }>> {
+  try {
+    const stored = JSON.parse(localStorage.getItem(WINDOW_POSITIONS_KEY) ?? 'null') as unknown;
+    if (!stored || typeof stored !== 'object') return {};
+    const positions: Partial<Record<WindowId, { x: number; y: number }>> = {};
+    for (const [id, value] of Object.entries(stored as Record<string, unknown>)) {
+      if (!(id in initialPositions)) continue;
+      const position = parseStoredPosition(value);
+      if (position) positions[id as WindowId] = position;
+    }
+    return positions;
+  } catch { return {}; }
+}
+
+function saveStoredPositions(windows: Record<WindowId, WindowState>): void {
+  try {
+    const positions = Object.fromEntries(
+      (Object.keys(initialPositions) as WindowId[]).map(id => [id, { x: windows[id].x, y: windows[id].y }]),
+    );
+    localStorage.setItem(WINDOW_POSITIONS_KEY, JSON.stringify(positions));
+  } catch { /* sin almacenamiento */ }
+}
+
 /** Claves i18n de los títulos de ventana (el texto vive en `locales/es.ts`). */
 export const WINDOW_KEYS: Record<WindowId, LocaleKey> = {
   map: 'windows.map', dossier: 'windows.dossier', lab: 'windows.lab',
@@ -33,13 +69,20 @@ export const WINDOW_KEYS: Record<WindowId, LocaleKey> = {
 };
 
 export function useWindows() {
+  // Posiciones guardadas en este navegador: sin esto, al recargar todas las
+  // ventanas volvían a su posición inicial y la del equipo quedaba pequeña
+  // y solapada con las demás. Solo se guardan las coordenadas (no si están
+  // abiertas o minimizadas); se validan y se limitan al viewport.
   const [windows, setWindows] = useState<Record<WindowId, WindowState>>(() => {
     const state = {} as Record<WindowId, WindowState>;
+    const stored = loadStoredPositions();
     (Object.keys(initialPositions) as WindowId[]).forEach(id => {
-      state[id] = { open: false, minimized: false, ...initialPositions[id] };
+      const position = stored[id] ?? initialPositions[id];
+      state[id] = { open: false, minimized: false, x: clampPosition(position.x, window.innerWidth - 120), y: clampPosition(position.y, window.innerHeight - 60) };
     });
     return state;
   });
+  useEffect(() => { saveStoredPositions(windows); }, [windows]);
   const [moving, setMoving] = useState<WindowId | null>(null);
   const openerRefs = useRef<Partial<Record<WindowId, HTMLElement | null>>>({});
   // Contador por ventana (§15): abrir o restaurar incrementa su contador y
@@ -95,6 +138,7 @@ export function useWindows() {
       });
       return next;
     });
+    try { localStorage.removeItem(WINDOW_POSITIONS_KEY); } catch { /* sin almacenamiento */ }
     setMoving(null);
   }, []);
 

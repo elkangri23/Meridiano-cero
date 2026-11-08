@@ -69,6 +69,10 @@ test.describe('E2E acciones irregulares (GDD §14)', () => {
     await openPreview(page, 'offer-travel:lisboa');
     await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    // El aviso de viaje no se cierra solo: hay que pulsar «Seguir» para
+    // poder pulsar en la escena.
+    await page.getByTestId('travel-animation').getByRole('button', { name: 'Seguir' }).click();
+    await expect(page.getByTestId('travel-animation')).toBeHidden();
     await expect(page.getByTestId('offer-irregular:force_entry:LIS-ALM')).toBeVisible();
     const before = await clockMinutes(page);
     // La confirmación nombra a los testigos de Lisboa y la inadmisibilidad.
@@ -87,8 +91,8 @@ test.describe('E2E acciones irregulares (GDD §14)', () => {
     await openWindow(page, 'Dossier');
     const dossier = page.getByRole('dialog', { name: 'Dossier' });
     await expect(dossier).toContainText('Forzaste el acceso a Almacén de depósito');
-    await expect(dossier).toContainText('EV-11');
-    const row = dossier.locator('tr', { hasText: 'EV-11' });
+    await expect(dossier).toContainText('El astrolabio original está recuperado.');
+    const row = dossier.locator('tr', { hasText: 'El astrolabio original está recuperado.' });
     await expect(row).toContainText('No');
     await page.keyboard.press('Escape');
     // Cerrar el caso: el informe final refleja el acto y descuenta 10 puntos.

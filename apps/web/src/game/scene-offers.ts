@@ -1,5 +1,27 @@
 import type { PublicActionOffer } from '@meridiano/contracts';
 
+export interface TalkGroup {
+  /** Personaje al que van dirigidas las ofertas del grupo. */
+  npcId: string;
+  /** Sus ofertas de hablar, en el orden del motor. */
+  offers: PublicActionOffer[];
+}
+
+/** Agrupa las ofertas de hablar por personaje, en orden de primera
+ * aparición: un personaje con varios temas (Lucía y su caja, o los temas de
+ * un expediente generado) sale una sola vez en la escena, con un botón por
+ * tema, en vez de repetirse una fila por oferta. */
+export function groupTalkOffers(offers: PublicActionOffer[]): TalkGroup[] {
+  const groups: TalkGroup[] = [];
+  for (const offer of offers) {
+    const npcId = typeof offer.action.params.npcId === 'string' ? offer.action.params.npcId : '';
+    const group = groups.find(item => item.npcId === npcId);
+    if (group) group.offers.push(offer);
+    else groups.push({ npcId, offers: [offer] });
+  }
+  return groups;
+}
+
 export interface GroupedOffers {
   /** Con quién se puede hablar en esta escena (NPC presentes). */
   talk: PublicActionOffer[];

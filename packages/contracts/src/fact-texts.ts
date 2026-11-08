@@ -269,7 +269,10 @@ function travelDiscovery(id: string, lookup: DiscoveryLookup): string | undefine
  * la advertencia de A.C.M.E. se leen como frases, nunca como claves. */
 function irregularMarker(id: string): string | undefined {
   if (id === 'forced-entry') return 'Acceso forzado: entraste sin permiso ni orden de acceso.';
-  if (id === 'warning') return 'Advertencia de A.C.M.E.: te han visto en una acción irregular. Si te ven otra vez, retirarán el caso.';
+  // La regla es retirar el caso a la 3.ª vez visto (motor `misconduct.ts`,
+  // `WITNESSED_WITHDRAWAL_COUNT`): el texto anterior decía «si te ven otra
+  // vez», que es la 2.ª, y mentía sobre la regla.
+  if (id === 'warning') return 'Advertencia de A.C.M.E.: te han visto en una acción irregular. A la 3.ª vez que te vean, A.C.M.E. retirará el caso.';
   return undefined;
 }
 
@@ -383,6 +386,9 @@ function teamRecordText(record: string): string | null {
     lookup: { verb: 'Consultaste a', object: 'en inteligencia' },
     routes: { verb: 'Preguntaste a', object: 'por las rutas de viaje' },
     organize: { verb: 'Pediste a', object: 'que organizara el expediente' },
+    // La evaluación de carrera de Margaret faltaba y el dossier enseñaba
+    // el registro crudo `team:margaret:evaluate@10`.
+    evaluate: { verb: 'Pediste a', object: 'que evaluara tu carrera' },
   };
   const phrase = phrases[serviceId];
   if (!phrase) return record;

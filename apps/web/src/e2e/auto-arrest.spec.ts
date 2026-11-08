@@ -37,6 +37,9 @@ async function travelTo(page: Page, cityId: string, minute: number) {
   await page.getByTestId('preview-confirm').click();
   await expect(page.getByTestId('preview-dialog')).toBeHidden();
   await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
+  // El aviso de viaje no se cierra solo: hay que pulsar «Seguir».
+  await page.getByTestId('travel-animation').getByRole('button', { name: 'Seguir' }).click();
+  await expect(page.getByTestId('travel-animation')).toBeHidden();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId(`travel-${cityId}`)).toBeHidden();
 }

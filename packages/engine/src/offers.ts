@@ -1,5 +1,5 @@
 import type { CaseDefinition, CaseRun, NPC } from '@meridiano/case-schema';
-import { ARREST_COORDINATION_MINUTES, arrestTypeOf, FORENSIC_TYPE_KEYS, resolveMessage, forensicTypeForAnalysis, DEFAULT_TRAVEL_ROUTES, getCity } from '@meridiano/case-schema';
+import { ARREST_COORDINATION_MINUTES, arrestTypeOf, FORENSIC_TYPE_KEYS, resolveMessage, evidenceText, forensicTypeForAnalysis, DEFAULT_TRAVEL_ROUTES, getCity } from '@meridiano/case-schema';
 import type { Action } from './types.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
 import { knowsEvidence, canCollect, queryRule, inspectedEvidence, listQueryIds, listInspectableElements, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
@@ -82,7 +82,10 @@ function inspectOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
 function collectOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   return def.evidence
     .filter(evidence => canCollect(def, run, evidence.id) && !run.inventory.includes(evidence.id))
-    .map((evidence): ActionOffer => ({ id: `collect:${evidence.id}`, label: `Recoger ${evidence.id} · ${evidenceTypeLabel[evidence.type] ?? evidence.type}`,
+    // La etiqueta nombra la evidencia por su texto legible, nunca por su
+    // ID crudo (`EV-06`): el texto viene del expediente (generado) o del
+    // catálogo fijo; sin texto se mantiene el ID para no ocultar la oferta.
+    .map((evidence): ActionOffer => ({ id: `collect:${evidence.id}`, label: `Recoger ${evidenceText(evidence.id, def.texts) ?? evidence.id} · ${evidenceTypeLabel[evidence.type] ?? evidence.type}`,
       action: { type: 'collect', params: { evidenceId: evidence.id } } }));
 }
 
@@ -106,7 +109,9 @@ function generatedTalkOffers(def: CaseDefinition, run: CaseRun, npc: CaseDefinit
 
 function talkOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const offers: ActionOffer[] = [];
-  for (const npc of def.npcs.filter(item => item.cityId === run.position.cityId)) {
+  // Un detenido ya no está en la escena: sin este filtro, Inés seguía
+  // listada como presente en Lisboa tras ser detenida en París.
+  for (const npc of def.npcs.filter(item => item.cityId === run.position.cityId && !run.detentions.includes(item.id))) {
     offers.push({ id: `talk:${npc.id}:identidad`, label: `Hablar con ${npc.name} sobre su identidad`,
       action: { type: 'talk', params: { npcId: npc.id, topicId: 'identidad' } } });
     const lucia = luciaBoxOffer(run, npc);
@@ -138,7 +143,7 @@ function analyzeOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
       .filter(rule => generatedAnalysis(def, run, rule.inputEvidenceId))
       .map((rule): ActionOffer => {
         const type = forensicTypeForAnalysis(def, rule);
-        return { id: `analyze:${rule.inputEvidenceId}`, label: `Análisis de ${resolveMessage('es', FORENSIC_TYPE_KEYS[type]).toLowerCase()} — ${rule.inputEvidenceId}`,
+        return { id: `analyze:${rule.inputEvidenceId}`, label: `Análisis de ${resolveMessage('es', FORENSIC_TYPE_KEYS[type]).toLowerCase()} — ${evidenceText(rule.inputEvidenceId, def.texts) ?? rule.inputEvidenceId}`,
           detail: `El resultado tarda ${rule.delayMinutes} min`, forensicType: type,
           action: { type: 'analyze', params: { evidenceId: rule.inputEvidenceId } } };
       });
@@ -146,7 +151,7 @@ function analyzeOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   if (!isFixedCase(def) || !run.inventory.includes(FIXED_ANALYSIS_RULE.inputEvidenceId)
     || run.discoveries.includes(FIXED_ANALYSIS_RULE.resultEvidenceId)) return [];
   const type = forensicTypeForAnalysis(def, FIXED_ANALYSIS_RULE);
-  return [{ id: `analyze:${FIXED_ANALYSIS_RULE.inputEvidenceId}`, label: `Análisis de ${resolveMessage('es', FORENSIC_TYPE_KEYS[type]).toLowerCase()} — ${FIXED_ANALYSIS_RULE.inputEvidenceId}`,
+  return [{ id: `analyze:${FIXED_ANALYSIS_RULE.inputEvidenceId}`, label: `Análisis de ${resolveMessage('es', FORENSIC_TYPE_KEYS[type]).toLowerCase()} — ${evidenceText(FIXED_ANALYSIS_RULE.inputEvidenceId, def.texts) ?? FIXED_ANALYSIS_RULE.inputEvidenceId}`,
     detail: `El resultado tarda ${FIXED_ANALYSIS_RULE.delayMinutes} min`, forensicType: type,
     action: { type: 'analyze', params: { evidenceId: FIXED_ANALYSIS_RULE.inputEvidenceId } } }];
 }
@@ -202,7 +207,9 @@ function warrantOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const knownEvidenceIds = def.evidence.filter(item => knowsEvidence(run, item.id)).map(item => item.id);
   if (knownEvidenceIds.length === 0) return [];
   return suspectIds(def)
-    .filter(suspectId => knownSuspect(def, run, suspectId) && !warrantPending(run, suspectId) && canIssueWarrant(def, run, suspectId))
+    // Con la orden ya concedida no se vuelve a ofrecer: sin este filtro
+    // «Solicitar orden» seguía apareciendo tras madurar la solicitud.
+    .filter(suspectId => knownSuspect(def, run, suspectId) && !warrantPending(run, suspectId) && !run.warrants.includes('warrant:' + suspectId) && canIssueWarrant(def, run, suspectId))
     .map((suspectId): ActionOffer => ({ id: `request_warrant:${suspectId}`, label: `Solicitar orden contra ${npcName(def, suspectId)}`,
       detail: 'Se resuelve en 30 min',
       action: { type: 'request_warrant', params: { suspectId, evidenceIds: knownEvidenceIds } } }));
@@ -264,7 +271,10 @@ function forceEntryOffer(def: CaseDefinition, run: CaseRun): ActionOffer | undef
   if (!irregularPlan(def, run, 'force_entry', forceTarget.locationId).ok) return undefined;
   const place = def.locations.find(location => location.id === forceTarget.locationId)?.name ?? forceTarget.locationId;
   return { id: `irregular:force_entry:${forceTarget.locationId}`, label: `Forzar el acceso a ${place}`,
-    detail: '30 min · pueden verte · lo obtenido no será admisible',
+    // El detalle avisa de la alternativa legal: la orden de acceso se pide
+    // con una orden que incluya una prueba de acceso (el juego no lo dejaba
+    // claro y el jugador solo veía la vía irregular).
+    detail: '30 min · pueden verte · lo obtenido no será admisible · o pide una orden con una prueba de acceso',
     action: { type: 'irregular', params: { kind: 'force_entry', targetId: forceTarget.locationId } } };
 }
 
@@ -287,7 +297,9 @@ function irregularOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const force = forceEntryOffer(def, run);
   return [
     ...(force ? [force] : []),
-    ...def.npcs.filter(item => item.cityId === run.position.cityId)
+    // Como en `talkOffers`: un detenido ya no está en la escena y no se le
+    // puede sobornar ni suplantar a nadie hablando con él.
+    ...def.npcs.filter(item => item.cityId === run.position.cityId && !run.detentions.includes(item.id))
       .flatMap(npc => npcIrregularOffers(def, run, npc)),
   ];
 }

@@ -45,6 +45,7 @@ function viewFixture(overrides: Partial<PlayerViewDto> = {}): PlayerViewDto {
       city: { id: 'paris', name: 'París', country: 'Francia' },
       location: { id: 'PAR-ARCH', name: 'Archivo de conservación', description: 'Archivo' },
     },
+    initialCityId: 'madrid',
     cities,
     locations: [{ id: 'MAD-SALA', name: 'Sala de embalaje', description: 'Sala' }],
     objects: [],
@@ -80,14 +81,21 @@ describe('Resumen al retomar la partida (§13)', () => {
     expect(summary.currentLocation).toBe('Archivo de conservación');
   });
 
-  it('las ciudades visitadas son la actual más las de los viajes del dossier', () => {
+  it('las ciudades visitadas incluyen la inicial, aunque nunca fuera destino de un viaje', () => {
     const summary = resumeSummary(viewFixture(), lookup, discover);
-    expect(summary.visitedCities).toEqual(['París']);
+    expect(summary.visitedCities).toEqual(['Madrid', 'París']);
     const fromMadrid = resumeSummary(viewFixture({
       position: { city: { id: 'madrid', name: 'Madrid', country: 'España' }, location: { id: 'MAD-SALA', name: 'Sala de embalaje', description: 'Sala' } },
       dossier: ['travel:paris', 'travel:lisbon'],
     }), lookup, discover);
     expect(fromMadrid.visitedCities).toEqual(['Madrid', 'París', 'Lisboa']);
+  });
+
+  it('sin ciudad inicial en la vista (vistas anteriores) solo siembra la actual y los viajes', () => {
+    const partial = { ...viewFixture() } as Partial<PlayerViewDto>;
+    delete partial.initialCityId;
+    const summary = resumeSummary(partial as PlayerViewDto, lookup, discover);
+    expect(summary.visitedCities).toEqual(['París']);
   });
 
   it('los últimos descubrimientos salen en frases, sin IDs crudos de viaje', () => {

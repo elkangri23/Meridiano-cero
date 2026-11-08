@@ -6,6 +6,7 @@ export const initialView: PlayerViewDto = {
   caseMeta: { crimeType: 'robo', contentRating: 'familiar' },
   position: { city: { id: 'synthetic-city', name: 'Ciudad sintética', country: 'País de prueba' },
     location: { id: 'synthetic-room', name: 'Sala sintética', description: 'Descripción pública de prueba.' } },
+  initialCityId: 'synthetic-city',
   cities: [{ id: 'synthetic-city', name: 'Ciudad sintética', country: 'País de prueba' }],
   atlas: [{ id: 'synthetic-city', name: 'Ciudad sintética', country: 'País de prueba', kind: 'case', discovered: true }],
   locations: [{ id: 'synthetic-room', name: 'Sala sintética', description: 'Descripción pública de prueba.' }],

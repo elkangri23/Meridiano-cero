@@ -11,8 +11,8 @@ export interface ResumeLookup {
 
 /** Resumen al retomar la partida (§13): dónde se quedó el jugador, construido
  * solo con datos reales de la vista del jugador y del estado del motor — sin
- * inventar nada. Las ciudades visitadas son la actual más las que aparecen
- * en los viajes registrados en el dossier (`travel:<ciudad>`); los últimos
+ * inventar nada. Las ciudades visitadas son la inicial y la actual más las
+ * que aparecen en los viajes registrados en el dossier (`travel:<ciudad>`); los últimos
  * descubrimientos son las entradas del dossier traducidas con el mismo
  * `discoveryText` del dossier, no sus IDs crudos. El `lookup` y el
  * `discover` son los que ya usa la pantalla de juego para traducir
@@ -32,7 +32,10 @@ export interface ResumeSummary {
 }
 
 export function resumeSummary(view: PlayerViewDto, lookup: ResumeLookup, discover: (id: string, lookup: ResumeLookup) => string): ResumeSummary {
-  const visited = new Set<string>([view.position.city.id]);
+  // La ciudad inicial nunca aparece como destino de un viaje (se empieza
+  // en ella), así que se siembra desde la vista; el filtro ignora un valor
+  // vacío o ausente (vistas anteriores al campo), sin romper el resumen.
+  const visited = new Set<string>([view.initialCityId, view.position.city.id].filter((id): id is string => typeof id === 'string' && id !== ''));
   for (const entry of view.dossier) {
     if (entry.startsWith('travel:')) visited.add(entry.slice('travel:'.length));
   }

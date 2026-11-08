@@ -234,6 +234,8 @@ export interface InitialPlayerViewDto {
     city: { id: string; name: string; country: string };
     location: { id: string; name: string; description: string };
   };
+  /** Ciudad inicial del expediente: al empezar es la ciudad de la posición. */
+  initialCityId: string;
   cities: Array<{ id: string; name: string; country: string }>;
   /** Atlas A.C.M.E. al empezar: en guiado, todas las ciudades del
    * expediente descubiertas; en libre, solo la inicial más los destinos
@@ -751,6 +753,10 @@ export interface PlayerViewDto {
     city: { id: string; name: string; country: string };
     location: { id: string; name: string; description: string };
   };
+  /** Ciudad inicial del expediente (la primera de su catálogo): el resumen
+   * al retomar la siembra como visitada, porque nunca aparece como destino
+   * de un viaje. */
+  initialCityId: string;
   cities: Array<{ id: string; name: string; country: string }>;
   /** Atlas A.C.M.E. (GDD §5, REQ-G05-01/03/04): las ciudades admitidas del
    * catálogo de geografía, con su tipo —escenario investigable del
@@ -1217,7 +1223,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'analysisResults,atlas,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,explorationMode,finalReport,locations,misconduct,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,team,version,warrants';
+const playerViewKeys = 'analysisResults,atlas,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,explorationMode,finalReport,initialCityId,locations,misconduct,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,team,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;

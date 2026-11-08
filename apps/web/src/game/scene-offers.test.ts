@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PublicActionOffer } from '@meridiano/contracts';
-import { groupOffers } from './scene-offers';
+import { groupOffers, groupTalkOffers } from './scene-offers';
 import { locationArtId } from './scene-art';
 
 function offer(id: string, type: PublicActionOffer['action']['type'], label: string): PublicActionOffer {
@@ -48,6 +48,28 @@ describe('groupOffers: las acciones de la escena salen de las ofertas reales', (
   it('sin ofertas, todos los grupos quedan vacíos y sin cierre', () => {
     const grouped = groupOffers([]);
     expect(grouped).toEqual({ talk: [], inspect: [], travel: [], lab: [], other: [], finish: undefined });
+  });
+});
+
+describe('groupTalkOffers: un personaje con varios temas sale una sola vez', () => {
+  function talk(id: string, npcId: string, label: string): PublicActionOffer {
+    return { id, label, action: { type: 'talk', params: { npcId, topicId: id.split(':').pop() } } };
+  }
+
+  it('agrupa la identidad y la caja de Lucía en un solo grupo, en orden', () => {
+    const groups = groupTalkOffers([
+      talk('talk:lucia:identidad', 'lucia', 'Hablar con Lucía sobre su identidad'),
+      talk('talk:tomas:identidad', 'tomas', 'Hablar con Tomás Ríos sobre su identidad'),
+      talk('talk:lucia:caja', 'lucia', 'Preguntar a Lucía por la caja'),
+    ]);
+    expect(groups.map(group => group.npcId)).toEqual(['lucia', 'tomas']);
+    const [lucia, tomas] = groups;
+    expect(lucia?.offers.map(item => item.id)).toEqual(['talk:lucia:identidad', 'talk:lucia:caja']);
+    expect(tomas?.offers.map(item => item.id)).toEqual(['talk:tomas:identidad']);
+  });
+
+  it('sin ofertas de hablar no hay grupos', () => {
+    expect(groupTalkOffers([])).toEqual([]);
   });
 });
 

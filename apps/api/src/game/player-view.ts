@@ -179,6 +179,10 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     explorationMode: definition.explorationMode,
     clock: { minute: run.minute, deadlineMinutes: definition.deadlineMinutes },
     position,
+    // Ciudad inicial del expediente (la primera de su catálogo, la misma
+    // que `createInitialRun` usa al crear la partida): el resumen al
+    // retomar la siembra como visitada.
+    initialCityId: definition.cities[0]?.id ?? '',
     cities: visibleCities.map(item => ({ id: item.id, name: item.name, country: item.country })),
     atlas: atlasFor(definition, run),
     locations,
@@ -266,11 +270,12 @@ const eventSummaries: Record<string, EventNamer> = {
       ? 'Inspección de ' + payload.elementId + ' en ' + location + '.'
       : 'Inspección en ' + location + '.';
   },
-  collect: (_definition, payload) => {
+  collect: (definition, payload) => {
     // El hallazgo se narra con su texto, nunca con el ID crudo (antes:
     // «Objeto EV-01 recogido.»). Sin texto, se mantiene el resumen anterior.
+    // Con los textos del expediente, un generado también narra su texto.
     const id = String(payload.evidenceId ?? '');
-    const text = evidenceText(id);
+    const text = evidenceText(id, definition.texts);
     return text ? 'Recogido: ' + text : 'Objeto ' + id + ' recogido.';
   },
   talk: (definition, payload) => {

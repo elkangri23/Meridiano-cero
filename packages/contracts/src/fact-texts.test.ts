@@ -88,6 +88,8 @@ describe('textos legibles del caso fijo', () => {
       .toBe('Preguntaste a David Nakamura por las rutas de viaje (min 60).');
     expect(conversationRecordText('team:clara:organize@90', lookup.npcName))
       .toBe('Pediste a Clara Beaumont que organizara el expediente (min 90).');
+    expect(conversationRecordText('team:margaret:evaluate@10', lookup.npcName))
+      .toBe('Pediste a Margaret Sullivan que evaluara tu carrera (min 10).');
     expect(conversationRecordText('team:desconocido:briefing@0', lookup.npcName))
       .toBe('team:desconocido:briefing@0');
   });
@@ -95,7 +97,8 @@ describe('textos legibles del caso fijo', () => {
   it('los marcadores de conducta irregular se leen como frases, nunca como claves crudas', () => {
     expect(discoveryText('forced-entry', lookup)).toBe('Acceso forzado: entraste sin permiso ni orden de acceso.');
     expect(discoveryText('warning', lookup)).toContain('Advertencia de A.C.M.E.');
-    expect(discoveryText('warning', lookup)).toContain('retirarán el caso');
+    // La retirada es a la 3.ª vez visto (motor `misconduct.ts`), no «otra vez».
+    expect(discoveryText('warning', lookup)).toContain('A la 3.ª vez que te vean, A.C.M.E. retirará el caso');
     expect(conversationRecordText('irregular:force_entry:LIS-ALM@150', lookup.npcName, undefined, lookup.locationName))
       .toBe('Forzaste el acceso a Almacén de depósito (min 150).');
     expect(conversationRecordText('irregular:bribe:lucia@30', lookup.npcName)).toBe('Sobornaste a Lucía (min 30).');

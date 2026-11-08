@@ -272,7 +272,11 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     // clave cruda del motor (arreglo: antes enseñaba `travel:paris`).
     await expect(page.locator('.game-console')).toContainText('Sales de Madrid y llegas a París.');
     await expect(page.locator('.game-console')).not.toContainText('travel:paris');
-    await expect(page.getByTestId('travel-animation')).toBeHidden({ timeout: 10000 });
+    // El aviso de viaje NO se cierra solo: se queda hasta pulsar «Seguir».
+    await page.waitForTimeout(4000);
+    await expect(page.getByTestId('travel-animation')).toBeVisible();
+    await page.getByTestId('travel-animation').getByRole('button', { name: 'Seguir' }).click();
+    await expect(page.getByTestId('travel-animation')).toBeHidden();
     // En París, la escena muestra a Émile y el archivo.
     await expect(page.locator('.game-scene')).toContainText('Émile · Archivo de conservación');
     await expect(page.getByTestId('offer-inspect:PAR-ARCH')).toBeVisible();

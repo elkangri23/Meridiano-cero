@@ -31,6 +31,7 @@ export async function initialPlayerView(db: Database['orm'], run: StoredRun): Pr
     schemaVersion: 1, runId: run.id, branchId: run.branchId, version: run.revision,
     status: 'active', difficulty: run.difficulty, explorationMode: effective.explorationMode, clock: { minute: 0, deadlineMinutes: run.deadlineMinutes },
     position: { city: { id: city.id, name: city.name, country: city.country }, location: { ...publicLocation } },
+    initialCityId: city.id,
     cities: cities.map(item => ({ id: item.id, name: item.name, country: item.country })),
     atlas: atlasFor(effective, initial),
     locations: [publicLocation], objects: [], dossier: [], conversation: [], communications: [], pendingRequests: [],
