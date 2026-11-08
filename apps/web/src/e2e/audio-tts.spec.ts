@@ -58,6 +58,17 @@ const NO_TTS_STUB = `
 Object.defineProperty(window, 'speechSynthesis', { value: undefined, configurable: true });
 `;
 
+/** Síntesis presente pero sin voces instaladas: `getVoices` vacío. */
+const NO_VOICES_STUB = `
+Object.defineProperty(window, 'speechSynthesis', { value: {
+  getVoices: () => [],
+  speak(u) { window.__tts.spoken.push(u.text); },
+  pause() {}, resume() {}, cancel() { window.__tts.cancelled++; },
+  addEventListener(type, fn) { (window.__tts.listeners[type] = window.__tts.listeners[type] || []).push(fn); },
+  removeEventListener() {},
+}, configurable: true, writable: true });
+`;
+
 async function ttsState(page: Page) {
   return page.evaluate(() => (window as unknown as { __tts: { spoken: Array<{ text: string; voice: string | null; rate: number; volume: number }>; cancelled: number; paused: number; resumed: number } }).__tts);
 }
@@ -220,5 +231,32 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     await page.getByTestId('offer-inspect:MAD-SALA').click();
     await expect(page.getByTestId('clock')).toContainText('10 min');
     await expect(page.getByTestId('tts-read')).toBeDisabled();
+  });
+
+  test('sin voces, pulsar Leer avisa y no habla ni apila avisos', async ({ page }) => {
+    await page.addInitScript(NO_VOICES_STUB);
+    await openGameScreen(page);
+    await enableTts(page);
+    await page.getByTestId('offer-inspect:MAD-SALA').click();
+    await expect(page.getByTestId('clock')).toContainText('10 min');
+    await page.getByTestId('tts-read').click();
+    await expect(page.getByTestId('tts-no-voices')).toBeVisible();
+    await expect(page.getByTestId('tts-no-voices')).toContainText('No hay voces disponibles');
+    await page.getByTestId('tts-read').click();
+    await expect(page.getByTestId('tts-no-voices')).toHaveCount(1);
+    let state = await ttsState(page);
+    expect(state.spoken.length).toBe(0);
+    await page.getByTestId('offer-talk:lucia:identidad').click();
+    const chat = page.getByRole('dialog', { name: 'Conversación' });
+    await expect(chat).toBeVisible();
+    await chat.getByTestId('chat-read-0').click();
+    await expect(chat.getByTestId('tts-no-voices-chat')).toBeVisible();
+    await page.click('button:has-text("Dossier")');
+    const dossier = page.getByRole('dialog', { name: 'Dossier' });
+    await expect(dossier).toBeVisible();
+    await dossier.getByTestId('dossier-read-0').click();
+    await expect(dossier.getByTestId('tts-no-voices-dossier')).toBeVisible();
+    state = await ttsState(page);
+    expect(state.spoken.length).toBe(0);
   });
 });

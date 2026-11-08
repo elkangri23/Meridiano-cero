@@ -85,6 +85,9 @@ export function createTTSController(): TTSController {
   return {
     speak(text: string, options: TTSOptions = {}): boolean {
       if (!synth || !text) return false;
+      // Sin voces no hay nada que leer: no se encola un enunciado que nunca
+      // sonaría ni se finge estar hablando.
+      if (getVoices().length === 0) return false;
       try {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.voice = pickVoice(options.voice);

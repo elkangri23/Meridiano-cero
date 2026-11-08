@@ -561,11 +561,19 @@ function ConsoleSection({ log, orderHistory, readBar }: { log: LogEntry[]; order
   </section>;
 }
 
+/** Aviso al pulsar «Leer» sin voces disponibles (GDD §15): el texto sigue
+ * visible y el juego no se bloquea; solo se explica por qué no suena. La
+ * condición vive aquí para no engordar la complejidad de quien lo usa. */
+function NoVoicesNotice({ show, testId }: { show?: boolean | undefined; testId: string }) {
+  if (!show) return null;
+  return <p className="game-notice" role="status" data-testid={testId}>No hay voces disponibles en este navegador o sistema para leer en voz alta.</p>;
+}
+
 /** Barra de lectura en voz alta de la consola (GDD §15): leer la última
  * entrada, repetirla, pausar/reanudar y detener. Solo se habilita cuando
  * el TTS está activado y no silenciado; el texto siempre sigue visible. */
-function ReadAloudBar({ text, canRead, speaking, paused, hasLast, onRead, onRepeat, onPauseResume, onStop }: {
-  text: string; canRead: boolean; speaking: boolean; paused: boolean; hasLast: boolean;
+function ReadAloudBar({ text, canRead, speaking, paused, hasLast, noVoices, onRead, onRepeat, onPauseResume, onStop }: {
+  text: string; canRead: boolean; speaking: boolean; paused: boolean; hasLast: boolean; noVoices?: boolean;
   onRead: () => void; onRepeat: () => void; onPauseResume: () => void; onStop: () => void;
 }) {
   return <div className="game-read-bar" role="group" aria-label="Lectura en voz alta">
@@ -573,6 +581,7 @@ function ReadAloudBar({ text, canRead, speaking, paused, hasLast, onRead, onRepe
     <button type="button" data-testid="tts-repeat" disabled={!canRead || !hasLast} onClick={onRepeat}>Repetir</button>
     <button type="button" data-testid="tts-pause" disabled={!speaking && !paused} onClick={onPauseResume}>{paused ? 'Reanudar' : 'Pausar'}</button>
     <button type="button" data-testid="tts-stop" disabled={!speaking && !paused} onClick={onStop}>Detener</button>
+    <NoVoicesNotice show={noVoices} testId="tts-no-voices" />
   </div>;
 }
 
@@ -635,6 +644,7 @@ interface TtsSpeaker {
   speaking: boolean;
   paused: boolean;
   lastText: string;
+  noVoices: boolean;
   speak: (text: string) => boolean;
   pauseOrResume: () => void;
   stop: () => void;
@@ -643,14 +653,20 @@ interface TtsSpeaker {
 /** Lectura en voz alta: hablar, pausar/reanudar y detener, con el volumen
  * y la voz de las preferencias. Cambiar de voz o de velocidad en mitad de
  * una lectura cancela la anterior para no dejar el sintetizador colgado, y
- * el mute cancela la narración en curso. */
+ * el mute cancela la narración en curso. Sin voces disponibles al pulsar,
+ * no se finge hablar: se marca el aviso y la lectura no se intenta. */
 function useTtsSpeaker(preferences: PresentationPreferences, controller: TTSController): TtsSpeaker {
   const [speaking, setSpeaking] = useState(false);
   const [paused, setPaused] = useState(false);
   const [lastText, setLastText] = useState('');
+  const [noVoices, setNoVoices] = useState(false);
 
   const speak = useCallback((text: string): boolean => {
     if (!preferences.tts.enabled || preferences.audio.muted || !text.trim()) return false;
+    if (controller.getVoices().length === 0) {
+      setNoVoices(true);
+      return false;
+    }
     controller.cancel();
     // `exactOptionalPropertyTypes`: la voz solo se pasa si no es 'auto'.
     const options: TTSOptions = { rate: preferences.tts.rate, volume: preferences.audio.narrationVolume / 100 };
@@ -660,6 +676,7 @@ function useTtsSpeaker(preferences: PresentationPreferences, controller: TTSCont
       setLastText(text);
       setSpeaking(true);
       setPaused(false);
+      setNoVoices(false);
     }
     return ok;
   }, [preferences, controller]);
@@ -669,7 +686,13 @@ function useTtsSpeaker(preferences: PresentationPreferences, controller: TTSCont
     controller.cancel();
     setSpeaking(false);
     setPaused(false);
+    setNoVoices(false);
   }, [preferences.audio.muted, controller]);
+
+  useEffect(() => {
+    if (preferences.tts.enabled) return;
+    setNoVoices(false);
+  }, [preferences.tts.enabled]);
 
   function pauseOrResume(): void {
     if (paused) {
@@ -687,7 +710,7 @@ function useTtsSpeaker(preferences: PresentationPreferences, controller: TTSCont
     setPaused(false);
   }
 
-  return { speaking, paused, lastText, speak, pauseOrResume, stop };
+  return { speaking, paused, lastText, noVoices, speak, pauseOrResume, stop };
 }
 
 /** Motor de música y efectos: volúmenes y mute de las preferencias, y
@@ -729,6 +752,7 @@ interface GameAudio {
   speaking: boolean;
   paused: boolean;
   lastText: string;
+  noVoices: boolean;
   canRead: boolean;
   autoReadOn: boolean;
   ttsSupported: boolean;
@@ -739,7 +763,9 @@ interface GameAudio {
 }
 
 /** Audio y TTS de la pantalla de juego (GDD §15): compone el controlador
- * TTS, sus voces y su lector con el motor de música y efectos. */
+ * TTS, sus voces y su lector con el motor de música y efectos. El aviso de
+ * falta de voces solo vive mientras no hay voces: si llegan después
+ * (`voiceschanged`), desaparece solo y Leer funciona sin recargar. */
 function useGameAudio(preferences: PresentationPreferences): GameAudio {
   const controllerRef = useRef<TTSController | null>(null);
   if (controllerRef.current === null) controllerRef.current = createTtsControllerForWindow();
@@ -752,6 +778,7 @@ function useGameAudio(preferences: PresentationPreferences): GameAudio {
     speaking: speaker.speaking,
     paused: speaker.paused,
     lastText: speaker.lastText,
+    noVoices: speaker.noVoices && voices.length === 0,
     canRead: preferences.tts.enabled && !preferences.audio.muted,
     autoReadOn: preferences.tts.enabled && preferences.tts.autoRead && !preferences.audio.muted,
     ttsSupported: controller.getStatus().supported,
@@ -985,7 +1012,7 @@ function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boo
   </section>;
 }
 
-function DossierContent({ view, onRead, canRead }: { view: PlayerViewDto; onRead?: (text: string) => void; canRead?: boolean }) {
+function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewDto; onRead?: (text: string) => void; canRead?: boolean; noVoices?: boolean }) {
   const lookup = lookupFromView(view);
   const npcName = (id: string) => lookup.npcName(id);
   return <div>
@@ -1005,6 +1032,7 @@ function DossierContent({ view, onRead, canRead }: { view: PlayerViewDto; onRead
           {canRead && onRead && <p><button type="button" data-testid={`dossier-read-${index}`} onClick={() => onRead(text)}>Leer</button></p>}
         </article>;
       })}
+    <NoVoicesNotice show={noVoices} testId="tts-no-voices-dossier" />
     <p className="game-panel-note">Nota de procedimiento: la ausencia de registro no demuestra inocencia.</p>
     <h4>Conversación registrada</h4>
     {view.conversation.length === 0
@@ -1021,10 +1049,10 @@ type ChatTurn = { from: 'you' | 'npc'; text: string };
  * partida y personaje; la memoria del servidor no se persiste (límite
  * documentado: al recargar la página la conversación sigue en esta pestaña,
  * pero una sesión nueva empieza de cero). */
-function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, placeholder, note, onRead, canRead }: {
+function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, placeholder, note, onRead, canRead, noVoices }: {
   npc: { id: string; name: string } | null; view: PlayerViewDto; turns: ChatTurn[]; draft: string; busy: boolean; error: string;
   onDraft: (value: string) => void; onSend: (event: FormEvent) => void;
-  placeholder?: string; note?: string; onRead?: (text: string) => void; canRead?: boolean;
+  placeholder?: string; note?: string; onRead?: (text: string) => void; canRead?: boolean; noVoices?: boolean;
 }) {
   if (!npc) {
     return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span>
@@ -1040,6 +1068,7 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
         {turn.from === 'npc' && canRead && onRead && <button type="button" data-testid={`chat-read-${index}`} onClick={() => onRead(turn.text)}>Leer</button>}
       </li>)}
     </ol>
+    <NoVoicesNotice show={noVoices} testId="tts-no-voices-chat" />
     <form onSubmit={onSend} className="game-chat-form">
       <input type="text" data-testid="chat-input" value={draft} disabled={busy} maxLength={4000}
         placeholder={placeholder ?? 'Pregúntale por lo que sabe: su tarea, lo que vio…'} aria-label="Pregunta para el personaje"
@@ -2517,7 +2546,7 @@ export function GameScreen() {
     <ObjectivesSection view={view} />
     <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} onOpenLab={() => windows.open('lab', null)} />
     <ConsoleSection log={log} orderHistory={orderHistory} readBar={<ReadAloudBar text={lastLogText} canRead={audioTts.canRead}
-      speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} onRead={() => void audioTts.speak(lastLogText)}
+      speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} noVoices={audioTts.noVoices} onRead={() => void audioTts.speak(lastLogText)}
       onRepeat={() => void audioTts.speak(audioTts.lastText)} onPauseResume={audioTts.pauseOrResume} onStop={audioTts.stop} />} />
     <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
       onDraft={setDraft} onSubmit={interpretOrder} onKeyDown={onOrderKeyDown} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
@@ -2534,7 +2563,7 @@ export function GameScreen() {
       <MapContent view={view} busy={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
     </GameWindow>
     <GameWindow id="dossier" title="Dossier" state={windows.windows.dossier} {...windowProps}>
-      <DossierContent view={view} onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} />
+      <DossierContent view={view} onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} />
     </GameWindow>
     <GameWindow id="lab" title="Laboratorio" state={windows.windows.lab} {...windowProps}>
       <LabContent view={view} labOffers={groupOffers(view.offers).lab} disabled={busy}
@@ -2572,12 +2601,12 @@ export function GameScreen() {
     <GameWindow id="chat" title="Conversación" state={windows.windows.chat} {...windowProps}>
       <ChatContent npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
         onDraft={setChatDraft} onSend={event => void sendChatMessage(event)}
-        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} />
+        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} />
     </GameWindow>
     <GameWindow id="intel" title="Terminal de inteligencia" state={windows.windows.intel} {...windowProps}>
       <ChatContent npc={{ id: INTEL_ID, name: INTEL_NAME }} view={view} turns={intelTurns} draft={intelDraft} busy={intelBusy} error={intelError}
         onDraft={setIntelDraft} onSend={event => void sendIntelMessage(event)}
-        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead}
+        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices}
         placeholder="Pregunta por lo investigado: un sospechoso, una prueba, un lugar…"
         note="La terminal solo responde con lo que consta en los registros de la partida. Sin registro, lo dice: la ausencia de registro no demuestra inocencia. Preguntar aquí no consume tiempo." />
     </GameWindow>

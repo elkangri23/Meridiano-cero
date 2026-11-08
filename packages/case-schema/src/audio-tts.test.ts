@@ -77,4 +77,26 @@ describe('audio-tts', () => {
     delete globals.SpeechSynthesisUtterance;
     vi.unstubAllGlobals();
   });
+
+  it('createTTSController con síntesis pero sin voces no habla ni finge hablar', () => {
+    const calls: SpeechSynthesisUtterance[] = [];
+    const globals = testGlobals();
+    globals.speechSynthesis = {
+      getVoices: () => [],
+      speak: (u: SpeechSynthesisUtterance) => { calls.push(u); },
+      pause: vi.fn(),
+      resume: vi.fn(),
+      cancel: vi.fn(),
+    } as unknown as SpeechSynthesis;
+    globals.SpeechSynthesisUtterance = FakeUtterance as unknown as typeof SpeechSynthesisUtterance;
+    const c = createTTSController();
+    expect(c.speak('hola')).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(c.getStatus().supported).toBe(true);
+    expect(c.getStatus().voices).toEqual([]);
+    expect(c.getStatus().speaking).toBe(false);
+    delete globals.speechSynthesis;
+    delete globals.SpeechSynthesisUtterance;
+    vi.unstubAllGlobals();
+  });
 });
