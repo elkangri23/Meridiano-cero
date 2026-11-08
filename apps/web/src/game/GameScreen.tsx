@@ -1286,7 +1286,10 @@ function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, d
 }) {
   const t = useTranslation();
   const memberName = (id: string) => TEAM_MEMBERS.find(member => member.id === id)?.name ?? id;
-  const serviceLabel = (id: TeamServiceId) => t(TEAM_SERVICE_KEYS[id]);
+  const serviceLabel = (id: string) => {
+    const key = (TEAM_SERVICE_KEYS as Record<string, LocaleKey>)[id];
+    return key ? t(key) : id;
+  };
   return <div>
     <h4>{t('game.teamMembers')}</h4>
     <ul className="game-destination-list">{TEAM_MEMBERS.map(member => <li key={member.id}>
@@ -1834,8 +1837,10 @@ function ReportContent({ view }: { view: PlayerViewDto }) {
       empty={t('game.reportNoDetentions')} />
     <h4>{t('game.reportIrregular')}</h4>
     <ReportList
-      items={(report.irregularActs ?? []).map(act =>
-        `${IRREGULAR_KIND_KEYS[act.kind] ? t(IRREGULAR_KIND_KEYS[act.kind]) : act.kind} — ${act.targetName} · min ${act.minute}${act.seen ? t('game.reportIrregularSeen') : t('game.reportIrregularUnseen')}`)}
+      items={(report.irregularActs ?? []).map(act => {
+        const kindKey = IRREGULAR_KIND_KEYS[act.kind];
+        return `${kindKey ? t(kindKey) : act.kind} — ${act.targetName} · min ${act.minute}${act.seen ? t('game.reportIrregularSeen') : t('game.reportIrregularUnseen')}`;
+      })}
       empty={t('game.reportNoIrregular')} />
     <h4>{t('game.reportScore')}</h4>
     <ul className="game-report-objectives">{report.score.breakdown.map(entry =>

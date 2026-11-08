@@ -590,6 +590,7 @@ export const ES_MESSAGES = {
   'game.manualSaves': 'Guardados manuales',
   'game.loadConfirmText': 'Volverás a «{name}» (min {minute}). Perderás el progreso posterior de la rama actual; el primer resultado oficial se mantiene.',
   'game.loadThisPoint': 'Cargar este punto',
+  'game.confirmLoad': 'Confirmar carga',
   'game.reportNoDetentions': 'No se detuvo a nadie.',
   'game.reportNoIrregular': 'Sin acciones irregulares registradas.',
   'game.reportScore': 'Puntuación',
