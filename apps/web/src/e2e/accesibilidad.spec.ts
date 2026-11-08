@@ -202,7 +202,7 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     await expect(map).toBeVisible();
     const atlas = map.locator('.game-atlas');
     await expect(atlas).toHaveAttribute('role', 'img');
-    await expect(atlas).toHaveAttribute('aria-label', /Madrid, París y Lisboa/);
+    await expect(atlas).toHaveAttribute('aria-label', /Madrid, París, Lisboa/);
   });
 
   test('a escala 200% no hay desbordamiento horizontal ni ventanas fuera de la pantalla', async ({ page }) => {
