@@ -25,15 +25,16 @@ async function openGeneratedGameScreen(page: Page) {
   const creation = page.locator('.archive-create').first();
   await expect(creation.getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
   await creation.getByRole('radio', { name: 'Desaparición', exact: true }).check();
+  // Con un solo expediente coincidente no se dibuja la lista de radios: el
+  // caso se auto-selecciona y solo se enseña su referencia en la línea.
   const generated = creation.getByRole('radio', { name: /1dfd99b9/ });
-  // La lista de casos tarda en cargar tras elegir el delito: esperar al
-  // radio antes de decidir si la semilla falta de verdad.
+  const caseLine = creation.getByText(/1dfd99b9/);
   try {
-    await expect(generated).toBeVisible({ timeout: 10000 });
+    await expect(generated.or(caseLine)).toBeVisible({ timeout: 10000 });
   } catch {
     test.skip(true, 'generado-1dfd99b9 no está en la BD dev');
   }
-  await generated.check();
+  if (await generated.count() > 0) await generated.check();
   await creation.getByRole('button', { name: 'Empezar partida' }).click();
   await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
   await expect(page.getByTestId('clock')).toContainText('0 min');
@@ -96,12 +97,14 @@ test.describe('E2E T5-05 - Traducción i18n (inglés y francés)', () => {
     await expect(page.getByTestId('objectives-panel')).toContainText('Arrest Inés with a valid warrant');
     await expect(page.getByTestId('difficulty')).toContainText('Normal · 48 hours');
 
-    // El dossier enseña los objetivos en inglés.
+    // El dossier enseña la ficha y la introducción en inglés (los objetivos
+    // ya se afirmaron en el panel de objetivos).
     await page.getByTestId('toolbar-dossier').click();
     const dossier = page.getByRole('dialog', { name: 'Dossier' });
     await expect(dossier).toBeVisible();
-    await expect(dossier).toContainText('Arrest Inés with a valid warrant');
-    await expect(dossier).toContainText('Recover the original astrolabe');
+    await expect(dossier).toContainText('Case file sheet');
+    await expect(dossier).toContainText('Margaret Sullivan brings you up to speed:');
+    await expect(dossier).toContainText('No evidence collected.');
     await page.keyboard.press('Escape');
 
     // El informe final, con su título en inglés.
@@ -131,8 +134,9 @@ test.describe('E2E T5-05 - Traducción i18n (inglés y francés)', () => {
     await page.getByTestId('toolbar-dossier').click();
     const dossier = page.getByRole('dialog', { name: 'Dossier' });
     await expect(dossier).toBeVisible();
-    await expect(dossier).toContainText('Arrêter Inés avec un mandat valide');
-    await expect(dossier).toContainText('Récupérer l\'astrolabe original');
+    await expect(dossier).toContainText('Fiche du dossier');
+    await expect(dossier).toContainText('Margaret Sullivan te met dans l\'ambiance :');
+    await expect(dossier).toContainText('Aucune preuve recueillie.');
     await page.keyboard.press('Escape');
 
     await page.getByTestId('toolbar-report').click();
