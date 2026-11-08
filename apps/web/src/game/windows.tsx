@@ -3,7 +3,7 @@ import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { LocaleKey } from '@meridiano/contracts';
 import { useTranslation } from '../i18n';
 
-export type WindowId = 'map' | 'dossier' | 'lab' | 'comms' | 'team' | 'saves' | 'settings' | 'report' | 'chat' | 'intel';
+export type WindowId = 'map' | 'dossier' | 'lab' | 'comms' | 'team' | 'saves' | 'settings' | 'report' | 'intel';
 
 export interface WindowState {
   open: boolean;
@@ -21,7 +21,6 @@ const initialPositions: Record<WindowId, { x: number; y: number }> = {
   saves: { x: 420, y: 100 },
   settings: { x: 200, y: 180 },
   report: { x: 300, y: 160 },
-  chat: { x: 180, y: 260 },
   intel: { x: 260, y: 300 },
 };
 
@@ -29,7 +28,7 @@ const initialPositions: Record<WindowId, { x: number; y: number }> = {
 export const WINDOW_KEYS: Record<WindowId, LocaleKey> = {
   map: 'windows.map', dossier: 'windows.dossier', lab: 'windows.lab',
   comms: 'windows.comms', team: 'windows.team', saves: 'windows.saves',
-  settings: 'windows.settings', report: 'windows.report', chat: 'windows.chat',
+  settings: 'windows.settings', report: 'windows.report',
   intel: 'windows.intel',
 };
 
@@ -65,8 +64,8 @@ export function useWindows() {
     setWindows(current => ({ ...current, [id]: { ...current[id], open: false, minimized: false } }));
     setMoving(current => (current === id ? null : current));
     setLastMinimized(current => (current === id ? null : current));
-    // El foco vuelve a quien abrió la ventana; si se abrió sola (charla,
-    // laboratorio, terminal), al botón de la barra que la abre.
+    // El foco vuelve a quien abrió la ventana; si se abrió sola
+    // (laboratorio, terminal), al botón de la barra que la abre.
     const opener = openerRefs.current[id];
     if (opener) opener.focus();
     else document.querySelector<HTMLElement>(`[data-testid="toolbar-${id}"]`)?.focus();

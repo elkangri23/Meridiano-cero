@@ -513,7 +513,7 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
  * inspeccionar, a dónde se puede viajar, y el resto de acciones. Cada oferta
  * sale una sola vez y con su mismo testid, así que la caja de texto libre
  * queda para las órdenes creativas. */
-function SceneSection({ view, disabled, clockPulse, onOffer, onOpenLab }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void }) {
+function SceneSection({ view, disabled, clockPulse, onOffer, onOpenLab, chatPanel }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void; chatPanel?: ReactNode }) {
   const t = useTranslation();
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   const grouped = groupOffers(view.offers);
@@ -524,6 +524,7 @@ function SceneSection({ view, disabled, clockPulse, onOffer, onOpenLab }: { view
     <p className="game-scene-description">{view.position.location.description}</p>
     <SceneMeta view={view} />
     <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} onOpenLab={onOpenLab} />
+    {chatPanel}
   </section>;
 }
 
@@ -1173,6 +1174,33 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
   </div>;
 }
 
+/** Conversación con un personaje DENTRO de la escena (sin ventana aparte):
+ * el personaje no «desaparece» al hablar: su retrato, sus turnos y la
+ * entrada de texto viven en línea en el panel de la escena, bajo las
+ * acciones. Al cerrarla se vuelve a la vista normal de la escena. El foco
+ * entra en el título de la charla al abrirla (o al cambiar de personaje) y
+ * vuelve a quien la abrió al cerrarla (lo hace quien llama). */
+function SceneChatPanel({ npc, view, turns, draft, busy, error, onDraft, onSend, onRead, canRead, noVoices, onClose }: {
+  npc: { id: string; name: string }; view: PlayerViewDto; turns: ChatTurn[]; draft: string; busy: boolean; error: string;
+  onDraft: (value: string) => void; onSend: (event: FormEvent) => void;
+  onRead: (text: string) => void; canRead: boolean; noVoices?: boolean; onClose: () => void;
+}) {
+  const t = useTranslation();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // Al abrir la charla (o cambiar de personaje) el foco entra en su
+  // título: quien navega con teclado no tiene que buscarla. Los turnos
+  // nuevos no mueven el foco (el id no cambia).
+  useEffect(() => { headingRef.current?.focus(); }, [npc.id]);
+  return <section className="game-scene-chat" data-testid="scene-chat" aria-labelledby="scene-chat-heading">
+    <div className="game-scene-chat-head">
+      <h3 id="scene-chat-heading" ref={headingRef} tabIndex={-1}>{t('game.chatTitle', { name: npc.name })}</h3>
+      <button type="button" data-testid="chat-close" onClick={onClose}>{t('game.chatClose')}</button>
+    </div>
+    <ChatContent npc={npc} view={view} turns={turns} draft={draft} busy={busy} error={error}
+      onDraft={onDraft} onSend={onSend} onRead={onRead} canRead={canRead} noVoices={noVoices} />
+  </section>;
+}
+
 /** Un análisis del laboratorio: su método forense, la prueba con su frase
  * del expediente y su estado (disponible, en curso o con resultado). */
 function LabAnalysisItem({ offer, view, pendingAnalysis, disabled, onAnalyze }: {
@@ -1266,7 +1294,7 @@ function CommsSendForm({ view, contacts, recipient, channel, channels, documentI
 
 function CommsHistoryItem({ view, contacts, record, onAskReply }: {
   view: PlayerViewDto; contacts: Contact[]; record: PlayerViewDto['communications'][number];
-  onAskReply: (record: PlayerViewDto['communications'][number]) => void;
+  onAskReply: (record: PlayerViewDto['communications'][number], trigger: HTMLElement | null) => void;
 }) {
   const t = useTranslation();
   const name = contacts.find(contact => contact.id === record.recipientId)?.name
@@ -1278,7 +1306,7 @@ function CommsHistoryItem({ view, contacts, record, onAskReply }: {
       <small>{t('game.commsSent', { sent: record.sentMinute, receipt: record.receivedMinute !== undefined
         ? t('game.commsReceiptReceived', { minute: record.receivedMinute }) : t('game.commsReceiptDue', { minute: record.dueMinute }) })}</small></span>
     {record.receivedMinute !== undefined && <span> <button type="button" data-testid={`comms-ask-${record.id}`}
-      onClick={() => onAskReply(record)}>{t('game.askForReply')}</button></span>}
+      onClick={event => onAskReply(record, event.currentTarget)}>{t('game.askForReply')}</button></span>}
   </li>;
 }
 
@@ -1286,7 +1314,7 @@ function CommsContent({ view, contacts, recipient, channel, documentId, text, bu
   view: PlayerViewDto; contacts: Contact[]; recipient: string; channel: string; documentId: string; text: string; busy: boolean;
   onRecipient: (value: string) => void; onChannel: (value: string) => void; onDocument: (value: string) => void; onText: (value: string) => void;
   onSend: (event: FormEvent) => void;
-  onAskReply: (record: PlayerViewDto['communications'][number]) => void;
+  onAskReply: (record: PlayerViewDto['communications'][number], trigger: HTMLElement | null) => void;
 }) {
   const t = useTranslation();
   const selected = contacts.find(contact => contact.id === recipient);
@@ -1915,6 +1943,9 @@ export function GameScreen() {
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // Quién abrió la charla en escena (botón «Hablar con» o «Preguntar por
+  // la respuesta» de la central): al cerrarla, el foco vuelve a él.
+  const chatOpenerRef = useRef<HTMLElement | null>(null);
   const orderInputRef = useRef<HTMLTextAreaElement>(null);
 
   const [identity, setIdentity] = useState<SessionDto | null>(null);
@@ -2108,13 +2139,16 @@ export function GameScreen() {
         setOrderPhase({ kind: 'idle' });
         return;
       }
+      // La charla en escena se cierra con Escape antes que las ventanas:
+      // es lo último que se abrió y su cierre devuelve el foco a la escena.
+      if (chatNpc) { closeChat(); return; }
       const open = (Object.keys(windows.windows) as WindowId[]).filter(id => windows.windows[id].open);
       const last = open[open.length - 1];
       if (last) windows.close(last);
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [orderPhase, windows.windows, windows.moving, windows.close]);
+  }, [orderPhase, windows.windows, windows.moving, windows.close, chatNpc, closeChat]);
 
   function applyResponse(response: ActionResponseDto, offerLabel: string, offer?: PublicActionOffer) {
     const previous = view;
@@ -2147,9 +2181,10 @@ export function GameScreen() {
     try { sessionStorage.setItem(key, JSON.stringify({ turns, memory })); } catch { /* sin almacenamiento */ }
   }
 
-  /** Abre la conversación con un personaje: recupera sus turnos y su
-   * memoria de esta pestaña o la inicia con su saludo. */
-  function openChat(npcId: string, npcName: string) {
+  /** Abre la conversación con un personaje DENTRO de la escena (sin
+   * ventana aparte): recupera sus turnos y su memoria de esta pestaña o
+   * la inicia con su saludo. El foco lo mueve el panel al montarse. */
+  function openChat(npcId: string, npcName: string, opener: HTMLElement | null = null) {
     if (!runId) return;
     const key = `meridiano:chat:${runId}:${npcId}`;
     const stored = loadStoredChat(key);
@@ -2164,10 +2199,24 @@ export function GameScreen() {
       setChatMemory(memory);
       saveChat(key, turns, memory);
     }
+    // Quién abrió la charla: el botón que se pasa, o el de la última
+    // orden confirmada (el «Hablar con» de la escena). Al cerrarla, el
+    // foco vuelve a él.
+    chatOpenerRef.current = opener ?? lastTriggerRef.current;
     setChatNpc({ id: npcId, name: npcName });
     setChatError('');
-    windows.open('chat', null);
   }
+
+  /** Cierra la charla en escena y devuelve el foco a quien la abrió (o a
+   * la escena si ese botón ya no está). Los turnos y la memoria quedan
+   * guardados en esta pestaña, como antes. */
+  const closeChat = useCallback(() => {
+    setChatNpc(null);
+    const opener = chatOpenerRef.current;
+    chatOpenerRef.current = null;
+    if (opener && opener.isConnected) opener.focus();
+    else document.getElementById('game-scene')?.focus();
+  }, []);
 
   /** Pregunta lista para enviar al personaje, o null si falta algo. */
   function chatQuestion(): { runId: string; csrfToken: string; npcId: string; name: string; text: string; facts: Array<{ id: string; text: string }>; memory: unknown } | null {
@@ -2625,14 +2674,14 @@ export function GameScreen() {
    * era un documento, su texto como hecho autorizado de esa pregunta. La
    * respuesta sigue las reglas de la conversación: solo hechos autorizados,
    * sin inventar; el turno queda en la memoria de chat del personaje. */
-  function askAboutCommunication(record: PlayerViewDto['communications'][number]) {
+  function askAboutCommunication(record: PlayerViewDto['communications'][number], trigger: HTMLElement | null = null) {
     if (!view) return;
     const name = contacts.find(contact => contact.id === record.recipientId)?.name
       ?? view.npcChat.find(entry => entry.id === record.recipientId)?.name ?? record.recipientId;
     const documentText = record.documentId ? view.evidenceTexts[record.documentId] : undefined;
     setChatExtraFacts({ npcId: record.recipientId,
       facts: record.documentId && documentText ? [{ id: record.documentId, text: documentText }] : [] });
-    openChat(record.recipientId, name);
+    openChat(record.recipientId, name, trigger);
     setChatDraft(documentText
       ? t('game.chatDraftSentDocument', { document: documentText })
       : t('game.chatDraftSentMessage', { message: record.requestText }));
@@ -2689,7 +2738,10 @@ export function GameScreen() {
     </div>
 
     <ObjectivesSection view={view} />
-    <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} onOpenLab={() => windows.open('lab', null)} />
+    <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} onOpenLab={() => windows.open('lab', null)}
+      chatPanel={chatNpc ? <SceneChatPanel npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
+        onDraft={setChatDraft} onSend={event => void sendChatMessage(event)}
+        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} onClose={closeChat} /> : null} />
     <ConsoleSection log={log} orderHistory={orderHistory} reducedMotion={reducedMotion} announceNarration={preferences.accessibility.announceNarration} readBar={<ReadAloudBar text={lastLogText} canRead={audioTts.canRead}
       speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} noVoices={audioTts.noVoices} onRead={() => void audioTts.speak(lastLogText)}
       onRepeat={() => void audioTts.speak(audioTts.lastText)} onPauseResume={audioTts.pauseOrResume} onStop={audioTts.stop} />} />
@@ -2746,11 +2798,6 @@ export function GameScreen() {
     </GameWindow>
     <GameWindow id="report" title={t(WINDOW_KEYS['report'])} state={windows.windows.report} {...windowProps}>
       <ReportContent view={view} />
-    </GameWindow>
-    <GameWindow id="chat" title={t(WINDOW_KEYS['chat'])} state={windows.windows.chat} {...windowProps}>
-      <ChatContent npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
-        onDraft={setChatDraft} onSend={event => void sendChatMessage(event)}
-        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} />
     </GameWindow>
     <GameWindow id="intel" title={t(WINDOW_KEYS['intel'])} state={windows.windows.intel} {...windowProps}>
       <ChatContent npc={{ id: INTEL_ID, name: INTEL_NAME }} view={view} turns={intelTurns} draft={intelDraft} busy={intelBusy} error={intelError}

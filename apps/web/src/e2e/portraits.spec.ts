@@ -37,7 +37,7 @@ test.describe('E2E retratos de personajes (GDD §2)', () => {
   test('la conversación enseña el retrato del personaje, en grande', async ({ page }) => {
     await openGameScreen(page);
     await page.getByTestId('offer-talk:tomas:identidad').click();
-    const chat = page.getByRole('dialog', { name: 'Conversación' });
+    const chat = page.getByTestId('scene-chat');
     await expect(chat).toBeVisible();
     const portrait = chat.getByRole('img', { name: 'Retrato de Tomás Ríos' });
     await expect(portrait).toBeVisible();
@@ -61,7 +61,7 @@ test.describe('E2E retratos de personajes (GDD §2)', () => {
   test('la central enseña el retrato del contacto tras hablar en persona', async ({ page }) => {
     await openGameScreen(page);
     await page.getByTestId('offer-talk:lucia:identidad').click();
-    await expect(page.getByRole('dialog', { name: 'Conversación' })).toBeVisible();
+    await expect(page.getByTestId('scene-chat')).toBeVisible();
     await page.keyboard.press('Escape');
     await page.click('button:has-text("Central de comunicaciones")');
     const comms = page.getByRole('dialog', { name: 'Central de comunicaciones' });

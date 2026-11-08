@@ -211,6 +211,15 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-chat-npc-turn { align-self:flex-start; background:#000000; color:var(--paper); border:1px solid var(--edge); border-left:4px solid var(--teal); }
 .game-chat-form { display:flex; gap:8px; margin-top:12px; }
 .game-chat-form input { flex:1; min-width:0; }
+
+/* Conversación dentro de la escena (sin ventana aparte): el panel vive en
+ * el flujo de la escena, bajo las acciones, con su borde dorado para
+ * marcar que es la charla en curso. El título recibe el foco al abrirla. */
+.game-scene-chat { border-top:2px solid var(--gold); padding:12px; }
+.game-scene-chat-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
+.game-scene-chat-head h3 { margin:0; font-size:.85em; letter-spacing:.1em; text-transform:uppercase; }
+.game-scene-chat-head h3:focus-visible { outline:3px solid var(--gold); }
+.game-scene-chat-head button { flex:none; }
 .game-order-hint { font-size:.75em; color:var(--muted); margin-top:8px; line-height:1.6; }
 
 /* Tarjeta de evidencia del prototipo: gris, texto negro, sombra dura. */

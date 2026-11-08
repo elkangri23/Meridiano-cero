@@ -14,10 +14,10 @@ async function openGameScreen(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('0 min');
 }
 
-/** Habla con Lucía en persona (abre su conversación, que se cierra). */
+/** Habla con Lucía en persona (abre su conversación en la escena, que se cierra). */
 async function talkToLucia(page: Page) {
   await page.getByTestId('offer-talk:lucia:identidad').click();
-  await expect(page.getByRole('dialog', { name: 'Conversación' })).toBeVisible();
+  await expect(page.getByTestId('scene-chat')).toBeVisible();
   await page.keyboard.press('Escape');
 }
 

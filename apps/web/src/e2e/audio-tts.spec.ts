@@ -196,7 +196,7 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     await openGameScreen(page);
     await enableTts(page);
     await page.getByTestId('offer-talk:lucia:identidad').click();
-    const chat = page.getByRole('dialog', { name: 'Conversación' });
+    const chat = page.getByTestId('scene-chat');
     await expect(chat).toBeVisible();
     await expect(chat.getByTestId('chat-read-0')).toBeVisible();
     await chat.getByTestId('chat-read-0').click();
@@ -247,7 +247,7 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     let state = await ttsState(page);
     expect(state.spoken.length).toBe(0);
     await page.getByTestId('offer-talk:lucia:identidad').click();
-    const chat = page.getByRole('dialog', { name: 'Conversación' });
+    const chat = page.getByTestId('scene-chat');
     await expect(chat).toBeVisible();
     await chat.getByTestId('chat-read-0').click();
     await expect(chat.getByTestId('tts-no-voices-chat')).toBeVisible();
