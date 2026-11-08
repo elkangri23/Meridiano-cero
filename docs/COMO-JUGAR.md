@@ -80,9 +80,21 @@ Cada expediente fija su tipo de detención al generarse (en el caso fijo, autom�
 Tu equipo recurrente (GDD §8) está en su propia ventana, «Equipo A.C.M.E.», desde la barra de herramientas. Son cinco: **Margaret Sullivan** (directora), **Dr. Samuel Richter** (laboratorio forense), **Elena Vázquez** (inteligencia), **David Nakamura** (viajes y detenciones) y **Clara Beaumont** (expedientes).
 
 - **Pedir ayuda no cuesta tiempo:** conversar y leer no avanzan el reloj. Lo que cuesta tiempo son las gestiones que ya existen: un análisis (90 min de espera), coordinar una detención (30 min) o enviar un documento (30 min).
-- **Margaret** te recuerda el encargo y tus objetivos con su estado. **Richter** te explica un análisis ya completado, solo con lo que la prueba permite decir. **Elena** consulta los registros de la partida como la terminal de inteligencia: sospechosos, pruebas, lugares; sin registro, lo dice y no inventa nada. **David** te enseña las rutas de viaje desde tu ciudad y coordina las detenciones (la detención en sí se pide desde aquí, con la misma oferta y confirmación que en la escena). **Clara** organiza tu expediente: pruebas con su admisibilidad, solicitudes pendientes, órdenes, detenciones y objetivos.
+- **Margaret** te recuerda el encargo y tus objetivos con su estado, y evalúa tu carrera («Evaluar mi carrera»: rango, puntos, casos, reputación y suspensiones; nunca valora el caso en curso). **Richter** te explica un análisis ya completado, solo con lo que la prueba permite decir. **Elena** consulta los registros de la partida como la terminal de inteligencia: sospechosos, pruebas, lugares; sin registro, lo dice y no inventa nada. **David** te enseña las rutas de viaje desde tu ciudad y coordina las detenciones (la detención en sí se pide desde aquí, con la misma oferta y confirmación que en la escena). **Clara** organiza tu expediente: pruebas con su admisibilidad, solicitudes pendientes, órdenes, detenciones y objetivos.
 - **El equipo nunca te dice si vas bien, ni señala al culpable ni sugiere la siguiente pista.** Sus respuestas son resúmenes de lo que ya consta en tu expediente: nada nuevo, solo ordenado. Si una pregunta no tiene respaldo en los registros, la respuesta es que no consta.
 - **Cada petición queda registrada** en la cronología y en el dossier (quién, qué servicio y en qué minuto), pero el texto libre de tu pregunta a Elena no se guarda.
+
+## Carrera y reputación
+
+Tu progreso como detective vive en el **archivo**: rango, puntos, casos cerrados y resueltos, medallas, países y lugares descubiertos, y tu reputación (prestigio, integridad y confianza institucional, con etiquetas como Sólida o Dudosa, nunca con barras secretas).
+
+- **Primer resultado oficial:** el primer cierre de un expediente fija tu resultado oficial para ese caso (puntos, medalla y rango). Las repeticiones del mismo caso son **práctica**: puedes jugarlas y cerrarlas, pero no cambian tu carrera ni vuelven a dar puntos o medallas. Cargar un guardado antes del primer cierre sí permite cambiar decisiones, porque aún no hay resultado oficial.
+- **Rangos:** Aspirante, Detective, Sargento e Inspector, por los puntos acumulados. El rango es honorífico: **todas las herramientas están disponibles desde el primer caso**, con independencia del rango.
+- **Reputación:** una detención errónea daña la confianza; la conducta irregular (forzar, sobornar, suplantar) daña la integridad; recuperar el objeto y actuar con legalidad (sin actos irregulares y con órdenes para todo) la mejoran. La reputación **se recupera** con casos limpios posteriores.
+- **Suspensión:** si A.C.M.E. te retira un caso por conducta irregular (a la tercera vez que te ven), tu carrera queda con una suspensión activa. No destruye tus guardados ni bloquea herramientas, y se resuelve con el primer caso limpio que cierres después.
+- **Dónde se ve:** el informe final de cada partida muestra sus consecuencias de carrera (puntos, medalla, cambio de rango o, si es práctica, el resultado oficial que ya tenías), y Margaret te evalúa la carrera desde el equipo.
+
+Las cifras (puntos por resultado, deltas y umbrales de rango) son valores iniciales para playtest, documentados en SPEC-008; no son un equilibrio definitivo y se afinarán tras jugar.
 
 ## Errores y conexión
 

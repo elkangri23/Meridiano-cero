@@ -24,6 +24,21 @@ describe('T3: frontera HTTP del archivo', () => {
     const fetcher = respond({ error: 'synthetic' }, 401);
     expect(await archiveApi.me(signal())).toBeNull(); expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it('carrera lista el perfil y 401 es ausencia de sesión', async () => {
+    const emptyCareer = {
+      rank: 'Aspirante', points: 0, prestige: 0, integrity: 0, trust: 0,
+      prestigeLabel: 'Discreta', integrityLabel: 'Discreta', trustLabel: 'Discreta',
+      totalCases: 0, completedCases: 0, medals: [], countries: [], places: [],
+      sanctions: [], results: [],
+    };
+    const fetcher = respond(emptyCareer);
+    expect(await archiveApi.career(signal())).toEqual(emptyCareer);
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/career');
+    respond({ error: 'synthetic' }, 401);
+    expect(await archiveApi.career(signal())).toBeNull();
+    respond({ ...emptyCareer, results: [{ caseId: 'x' }] });
+    await expect(archiveApi.career(signal())).rejects.toEqual(new ArchiveError('invalid'));
+  });
   it('entrada local explícita usa cuerpo vacío y conserva CSRF solo en respuesta validada', async () => {
     const fetcher = respond(session);
     expect(await archiveApi.connect(signal())).toEqual(session);

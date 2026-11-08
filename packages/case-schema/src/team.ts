@@ -3,8 +3,9 @@
 // pedirles. Los miembros recuerdan la trayectoria del detective y mantienen
 // personalidades diferenciadas; pueden ejecutar consultas y gestiones
 // concretas, pero nunca indicar si se va bien, señalar al culpable ni
-// sugerir la siguiente pista. La evaluación de carrera de Margaret queda
-// fuera: la carrera no está conectada al producto (auditoría §13).
+// sugerir la siguiente pista. La evaluación de carrera de Margaret está
+// conectada desde T5-04: responde solo con el perfil de carrera oficial
+// (rango, puntos, medallas, reputación), nunca con el estado del caso.
 import type { TeamMember, TeamMemberId, TeamRecord, TeamServiceId } from './types.js';
 
 export const TEAM_MEMBERS: readonly TeamMember[] = [
@@ -26,7 +27,7 @@ export function teamMember(id: string): TeamMember | undefined {
  * que ya existe (GDD §12) y la ventana del equipo solo la enseña a través
  * de David, con su mismo flujo de confirmación. */
 export const TEAM_SERVICES: Readonly<Record<TeamMemberId, readonly TeamServiceId[]>> = {
-  margaret: ['briefing'],
+  margaret: ['briefing', 'evaluate'],
   richter: ['explain'],
   elena: ['lookup'],
   david: ['routes'],

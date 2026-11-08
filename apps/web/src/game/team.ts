@@ -1,4 +1,4 @@
-import type { PlayerViewDto } from '@meridiano/contracts';
+import type { CareerProfileDto, PlayerViewDto } from '@meridiano/contracts';
 
 /** Equipo recurrente A.C.M.E. (GDD §8) en la web: módulo PURO, sin importar
  * case-schema (la regla de aislamiento de la web). El catálogo de miembros
@@ -9,7 +9,7 @@ import type { PlayerViewDto } from '@meridiano/contracts';
  * sugiere la siguiente pista. */
 
 export type TeamMemberId = 'margaret' | 'richter' | 'elena' | 'david' | 'clara';
-export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'coordinate' | 'routes' | 'organize';
+export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'coordinate' | 'routes' | 'organize' | 'evaluate';
 
 export interface TeamMemberDisplay {
   id: TeamMemberId;
@@ -38,6 +38,7 @@ export const TEAM_SERVICE_LABELS: Record<TeamServiceId, string> = {
   coordinate: 'Coordinar una detención',
   routes: 'Consultar rutas de viaje',
   organize: 'Organizar el expediente',
+  evaluate: 'Evaluar mi carrera',
 };
 
 /** Elena Vázquez como interlocutora: la misma consulta determinista que la
@@ -48,17 +49,21 @@ export const ELENA_NAME = 'Elena Vázquez';
 export const ELENA_PERSONA = 'Eres Elena Vázquez, de inteligencia de A.C.M.E. Respondes con frases cortas y formales, en primera persona, solo con lo que dicen los registros citados. Nunca inventas hechos del caso, nunca revelas culpabilidad y nunca dices quién es el culpable salvo que un registro citado lo afirme. Si un dato no está en los registros citados, di que no consta.';
 export const ELENA_REFUSAL = 'Sin registro en los archivos consultados. La ausencia de registro no demuestra inocencia.';
 export const ELENA_GREETING = 'Soy Elena Vázquez, inteligencia de A.C.M.E. Pregunta por lo investigado: sospechosos, pruebas, lugares. Solo respondo con lo que consta en los registros.';
-export const TEAM_GREETING = 'Soy Margaret Sullivan, directora de A.C.M.E. Pregunta al equipo: yo te recuerdo el encargo, Richter explica los análisis, Elena consulta los registros, David coordina detenciones y Clara organiza el expediente.';
+export const TEAM_GREETING = 'Soy Margaret Sullivan, directora de A.C.M.E. Pregunta al equipo: yo te recuerdo el encargo y evalúo tu carrera, Richter explica los análisis, Elena consulta los registros, David coordina detenciones y Clara organiza el expediente.';
 
 /** Respuesta de un servicio determinista desde la vista, o null si el
  * servicio no tiene respuesta calculable (la consulta de Elena y la
- * coordinación de David van por otro camino). */
-export function teamServiceAnswer(serviceId: TeamServiceId, view: PlayerViewDto, targetId?: string): string | null {
+ * coordinación de David van por otro camino). La evaluación de carrera
+ * necesita además el perfil (`career`): sin perfil cargado no hay
+ * evaluación (null); con el perfil vacío, la respuesta dice que la
+ * carrera empieza con el primer cierre. */
+export function teamServiceAnswer(serviceId: TeamServiceId, view: PlayerViewDto, targetId?: string, career?: CareerProfileDto | null): string | null {
   switch (serviceId) {
     case 'briefing': return briefingAnswer(view);
     case 'explain': return targetId ? explainAnswer(view, targetId) : null;
     case 'routes': return routesAnswer(view);
     case 'organize': return organizeAnswer(view);
+    case 'evaluate': return career ? evaluateAnswer(career) : null;
     default: return null;
   }
 }
@@ -71,9 +76,39 @@ export function teamRequestText(serviceId: TeamServiceId, targetId?: string): st
     case 'explain': return `¿Qué dice el análisis ${targetId ?? ''}?`;
     case 'routes': return '¿Qué rutas de viaje hay desde aquí?';
     case 'organize': return '¿Puedes organizar el expediente?';
+    case 'evaluate': return '¿Cómo va mi carrera?';
     case 'coordinate': return 'Coordinar una detención.';
     case 'lookup': return 'Consulta de inteligencia.';
   }
+}
+
+/** Etiqueta legible de una medalla de carrera. */
+export function medalLabel(medal: string | null): string {
+  if (medal === 'medalla-oro') return 'Medalla de oro';
+  if (medal === 'medalla-plata') return 'Medalla de plata';
+  return 'Sin medalla';
+}
+
+/** Margaret evalúa la carrera: solo el perfil oficial (rango, puntos,
+ * casos, medallas, reputación y sanciones activas). Nunca valora el caso
+ * en curso ni dice si se va bien: la carrera solo cuenta cierres. */
+export function evaluateAnswer(career: CareerProfileDto): string {
+  if (career.totalCases === 0) {
+    return 'Aún no tienes casos cerrados. Tu carrera empieza con el primer informe oficial: cierra un caso y te diré tu rango, tus puntos y tu reputación.';
+  }
+  const parts: string[] = [];
+  parts.push(`Tu carrera: rango ${career.rank}, ${career.points} puntos en ${career.totalCases} ${career.totalCases === 1 ? 'caso' : 'casos'} (${career.completedCases} ${career.completedCases === 1 ? 'resuelto' : 'resueltos'}).`);
+  parts.push(`Prestigio ${career.prestigeLabel.toLowerCase()}, integridad ${career.integrityLabel.toLowerCase()}, confianza ${career.trustLabel.toLowerCase()}.`);
+  if (career.medals.length > 0) {
+    parts.push('Medallas: ' + career.medals.map(medalLabel).join(', ') + '.');
+  }
+  const active = career.sanctions.filter(sanction => sanction.active);
+  if (active.length > 0) {
+    parts.push(`Tienes ${active.length} ${active.length === 1 ? 'suspensión activa' : 'suspensiones activas'}: ${active.map(sanction => sanction.reason).join('; ')}. Un caso limpio la resuelve.`);
+  } else if (career.sanctions.length > 0) {
+    parts.push('Tuviste una suspensión y ya la resolviste con casos limpios.');
+  }
+  return parts.join(' ');
 }
 
 /** Margaret sobre el encargo: la introducción del caso tal como la

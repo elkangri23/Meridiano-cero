@@ -12,7 +12,7 @@ describe('Equipo A.C.M.E. (GDD §8)', () => {
   });
   it('cada miembro solo ofrece sus servicios; coordinar no es un servicio del motor', () => {
     expect(TEAM_SERVICES).toEqual({
-      margaret: ['briefing'],
+      margaret: ['briefing', 'evaluate'],
       richter: ['explain'],
       elena: ['lookup'],
       david: ['routes'],
@@ -23,6 +23,9 @@ describe('Equipo A.C.M.E. (GDD §8)', () => {
     expect(isTeamServiceId('richter', 'explain')).toBe(true);
     expect(isTeamServiceId('richter', 'briefing')).toBe(false);
     expect(isTeamServiceId('david', 'coordinate')).toBe(false);
+    // La evaluación de carrera es solo de Margaret (T5-04, GDD §13).
+    expect(isTeamServiceId('margaret', 'evaluate')).toBe(true);
+    expect(isTeamServiceId('clara', 'evaluate')).toBe(false);
   });
   it('isTeamRecord acepta registros con y sin objetivo, y rechaza el resto', () => {
     expect(isTeamRecord({ id: 'team-1', memberId: 'margaret', serviceId: 'briefing', minute: 0 })).toBe(true);

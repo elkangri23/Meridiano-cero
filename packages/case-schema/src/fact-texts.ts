@@ -68,32 +68,9 @@ export function evidenceText(evidenceId: string, texts?: CaseTexts): string | un
   return texts ? texts.evidence[evidenceId] : EVIDENCE_TEXTS[evidenceId];
 }
 
-/** Informe final: resultado y motivo del cierre, en español. El motor
- * trabaja con identificadores en inglés (`complete`, `finished`…); la
- * pantalla del jugador nunca los enseña tal cual. Un valor desconocido se
- * devuelve tal cual: nunca se oculta el resultado por no tener texto. */
-export const REPORT_RESULT_TEXT: Record<string, string> = {
-  complete: 'completado',
-  partial: 'parcial',
-  incorrect: 'incorrecto',
-  unresolved: 'sin resolver',
-};
-
-export const REPORT_REASON_TEXT: Record<string, string> = {
-  finished: 'finalizado',
-  deadline: 'plazo agotado',
-  withdrawn: 'retirado por A.C.M.E.',
-};
-
-/** Frase de un resultado del informe final. */
-export function reportResultText(result: string): string {
-  return REPORT_RESULT_TEXT[result] ?? result;
-}
-
-/** Frase de un motivo de cierre del informe final. */
-export function reportReasonText(reason: string): string {
-  return REPORT_REASON_TEXT[reason] ?? reason;
-}
+/** Informe final: resultado y motivo del cierre, en español. Definidos en
+ * `@meridiano/contracts` y re-exportados aquí para el resto del paquete. */
+export { REPORT_RESULT_TEXT, REPORT_REASON_TEXT, reportResultText, reportReasonText } from '@meridiano/contracts';
 
 /** Etiqueta legible de cada tipo de acción irregular (GDD §14). */
 export const IRREGULAR_KIND_TEXT: Record<string, string> = {

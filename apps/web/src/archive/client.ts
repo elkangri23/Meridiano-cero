@@ -1,5 +1,5 @@
-import { isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto, isGenerationJobDto, isGenerationJobListDto, isCaseImportResultDto } from '@meridiano/contracts';
-import type { PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto, CrimeType, ContentRating, GenerationJobDto, GenerationJobListDto, CaseImportResultDto } from '@meridiano/contracts';
+import { isCareerProfileDto, isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto, isGenerationJobDto, isGenerationJobListDto, isCaseImportResultDto } from '@meridiano/contracts';
+import type { CareerProfileDto, PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto, CrimeType, ContentRating, GenerationJobDto, GenerationJobListDto, CaseImportResultDto } from '@meridiano/contracts';
 
 export type Filter = 'all' | 'active' | 'closed';
 
@@ -27,6 +27,10 @@ export interface ArchiveApi {
   /** Importa un fichero de expediente: el servidor lo valida (v1.5) antes
    * de registrarlo en el catálogo. */
   importCase(fileText: string, identity: SessionDto, signal: AbortSignal): Promise<CaseImportResultDto>;
+  /** Perfil de carrera del detective (GDD §13): rango, puntos,
+   * reputación, medallas, casos, países, lugares, sanciones y resultados
+   * oficiales. Null sin sesión. */
+  career(signal: AbortSignal): Promise<CareerProfileDto | null>;
 }
 
 /** Parámetros de generación (T4-08): delito opcional (sin él, el servidor
@@ -118,6 +122,13 @@ async function readGenerationJobListDto(response: Response): Promise<GenerationJ
 async function readCaseImportResultDto(response: Response): Promise<CaseImportResultDto> {
   const body = await read(response);
   if (!isCaseImportResultDto(body)) throw new ArchiveError('invalid');
+  return body;
+}
+
+async function readCareerProfileDtoOrNull(response: Response): Promise<CareerProfileDto | null> {
+  if (response.status === 401) { await response.body?.cancel(); return null; }
+  const body = await read(response);
+  if (!isCareerProfileDto(body)) throw new ArchiveError('invalid');
   return body;
 }
 
@@ -261,5 +272,9 @@ export const archiveApi: ArchiveApi = {
       { method: 'POST', headers: mutationHeaders(identity), body: fileText });
     if (response.status === 200 || response.status === 201) return readCaseImportResultDto(response);
     throw new ArchiveError('unavailable', await errorDetail(response));
+  },
+
+  async career(signal: AbortSignal): Promise<CareerProfileDto | null> {
+    return readCareerProfileDtoOrNull(await request('/api/v1/career', signal));
   },
 };

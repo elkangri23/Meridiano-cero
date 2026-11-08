@@ -22,7 +22,8 @@ function api() {
     createGenerationJob: vi.fn<ArchiveApi['createGenerationJob']>(),
     cancelGenerationJob: vi.fn<ArchiveApi['cancelGenerationJob']>(),
     exportCase: vi.fn<ArchiveApi['exportCase']>(),
-    importCase: vi.fn<ArchiveApi['importCase']>() };
+    importCase: vi.fn<ArchiveApi['importCase']>(),
+    career: vi.fn<ArchiveApi['career']>().mockResolvedValue(null) };
 }
 
 describe('T3: creación durable en pestaña sin otra intención', () => {

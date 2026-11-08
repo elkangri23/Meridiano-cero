@@ -17,12 +17,12 @@ import { Portrait } from './portrait';
 import { portraitSeed, teamPortraitSeed } from './portraits';
 import { groupOffers } from './scene-offers';
 import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
-import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_LABELS, teamRequestText, teamServiceAnswer } from './team';
+import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_LABELS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
-import type { ActionResponseDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
+import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
 import { caseLabel, conversationRecordText, discoveryText, FORENSIC_TYPE_LABELS, getNPC, IRREGULAR_KIND_TEXT, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
 import type { CaseTexts, DiscoveryLookup, ForensicType, PaletteMode } from '@meridiano/case-schema';
@@ -994,6 +994,8 @@ function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, d
       <span>
         {member.id === 'margaret' && <button type="button" data-testid="team-briefing" disabled={busy}
           onClick={event => onService('margaret', 'briefing', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.briefing}</button>}
+        {member.id === 'margaret' && <button type="button" data-testid="team-evaluate" disabled={busy}
+          onClick={event => onService('margaret', 'evaluate', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.evaluate}</button>}
         {member.id === 'clara' && <button type="button" data-testid="team-organize" disabled={busy}
           onClick={event => onService('clara', 'organize', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.organize}</button>}
         {member.id === 'david' && <button type="button" data-testid="team-routes" disabled={busy}
@@ -1400,6 +1402,35 @@ function ReportList({ items, empty }: { items: string[]; empty: string }) {
     : <ul className="game-report-objectives">{items.map((item, index) => <li key={index}>{item}</li>)}</ul>;
 }
 
+/** Delta con signo para el informe: +3, 0, −2. */
+function signedDelta(delta: number): string {
+  return delta > 0 ? `+${delta}` : String(delta);
+}
+
+/** Sufijo de medalla para una línea de resultado oficial, o vacío. */
+function medalSuffix(medal: string | null | undefined): string {
+  return medal ? ` · ${medalLabel(medal)}` : '';
+}
+
+/** Consecuencias de carrera del cierre (GDD §13, DEC-020): el cierre
+ * oficial fija el resultado y enseña puntos/medalla/rango antes→después;
+ * el de práctica recuerda el oficial existente; una partida cerrada antes
+ * de la carrera no tiene resultado oficial. */
+function CareerConsequences({ officialResult }: { officialResult: PlayerViewDto['officialResult'] }) {
+  return <>
+    <h4>Consecuencias de carrera</h4>
+    {!officialResult && <p>Esta partida se cerró antes de que existiera la carrera y no tiene resultado oficial.</p>}
+    {officialResult?.isThisRun && <>
+      <p>Resultado oficial: <strong>{reportResultText(officialResult.result)}</strong> · {officialResult.points} puntos{medalSuffix(officialResult.medal)} · Rango: {officialResult.rankBefore} → {officialResult.rankAfter}</p>
+      <p>Prestigio {signedDelta(officialResult.prestigeDelta)} · Integridad {signedDelta(officialResult.integrityDelta)} · Confianza {signedDelta(officialResult.trustDelta)}</p>
+      <p>Este cierre fija tu resultado oficial en este expediente: las próximas partidas del mismo caso serán de práctica y no cambiarán tu carrera.</p>
+    </>}
+    {officialResult && !officialResult.isThisRun && <>
+      <p>Esta partida es de práctica: tu resultado oficial en «{officialResult.caseTitle}» es «{reportResultText(officialResult.result)}» ({officialResult.points} puntos{officialResult.medal ? `, ${medalLabel(officialResult.medal)}` : ''}), y este cierre no cambia tu carrera.</p>
+    </>}
+  </>;
+}
+
 function ReportContent({ view }: { view: PlayerViewDto }) {
   if (!view.finalReport) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>El informe final estará disponible al cerrar el caso.</p></div>;
   const report = view.finalReport;
@@ -1435,6 +1466,7 @@ function ReportContent({ view }: { view: PlayerViewDto }) {
     <ul className="game-report-objectives">{report.score.breakdown.map(entry =>
       <li key={entry.label}>{entry.label}: {entry.points > 0 ? `+${entry.points}` : entry.points}</li>)}</ul>
     <p>Total: <strong>{report.score.total} / {report.score.max}</strong></p>
+    <CareerConsequences officialResult={view.officialResult} />
     <h4>Objetivos logrados</h4>
     <ReportList items={report.objectivesAchieved.map(objectiveDescription)} empty="Ningún objetivo registrado." />
   </div>;
@@ -1518,6 +1550,11 @@ export function GameScreen() {
   const [teamElenaBusy, setTeamElenaBusy] = useState(false);
   const [teamError, setTeamError] = useState('');
   const [teamAnalysisId, setTeamAnalysisId] = useState('');
+  // Carrera (GDD §13): el perfil se carga bajo demanda al pedir la
+  // evaluación a Margaret y se guarda en la pestaña para no pedirlo dos
+  // veces; si la carga falla, no se guarda nada y se puede reintentar.
+  const [career, setCareer] = useState<CareerProfileDto | null>(null);
+  const [careerLoaded, setCareerLoaded] = useState(false);
   // Lote 1 de jugabilidad: reloj de arena y animación de viaje (ver hook).
   const timeFeedback = useTimeFeedback();
 
@@ -1869,12 +1906,37 @@ export function GameScreen() {
     windows.open('team', opener);
   }
 
+  /** Carga el perfil de carrera para la evaluación de Margaret (GDD §13):
+   * null si la carga falla (el error queda en la ventana del equipo y la
+   * petición no se registra). El perfil vacío (sin casos cerrados) es un
+   * objeto válido, no un fallo. */
+  async function ensureCareer(): Promise<CareerProfileDto | null> {
+    if (careerLoaded) return career;
+    try {
+      const profile = await gameApi.career(new AbortController().signal);
+      setCareer(profile);
+      setCareerLoaded(true);
+      return profile;
+    } catch {
+      setTeamError('No se pudo cargar tu carrera. Inténtalo de nuevo.');
+      return null;
+    }
+  }
+
   /** Pide un servicio determinista al equipo: la respuesta se calcula
    * desde la vista (resumen de lo que ya consta) y la petición queda
-   * registrada en el motor con una acción `team` gratuita. */
-  function requestTeamService(memberId: TeamMemberId, serviceId: TeamServiceId, targetId: string | undefined, trigger: HTMLElement | null) {
+   * registrada en el motor con una acción `team` gratuita. La evaluación
+   * de carrera carga además el perfil oficial antes de responder. */
+  async function requestTeamService(memberId: TeamMemberId, serviceId: TeamServiceId, targetId: string | undefined, trigger: HTMLElement | null) {
     if (!runId || !view) return;
-    const answer = teamServiceAnswer(serviceId, view, targetId);
+    let answer: string | null;
+    if (serviceId === 'evaluate') {
+      const profile = await ensureCareer();
+      if (!profile) return;
+      answer = teamServiceAnswer(serviceId, view, targetId, profile);
+    } else {
+      answer = teamServiceAnswer(serviceId, view, targetId);
+    }
     if (!answer) return;
     const name = TEAM_MEMBERS.find(member => member.id === memberId)?.name ?? memberId;
     const offer: PublicActionOffer = { id: `team:${memberId}:${serviceId}${targetId ? `:${targetId}` : ''}`,
