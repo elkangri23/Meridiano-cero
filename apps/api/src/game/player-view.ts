@@ -276,7 +276,8 @@ type EventNamer = (definition: CaseDefinition, payload: EventPayload, language: 
 const eventSummaries: Record<string, EventNamer> = {
   inspect: (definition, payload, language) => {
     const target = payload.targetId;
-    const location = definition.locations.find(item => item.id === target)?.name ?? String(target ?? '');
+    const location = caseText(definition.id, 'location.' + String(target ?? '') + '.name', language)
+      ?? definition.locations.find(item => item.id === target)?.name ?? String(target ?? '');
     if (typeof payload.elementId === 'string') {
       const element = caseText(definition.id, 'inspect.' + String(target ?? '') + '.' + payload.elementId, language) ?? payload.elementId;
       return resolveMessage(language, 'engine.event.inspectElement', { element, location });

@@ -127,6 +127,12 @@ describe('vista del jugador en francés (T5-05)', () => {
     expect(summaries[1]).toBe('Message envoyé à Tomás Ríos par appel.');
     expect(summaries[2]).toBe('Tu as soudoyé Lucía. Personne ne t\'a vu.');
     expect(summaries[3]).toBe('Les autorités ont arrêté Inés Valera sur ordre de l\'A.C.M.E.');
+    // El resumen de inspeccionar nombra el lugar traducido, no el español
+    // de la definición (antes: «Inspection in Sala de embalaje.» en inglés).
+    const inspect = [{ ordinal: 1, minute: 10, type: 'inspect', payload: { targetId: 'MAD-SALA' } }] as EngineEvent[];
+    expect(projectEvents(astrolabioDefinition, inspect, 'fr').map(item => item.summary)).toEqual(['Inspection à Salle d\'emballage.']);
+    expect(projectEvents(astrolabioDefinition, inspect, 'en').map(item => item.summary)).toEqual(['Inspection in Packing room.']);
+    expect(projectEvents(astrolabioDefinition, inspect).map(item => item.summary)).toEqual(['Inspección en Sala de embalaje.']);
   });
 
   it('en español la vista sigue diciendo exactamente lo mismo que antes', () => {
