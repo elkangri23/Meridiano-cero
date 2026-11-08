@@ -1,4 +1,5 @@
 import type { PlayerView } from '@meridiano/contracts';
+import type { LocaleKey } from '@meridiano/contracts';
 
 // Public presentation data only: never import the complete engine fixture here.
 export const sampleView: PlayerView = {
@@ -15,12 +16,13 @@ export const destinations = [
   { id: 'lisboa', name: 'Lisboa', country: 'Portugal', x: 23, y: 75 },
 ] as const;
 export type Tool = 'dossier' | 'mapa' | 'laboratorio' | 'comunicaciones' | 'ajustes';
-export const tools: { id: Tool; label: string; short: string }[] = [
-  { id: 'dossier', label: 'Dossier', short: '01' },
-  { id: 'mapa', label: 'Atlas y viajes', short: '02' },
-  { id: 'laboratorio', label: 'Laboratorio', short: '03' },
-  { id: 'comunicaciones', label: 'Comunicaciones', short: '04' },
-  { id: 'ajustes', label: 'Lectura y contraste', short: '05' },
+/** Etiquetas de las herramientas (i18n): el texto vive en `locales/es.ts`. */
+export const tools: { id: Tool; labelKey: LocaleKey; short: string }[] = [
+  { id: 'dossier', labelKey: 'prototype.tool.dossier', short: '01' },
+  { id: 'mapa', labelKey: 'prototype.tool.mapa', short: '02' },
+  { id: 'laboratorio', labelKey: 'prototype.tool.laboratorio', short: '03' },
+  { id: 'comunicaciones', labelKey: 'prototype.tool.comunicaciones', short: '04' },
+  { id: 'ajustes', labelKey: 'prototype.tool.ajustes', short: '05' },
 ];
 export function clockLabel(minute: number): string {
   const hours = Math.floor(minute / 60);

@@ -1,31 +1,34 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { GLOSSARY, REGLES, COSTES, FAQ } from './glosario';
+import { useTranslation } from '../i18n';
+import type { LocaleKey } from '@meridiano/contracts';
 import './glosario.css';
 
 type SectionId = 'glosario' | 'reglas' | 'costes' | 'faq';
 
-const SECTIONS: { id: SectionId; label: string }[] = [
-  { id: 'glosario', label: 'Glosario' },
-  { id: 'reglas', label: 'Reglas' },
-  { id: 'costes', label: 'Costes y tiempos' },
-  { id: 'faq', label: 'FAQ' },
+const SECTIONS: { id: SectionId; labelKey: LocaleKey }[] = [
+  { id: 'glosario', labelKey: 'glossary.section.glossary' },
+  { id: 'reglas', labelKey: 'glossary.section.rules' },
+  { id: 'costes', labelKey: 'glossary.section.costs' },
+  { id: 'faq', labelKey: 'glossary.section.faq' },
 ];
 
 export function Glosario() {
+  const t = useTranslation();
   const [active, setActive] = useState<SectionId>('glosario');
 
   return (
-    <main className="glosario" aria-label="Glosario y reglas del juego">
-      <a className="skip-link" href="#glosario-contenido">Ir al contenido del glosario</a>
+    <main className="glosario" aria-label={t('glossary.ariaLabel')}>
+      <a className="skip-link" href="#glosario-contenido">{t('glossary.skipLink')}</a>
       <header className="glosario-header">
         <span className="glosario-mark" aria-hidden="true">M<span>0</span></span>
         <div>
-          <p>AGENCIA DE INVESTIGACIÓN INTERNACIONAL</p>
-          <h1>Archivo · Glosario y reglas</h1>
+          <p>{t('glossary.agency')}</p>
+          <h1>{t('glossary.pageTitle')}</h1>
         </div>
       </header>
-      <nav className="glosario-nav" aria-label="Secciones del glosario">
+      <nav className="glosario-nav" aria-label={t('glossary.sectionsAria')}>
         {SECTIONS.map(section => (
           <button
             key={section.id}
@@ -33,7 +36,7 @@ export function Glosario() {
             aria-pressed={active === section.id}
             onClick={() => setActive(section.id)}
           >
-            {section.label}
+            {t(section.labelKey)}
           </button>
         ))}
       </nav>
@@ -44,22 +47,23 @@ export function Glosario() {
         {active === 'faq' && <FaqSection />}
       </div>
       <footer className="glosario-footer">
-        <Link to="/">Volver al archivo</Link>
-        <Link to="/prototype">Volver a la vista de muestra</Link>
-        <span>Un detective por partida · El mundo guarda sus pistas</span>
+        <Link to="/">{t('glossary.backArchive')}</Link>
+        <Link to="/prototype">{t('glossary.backPrototype')}</Link>
+        <span>{t('glossary.footer')}</span>
       </footer>
     </main>
   );
 }
 
 function GlossarySection() {
+  const t = useTranslation();
   return (
     <section className="glosario-section" aria-labelledby="glosario-titulo">
-      <h2 id="glosario-titulo">Glosario</h2>
+      <h2 id="glosario-titulo">{t('glossary.section.glossary')}</h2>
       {GLOSSARY.map(term => (
-        <dl key={term.term} className="glosario-definition">
-          <dt>{term.term}</dt>
-          <dd>{term.definition}</dd>
+        <dl key={term.termKey} className="glosario-definition">
+          <dt>{t(term.termKey)}</dt>
+          <dd>{t(term.definitionKey)}</dd>
         </dl>
       ))}
     </section>
@@ -67,13 +71,14 @@ function GlossarySection() {
 }
 
 function ReglasSection() {
+  const t = useTranslation();
   return (
     <section className="glosario-section" aria-labelledby="reglas-titulo">
-      <h2 id="reglas-titulo">Reglas fundamentales</h2>
+      <h2 id="reglas-titulo">{t('glossary.rulesTitle')}</h2>
       {REGLES.map((rule, index) => (
         <div key={index} className="glosario-rule">
           <span className="num" aria-hidden="true">{index + 1}.</span>
-          <p>{rule}</p>
+          <p>{t(rule)}</p>
         </div>
       ))}
     </section>
@@ -81,13 +86,14 @@ function ReglasSection() {
 }
 
 function CostesSection() {
+  const t = useTranslation();
   return (
     <section className="glosario-section" aria-labelledby="costes-titulo">
-      <h2 id="costes-titulo">Costes y tiempos</h2>
+      <h2 id="costes-titulo">{t('glossary.costsTitle')}</h2>
       {COSTES.map((cost, index) => (
         <div key={index} className="glosario-rule">
           <span className="num" aria-hidden="true">{index + 1}.</span>
-          <p>{cost}</p>
+          <p>{t(cost)}</p>
         </div>
       ))}
     </section>
@@ -95,13 +101,14 @@ function CostesSection() {
 }
 
 function FaqSection() {
+  const t = useTranslation();
   return (
     <section className="glosario-section glosario-faq" aria-labelledby="faq-titulo">
-      <h2 id="faq-titulo">Preguntas frecuentes</h2>
+      <h2 id="faq-titulo">{t('glossary.faqTitle')}</h2>
       {FAQ.map((item, index) => (
         <details key={index}>
-          <summary>{item.question}</summary>
-          <p>{item.answer}</p>
+          <summary>{t(item.questionKey)}</summary>
+          <p>{t(item.answerKey)}</p>
         </details>
       ))}
     </section>

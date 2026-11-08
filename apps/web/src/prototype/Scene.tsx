@@ -1,7 +1,10 @@
+import { useTranslation } from '../i18n';
+
 export function Scene() {
+  const t = useTranslation();
   return <section className="scene" aria-labelledby="scene-title">
-    <div className="scene-top"><span>LOCALIZACIÓN 01</span><span>MADRID · ESPAÑA</span></div>
-    <div className="scene-art" role="img" aria-label="Sala de embalaje con ventanales, una mesa de trabajo, una caja de transporte y una carpeta visible.">
+    <div className="scene-top"><span>{t('prototype.scene.location')}</span><span>{t('prototype.scene.city')}</span></div>
+    <div className="scene-art" role="img" aria-label={t('prototype.scene.artAlt')}>
       <svg viewBox="0 0 320 160" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
         <rect width="320" height="160" fill="#555555" />
         <path d="M0 0H8V120H0ZM312 0H320V120H312Z" fill="#aaaaaa" />
@@ -29,7 +32,7 @@ export function Scene() {
         <rect x="208" y="108" width="24" height="4" fill="#aaaaaa" />
       </svg>
     </div>
-    <div className="scene-caption"><div><p className="overline">INSTITUTO HORIZONTE</p><h2 id="scene-title">La sala de embalaje</h2></div><span className="scene-tag">INTERIOR</span></div>
-    <p className="scene-description">Luz de mañana, madera y papel. La caja de transporte permanece sobre la mesa. Puedes describir con tus palabras qué quieres observar.</p>
+    <div className="scene-caption"><div><p className="overline">{t('prototype.scene.institute')}</p><h2 id="scene-title">{t('prototype.scene.title')}</h2></div><span className="scene-tag">{t('prototype.scene.tag')}</span></div>
+    <p className="scene-description">{t('prototype.scene.description')}</p>
   </section>;
 }
