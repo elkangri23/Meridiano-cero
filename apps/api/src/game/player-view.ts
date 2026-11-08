@@ -91,7 +91,10 @@ export function atlasFor(definition: CaseDefinition, run: CaseRun): AtlasCityDto
     return {
       id: city.id,
       name: defCity?.name ?? city.name,
-      country: defCity?.country ?? city.countryName,
+      // El atlas enseña el nombre completo del país en todas sus ciudades:
+      // el expediente usa códigos ISO ('FR') y mezclarlos con nombres
+      // ('España') en la misma lista se leía mal.
+      country: city.countryName,
       kind: isCase ? 'case' as const : 'tourist' as const,
       discovered: isCase ? visible.has(city.id) : true,
     };

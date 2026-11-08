@@ -45,9 +45,9 @@ describe('vista en modo libre y atlas (GDD §5)', () => {
     const paris = view.atlas.find(city => city.id === 'paris');
     const lisboa = view.atlas.find(city => city.id === 'lisboa');
     const barcelona = view.atlas.find(city => city.id === 'barcelona');
-    expect(paris).toMatchObject({ kind: 'case', discovered: false });
-    expect(lisboa).toMatchObject({ kind: 'case', discovered: false });
-    expect(barcelona).toMatchObject({ kind: 'tourist', discovered: true });
+    expect(paris).toMatchObject({ kind: 'case', discovered: false, country: 'Francia' });
+    expect(lisboa).toMatchObject({ kind: 'case', discovered: false, country: 'Portugal' });
+    expect(barcelona).toMatchObject({ kind: 'tourist', discovered: true, country: 'España' });
     expect(isPlayerViewDto(view)).toBe(true);
   });
 
