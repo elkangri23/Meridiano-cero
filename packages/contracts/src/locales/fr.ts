@@ -675,6 +675,8 @@ export const FR_MESSAGES: Record<LocaleKey, string> = {
   'game.stop': 'Arrêter',
 
   // Pantalla de juego: errores, avisos y cromo de la interfaz.
+  'game.loading': 'Chargement de l\'affaire…',
+  'game.unavailable': 'Affaire indisponible',
   'game.error.session': 'La session a expiré. Retourne aux archives et reconnecte-toi.',
   'game.error.not_found': 'La partie n\'existe pas ou n\'appartient pas à ton compte.',
   'game.error.version_conflict': 'La partie a changé dans un autre onglet. La vue a été actualisée ; réessaie.',

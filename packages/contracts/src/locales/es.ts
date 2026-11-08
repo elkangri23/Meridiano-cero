@@ -682,6 +682,8 @@ export const ES_MESSAGES = {
   'game.stop': 'Detener',
 
   // Pantalla de juego: errores, avisos y cromo de la interfaz.
+  'game.loading': 'Cargando la partida…',
+  'game.unavailable': 'Partida no disponible',
   'game.error.session': 'La sesión caducó. Vuelve al archivo e inicia sesión de nuevo.',
   'game.error.not_found': 'La partida no existe o no pertenece a tu cuenta.',
   'game.error.version_conflict': 'La partida cambió en otra pestaña. Se ha actualizado la vista; vuelve a intentarlo.',

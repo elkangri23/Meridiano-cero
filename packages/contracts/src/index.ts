@@ -1,3 +1,4 @@
+import { resolveMessage, SUPPORTED_LANGUAGES } from './i18n.js';
 import type { LocaleKey, TranslateFn } from './i18n.js';
 
 /** Solo estado público de proceso; no acredita DB, sesión ni juego operativo. */
@@ -344,9 +345,18 @@ function isoDate(value: unknown): boolean {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date.toISOString() === value;
 }
-const CAREER_RANKS = ['Aspirante', 'Detective', 'Sargento', 'Inspector'];
+/** Rangos y etiquetas de reputación de carrera en los tres idiomas: la API
+ * los devuelve traducidos (`rankForTotals`/`reputationLabel` con idioma),
+ * así que el validador del DTO debe aceptar cualquier forma localizada, no
+ * solo la española. Se derivan de los locales para que un cambio de
+ * traducción no rompa el contrato ni deje fuera un idioma nuevo. */
+const CAREER_RANK_KEYS = ['career.rank.aspirante', 'career.rank.detective', 'career.rank.sargento', 'career.rank.inspector'] as const;
+const CAREER_REPUTATION_KEYS = ['career.reputation.ejemplar', 'career.reputation.solida', 'career.reputation.discreta', 'career.reputation.dudosa', 'career.reputation.danada'] as const;
+const CAREER_RANKS = [...new Set(SUPPORTED_LANGUAGES.flatMap(({ id }) =>
+  CAREER_RANK_KEYS.map(key => resolveMessage(id, key))))];
+const REPUTATION_LABELS = [...new Set(SUPPORTED_LANGUAGES.flatMap(({ id }) =>
+  CAREER_REPUTATION_KEYS.map(key => resolveMessage(id, key))))];
 const CAREER_MEDALS = ['medalla-oro', 'medalla-plata'];
-const REPUTATION_LABELS = ['Ejemplar', 'Sólida', 'Discreta', 'Dudosa', 'Dañada'];
 const CASE_RESULTS = ['complete', 'partial', 'incorrect', 'unresolved'];
 const CLOSE_REASONS = ['finished', 'deadline', 'withdrawn'];
 function careerInteger(value: unknown): value is number {

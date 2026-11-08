@@ -26,7 +26,11 @@ async function openGeneratedGameScreen(page: Page) {
   await expect(creation.getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
   await creation.getByRole('radio', { name: 'Desaparición', exact: true }).check();
   const generated = creation.getByRole('radio', { name: /1dfd99b9/ });
-  if (await generated.count() === 0) {
+  // La lista de casos tarda en cargar tras elegir el delito: esperar al
+  // radio antes de decidir si la semilla falta de verdad.
+  try {
+    await expect(generated).toBeVisible({ timeout: 10000 });
+  } catch {
     test.skip(true, 'generado-1dfd99b9 no está en la BD dev');
   }
   await generated.check();

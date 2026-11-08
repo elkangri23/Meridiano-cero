@@ -1926,13 +1926,14 @@ function ReportContent({ view }: { view: PlayerViewDto }) {
 }
 
 function UnavailableScreen({ phase, notice }: { phase: ScreenPhase; notice: string }) {
+  const t = useTranslation();
   return <main className="game" data-testid="game-screen">
     {phase === 'loading'
-      ? <p className="game-notice" role="status">Cargando la partida…</p>
-      : <><h1>Partida no disponible</h1>
+      ? <p className="game-notice" role="status">{t('game.loading')}</p>
+      : <><h1>{t('game.unavailable')}</h1>
         <p className="game-notice" role="status">{notice}</p>
-        <p><Link to="/">Volver al archivo</Link></p>
-        {phase === 'error' && <p><button type="button" onClick={() => window.location.reload()}>Reintentar</button></p>}</>}
+        <p><Link to="/">{t('glossary.backArchive')}</Link></p>
+        {phase === 'error' && <p><button type="button" onClick={() => window.location.reload()}>{t('common.retry')}</button></p>}</>}
   </main>;
 }
 
@@ -1971,7 +1972,7 @@ export function GameScreen() {
   const [view, setView] = useState<PlayerViewDto | null>(null);
   const [caseTitle, setCaseTitle] = useState<string | null>(null);
   const [phase, setPhase] = useState<ScreenPhase>('loading');
-  const [notice, setNotice] = useState('Cargando la partida…');
+  const [notice, setNotice] = useState(t('game.loading'));
   // Consola narrativa guardada en esta pestaña por partida (como el
   // borrador y la memoria de chat): sin esto, al recargar se perdía y la
   // consola volvía al texto genérico «La investigación comienza…».

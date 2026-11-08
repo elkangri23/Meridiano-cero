@@ -672,6 +672,8 @@ export const EN_MESSAGES: Record<LocaleKey, string> = {
   'game.stop': 'Stop',
 
   // Game screen: errors, notices and interface chrome.
+  'game.loading': 'Loading the case…',
+  'game.unavailable': 'Case unavailable',
   'game.error.session': 'The session expired. Go back to the archive and log in again.',
   'game.error.not_found': 'The run does not exist or does not belong to your account.',
   'game.error.version_conflict': 'The run changed in another tab. The view has been updated; try again.',
