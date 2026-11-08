@@ -206,6 +206,19 @@ export interface GenerationJobDto {
 
 /** Primera entrega HTTP: únicamente partidas iniciales sin acciones ejecutadas.
  * El resto del DTO se ampliará junto a sus transiciones y proyecciones. */
+/** Una ciudad del Atlas A.C.M.E. (GDD §5): admitida por el catálogo de
+ * geografía; `kind` distingue el escenario investigable del expediente del
+ * destino turístico/cultural, y `discovered` dice si el jugador ya la
+ * conoce (en guiado, todas las del expediente; en libre, solo las
+ * descubiertas investigando o viajando). */
+export interface AtlasCityDto {
+  id: string;
+  name: string;
+  country: string;
+  kind: 'case' | 'tourist';
+  discovered: boolean;
+}
+
 export interface InitialPlayerViewDto {
   schemaVersion: 1;
   runId: string;
@@ -214,12 +227,18 @@ export interface InitialPlayerViewDto {
   status: 'active';
   /** Dificultad elegida al crear la partida (determina su plazo interno). */
   difficulty: 'easy' | 'normal' | 'hard';
+  /** Modo de exploración elegido al crear la partida (GDD §5). */
+  explorationMode: 'guided' | 'free';
   clock: { minute: 0; deadlineMinutes: number };
   position: {
     city: { id: string; name: string; country: string };
     location: { id: string; name: string; description: string };
   };
   cities: Array<{ id: string; name: string; country: string }>;
+  /** Atlas A.C.M.E. al empezar: en guiado, todas las ciudades del
+   * expediente descubiertas; en libre, solo la inicial más los destinos
+   * turísticos del catálogo. */
+  atlas: AtlasCityDto[];
   locations: Array<{ id: string; name: string; description: string }>;
   objects: never[];
   dossier: never[];
@@ -593,22 +612,54 @@ function publicCities(value: unknown): value is InitialPlayerViewDto['cities'] {
 function publicLocations(value: unknown): value is InitialPlayerViewDto['locations'] {
   return Array.isArray(value) && value.length <= 100 && value.every(publicLocation) && new Set(value.map(item => item.id)).size === value.length;
 }
+function publicAtlasCity(value: unknown): value is AtlasCityDto {
+  if (!dtoRecord(value, 'country,discovered,id,kind,name')) return false;
+  return publicId(value.id) && shortText(value.name) && shortText(value.country) &&
+    (value.kind === 'case' || value.kind === 'tourist') && typeof value.discovered === 'boolean';
+}
+function publicAtlas(value: unknown): value is AtlasCityDto[] {
+  return Array.isArray(value) && value.length <= 100 && value.every(publicAtlasCity) &&
+    new Set(value.map(item => item.id)).size === value.length;
+}
+function validExplorationMode(value: unknown): value is 'guided' | 'free' {
+  return value === 'guided' || value === 'free';
+}
+function positionCityKnown(value: Record<string, unknown>, city: { id: string; name: string; country: string }): boolean {
+  const cities = value.cities;
+  if (Array.isArray(cities) && cities.some(item => item.id === city.id && item.name === city.name && item.country === city.country)) return true;
+  const atlas = value.atlas;
+  return Array.isArray(atlas) && atlas.some(item => item.id === city.id && item.name === city.name && item.country === city.country);
+}
+function positionLocationKnown(value: Record<string, unknown>, location: { id: string; name: string; description: string }, cityId: string): boolean {
+  const locations = value.locations;
+  if (Array.isArray(locations) && locations.some(item => item.id === location.id && item.name === location.name && item.description === location.description)) return true;
+  return typeof location.id === 'string' && location.id === 'visit:' + cityId;
+}
 function initialGeography(value: Record<string, unknown>): boolean {
   const position = value.position;
   if (!dtoRecord(position, 'city,location') || !publicCity(position.city) || !publicLocation(position.location)) return false;
   const cities = value.cities; const locations = value.locations;
   if (!publicCities(cities) || !publicLocations(locations)) return false;
+  // La lista de ciudades nunca está vacía: en guiado trae el expediente y
+  // en libre al menos la inicial (el atlas no sustituye a `cities`).
+  if (cities.length < 1) return false;
   const city = position.city; const location = position.location;
-  return cities.some(item => item.id === city.id && item.name === city.name && item.country === city.country) &&
-    locations.some(item => item.id === location.id && item.name === location.name && item.description === location.description);
+  // La ciudad de la posición puede ser del expediente (en `cities`) o una
+  // admitida del atlas (viaje libre fuera del expediente); el lugar puede
+  // ser un escenario del expediente o el lugar sintético de visita
+  // (`visit:<ciudad>`) de una ciudad turística.
+  return positionCityKnown(value, city) && positionLocationKnown(value, location, city.id);
 }
 function initialHeader(value: Record<string, unknown>): boolean {
   return value.schemaVersion === 1 && uuid(value.runId) && uuid(value.branchId) && value.version === 1 && value.status === 'active';
 }
+function initialMode(value: Record<string, unknown>): boolean {
+  return validDifficulty(value.difficulty) && validExplorationMode(value.explorationMode);
+}
 /** Solo GET inicial: no acepta replay de creación, progreso o campos privados adicionales. */
 export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerViewDto {
-  if (!dtoRecord(value, 'batch,branchId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,finalReport,locations,objectives,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
-  if (!initialHeader(value) || !publicCaseMeta(value.caseMeta) || !validDifficulty(value.difficulty)) return false;
+  if (!dtoRecord(value, 'atlas,batch,branchId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,explorationMode,finalReport,locations,objectives,objects,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,version,warrants')) return false;
+  if (!initialHeader(value) || !publicCaseMeta(value.caseMeta) || !initialMode(value) || !publicAtlas(value.atlas)) return false;
   return initialClock(value.clock) && initialCapabilities(value) && initialEmptyCollections(value) && initialGeography(value) && publicObjectives(value.objectives);
 }
 
@@ -691,12 +742,23 @@ export interface PlayerViewDto {
   caseId: string;
   /** Dificultad elegida al crear la partida (determina su plazo interno). */
   difficulty: 'easy' | 'normal' | 'hard';
+  /** Modo de exploración elegido al crear la partida (GDD §5, REQ-G05-02):
+   * guiado muestra las ciudades investigables desde el principio; libre las
+   * descubre investigando, sin bloquear el buscador del atlas. */
+  explorationMode: 'guided' | 'free';
   clock: { minute: number; deadlineMinutes: number };
   position: {
     city: { id: string; name: string; country: string };
     location: { id: string; name: string; description: string };
   };
   cities: Array<{ id: string; name: string; country: string }>;
+  /** Atlas A.C.M.E. (GDD §5, REQ-G05-01/03/04): las ciudades admitidas del
+   * catálogo de geografía, con su tipo —escenario investigable del
+   * expediente o destino turístico/cultural— y si el jugador ya las conoce.
+   * En modo libre, una ciudad del expediente no descubierta no se lista
+   * (el buscador admite viajar a ella si se conoce su nombre); los destinos
+   * turísticos son información pública del atlas y siempre se listan. */
+  atlas: AtlasCityDto[];
   locations: Array<{ id: string; name: string; description: string }>;
   objects: Array<{ id: string; type: string; origin: string; minute: number; admissible: boolean }>;
   dossier: string[];
@@ -1124,11 +1186,15 @@ function generalReports(value: Record<string, unknown>): boolean {
   if (value.finalReport !== null && !publicFinalReport(value.finalReport)) return false;
   return value.officialResult === null || isOfficialResultDto(value.officialResult);
 }
+function validCaseId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 128;
+}
 function playerViewIdentity(value: Record<string, unknown>): boolean {
   if (value.schemaVersion !== 1 || !uuid(value.runId) || !uuid(value.branchId)) return false;
   if (!positiveInteger(value.version)) return false;
-  if (typeof value.caseId !== 'string' || value.caseId.length === 0 || value.caseId.length > 128) return false;
+  if (!validCaseId(value.caseId)) return false;
   if (!validDifficulty(value.difficulty)) return false;
+  if (!validExplorationMode(value.explorationMode)) return false;
   return value.status === 'active' || value.status === 'closed';
 }
 function validBriefingParagraphs(value: unknown): value is string[] {
@@ -1151,7 +1217,7 @@ function publicBriefing(value: unknown): value is PlayerViewDto['briefing'] {
   if (!shortText(record.speaker) || !shortText(record.title)) return false;
   return validBriefingParagraphs(record.paragraphs);
 }
-const playerViewKeys = 'analysisResults,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,finalReport,locations,misconduct,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,team,version,warrants';
+const playerViewKeys = 'analysisResults,atlas,batch,branchId,briefing,caseId,caseMeta,cities,clock,communications,conversation,detentions,difficulty,dossier,evidenceTexts,explorationMode,finalReport,locations,misconduct,npcChat,objectives,objects,offers,officialResult,pendingRequests,position,recovery,runId,saveCapabilities,schemaVersion,status,team,version,warrants';
 /** Vista general: acepta también la forma inicial (es un caso particular). */
 export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!dtoRecord(value, playerViewKeys)) return false;
@@ -1159,7 +1225,7 @@ export function isPlayerViewDto(value: unknown): value is PlayerViewDto {
   if (!publicBriefing(value.briefing)) return false;
   if (!publicCaseMeta(value.caseMeta)) return false;
   if (!generalClock(value.clock) || !generalCapabilities(value) || !initialGeography(value)) return false;
-  return generalCollections(value) && generalReports(value);
+  return generalCollections(value) && generalReports(value) && publicAtlas(value.atlas);
 }
 
 function publicEventId(value: unknown): value is string {
@@ -1300,3 +1366,20 @@ export {
   isTeamServiceId, isTeamRecord,
   type TeamMember, type TeamMemberId, type TeamServiceId, type TeamRecord,
 } from './team.js';
+
+// Catálogo geográfico verificable (`geography-catalog.ts`): las 9 ciudades
+// admitidas, sus rutas y el buscador. Lo usa el motor para viajar fuera del
+// expediente, la API para el atlas y la web para el mapa.
+export {
+  GEOGRAPHIC_CATALOG, DEFAULT_TRAVEL_ROUTES, getCity, getRoute,
+  getReachableCities, searchCities,
+  type GeographicCity, type TravelRoute,
+} from './geography-catalog.js';
+
+// Información turística y cultural determinista (`tourist-info.ts`): datos
+// de contenido del catálogo, sin pruebas nuevas. La web y la API la enseñan
+// al visitar una ciudad que no es del expediente.
+export {
+  TOURIST_INFO, touristInfoFor, visitLocationName, visitLocationId, visitCityId,
+  type TouristInfo,
+} from './tourist-info.js';

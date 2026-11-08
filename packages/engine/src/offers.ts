@@ -1,11 +1,12 @@
 import type { CaseDefinition, CaseRun, NPC } from '@meridiano/case-schema';
-import { ARREST_COORDINATION_MINUTES, arrestTypeOf, FORENSIC_TYPE_KEYS, resolveMessage, forensicTypeForAnalysis } from '@meridiano/case-schema';
+import { ARREST_COORDINATION_MINUTES, arrestTypeOf, FORENSIC_TYPE_KEYS, resolveMessage, forensicTypeForAnalysis, DEFAULT_TRAVEL_ROUTES, getCity } from '@meridiano/case-schema';
 import type { Action } from './types.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
 import { knowsEvidence, canCollect, queryRule, inspectedEvidence, listQueryIds, listInspectableElements, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
 import { canIssueWarrant, knownSuspect } from './warrants.js';
 import { irregularPlan, hasUnrevealedTalkFacts } from './irregular.js';
 import { detentionPlan } from './arrest.js';
+import { visibleCaseCityIds } from './discovery.js';
 import { generatedAnalysis, generatedDetentionAvailable, generatedInspectLabel, generatedQueryRule, isGeneratedCase, listGeneratedInspectableElements } from './generated-mechanics.js';
 
 /**
@@ -150,13 +151,35 @@ function analyzeOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
     action: { type: 'analyze', params: { evidenceId: FIXED_ANALYSIS_RULE.inputEvidenceId } } }];
 }
 
+/** Ofertas de viaje (GDD §5, REQ-G05-01/02): las rutas del expediente
+ * para sus ciudades y las del catálogo de geografía para las admitidas
+ * fuera del expediente. En modo libre, una ciudad del expediente no
+ * descubierta no se ofrece en la escena —se descubre investigando—; los
+ * destinos turísticos del catálogo son información pública del atlas y se
+ * ofrecen siempre. La ruta del expediente manda cuando existe. */
 function travelOffers(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   const offers: ActionOffer[] = [];
+  // Ciudades del expediente visibles (GDD §5): en libre, la inicial, la
+  // actual y las descubiertas; el resto no se ofrece en la escena.
+  const visible = new Set(visibleCaseCityIds(def, run));
   for (const duration of def.travelDurations.filter(item => item.fromCityId === run.position.cityId)) {
     const destination = def.cities.find(city => city.id === duration.toCityId);
-    if (!destination) continue;
+    if (!destination || !visible.has(destination.id)) continue;
     offers.push({ id: `travel:${destination.id}`, label: `Viajar a ${destination.name}`,
       detail: `${duration.minutes} min`, action: { type: 'travel', params: { toCityId: destination.id } } });
+  }
+  const caseIds = new Set(def.cities.map(city => city.id));
+  const fromIsCaseCity = caseIds.has(run.position.cityId);
+  for (const route of DEFAULT_TRAVEL_ROUTES.filter(item => item.fromCityId === run.position.cityId)) {
+    const destination = getCity(route.toCityId);
+    if (!destination) continue;
+    // Entre ciudades del expediente manda su ruta (ya ofrecida arriba o
+    // oculta en libre por no descubierta). Desde una ciudad turística, el
+    // catálogo es la única forma de volver al caso: se ofrece solo a las
+    // ciudades del expediente visibles, sin anunciar las no descubiertas.
+    if (caseIds.has(route.toCityId) && (fromIsCaseCity || !visible.has(route.toCityId))) continue;
+    offers.push({ id: `travel:${destination.id}`, label: `Viajar a ${destination.name}`,
+      detail: `${route.minutes} min`, action: { type: 'travel', params: { toCityId: destination.id } } });
   }
   return offers;
 }

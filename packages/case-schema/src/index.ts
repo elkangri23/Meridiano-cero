@@ -4,7 +4,13 @@ export { LEGACY_ASTROLABIO_ID, legacyAstrolabioSuspect } from './legacy-astrolab
 // El catálogo vive en `@meridiano/contracts` (`catalog.ts`); se
 // re-exporta aquí para el motor, la API y el generador.
 export { validateCatalogParams, getBudgetForParams, getSuggestedDuration, deadlineMinutesForDifficulty, DIFFICULTY_DEADLINE_FACTOR, GDD_CRIME_TYPES, GENERAL_ONLY_CRIMES, crimeAllowedForRating, CRIME_TYPE_KEYS, CONTENT_RATING_KEYS, caseLabel, type CatalogParams, type CatalogValidationResult, type Duration, type CrimeType, type ContentRating } from '@meridiano/contracts';
-export { GEOGRAPHIC_CATALOG, DEFAULT_TRAVEL_ROUTES, getCity, getRoute, getReachableCities, searchCities, type GeographicCity, type TravelRoute } from './geography-catalog.js';
+// El catálogo geográfico vive en `@meridiano/contracts`
+// (`geography-catalog.ts`); se re-exporta aquí para el motor, la API y el
+// generador.
+export { GEOGRAPHIC_CATALOG, DEFAULT_TRAVEL_ROUTES, getCity, getRoute, getReachableCities, searchCities, type GeographicCity, type TravelRoute } from '@meridiano/contracts';
+// La información turística vive en `@meridiano/contracts`
+// (`tourist-info.ts`); se re-exporta aquí para la API.
+export { TOURIST_INFO, touristInfoFor, visitLocationName, visitLocationId, visitCityId, type TouristInfo } from '@meridiano/contracts';
 export { RECURRENT_NPCS, COMMUNICATION_CHANNELS, REMOTE_CHANNELS, REMOTE_CHANNEL_LABELS, QUERY_TYPES, getNPC, getNPCsByCity, getQueryType, getChannelCost, searchNPCs, type NPCProfile, type CommunicationChannel, type RemoteChannel, type QueryType } from '@meridiano/contracts';
 export { channelsForNpc, isRemoteChannel, normalizeRemoteChannels, isCommunicationRecord, LEGACY_REMOTE_CHANNELS, DOCUMENT_SEND_MINUTES, IRREGULAR_MINUTES, IRREGULAR_KINDS, isIrregularKind, isMisconductRecord } from './communications.js';
 export { calculateCaseOutcome, outcomeFromReport, createInitialCareer, applyOutcome, applySanction, resolveSanction, getActiveSanctions, getRank, rankForTotals, reputationLabel, deriveCareerProfile, type CaseResult, type CareerRecord, type SanctionRecord, type CaseOutcome, type CareerResultEntry, type DerivedCareerProfile } from './career.js';

@@ -5,6 +5,8 @@ import { detentionPlan } from './arrest.js';
 import { startBatch, decideBatch } from './batch.js';
 import { materialMinutes, confirmation } from './timed-action.js';
 import { appendRequest, pendingEvidence } from './requests.js';
+import { visibleCaseCityIds } from './discovery.js';
+import { getCity, getRoute, visitLocationId } from '@meridiano/case-schema';
 import { isFixedCase, ORIGINAL_OBJECT } from './fixed-case.js';
 import { revealInspection, canCollect, revealTalk, queryRule, matureEvidence, revealEvidence, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
 import { generatedAnalysis, generatedQueryRule, matureGeneratedEvidence, revealGeneratedInspection, revealGeneratedTalk } from './generated-mechanics.js';
@@ -14,6 +16,7 @@ export { knowsEvidence } from './fixed-evidence.js';
 export { misconductFactsForNpc } from './irregular.js';
 export { arrestFactsForNpc } from './arrest.js';
 export { availableOffers } from './offers.js';
+export { visibleCaseCityIds, discoveredCityIds } from './discovery.js';
 export { liveObjectives, completeFinalReport, scoreForReport, SCORE_MAX, buildFinalReport } from './final-report.js';
 export type { ActionOffer } from './offers.js';
 import { EngineStateError } from './state-error.js';
@@ -43,9 +46,7 @@ function publicFinalReport(def: CaseDefinition, run: CaseRun): FinalReport | nul
 }
 
 export function projectToPlayerView(def: CaseDefinition, run: CaseRun): PlayerView {
-  const visibleCities = run.discoveries.includes('map')
-    ? def.cities.map((c) => c.id)
-    : [run.position.cityId];
+  const visibleCities = visibleCaseCityIds(def, run);
 
   const discoveredLocations = def.locations
     .filter((l) => run.discoveries.includes(l.id))
@@ -400,20 +401,36 @@ function nextTripCount(run: CaseRun): number {
   return count;
 }
 
+/** Duración de un viaje (GDD §5, REQ-G05-01): la ruta del expediente
+ * manda para sus ciudades —puede diferir de la del catálogo—; para un
+ * viaje con al menos un extremo fuera del expediente vale la ruta del
+ * catálogo de geografía (sin ella, desde una ciudad turística no habría
+ * forma de volver al caso: el expediente no tiene rutas desde fuera).
+ * Sin ruta en ninguno de los dos, no hay viaje: el catálogo no finge
+ * cobertura universal. */
+function travelDuration(def: CaseDefinition, fromCityId: string, toCityId: string): number | undefined {
+  const cased = def.travelDurations.find(
+    (d) => d.fromCityId === fromCityId && d.toCityId === toCityId,
+  );
+  if (cased) return cased.minutes;
+  const fromIsCase = def.cities.some(city => city.id === fromCityId);
+  const toIsCase = def.cities.some(city => city.id === toCityId);
+  if (fromIsCase && toIsCase) return undefined;
+  return getRoute(fromCityId, toCityId)?.minutes;
+}
+
 function previewTravel(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
   const toCityId = action.params.toCityId;
   if (typeof toCityId !== 'string') {
     return { status: 'impossible', run, events: [], reason: 'toCityId inválido.' };
   }
-  const duration = def.travelDurations.find(
-    (d) => d.fromCityId === run.position.cityId && d.toCityId === toCityId,
-  );
-  if (!duration) {
+  const minutes = travelDuration(def, run.position.cityId, toCityId);
+  if (minutes === undefined) {
     return { status: 'impossible', run, events: [], reason: 'No hay ruta disponible.' };
   }
   nextTripCount(run);
-  const baseCost = duration.minutes;
-  const destination = def.cities.find(city => city.id === toCityId);
+  const baseCost = minutes;
+  const destination = def.cities.find(city => city.id === toCityId) ?? getCity(toCityId);
   const preview: ActionPreview = {
     actionType: 'travel',
     estimatedMinutes: baseCost,
@@ -573,7 +590,12 @@ function applyCommunication(def: CaseDefinition, run: CaseRun, action: Action): 
 function travelPosition(def: CaseDefinition, run: CaseRun, toCityId: string, expired: boolean): CaseRun['position'] {
   if (expired) return { ...run.position };
   const destination = def.locations.find(location => location.cityId === toCityId && location.accessible);
-  return { cityId: toCityId, locationId: destination?.id ?? '' };
+  if (destination) return { cityId: toCityId, locationId: destination.id };
+  // Ciudad del expediente sin lugar accesible: se queda sin lugar. Ciudad
+  // admitida fuera del expediente: lugar sintético de visita (la API lo
+  // proyecta con la información turística; no es un escenario investigable).
+  if (def.cities.some(city => city.id === toCityId)) return { cityId: toCityId, locationId: '' };
+  return { cityId: toCityId, locationId: visitLocationId(toCityId) };
 }
 
 function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false): ActionResult {
@@ -581,14 +603,12 @@ function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action, estima
   if (typeof toCityId !== 'string') {
     return { status: 'impossible', run, events: [], reason: 'toCityId inválido.' };
   }
-  const duration = def.travelDurations.find(
-    (d) => d.fromCityId === run.position.cityId && d.toCityId === toCityId,
-  );
-  if (!duration) {
+  const minutes = travelDuration(def, run.position.cityId, toCityId);
+  if (minutes === undefined) {
     return { status: 'impossible', run, events: [], reason: 'No hay ruta disponible.' };
   }
   const confirmedTrips = nextTripCount(run);
-  const baseCost = duration.minutes;
+  const baseCost = minutes;
   const delay = estimateOnly ? 0 : seededDelay(def.seed, run.tripCount);
   const totalCost = baseCost + delay;
   const newMinute = advanceMinute(run.minute, totalCost, def.deadlineMinutes);
