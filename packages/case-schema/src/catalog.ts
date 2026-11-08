@@ -145,55 +145,77 @@ export interface CatalogValidationResult {
   errors: string[];
 }
 
-export function validateCatalogParams(params: unknown): CatalogValidationResult {
-  const errors: string[] = [];
+/** Guarda de pertenencia a una lista cerrada de cadenas. */
+function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value);
+}
 
+function checkCrimeType(p: Record<string, unknown>): string | null {
+  if (!isOneOf(p.crimeType, ALLOWED_CRIME_TYPES)) {
+    return `Tipo de delito inválido: "${String(p.crimeType)}". Debe ser uno de: ${ALLOWED_CRIME_TYPES.join(', ')}.`;
+  }
+  return null;
+}
+
+function checkDifficulty(p: Record<string, unknown>): string | null {
+  const validDifficulties: Difficulty[] = ['easy', 'normal', 'hard'];
+  if (!isOneOf(p.difficulty, validDifficulties)) {
+    return `Dificultad inválida: "${String(p.difficulty)}". Debe ser: easy, normal o hard.`;
+  }
+  return null;
+}
+
+function checkExplorationMode(p: Record<string, unknown>): string | null {
+  const validModes: ExplorationMode[] = ['guided', 'free'];
+  if (!isOneOf(p.explorationMode, validModes)) {
+    return `Modo de exploración inválido: "${String(p.explorationMode)}". Debe ser: guided o free.`;
+  }
+  return null;
+}
+
+function checkDuration(p: Record<string, unknown>): string | null {
+  const validDurations: Duration[] = ['short', 'medium', 'long'];
+  if (!isOneOf(p.duration, validDurations)) {
+    return `Duración inválida: "${String(p.duration)}". Debe ser: short, medium o long.`;
+  }
+  return null;
+}
+
+function checkRegion(p: Record<string, unknown>): string | null {
+  if (!isOneOf(p.region, ALLOWED_REGIONS)) {
+    return `Región inválida: "${String(p.region)}". Debe ser una de: ${ALLOWED_REGIONS.join(', ')}.`;
+  }
+  return null;
+}
+
+function checkContentMode(p: Record<string, unknown>): string | null {
+  const validContentModes: ContentMode[] = ['fixed', 'generated'];
+  if (!isOneOf(p.contentMode, validContentModes)) {
+    return `Modo de contenido inválido: "${String(p.contentMode)}". Debe ser: fixed o generated.`;
+  }
+  return null;
+}
+
+function checkCombination(p: Record<string, unknown>): string | null {
+  if (typeof p.difficulty === 'string' && typeof p.duration === 'string') {
+    const combo = INVALID_COMBINATIONS.find(c => c.difficulty === p.difficulty && c.duration === p.duration);
+    if (combo) {
+      return `Combinación inválida: dificultad "${combo.difficulty}" con duración "${combo.duration}".`;
+    }
+  }
+  return null;
+}
+
+export function validateCatalogParams(params: unknown): CatalogValidationResult {
   if (typeof params !== 'object' || params === null) {
     return { valid: false, errors: ['Los parámetros deben ser un objeto.'] };
   }
 
   const p = params as Record<string, unknown>;
-
-  // crimeType
-  if (typeof p.crimeType !== 'string' || !ALLOWED_CRIME_TYPES.includes(p.crimeType as any)) {
-    errors.push(`Tipo de delito inválido: "${p.crimeType}". Debe ser uno de: ${ALLOWED_CRIME_TYPES.join(', ')}.`);
-  }
-
-  // difficulty
-  const validDifficulties: Difficulty[] = ['easy', 'normal', 'hard'];
-  if (typeof p.difficulty !== 'string' || !validDifficulties.includes(p.difficulty as Difficulty)) {
-    errors.push(`Dificultad inválida: "${p.difficulty}". Debe ser: easy, normal o hard.`);
-  }
-
-  // explorationMode
-  const validModes: ExplorationMode[] = ['guided', 'free'];
-  if (typeof p.explorationMode !== 'string' || !validModes.includes(p.explorationMode as ExplorationMode)) {
-    errors.push(`Modo de exploración inválido: "${p.explorationMode}". Debe ser: guided o free.`);
-  }
-
-  // duration
-  const validDurations: Duration[] = ['short', 'medium', 'long'];
-  if (typeof p.duration !== 'string' || !validDurations.includes(p.duration as Duration)) {
-    errors.push(`Duración inválida: "${p.duration}". Debe ser: short, medium o long.`);
-  }
-
-  // region
-  if (typeof p.region !== 'string' || !ALLOWED_REGIONS.includes(p.region as any)) {
-    errors.push(`Región inválida: "${p.region}". Debe ser una de: ${ALLOWED_REGIONS.join(', ')}.`);
-  }
-
-  // contentMode
-  const validContentModes: ContentMode[] = ['fixed', 'generated'];
-  if (typeof p.contentMode !== 'string' || !validContentModes.includes(p.contentMode as ContentMode)) {
-    errors.push(`Modo de contenido inválido: "${p.contentMode}". Debe ser: fixed o generated.`);
-  }
-
-  // Combinaciones inválidas
-  if (typeof p.difficulty === 'string' && typeof p.duration === 'string') {
-    const combo = INVALID_COMBINATIONS.find(c => c.difficulty === p.difficulty && c.duration === p.duration);
-    if (combo) {
-      errors.push(`Combinación inválida: dificultad "${combo.difficulty}" con duración "${combo.duration}".`);
-    }
+  const errors: string[] = [];
+  for (const check of [checkCrimeType, checkDifficulty, checkExplorationMode, checkDuration, checkRegion, checkContentMode, checkCombination]) {
+    const error = check(p);
+    if (error) errors.push(error);
   }
 
   return { valid: errors.length === 0, errors };

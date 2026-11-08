@@ -101,7 +101,8 @@ export function getReachableCities(fromCityId: string): GeographicCity[] {
   const queue = [fromCityId];
   reachable.add(fromCityId);
   while (queue.length > 0) {
-    const current = queue.shift()!;
+    const current = queue.shift();
+    if (current === undefined) break;
     for (const route of DEFAULT_TRAVEL_ROUTES) {
       if (route.fromCityId === current && !reachable.has(route.toCityId)) {
         reachable.add(route.toCityId);

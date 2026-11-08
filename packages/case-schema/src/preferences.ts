@@ -80,42 +80,55 @@ function resolveHighContrast(input: Partial<PresentationPreferences>): boolean {
   return input.highContrast === true || input.palette === 'high-contrast';
 }
 
+const PALETTE_MODES: readonly PaletteMode[] = ['default', 'protanopia', 'deuteranopia', 'tritanopia', 'high-contrast'];
+const LANGUAGES: readonly Language[] = ['es', 'en', 'fr'];
+
+/** Valor de una lista cerrada, o el respaldo si no es un valor válido. */
+function pickFromList<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) return value as T;
+  return fallback;
+}
+
+function normalizeAudio(input: Partial<PresentationPreferences>, base: PresentationPreferences): AudioSettings {
+  return {
+    musicVolume: clampVolume(input.audio?.musicVolume ?? base.audio.musicVolume),
+    effectsVolume: clampVolume(input.audio?.effectsVolume ?? base.audio.effectsVolume),
+    narrationVolume: clampVolume(input.audio?.narrationVolume ?? base.audio.narrationVolume),
+    muted: Boolean(input.audio?.muted),
+  };
+}
+
+function normalizeTts(input: Partial<PresentationPreferences>, base: PresentationPreferences): TTSSettings {
+  return {
+    enabled: Boolean(input.tts?.enabled),
+    voice: typeof input.tts?.voice === 'string' ? input.tts.voice : 'auto',
+    rate: clampRate(input.tts?.rate ?? base.tts.rate),
+    autoRead: Boolean(input.tts?.autoRead),
+  };
+}
+
+function normalizeAccessibility(input: Partial<PresentationPreferences>): AccessibilitySettings {
+  return {
+    reducedMotion: Boolean(input.accessibility?.reducedMotion),
+    focusVisible: input.accessibility?.focusVisible !== false,
+    skipNav: input.accessibility?.skipNav !== false,
+    announceNarration: Boolean(input.accessibility?.announceNarration),
+  };
+}
+
 export function normalizePreferences(input: Partial<PresentationPreferences> | null | undefined): PresentationPreferences {
   const base = createDefaultPreferences();
   if (!input || typeof input !== 'object') return base;
-  const fontMode: FontMode = input.fontMode === 'accessible' ? 'accessible' : 'retro';
-  const palette: PaletteMode = (['default', 'protanopia', 'deuteranopia', 'tritanopia', 'high-contrast'] as const)
-    .includes(input.palette as PaletteMode)
-    ? (input.palette as PaletteMode)
-    : 'default';
-  const language: Language = (['es', 'en', 'fr'] as const).includes(input.language as Language)
-    ? (input.language as Language)
-    : 'es';
   return {
     version: 1,
-    fontMode,
+    fontMode: input.fontMode === 'accessible' ? 'accessible' : 'retro',
     textScale: clampScale(input.textScale ?? base.textScale),
-    palette,
+    palette: pickFromList(input.palette, PALETTE_MODES, 'default'),
     highContrast: resolveHighContrast(input),
-    language,
-    audio: {
-      musicVolume: clampVolume(input.audio?.musicVolume ?? base.audio.musicVolume),
-      effectsVolume: clampVolume(input.audio?.effectsVolume ?? base.audio.effectsVolume),
-      narrationVolume: clampVolume(input.audio?.narrationVolume ?? base.audio.narrationVolume),
-      muted: Boolean(input.audio?.muted),
-    },
-    tts: {
-      enabled: Boolean(input.tts?.enabled),
-      voice: typeof input.tts?.voice === 'string' ? input.tts.voice : 'auto',
-      rate: clampRate(input.tts?.rate ?? base.tts.rate),
-      autoRead: Boolean(input.tts?.autoRead),
-    },
-    accessibility: {
-      reducedMotion: Boolean(input.accessibility?.reducedMotion),
-      focusVisible: input.accessibility?.focusVisible !== false,
-      skipNav: input.accessibility?.skipNav !== false,
-      announceNarration: Boolean(input.accessibility?.announceNarration),
-    },
+    language: pickFromList(input.language, LANGUAGES, 'es'),
+    audio: normalizeAudio(input, base),
+    tts: normalizeTts(input, base),
+    accessibility: normalizeAccessibility(input),
   };
 }
 

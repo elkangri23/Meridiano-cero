@@ -40,12 +40,13 @@ function isSpeechSynthesisSupported(): boolean {
   return typeof globalThis !== 'undefined' && 'speechSynthesis' in globalThis;
 }
 
-function getSpeechSynthesis(): any {
+function getSpeechSynthesis(): SpeechSynthesis | null {
   if (typeof globalThis === 'undefined') return null;
-  return (globalThis as any).speechSynthesis ?? null;
+  const holder = globalThis as unknown as { speechSynthesis?: SpeechSynthesis };
+  return holder.speechSynthesis ?? null;
 }
 
-function toVoice(voice: any): TTSVoice {
+function toVoice(voice: SpeechSynthesisVoice): TTSVoice {
   return {
     name: String(voice?.name ?? ''),
     lang: String(voice?.lang ?? ''),
@@ -69,13 +70,13 @@ export function createTTSController(): TTSController {
     }
   }
 
-  function pickVoice(voiceName?: string): any {
+  function pickVoice(voiceName?: string): SpeechSynthesisVoice | null {
     const voices = synth ? synth.getVoices() : [];
     if (voiceName) {
-      const match = voices.find((v: any) => v.name === voiceName);
+      const match = voices.find((v: SpeechSynthesisVoice) => v.name === voiceName);
       if (match) return match;
     }
-    const es = voices.find((v: any) => String(v.lang || '').toLowerCase().startsWith('es'));
+    const es = voices.find((v: SpeechSynthesisVoice) => String(v.lang || '').toLowerCase().startsWith('es'));
     return es ?? voices[0] ?? null;
   }
 
@@ -83,7 +84,7 @@ export function createTTSController(): TTSController {
     speak(text: string, options: TTSOptions = {}): boolean {
       if (!synth || !text) return false;
       try {
-        const utterance = new (window as any).SpeechSynthesisUtterance(text);
+        const utterance = new SpeechSynthesisUtterance(text);
         utterance.voice = pickVoice(options.voice);
         utterance.lang = utterance.lang || 'es-ES';
         utterance.rate = options.rate ?? DEFAULT_RATE;

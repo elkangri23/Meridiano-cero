@@ -68,6 +68,39 @@ export interface SanitizedText {
   leakedSecrets: string[];
 }
 
+function truncateText(text: string, maxLength: number): { text: string; truncated: boolean } {
+  if (text.length <= maxLength) return { text, truncated: false };
+  return { text: text.slice(0, maxLength), truncated: true };
+}
+
+function detectRtl(text: string, allowRTL: boolean): { text: string; rtl: boolean } {
+  const rtlPattern = /[֑-߿؀-ۿ]/;
+  const rtl = rtlPattern.test(text);
+  if (!allowRTL && rtl) {
+    return { text: text.split('').reverse().join(''), rtl };
+  }
+  return { text, rtl };
+}
+
+/** Caracteres fuera del latín básico (punto de código mayor que 0xFF):
+ * la misma condición que el rango negado anterior, sin usar caracteres
+ * de control en la expresión regular. */
+function hasNonLatin(text: string): boolean {
+  return [...text].some(ch => (ch.codePointAt(0) ?? 0) > 0xFF);
+}
+
+function redactSecrets(text: string, secretIds: Set<string>): { text: string; leakedSecrets: string[] } {
+  const leakedSecrets: string[] = [];
+  let redacted = text;
+  for (const secret of secretIds) {
+    if (redacted.includes(secret)) {
+      leakedSecrets.push(secret);
+      redacted = redacted.split(secret).join('[redacted]');
+    }
+  }
+  return { text: redacted, leakedSecrets };
+}
+
 export function sanitizeText(
   input: string,
   options: TextSanitizationOptions = {},
@@ -77,38 +110,18 @@ export function sanitizeText(
   const fallbackLanguage = options.fallbackLanguage ?? 'es';
   const secretIds = options.secretIds ?? new Set<string>();
 
-  let text = String(input ?? '');
-  let truncated = false;
-  if (text.length > maxLength) {
-    text = text.slice(0, maxLength);
-    truncated = true;
-  }
-
-  // Detectar RTL (hebreo/árabe)
-  const rtlPattern = /[֑-߿؀-ۿ]/;
-  const rtl = rtlPattern.test(text);
-  if (!allowRTL && rtl) {
-    text = text.split('').reverse().join('');
-  }
-
-  // Escapar HTML básico para evitar inyección
-  text = escapeHtml(text);
+  const truncatedResult = truncateText(String(input ?? ''), maxLength);
+  const rtlResult = detectRtl(truncatedResult.text, allowRTL);
+  const escaped = escapeHtml(rtlResult.text);
 
   // Fallback lingüístico: si el texto contiene caracteres no latinos y no es RTL,
   // marcar como fallback (no ocultar IDs secretos)
-  const nonLatin = /[^\u0000-ÿ]/;
-  const fallbackApplied = nonLatin.test(text) && fallbackLanguage !== 'es';
+  const fallbackApplied = hasNonLatin(escaped) && fallbackLanguage !== 'es';
 
   // Filtrar IDs secretos
-  const leakedSecrets: string[] = [];
-  for (const secret of secretIds) {
-    if (text.includes(secret)) {
-      leakedSecrets.push(secret);
-      text = text.split(secret).join('[redacted]');
-    }
-  }
+  const redacted = redactSecrets(escaped, secretIds);
 
-  return { text, truncated, rtl, fallbackApplied, leakedSecrets };
+  return { text: redacted.text, truncated: truncatedResult.truncated, rtl: rtlResult.rtl, fallbackApplied, leakedSecrets: redacted.leakedSecrets };
 }
 
 // BOR-074: TTS debe parar al cargar/logout; no repetir spoilers.
