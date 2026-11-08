@@ -60,6 +60,32 @@ function rateLimit(max: number, windowMs: number) {
   };
 }
 
+/** Marca el token de recuperación como usado y cambia la contraseña,
+ * revocando todas las sesiones. Devuelve false si el token no es válido. */
+async function confirmRecovery(database: Database, tokenHash: string, newPassword: string): Promise<boolean> {
+  return database.orm.transaction(async tx => {
+    const marked = await tx.update(recoveryTokens).set({ usedAt: new Date() })
+      .where(and(eq(recoveryTokens.tokenHash, tokenHash), isNull(recoveryTokens.usedAt))).returning({ profileId: recoveryTokens.profileId });
+    const row = marked[0];
+    if (!row) return false;
+    const profileRows = await tx.select().from(profiles).where(eq(profiles.id, row.profileId)).limit(1);
+    const profile = profileRows[0];
+    // El token llegó al correo registrado: eso ya acredita el buzón, con
+    // la cuenta verificada o sin ella.
+    if (!profile) return false;
+    const passwordHash = await argon2.hash(newPassword);
+    await tx.update(profiles).set({ passwordHash }).where(eq(profiles.id, profile.id));
+    // Revocar todas las sesiones existentes
+    await tx.delete(sessions).where(eq(sessions.profileId, profile.id));
+    return true;
+  });
+}
+
+/** Resumen del perfil para la exportación GDPR (sin secretos). */
+function exportProfileSummary(profile: typeof profiles.$inferSelect | undefined): { id: string; displayName: string; role: string } {
+  return { id: profile?.id ?? "", displayName: profile?.displayName ?? "", role: profile?.role ?? "player" };
+}
+
 export function registerPublicAuth(app: FastifyInstance, config: AppConfig, database: Database, mailer: Mailer | null = null): void {
   const store = createSessionStore(database);
   const registerLimit = rateLimit(5, 300000);
@@ -270,7 +296,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     onRequest: async (request, reply) => {
       if (request.headers.origin !== config.origin) return deny(reply, request, 403, 'ORIGIN_REJECTED');
     },
-  }, async (request, _reply) => {
+  }, async (request) => {
     const { email } = request.body as { email: string };
     try {
       const profileRows = await database.orm.select().from(profiles).where(eq(profiles.localKey, email.toLowerCase())).limit(1);
@@ -312,22 +338,7 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     const { token, newPassword } = request.body as { token: string; newPassword: string };
     try {
       const tokenHash = hashToken(token);
-      const done = await database.orm.transaction(async tx => {
-        const marked = await tx.update(recoveryTokens).set({ usedAt: new Date() })
-          .where(and(eq(recoveryTokens.tokenHash, tokenHash), isNull(recoveryTokens.usedAt))).returning({ profileId: recoveryTokens.profileId });
-        const row = marked[0];
-        if (!row) return false;
-        const profileRows = await tx.select().from(profiles).where(eq(profiles.id, row.profileId)).limit(1);
-        const profile = profileRows[0];
-        // El token llegó al correo registrado: eso ya acredita el buzón, con
-        // la cuenta verificada o sin ella.
-        if (!profile) return false;
-        const passwordHash = await argon2.hash(newPassword);
-        await tx.update(profiles).set({ passwordHash }).where(eq(profiles.id, profile.id));
-        // Revocar todas las sesiones existentes
-        await tx.delete(sessions).where(eq(sessions.profileId, profile.id));
-        return true;
-      });
+      const done = await confirmRecovery(database, tokenHash, newPassword);
       if (!done) return deny(reply, request, 400, 'INVALID_RECOVERY_TOKEN');
       return { message: 'Contraseña actualizada. Inicie sesión con la nueva contraseña.' };
     } catch {
@@ -350,13 +361,13 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     const userRuns = await database.orm.select().from(runs).where(eq(runs.ownerId, session.profile.id));
 
     const exportData = {
-      profile: { id: profile?.id ?? "", displayName: profile?.displayName ?? "", role: profile?.role ?? "player" },
+      profile: exportProfileSummary(profile),
       runs: userRuns.map(r => ({ id: r.id, definitionId: r.definitionId, createdAt: r.createdAt, updatedAt: r.updatedAt })),
       exportedAt: new Date().toISOString(),
     };
 
     reply.header('Content-Type', 'application/json');
-    reply.header('Content-Disposition', `attachment; filename="meridiano-export-${profile?.id ?? ""}.json"`);
+    reply.header('Content-Disposition', `attachment; filename="meridiano-export-${exportData.profile.id}.json"`);
     return exportData;
   });
 

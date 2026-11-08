@@ -86,100 +86,119 @@ export function estimateTokensFromContext(context: Record<string, unknown>): num
   return estimateTokens(JSON.stringify(context));
 }
 
+export interface QuotaCheckParams {
+  ownerId?: string;
+  ip?: string;
+  function: string;
+  providerId: string;
+  model: string;
+  estimatedTokens: number;
+}
+
+async function checkGlobalCutoff(database: Database): Promise<QuotaCheckResult | null> {
+  const [cutoff] = await database.orm.select().from(aiGlobalCutoff).where(eq(aiGlobalCutoff.id, 1)).limit(1);
+  if (!cutoff?.isEnabled) return null;
+  return { allowed: false, reason: cutoff.reason ?? 'Servicio de IA no disponible temporalmente', retryAfter: 300 };
+}
+
+function quotaScopeMatches(quota: typeof aiQuotas.$inferSelect, params: QuotaCheckParams): boolean {
+  switch (quota.scope) {
+    case 'global':
+      return true;
+    case 'user':
+      return !!params.ownerId && quota.scopeValue === params.ownerId;
+    case 'ip':
+      return !!params.ip && quota.scopeValue === params.ip;
+    case 'function':
+      return quota.scopeValue === params.function;
+    case 'model':
+      return quota.scopeValue === params.model;
+    case 'provider':
+      return quota.scopeValue === params.providerId;
+    default:
+      return false;
+  }
+}
+
+async function countRequestUsage(database: Database, quota: typeof aiQuotas.$inferSelect, params: QuotaCheckParams, windowStart: Date): Promise<number> {
+  const [count] = await database.orm.select({ count: sql`count(*)` }).from(aiUsage)
+    .where(and(
+      quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
+      quota.scope === 'ip' ? sql`${aiUsage.ownerId} IS NULL` : sql`1=1`, // simplify
+      gte(aiUsage.createdAt, windowStart),
+      quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
+      quota.scope === 'model' ? eq(aiUsage.model, params.model) : sql`1=1`,
+      quota.scope === 'provider' ? eq(aiUsage.providerId, params.providerId) : sql`1=1`,
+    ));
+  return Number(count?.count ?? 0);
+}
+
+async function sumTokenUsage(database: Database, quota: typeof aiQuotas.$inferSelect, params: QuotaCheckParams, windowStart: Date): Promise<number> {
+  const [sumResult] = await database.orm.select({ sum: sum(aiUsage.totalTokens) }).from(aiUsage)
+    .where(and(
+      quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
+      gte(aiUsage.createdAt, windowStart),
+      quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
+      quota.scope === 'model' ? eq(aiUsage.model, params.model) : sql`1=1`,
+      quota.scope === 'provider' ? eq(aiUsage.providerId, params.providerId) : sql`1=1`,
+    ));
+  // Añadir tokens estimados de la petición actual
+  return Number(sumResult?.sum ?? 0) + params.estimatedTokens;
+}
+
+async function sumDailyTokenUsage(database: Database, quota: typeof aiQuotas.$inferSelect, params: QuotaCheckParams, dayStart: Date): Promise<number> {
+  const [sumResult] = await database.orm.select({ sum: sum(aiUsage.totalTokens) }).from(aiUsage)
+    .where(and(
+      quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
+      gte(aiUsage.createdAt, dayStart),
+      quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
+    ));
+  return Number(sumResult?.sum ?? 0) + params.estimatedTokens;
+}
+
+async function measureQuotaUsage(database: Database, quota: typeof aiQuotas.$inferSelect, params: QuotaCheckParams, now: Date, dayStart: Date): Promise<number> {
+  const windowStart = quota.windowSeconds > 0 ? new Date(now.getTime() - quota.windowSeconds * 1000) : dayStart;
+  if (quota.limitType === 'requests') return countRequestUsage(database, quota, params, windowStart);
+  if (quota.limitType === 'tokens') return sumTokenUsage(database, quota, params, windowStart);
+  if (quota.limitType === 'daily_tokens') return sumDailyTokenUsage(database, quota, params, dayStart);
+  return 0;
+}
+
+function quotaDenial(quota: typeof aiQuotas.$inferSelect, currentUsage: number, now: Date, dayStart: Date): QuotaCheckResult | null {
+  if (currentUsage <= quota.limitValue) return null;
+  if (quota.action === 'deny') {
+    const retryAfter = quota.windowSeconds > 0 ? quota.windowSeconds : Math.ceil((dayStart.getTime() + 86400000 - now.getTime()) / 1000);
+    return { allowed: false, reason: `Cuota ${quota.limitType} excedida (${currentUsage}/${quota.limitValue})`, retryAfter, currentUsage, limit: quota.limitValue };
+  }
+  if (quota.action === 'throttle') {
+    return { allowed: false, reason: `Rate limit: cuota ${quota.limitType} excedida`, retryAfter: 60, currentUsage, limit: quota.limitValue };
+  }
+  // 'warn' permite pero registra
+  return null;
+}
+
+async function evaluateQuota(database: Database, quota: typeof aiQuotas.$inferSelect, params: QuotaCheckParams, now: Date, dayStart: Date): Promise<QuotaCheckResult | null> {
+  if (!quotaScopeMatches(quota, params)) return null;
+  const currentUsage = await measureQuotaUsage(database, quota, params, now, dayStart);
+  return quotaDenial(quota, currentUsage, now, dayStart);
+}
+
 export async function checkQuota(
   database: Database,
-  params: {
-    ownerId?: string;
-    ip?: string;
-    function: string;
-    providerId: string;
-    model: string;
-    estimatedTokens: number;
-  }
+  params: QuotaCheckParams
 ): Promise<QuotaCheckResult> {
   const now = new Date();
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Verificar corte global
-  const [cutoff] = await database.orm.select().from(aiGlobalCutoff).where(eq(aiGlobalCutoff.id, 1)).limit(1);
-  if (cutoff?.isEnabled) {
-    return { allowed: false, reason: cutoff.reason ?? 'Servicio de IA no disponible temporalmente', retryAfter: 300 };
-  }
+  const cutoff = await checkGlobalCutoff(database);
+  if (cutoff) return cutoff;
 
   // Verificar cuotas activas
   const quotas = await database.orm.select().from(aiQuotas).where(eq(aiQuotas.isActive, 1));
 
   for (const quota of quotas) {
-    let scopeMatch = false;
-
-    switch (quota.scope) {
-      case 'global':
-        scopeMatch = true;
-        break;
-      case 'user':
-        scopeMatch = !!params.ownerId && quota.scopeValue === params.ownerId;
-        break;
-      case 'ip':
-        scopeMatch = !!params.ip && quota.scopeValue === params.ip;
-        break;
-      case 'function':
-        scopeMatch = quota.scopeValue === params.function;
-        break;
-      case 'model':
-        scopeMatch = quota.scopeValue === params.model;
-        break;
-      case 'provider':
-        scopeMatch = quota.scopeValue === params.providerId;
-        break;
-    }
-
-    if (!scopeMatch) continue;
-
-    let currentUsage = 0;
-    const windowStart = quota.windowSeconds > 0 ? new Date(now.getTime() - quota.windowSeconds * 1000) : dayStart;
-
-    if (quota.limitType === 'requests') {
-      const [count] = await database.orm.select({ count: sql`count(*)` }).from(aiUsage)
-        .where(and(
-          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
-          quota.scope === 'ip' ? sql`${aiUsage.ownerId} IS NULL` : sql`1=1`, // simplify
-          gte(aiUsage.createdAt, windowStart),
-          quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
-          quota.scope === 'model' ? eq(aiUsage.model, params.model) : sql`1=1`,
-          quota.scope === 'provider' ? eq(aiUsage.providerId, params.providerId) : sql`1=1`,
-        ));
-      currentUsage = Number(count?.count ?? 0);
-    } else if (quota.limitType === 'tokens') {
-      const [sumResult] = await database.orm.select({ sum: sum(aiUsage.totalTokens) }).from(aiUsage)
-        .where(and(
-          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
-          gte(aiUsage.createdAt, windowStart),
-          quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
-          quota.scope === 'model' ? eq(aiUsage.model, params.model) : sql`1=1`,
-          quota.scope === 'provider' ? eq(aiUsage.providerId, params.providerId) : sql`1=1`,
-        ));
-      currentUsage = Number(sumResult?.sum ?? 0);
-      // Añadir tokens estimados de la petición actual
-      currentUsage += params.estimatedTokens;
-    } else if (quota.limitType === 'daily_tokens') {
-      const [sumResult] = await database.orm.select({ sum: sum(aiUsage.totalTokens) }).from(aiUsage)
-        .where(and(
-          quota.scope === 'user' ? eq(aiUsage.ownerId, params.ownerId as string) : sql`1=1`,
-          gte(aiUsage.createdAt, dayStart),
-          quota.scope === 'function' ? eq(aiUsage.function, params.function) : sql`1=1`,
-        ));
-      currentUsage = Number(sumResult?.sum ?? 0) + params.estimatedTokens;
-    }
-
-    if (currentUsage > quota.limitValue) {
-      if (quota.action === 'deny') {
-        const retryAfter = quota.windowSeconds > 0 ? quota.windowSeconds : Math.ceil((dayStart.getTime() + 86400000 - now.getTime()) / 1000);
-        return { allowed: false, reason: `Cuota ${quota.limitType} excedida (${currentUsage}/${quota.limitValue})`, retryAfter, currentUsage, limit: quota.limitValue };
-      } else if (quota.action === 'throttle') {
-        return { allowed: false, reason: `Rate limit: cuota ${quota.limitType} excedida`, retryAfter: 60, currentUsage, limit: quota.limitValue };
-      }
-      // 'warn' permite pero registra
-    }
+    const denial = await evaluateQuota(database, quota, params, now, dayStart);
+    if (denial) return denial;
   }
 
   return { allowed: true };

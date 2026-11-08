@@ -56,12 +56,16 @@ describe('persistencia de acciones y guardados (Fase A)', () => {
   async function storedRun(runId: string) {
     const rows = await owner.pool.query<{ revision: number; branch_id: string; engine_state: Record<string, unknown> }>(
       'SELECT revision, branch_id, engine_state FROM runs WHERE id=$1', [runId]);
-    return rows.rows[0]!;
+    const row = rows.rows[0];
+    if (!row) throw new Error('Expected stored run');
+    return row;
   }
   async function operationCount(runId: string, kind?: string) {
     const rows = await owner.pool.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM operation_records WHERE run_id=$1${kind ? ` AND kind='${kind}'` : ''}`, [runId]);
-    return rows.rows[0]!.n;
+    const row = rows.rows[0];
+    if (!row) throw new Error('Expected operation count');
+    return row.n;
   }
   async function createSave(runId: string, name: string, expectedVersion: number) {
     const response = await app.inject({ method: 'POST', url: `/api/v1/runs/${runId}/saves`, headers,

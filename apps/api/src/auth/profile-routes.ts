@@ -11,6 +11,20 @@ function deny(reply: FastifyReply, request: FastifyRequest, status: number, code
   return reply.code(status).send({ error: { code, message: 'Solicitud no autorizada o servicio no disponible.', requestId: request.id } });
 }
 
+/** Valida el cuerpo del PATCH de perfil; null si alias o avatar no son válidos. */
+function validateDetectiveBody(body: { alias?: unknown; avatar?: unknown }): { alias?: string; avatar?: DetectiveAvatar } | null {
+  const updates: { alias?: string; avatar?: DetectiveAvatar } = {};
+  if (body.alias !== undefined) {
+    if (typeof body.alias !== 'string' || body.alias.trim().length === 0 || body.alias.length > 160) return null;
+    updates.alias = body.alias.trim();
+  }
+  if (body.avatar !== undefined) {
+    if (!isDetectiveAvatar(body.avatar)) return null;
+    updates.avatar = body.avatar;
+  }
+  return updates;
+}
+
 /** Perfil de detective (§13): alias y avatar pixel art por jugador.
  * La fila se crea al primer guardado (upsert); hasta entonces GET devuelve
  * el avatar por defecto y sin alias. Al crear la fila sin alias explícito
@@ -73,17 +87,8 @@ export function registerDetectiveProfile(app: FastifyInstance, config: AppConfig
       if (!session) return deny(reply, request, 401, 'SESSION_REQUIRED');
       if (!matches(request.headers['x-csrf-token'], session.csrfToken)) return deny(reply, request, 403, 'CSRF_REJECTED');
       const body = request.body as { alias?: unknown; avatar?: unknown };
-      const updates: { alias?: string; avatar?: DetectiveAvatar } = {};
-      if (body.alias !== undefined) {
-        if (typeof body.alias !== 'string' || body.alias.trim().length === 0 || body.alias.length > 160) {
-          return deny(reply, request, 400, 'INVALID_REQUEST');
-        }
-        updates.alias = body.alias.trim();
-      }
-      if (body.avatar !== undefined) {
-        if (!isDetectiveAvatar(body.avatar)) return deny(reply, request, 400, 'INVALID_REQUEST');
-        updates.avatar = body.avatar;
-      }
+      const updates = validateDetectiveBody(body);
+      if (!updates) return deny(reply, request, 400, 'INVALID_REQUEST');
       await database.orm.insert(detectiveProfiles).values({
         userId: session.profile.id,
         alias: updates.alias ?? session.profile.displayName,

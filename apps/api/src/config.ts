@@ -28,9 +28,7 @@ function readDevelopmentRegistration(env: NodeJS.ProcessEnv): boolean {
   if (env.REGISTRATION_ENABLED !== 'false' && env.REGISTRATION_ENABLED !== 'true') throw new Error('CONFIG_REGISTRATION_ENABLED');
   return env.REGISTRATION_ENABLED === 'true';
 }
-function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig & { mode: 'development' | 'production'; origin: string; registrationEnabled: boolean } {
-  const mode = env.APP_MODE;
-  if (mode !== 'development' && mode !== 'production') throw new Error('CONFIG_APP_MODE');
+function readHttpHost(env: NodeJS.ProcessEnv, mode: 'development' | 'production'): '127.0.0.1' | '0.0.0.0' {
   // En desarrollo la API solo escucha en el loopback del host. En producción
   // corre en contenedor: el loopback del contenedor no es el del host, y el
   // puerto publicado (127.0.0.1:3000) es lo que la mantiene solo-local; por
@@ -39,9 +37,18 @@ function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig & { mode: 'developmen
   if (mode === 'development') {
     if (env.API_HOST !== '127.0.0.1') throw new Error('CONFIG_API_HOST');
   } else if (env.API_HOST !== '127.0.0.1' && env.API_HOST !== '0.0.0.0') throw new Error('CONFIG_API_HOST');
-  const host = env.API_HOST as '127.0.0.1' | '0.0.0.0';
+  return env.API_HOST as '127.0.0.1' | '0.0.0.0';
+}
+function readHttpPort(env: NodeJS.ProcessEnv): number {
   const port = Number(env.API_PORT);
   if (!env.API_PORT || !/^[1-9]\d*$/.test(env.API_PORT) || !Number.isSafeInteger(port) || port > 65535) throw new Error('CONFIG_API_PORT');
+  return port;
+}
+function readHttp(env: NodeJS.ProcessEnv): BootstrapConfig & { mode: 'development' | 'production'; origin: string; registrationEnabled: boolean } {
+  const mode = env.APP_MODE;
+  if (mode !== 'development' && mode !== 'production') throw new Error('CONFIG_APP_MODE');
+  const host = readHttpHost(env, mode);
+  const port = readHttpPort(env);
   const origin = validateOrigin(env.PUBLIC_ORIGIN, mode);
   if (mode === 'production') {
     if (env.REGISTRATION_ENABLED !== 'true') throw new Error('CONFIG_REGISTRATION_ENABLED');

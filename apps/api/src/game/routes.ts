@@ -102,19 +102,27 @@ function computeSnapshotHash(snapshot: unknown): string {
   return createHash('sha256').update(canonical).digest('hex');
 }
 
+function validSaveName(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 80;
+}
+function validVersion(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
+}
+function validReplaceSaveId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value);
+}
+
 function saveBody(value: unknown): { name: string; expectedVersion: number; idempotencyKey: string; replaceSaveId?: string } {
   if (!isRecord(value)) throw new RunStoreError('INVALID_REQUEST');
   const name = value.name;
   const expectedVersion = value.expectedVersion;
   const idempotencyKey = value.idempotencyKey;
   const replaceSaveId = value.replaceSaveId;
-  if (typeof name !== 'string' || name.trim().length === 0 || name.length > 80) throw new RunStoreError('INVALID_REQUEST');
-  if (typeof expectedVersion !== 'number' || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new RunStoreError('INVALID_REQUEST');
+  if (!validSaveName(name)) throw new RunStoreError('INVALID_REQUEST');
+  if (!validVersion(expectedVersion)) throw new RunStoreError('INVALID_REQUEST');
   if (!isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
   if (replaceSaveId !== undefined) {
-    if (typeof replaceSaveId !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(replaceSaveId)) {
-      throw new RunStoreError('INVALID_REQUEST');
-    }
+    if (!validReplaceSaveId(replaceSaveId)) throw new RunStoreError('INVALID_REQUEST');
   }
   return replaceSaveId !== undefined
     ? { name: name.trim(), expectedVersion, idempotencyKey, replaceSaveId }
@@ -362,7 +370,8 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         canLoad: s.status === 'active',
       }));
 
-      const nextCursor = saves.length > limitNum ? saves[limitNum]!.id : null;
+      const next = saves.length > limitNum ? saves[limitNum] : undefined;
+      const nextCursor = next ? next.id : null;
       return reply.send({ items, manualLimit: 10, manualCount: items.length, nextCursor });
     }
   );
@@ -505,8 +514,8 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
 
       const save = await database.orm.select().from(manualSaves)
         .where(and(eq(manualSaves.id, request.params.saveId), eq(manualSaves.runId, request.params.runId))).limit(1);
-      if (!save.length) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
-      const s = save[0]!;
+      const s = save[0];
+      if (!s) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
       if (s.metadataVersion !== body.expectedSaveVersion) return reply.code(409).send({ error: { code: 'VERSION_CONFLICT', message: 'Versión de metadatos obsoleta.', requestId: request.id } });
       if (s.status !== 'active') return reply.code(400).send({ error: { code: 'SAVE_NOT_ACTIVE', message: 'El guardado no está activo.', requestId: request.id } });
 
@@ -515,7 +524,8 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
         .set({ name: body.name, metadataVersion: s.metadataVersion + 1, updatedAt: new Date() })
         .where(and(eq(manualSaves.id, request.params.saveId), eq(manualSaves.runId, request.params.runId)))
         .returning({ id: manualSaves.id, name: manualSaves.name, metadataVersion: manualSaves.metadataVersion, updatedAt: manualSaves.updatedAt });
-      const updated = updatedResult[0]!;
+      const updated = updatedResult[0];
+      if (!updated) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
 
       await database.orm.insert(operationRecords).values({
         runId: request.params.runId,
@@ -543,8 +553,8 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
 
       const save = await database.orm.select().from(manualSaves)
         .where(and(eq(manualSaves.id, request.params.saveId), eq(manualSaves.runId, request.params.runId))).limit(1);
-      if (!save.length) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
-      const s = save[0]!;
+      const s = save[0];
+      if (!s) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Guardado no encontrado.', requestId: request.id } });
       if (s.metadataVersion !== body.expectedSaveVersion) return reply.code(409).send({ error: { code: 'VERSION_CONFLICT', message: 'Versión de metadatos obsoleta.', requestId: request.id } });
       if (s.status !== 'active') return reply.code(400).send({ error: { code: 'SAVE_NOT_ACTIVE', message: 'El guardado no está activo.', requestId: request.id } });
 

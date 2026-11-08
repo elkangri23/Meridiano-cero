@@ -50,22 +50,29 @@ export function remember(
   return { ...memory, turns: [...memory.turns.slice(-11), { factIds: [...factIds], act, you, npc }] };
 }
 
-function memoryTurn(value: unknown): value is ConversationMemory['turns'][number] {
-  if (!record(value)) return false;
+function memoryTurnShape(value: Record<string, unknown>): boolean {
   const keys = Object.keys(value);
-  if (!keys.every(key => ['factIds', 'act', 'you', 'npc'].includes(key))) return false;
-  if (!('factIds' in value) || !('act' in value)) return false;
-  if (!speechActs.some(act => act === value.act)) return false;
+  return keys.every(key => ['factIds', 'act', 'you', 'npc'].includes(key)) &&
+    'factIds' in value && 'act' in value &&
+    speechActs.some(act => act === value.act);
+}
+function memoryTurnFacts(value: Record<string, unknown>): boolean {
   if (!Array.isArray(value.factIds) || value.factIds.length > 16) return false;
   if (new Set(value.factIds).size !== value.factIds.length) return false;
   if ((value.act === 'state') !== (value.factIds.length > 0)) return false;
-  if (!value.factIds.every(id => typeof id === 'string' && id.length > 0 && id.length <= 128)) return false;
+  return value.factIds.every(id => typeof id === 'string' && id.length > 0 && id.length <= 128);
+}
+function memoryTurnTexts(value: Record<string, unknown>): boolean {
   // Textos opcionales (turnos viejos): si vienen, acotados como la entrada
   // del jugador (4000) y la respuesta mostrada (2000, por encima del tope
   // de 600 del modelo para no rechazar líneas fijas antiguas).
   if ('you' in value && (typeof value.you !== 'string' || value.you.length > 4000)) return false;
   if ('npc' in value && (typeof value.npc !== 'string' || value.npc.length > 2000)) return false;
   return true;
+}
+function memoryTurn(value: unknown): value is ConversationMemory['turns'][number] {
+  if (!record(value)) return false;
+  return memoryTurnShape(value) && memoryTurnFacts(value) && memoryTurnTexts(value);
 }
 export function restoreMemory(value: unknown, runId: string, npcId: string): ConversationMemory {
   if (!record(value) || !exactKeys(value, ['schemaVersion', 'runId', 'npcId', 'treatment', 'turns'])) {

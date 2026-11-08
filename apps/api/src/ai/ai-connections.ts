@@ -2,7 +2,7 @@
 // Almacenamiento cifrado de credenciales, selección de proveedor, límites
 
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { Database } from '../database/connection.ts';
 import { pgTable, uuid, text, timestamp, integer, jsonb, index, check, unique } from 'drizzle-orm/pg-core';
 
@@ -118,9 +118,7 @@ export async function createAIConnection(database: Database, ownerId: string, in
 
   // Si es default, desactivar otros defaults del usuario
   if (input.isDefault) {
-    await database.orm.update(aiConnections)
-      .set({ isDefault: 0, updatedAt: new Date() })
-      .where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.isDefault, 1)));
+    await clearOtherDefaults(database, ownerId);
   }
 
   const [connection] = await database.orm.insert(aiConnections).values({
@@ -237,9 +235,14 @@ export async function getAIConnectionWithCredential(database: Database, ownerId:
   };
 }
 
-export async function updateAIConnection(database: Database, ownerId: string, connectionId: string, updates: Partial<AIConnectionInput>): Promise<AIConnectionOutput | null> {
-  const data: any = { updatedAt: new Date() };
+/** Desactiva los defaults actuales del usuario (solo queda el nuevo). */
+async function clearOtherDefaults(database: Database, ownerId: string): Promise<void> {
+  await database.orm.update(aiConnections)
+    .set({ isDefault: 0, updatedAt: new Date() })
+    .where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.isDefault, 1)));
+}
 
+function applyConnectionUpdates(data: Partial<typeof aiConnections.$inferInsert>, updates: Partial<AIConnectionInput>): void {
   if (updates.name) data.name = updates.name;
   if (updates.adapterId) data.adapterId = updates.adapterId;
   if (updates.baseUrl) data.baseUrl = updates.baseUrl;
@@ -247,18 +250,21 @@ export async function updateAIConnection(database: Database, ownerId: string, co
   if (updates.roles) data.roles = updates.roles;
   if (updates.limits) data.limits = updates.limits;
   if (updates.capabilities) data.capabilities = updates.capabilities;
-  if (updates.isDefault !== undefined) {
-    data.isDefault = updates.isDefault ? 1 : 0;
-    if (updates.isDefault) {
-      await database.orm.update(aiConnections)
-        .set({ isDefault: 0, updatedAt: new Date() })
-        .where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.isDefault, 1)));
-    }
-  }
-
   if (updates.credential) {
     data.credentialRef = hashCredential(updates.credential);
     data.encryptedCredential = encryptCredential(updates.credential);
+  }
+}
+
+export async function updateAIConnection(database: Database, ownerId: string, connectionId: string, updates: Partial<AIConnectionInput>): Promise<AIConnectionOutput | null> {
+  const data: Partial<typeof aiConnections.$inferInsert> = { updatedAt: new Date() };
+  applyConnectionUpdates(data, updates);
+
+  if (updates.isDefault !== undefined) {
+    data.isDefault = updates.isDefault ? 1 : 0;
+    if (updates.isDefault) {
+      await clearOtherDefaults(database, ownerId);
+    }
   }
 
   const [connection] = await database.orm.update(aiConnections)
@@ -297,7 +303,7 @@ export async function deleteAIConnection(database: Database, ownerId: string, co
 }
 
 export async function recordAIConnectionUsage(database: Database, ownerId: string, connectionId: string, error?: string): Promise<void> {
-  const updates: any = { lastUsedAt: new Date() };
+  const updates: Omit<Partial<typeof aiConnections.$inferInsert>, 'errorCount'> & { errorCount?: number | SQL } = { lastUsedAt: new Date() };
   if (error) {
     updates.lastError = error;
     updates.errorCount = sql`${aiConnections.errorCount} + 1`;
@@ -348,7 +354,7 @@ export async function disableAllAIConnections(database: Database, ownerId: strin
 }
 
 // Resolver conexión para una petición: personal > default admin
-export async function resolveAIConnection(database: Database, ownerId: string, adminDefaultConnectionId?: string): Promise<{ connection: any; credential: string } | null> {
+export async function resolveAIConnection(database: Database, ownerId: string, adminDefaultConnectionId?: string): Promise<{ connection: typeof aiConnections.$inferSelect; credential: string } | null> {
   // 1. Buscar conexión personal activa
   const personal = await database.orm.select().from(aiConnections)
     .where(and(eq(aiConnections.ownerId, ownerId), eq(aiConnections.status, 'active')))
