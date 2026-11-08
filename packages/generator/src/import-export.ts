@@ -43,6 +43,13 @@ export function computeChecksum(data: unknown): string {
   return Math.abs(hash).toString(16);
 }
 
+/** Id del expediente para la exportación, o 'unknown' si no es un objeto con id. */
+function exportCaseId(definition: unknown): string {
+  if (typeof definition !== 'object' || definition === null) return 'unknown';
+  const id = (definition as Record<string, unknown>).id;
+  return typeof id === 'string' && id.length > 0 ? id : 'unknown';
+}
+
 export function createExport(definition: unknown, metadata: CaseExport['metadata']): ExportResult {
   const errors: string[] = [];
 
@@ -60,7 +67,7 @@ export function createExport(definition: unknown, metadata: CaseExport['metadata
   const exportData: CaseExport = {
     version: EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
-    caseId: (definition as any)?.id || 'unknown',
+    caseId: exportCaseId(definition),
     definition,
     metadata,
     checksum: computeChecksum(definition),
@@ -69,31 +76,22 @@ export function createExport(definition: unknown, metadata: CaseExport['metadata
   return { success: true, export: exportData, errors: [] };
 }
 
-export function validateImport(data: unknown, maxSizeBytes: number = MAX_IMPORT_SIZE_BYTES): ImportResult {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
-  if (!data || typeof data !== 'object') {
-    errors.push('Datos de importación inválidos');
-    return { success: false, errors, warnings };
-  }
-
-  const exp = data as CaseExport;
-
-  // Validar versión
+function checkImportVersion(exp: CaseExport, errors: string[], warnings: string[]): void {
   if (!exp.version) {
     errors.push('Versión de exportación requerida');
   } else if (exp.version !== EXPORT_VERSION) {
     warnings.push(`Versión ${exp.version} puede no ser compatible con ${EXPORT_VERSION}`);
   }
+}
 
-  // Validar tamaño
+function checkImportSize(data: unknown, maxSizeBytes: number, errors: string[]): void {
   const size = JSON.stringify(data).length;
   if (size > maxSizeBytes) {
     errors.push(`Importación excede tamaño máximo: ${size} > ${maxSizeBytes} bytes`);
   }
+}
 
-  // Validar estructura
+function checkImportStructure(exp: CaseExport, errors: string[]): void {
   if (!exp.definition) {
     errors.push('Definición de caso requerida');
   }
@@ -108,12 +106,30 @@ export function validateImport(data: unknown, maxSizeBytes: number = MAX_IMPORT_
       errors.push('Checksum no coincide: posible corrupción de datos');
     }
   }
+}
 
-  // Validar campos prohibidos (seguridad: no ejecutar código)
+function checkImportForbiddenFields(data: unknown, errors: string[]): void {
   const jsonStr = JSON.stringify(data);
   if (jsonStr.includes('__proto__') || jsonStr.includes('constructor') || jsonStr.includes('prototype')) {
     errors.push('Datos contienen campos prohibidos');
   }
+}
+
+export function validateImport(data: unknown, maxSizeBytes: number = MAX_IMPORT_SIZE_BYTES): ImportResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!data || typeof data !== 'object') {
+    errors.push('Datos de importación inválidos');
+    return { success: false, errors, warnings };
+  }
+
+  const exp = data as CaseExport;
+
+  checkImportVersion(exp, errors, warnings);
+  checkImportSize(data, maxSizeBytes, errors);
+  checkImportStructure(exp, errors);
+  checkImportForbiddenFields(data, errors);
 
   if (errors.length > 0) {
     return { success: false, errors, warnings };

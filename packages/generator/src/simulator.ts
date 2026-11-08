@@ -152,19 +152,26 @@ function pendingEvidence(run: CaseRun): Map<string, { dueMinute: number; method:
   return pending;
 }
 
+/** Lo que revela una acción concreta (consulta o análisis) para una evidencia. */
+function requestingStepForAction(definition: CaseDefinition, action: GoldenPathAction, evidenceId: string): { label: string; delayMinutes: number } | null {
+  if (action.type === 'query') {
+    const rule = definition.mechanics?.queries.find(entry => entry.id === paramId(action, 'topicId'));
+    if (rule?.evidenceId === evidenceId) return { label: `la consulta «${rule.id}»`, delayMinutes: rule.delayMinutes };
+  }
+  if (action.type === 'analyze') {
+    const rule = definition.mechanics?.analyses.find(entry => entry.inputEvidenceId === paramId(action, 'evidenceId'));
+    if (rule?.resultEvidenceId === evidenceId) return { label: `el análisis de ${rule.inputEvidenceId}`, delayMinutes: rule.delayMinutes };
+  }
+  return null;
+}
+
 /** Paso de la ruta que pidió una evidencia pendiente, con su retardo. */
 function requestingStep(definition: CaseDefinition, path: GoldenPathAction[], index: number, evidenceId: string): { stepIndex: number; label: string; delayMinutes: number } | null {
   for (let stepIndex = 0; stepIndex < index; stepIndex++) {
     const action = path[stepIndex];
     if (!action) continue;
-    if (action.type === 'query') {
-      const rule = definition.mechanics?.queries.find(entry => entry.id === paramId(action, 'topicId'));
-      if (rule?.evidenceId === evidenceId) return { stepIndex, label: `la consulta «${rule.id}»`, delayMinutes: rule.delayMinutes };
-    }
-    if (action.type === 'analyze') {
-      const rule = definition.mechanics?.analyses.find(entry => entry.inputEvidenceId === paramId(action, 'evidenceId'));
-      if (rule?.resultEvidenceId === evidenceId) return { stepIndex, label: `el análisis de ${rule.inputEvidenceId}`, delayMinutes: rule.delayMinutes };
-    }
+    const found = requestingStepForAction(definition, action, evidenceId);
+    if (found) return { stepIndex, ...found };
   }
   return null;
 }
@@ -178,6 +185,16 @@ function pendingDiagnosis(definition: CaseDefinition, run: CaseRun, path: Golden
   return `${evidenceId} ya está pedida (${where}) pero su resultado aún no ha llegado: una consulta o un análisis no entrega su evidencia al instante, solo cuando pasa el tiempo. Añade un wait de al menos ${wait} min —o un viaje— después de ese paso, antes de usar ${evidenceId}.`;
 }
 
+function diagnoseQueryRequires(definition: CaseDefinition, run: CaseRun, path: GoldenPathAction[], index: number, step: string, topicId: string, rule: NonNullable<CaseDefinition['mechanics']>['queries'][number]): string | null {
+  if (rule.requires.length === 0 || rule.requires.some(id => knowsEvidence(run, id))) return null;
+  const pending = rule.requires.find(id => pendingEvidence(run).has(id));
+  if (pending) {
+    const cause = pendingDiagnosis(definition, run, path, index, pending);
+    if (cause) return `${step}: la consulta «${topicId}» exige haber obtenido antes ${pending}. ${cause}`;
+  }
+  return `${step}: la consulta «${topicId}» exige haber obtenido antes al menos una de estas evidencias: ${rule.requires.join(', ')}. En este punto conoces: ${knownEvidenceList(run)}. Mueve la consulta DESPUÉS del paso que revela una de ellas.`;
+}
+
 function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, path: GoldenPathAction[], index: number, engineError: string): string {
   const step = `Paso ${index + 1} (query)`;
   const topicId = paramId(action, 'topicId');
@@ -189,18 +206,41 @@ function diagnoseQuery(definition: CaseDefinition, run: CaseRun, action: GoldenP
   if (run.position.cityId !== rule.cityId || run.position.locationId !== rule.locationId) {
     return `${step}: la consulta «${topicId}» exige estar en ${cityLabel(definition, rule.cityId)} / ${locationLabel(definition, rule.locationId)} y estás en ${positionLabel(definition, run)}. Viaja antes a esa ciudad y vuelve a intentarlo en ese lugar.`;
   }
-  if (rule.requires.length > 0 && !rule.requires.some(id => knowsEvidence(run, id))) {
-    const pending = rule.requires.find(id => pendingEvidence(run).has(id));
-    if (pending) {
-      const cause = pendingDiagnosis(definition, run, path, index, pending);
-      if (cause) return `${step}: la consulta «${topicId}» exige haber obtenido antes ${pending}. ${cause}`;
-    }
-    return `${step}: la consulta «${topicId}» exige haber obtenido antes al menos una de estas evidencias: ${rule.requires.join(', ')}. En este punto conoces: ${knownEvidenceList(run)}. Mueve la consulta DESPUÉS del paso que revela una de ellas.`;
-  }
+  const requiresProblem = diagnoseQueryRequires(definition, run, path, index, step, topicId, rule);
+  if (requiresProblem) return requiresProblem;
   if (knowsEvidence(run, rule.evidenceId)) {
     return `${step}: la consulta «${topicId}» ya dio su resultado (${rule.evidenceId} ya se conoce). Quítala de la ruta.`;
   }
   return stepFallback(action, index, engineError);
+}
+
+function diagnoseRecoverAccess(definition: CaseDefinition, run: CaseRun, path: GoldenPathAction[], index: number, step: string, recovery: NonNullable<CaseDefinition['mechanics']>['recovery']): string | null {
+  if (!recovery.requiresAccessWarrant || run.warrants.includes('warrant:access') || run.discoveries.includes('forced-entry')) return null;
+  const suspect = definition.mechanics?.suspects.find(entry => entry.id === definition.solution);
+  const accessIds = suspect?.accessEvidenceIds ?? [];
+  const requestIndex = path.slice(0, index).findIndex(entry => entry?.type === 'request_warrant');
+  if (requestIndex === -1) {
+    return `${step}: la recuperación exige la orden de acceso (warrant:access) y la ruta no pide ninguna orden antes de recuperar. Pide la orden con request_warrant (con una evidencia de acceso entre sus evidenceIds) y espera 30 min a que madure antes de recuperar.`;
+  }
+  const request = path[requestIndex];
+  const evidenceIds = Array.isArray(request?.params.evidenceIds)
+    ? request.params.evidenceIds.filter((id): id is string => typeof id === 'string')
+    : [];
+  const pending = run.pendingRequests.find(entry => entry.type === 'warrant');
+  return diagnoseRecoverRequest(step, requestIndex, evidenceIds, pending, suspect, accessIds, run.minute);
+}
+
+function diagnoseRecoverRequest(step: string, requestIndex: number, evidenceIds: string[], pending: CaseRun['pendingRequests'][number] | undefined, suspect: MechanicsSuspect | undefined, accessIds: string[], minute: number): string {
+  if (pending) {
+    return `${step}: la orden se pidió en el paso ${requestIndex + 1} pero aún no ha madurado (vence en el minuto ${pending.dueMinute} y estás en el minuto ${minute}). Espera ${pending.dueMinute - minute} min más con wait antes de recuperar.`;
+  }
+  if (accessIds.length === 0) {
+    return `${step}: el sospechoso no declara ninguna evidencia de acceso (accessEvidenceIds vacío en la mecánica): sin ella el motor nunca concede warrant:access y la recuperación es imposible. Declara al menos una evidencia de acceso en el sospechoso y úsala en la request_warrant.`;
+  }
+  if (!evidenceIds.some(id => accessIds.includes(id))) {
+    return `${step}: la orden pedida en el paso ${requestIndex + 1} usa evidenceIds [${evidenceIds.join(', ')}] y ninguna es una evidencia de acceso (${accessIds.join(', ')}). Incluye una evidencia de acceso en la request_warrant para que al madurar se conceda warrant:access.`;
+  }
+  return `${step}: la orden pedida en el paso ${requestIndex + 1} se denegó al madurar o no cubre una combinación válida: revisa que use una combinación completa de warrantCombinations del sospechoso (${JSON.stringify(suspect?.warrantCombinations ?? [])}) con evidencias conocidas y admisibles.`;
 }
 
 function diagnoseRecover(definition: CaseDefinition, run: CaseRun, action: GoldenPathAction, path: GoldenPathAction[], index: number, engineError: string): string {
@@ -213,29 +253,8 @@ function diagnoseRecover(definition: CaseDefinition, run: CaseRun, action: Golde
     return `${step}: la recuperación exige estar en ${cityLabel(definition, recovery.cityId)} / ${locationLabel(definition, recovery.locationId)} y estás en ${positionLabel(definition, run)}. Viaja antes a esa ciudad y vuelve a intentarlo en ese lugar.`;
   }
   if (run.recoveredObjects.includes(recovery.objectId)) return `${step}: el objeto ya está recuperado. Quita este paso.`;
-  if (recovery.requiresAccessWarrant && !run.warrants.includes('warrant:access') && !run.discoveries.includes('forced-entry')) {
-    const suspect = definition.mechanics?.suspects.find(entry => entry.id === definition.solution);
-    const accessIds = suspect?.accessEvidenceIds ?? [];
-    const requestIndex = path.slice(0, index).findIndex(entry => entry?.type === 'request_warrant');
-    if (requestIndex === -1) {
-      return `${step}: la recuperación exige la orden de acceso (warrant:access) y la ruta no pide ninguna orden antes de recuperar. Pide la orden con request_warrant (con una evidencia de acceso entre sus evidenceIds) y espera 30 min a que madure antes de recuperar.`;
-    }
-    const request = path[requestIndex];
-    const evidenceIds = Array.isArray(request?.params.evidenceIds)
-      ? request.params.evidenceIds.filter((id): id is string => typeof id === 'string')
-      : [];
-    const pending = run.pendingRequests.find(entry => entry.type === 'warrant');
-    if (pending) {
-      return `${step}: la orden se pidió en el paso ${requestIndex + 1} pero aún no ha madurado (vence en el minuto ${pending.dueMinute} y estás en el minuto ${run.minute}). Espera ${pending.dueMinute - run.minute} min más con wait antes de recuperar.`;
-    }
-    if (accessIds.length === 0) {
-      return `${step}: el sospechoso no declara ninguna evidencia de acceso (accessEvidenceIds vacío en la mecánica): sin ella el motor nunca concede warrant:access y la recuperación es imposible. Declara al menos una evidencia de acceso en el sospechoso y úsala en la request_warrant.`;
-    }
-    if (!evidenceIds.some(id => accessIds.includes(id))) {
-      return `${step}: la orden pedida en el paso ${requestIndex + 1} usa evidenceIds [${evidenceIds.join(', ')}] y ninguna es una evidencia de acceso (${accessIds.join(', ')}). Incluye una evidencia de acceso en la request_warrant para que al madurar se conceda warrant:access.`;
-    }
-    return `${step}: la orden pedida en el paso ${requestIndex + 1} se denegó al madurar o no cubre una combinación válida: revisa que use una combinación completa de warrantCombinations del sospechoso (${JSON.stringify(suspect?.warrantCombinations ?? [])}) con evidencias conocidas y admisibles.`;
-  }
+  const accessProblem = diagnoseRecoverAccess(definition, run, path, index, step, recovery);
+  if (accessProblem) return accessProblem;
   return stepFallback(action, index, engineError);
 }
 

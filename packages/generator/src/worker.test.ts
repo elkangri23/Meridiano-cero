@@ -69,10 +69,9 @@ describe('JobQueue', () => {
     if (!dequeued) throw new Error('Expected job to be dequeued');
 
     // Simular expiración del lease
-    const stale = dequeued as any;
-    stale.leaseUntil = new Date(Date.now() - 1000).toISOString();
+    dequeued.leaseUntil = new Date(Date.now() - 1000).toISOString();
 
-    const recovered = await queue.recoverStale(0);
+    const recovered = await queue.recoverStale();
     expect(recovered).toBe(1);
     expect((await queue.getJob(dequeued.id))?.status).toBe('pending');
   });

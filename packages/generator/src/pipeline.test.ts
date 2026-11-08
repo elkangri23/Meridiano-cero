@@ -1300,7 +1300,9 @@ describe('validación de la etapa 4 (delayMinutes)', () => {
     const outputs = fakeOutputs(geography);
     const clues = { ...outputs.cluesWorld, ...structuredClone(outputs.cluesRules) };
     const mechanics = clues.mechanics as { queries: Array<{ delayMinutes: number }> };
-    mechanics.queries[0]!.delayMinutes = 0;
+    const query = mechanics.queries[0];
+    if (query === undefined) throw new Error('Expected at least one query');
+    query.delayMinutes = 0;
     const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
     expect(result.valid).toBe(false);
     expect(result.errors.some(error => error.includes('delayMinutes'))).toBe(true);
@@ -1440,7 +1442,9 @@ describe('validación de la etapa 4 (accessEvidenceIds)', () => {
     const outputs = fakeOutputs(geography);
     const clues = { ...outputs.cluesWorld, ...structuredClone(outputs.cluesRules) };
     const mechanics = clues.mechanics as { suspects: Array<Record<string, unknown>> };
-    delete mechanics.suspects[0]!.accessEvidenceIds;
+    const suspect = mechanics.suspects[0];
+    if (suspect === undefined) throw new Error('Expected at least one suspect');
+    delete suspect.accessEvidenceIds;
     const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
     expect(result.valid).toBe(false);
     expect(result.errors.some(error => error.includes('accessEvidenceIds'))).toBe(true);
@@ -1495,7 +1499,8 @@ describe('validación del expediente completo (textos de conocimiento decibles)'
     const draft = await service.createDraft(PARAMS);
     const result = await runPipeline(draft, config);
     expect(result.success).toBe(true);
-    const definition = result.definition!;
+    const definition = result.definition;
+    if (definition === undefined) throw new Error('Expected pipeline to produce a definition');
     expect(validateCaseDefinition(definition).valid).toBe(true);
     const labelled = structuredClone(definition) as unknown as Record<string, unknown>;
     const texts = labelled.texts as { knowledge: Record<string, string> };

@@ -315,14 +315,18 @@ function checkPremiseBriefing(output: Record<string, unknown>, errors: string[])
       !output.briefing.paragraphs.every(isNonEmptyString)) errors.push('briefing debe tener speaker, title y 3 párrafos.');
 }
 
-function validatePremise(output: unknown, cities: SelectedGeography['cities'], errors: string[]): void {
-  if (!isRecord(output)) { errors.push('La premisa debe ser un objeto.'); return; }
-  checkKeys(output, ['title', 'crimeLabel', 'truth', 'solution', 'decoy', 'witnesses', 'motive', 'objectives', 'objectLabel', 'briefing'], errors);
+function checkPremiseTitle(output: Record<string, unknown>, errors: string[]): void {
   if (!isNonEmptyString(output.title)) errors.push('title vacío.');
   // El título es el nombre del caso («Caso: …»): si empieza por
   // «Expediente:», la interfaz lo duplica al mostrarlo («Expediente:
   // Expediente: …»).
   if (isNonEmptyString(output.title) && /^expediente:/i.test(output.title.trim())) errors.push('El título no debe empezar por «Expediente:» (la interfaz ya lo añade al mostrarlo).');
+}
+
+function validatePremise(output: unknown, cities: SelectedGeography['cities'], errors: string[]): void {
+  if (!isRecord(output)) { errors.push('La premisa debe ser un objeto.'); return; }
+  checkKeys(output, ['title', 'crimeLabel', 'truth', 'solution', 'decoy', 'witnesses', 'motive', 'objectives', 'objectLabel', 'briefing'], errors);
+  checkPremiseTitle(output, errors);
   if (!isNonEmptyString(output.truth)) errors.push('truth vacío.');
   const cityIds = new Set(cities.map(city => city.id));
   const cast = [output.solution, output.decoy, ...(Array.isArray(output.witnesses) ? output.witnesses : [])];
@@ -466,63 +470,78 @@ function checkForensicType(entry: Record<string, unknown>, index: number, errors
   }
 }
 
+/** El validador v1.5 exige delayMinutes entero entre 1 y 240: con 0 el
+ * resultado queda en curso y el paso siguiente que lo necesita se
+ * rechaza en la simulación sin que el diagnóstico de orden lo explique. */
+function checkDelayMinutes(group: { key: string }, entry: Record<string, unknown>, index: number, errors: string[]): void {
+  if ((group.key !== 'queries' && group.key !== 'analyses') || !('delayMinutes' in entry)) return;
+  const delay = entry.delayMinutes;
+  if (typeof delay !== 'number' || !Number.isInteger(delay) || delay < 1 || delay > 240) {
+    errors.push(`mechanics.${group.key}[${index}] delayMinutes debe ser un entero entre 1 y 240 (es ${String(delay)}).`);
+  }
+}
+
+function checkMechanicEntry(group: { key: string; fields: Array<[string, 'nonempty' | 'string' | 'array' | 'number' | 'boolean']> }, entry: unknown, index: number, errors: string[]): void {
+  if (!isRecord(entry)) { errors.push(`mechanics.${group.key}[${index}] no es un objeto.`); return; }
+  for (const [field, kind] of group.fields) {
+    const value = entry[field];
+    const ok = kind === 'nonempty' ? isNonEmptyString(value)
+      : kind === 'string' ? typeof value === 'string'
+      : kind === 'array' ? Array.isArray(value)
+      : kind === 'number' ? typeof value === 'number'
+      : typeof value === 'boolean';
+    if (!ok) errors.push(`mechanics.${group.key}[${index}] debe tener ${field} (${kind}).`);
+  }
+  checkMechanicId(group, entry, index, errors);
+  if (group.key === 'analyses') checkForensicType(entry, index, errors);
+  checkDelayMinutes(group, entry, index, errors);
+}
+
+function checkRecoveryFields(mechanics: Record<string, unknown>, errors: string[]): void {
+  const recovery = mechanics.recovery;
+  if (!isRecord(recovery)) return;
+  const recoveryFields: Array<[string, 'nonempty' | 'boolean']> = [['objectId', 'nonempty'], ['label', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['evidenceId', 'nonempty'], ['requiresAccessWarrant', 'boolean']];
+  for (const [field, kind] of recoveryFields) {
+    const value = recovery[field];
+    const ok = kind === 'nonempty' ? isNonEmptyString(value) : typeof value === 'boolean';
+    if (!ok) errors.push(`mechanics.recovery debe tener ${field} (${kind}).`);
+  }
+  if (typeof recovery.objectId === 'string' && !KEBAB_ID.test(recovery.objectId)) errors.push(`mechanics.recovery objectId inválido: ${recovery.objectId} (minúsculas con guiones, sin acentos).`);
+}
+
 function checkMechanicFields(mechanics: Record<string, unknown>, errors: string[]): void {
   for (const group of MECHANIC_FIELDS) {
     const entries = mechanics[group.key];
     if (!Array.isArray(entries)) continue;
-    entries.forEach((entry, index) => {
-      if (!isRecord(entry)) { errors.push(`mechanics.${group.key}[${index}] no es un objeto.`); return; }
-      for (const [field, kind] of group.fields) {
-        const value = entry[field];
-        const ok = kind === 'nonempty' ? isNonEmptyString(value)
-          : kind === 'string' ? typeof value === 'string'
-          : kind === 'array' ? Array.isArray(value)
-          : kind === 'number' ? typeof value === 'number'
-          : typeof value === 'boolean';
-        if (!ok) errors.push(`mechanics.${group.key}[${index}] debe tener ${field} (${kind}).`);
-      }
-      checkMechanicId(group, entry, index, errors);
-      if (group.key === 'analyses') checkForensicType(entry, index, errors);
-      // El validador v1.5 exige delayMinutes entero entre 1 y 240: con 0 el
-      // resultado queda en curso y el paso siguiente que lo necesita se
-      // rechaza en la simulación sin que el diagnóstico de orden lo explique.
-      if ((group.key === 'queries' || group.key === 'analyses') && 'delayMinutes' in entry) {
-        const delay = entry.delayMinutes;
-        if (typeof delay !== 'number' || !Number.isInteger(delay) || delay < 1 || delay > 240) {
-          errors.push(`mechanics.${group.key}[${index}] delayMinutes debe ser un entero entre 1 y 240 (es ${String(delay)}).`);
-        }
-      }
-    });
+    entries.forEach((entry, index) => checkMechanicEntry(group, entry, index, errors));
   }
-  const recovery = mechanics.recovery;
-  if (isRecord(recovery)) {
-    const recoveryFields: Array<[string, 'nonempty' | 'boolean']> = [['objectId', 'nonempty'], ['label', 'nonempty'], ['cityId', 'nonempty'], ['locationId', 'nonempty'], ['evidenceId', 'nonempty'], ['requiresAccessWarrant', 'boolean']];
-    for (const [field, kind] of recoveryFields) {
-      const value = recovery[field];
-      const ok = kind === 'nonempty' ? isNonEmptyString(value) : typeof value === 'boolean';
-      if (!ok) errors.push(`mechanics.recovery debe tener ${field} (${kind}).`);
-    }
-    if (typeof recovery.objectId === 'string' && !KEBAB_ID.test(recovery.objectId)) errors.push(`mechanics.recovery objectId inválido: ${recovery.objectId} (minúsculas con guiones, sin acentos).`);
-  }
+  checkRecoveryFields(mechanics, errors);
 }
 
-function checkClueMechanics(output: Record<string, unknown>, errors: string[]): void {
-  if (!isRecord(output.mechanics)) { errors.push('mechanics debe ser un objeto.'); return; }
-  const mechanics = output.mechanics;
+function checkMechanicCounts(mechanics: Record<string, unknown>, errors: string[]): void {
   for (const entry of MECHANIC_COUNTS) {
     if (!Array.isArray(mechanics[entry.key]) || (mechanics[entry.key] as unknown[]).length !== entry.count) errors.push(entry.message);
   }
   if (!Array.isArray(mechanics.suspects) || mechanics.suspects.length < 1 || mechanics.suspects.length > 2) errors.push('mechanics.suspects debe tener 1 o 2 sospechosos.');
   if (!isRecord(mechanics.recovery)) errors.push('mechanics.recovery debe ser un objeto.');
+}
+
+// Sin evidencia de acceso declarada, la recuperación con orden de acceso
+// es imposible para cualquier sospechoso: el motor nunca concede
+// warrant:access. El campo era opcional y el modelo lo omitía.
+function checkAccessEvidence(mechanics: Record<string, unknown>, errors: string[]): void {
+  if (!isRecord(mechanics.recovery) || mechanics.recovery.requiresAccessWarrant !== true) return;
+  const suspects = Array.isArray(mechanics.suspects) ? mechanics.suspects : [];
+  const withAccess = suspects.some(entry => isRecord(entry) && Array.isArray(entry.accessEvidenceIds) && entry.accessEvidenceIds.length > 0);
+  if (!withAccess) errors.push('mechanics.suspects debe declarar accessEvidenceIds no vacío en al menos un sospechoso: recovery exige warrant:access y sin él la recuperación es imposible.');
+}
+
+function checkClueMechanics(output: Record<string, unknown>, errors: string[]): void {
+  if (!isRecord(output.mechanics)) { errors.push('mechanics debe ser un objeto.'); return; }
+  const mechanics = output.mechanics;
+  checkMechanicCounts(mechanics, errors);
   checkMechanicFields(mechanics, errors);
-  // Sin evidencia de acceso declarada, la recuperación con orden de acceso
-  // es imposible para cualquier sospechoso: el motor nunca concede
-  // warrant:access. El campo era opcional y el modelo lo omitía.
-  if (isRecord(mechanics.recovery) && mechanics.recovery.requiresAccessWarrant === true) {
-    const suspects = Array.isArray(mechanics.suspects) ? mechanics.suspects : [];
-    const withAccess = suspects.some(entry => isRecord(entry) && Array.isArray(entry.accessEvidenceIds) && entry.accessEvidenceIds.length > 0);
-    if (!withAccess) errors.push('mechanics.suspects debe declarar accessEvidenceIds no vacío en al menos un sospechoso: recovery exige warrant:access y sin él la recuperación es imposible.');
-  }
+  checkAccessEvidence(mechanics, errors);
 }
 
 function checkClueKnowledgeTexts(texts: Record<string, unknown>, knowledgeIds: string[], errors: string[], anchors?: KnowledgeContentAnchors): void {

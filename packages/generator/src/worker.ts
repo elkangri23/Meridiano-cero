@@ -26,7 +26,7 @@ export interface JobQueue {
   cancel(jobId: string): Promise<void>;
   getJob(jobId: string): Promise<GenerationJob | null>;
   listJobs(status?: JobStatus): Promise<GenerationJob[]>;
-  recoverStale(leaseMs: number): Promise<number>;
+  recoverStale(): Promise<number>;
 }
 
 export interface WorkerConfig {
@@ -141,7 +141,7 @@ export class InMemoryJobQueue implements JobQueue {
     return jobs;
   }
 
-  async recoverStale(_leaseMs: number): Promise<number> {
+  async recoverStale(): Promise<number> {
     const now = Date.now();
     let recovered = 0;
 

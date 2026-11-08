@@ -45,9 +45,9 @@ export function createInMemoryCheckpointStore(): CheckpointStore {
 // Implementación con localStorage (para navegador)
 // ============================================================================
 
-function getLocalStorage(): any {
+function getLocalStorage(): Storage | null {
   if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
-    return (globalThis as any).localStorage;
+    return (globalThis as unknown as { localStorage?: Storage }).localStorage ?? null;
   }
   return null;
 }
@@ -213,7 +213,8 @@ export function createLeasedCheckpointStore(
       const draft = await loadWithLease(id);
       if (!draft || !draft.lease || draft.lease.holder !== holder) return;
 
-      const { lease, ...rest } = draft;
+      const rest = { ...draft };
+      delete rest.lease;
       await storage.set(id, JSON.stringify(rest));
     },
 
@@ -243,7 +244,8 @@ export function createLeasedCheckpointStore(
         const expiresAt = new Date(draft.lease.expiresAt);
         if (expiresAt <= now) {
           // Lease expirado - resetear
-          const { lease, ...rest } = draft;
+          const rest = { ...draft };
+          delete rest.lease;
           rest.updatedAt = new Date().toISOString();
           await storage.set(key, JSON.stringify(rest));
           recovered.push(key);
