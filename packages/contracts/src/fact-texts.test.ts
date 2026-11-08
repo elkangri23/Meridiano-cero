@@ -99,6 +99,12 @@ describe('textos legibles del caso fijo', () => {
     expect(discoveryText('warning', lookup)).toContain('Advertencia de A.C.M.E.');
     // La retirada es a la 3.ª vez visto (motor `misconduct.ts`), no «otra vez».
     expect(discoveryText('warning', lookup)).toContain('A la 3.ª vez que te vean, A.C.M.E. retirará el caso');
+    // En inglés el ordinal no existe: «3 times», nunca «3th» (el contador es siempre 3).
+    expect(discoveryText('warning', lookup, undefined, undefined, 'en'))
+      .toContain('If they see you 3 times, A.C.M.E. will withdraw the case.');
+    expect(discoveryText('warning', lookup, undefined, undefined, 'en')).not.toContain('3th');
+    expect(discoveryText('warning', lookup, undefined, undefined, 'fr'))
+      .toContain('À la 3e fois qu\'on te verra, l\'A.C.M.E. retirera le dossier.');
     expect(conversationRecordText('irregular:force_entry:LIS-ALM@150', lookup.npcName, undefined, lookup.locationName))
       .toBe('Forzaste el acceso a Almacén de depósito (min 150).');
     expect(conversationRecordText('irregular:bribe:lucia@30', lookup.npcName)).toBe('Sobornaste a Lucía (min 30).');
