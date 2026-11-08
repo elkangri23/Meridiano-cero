@@ -124,7 +124,7 @@ POST /runs/:runId/actions:
 {
   "confirmationToken": "TOKEN_OPACO_DE_EJEMPLO",
   "expectedVersion": 12,
-  "idempotencyKey": "operacion-sintetica-0001"
+  "idempotencyKey": "operacion-de-ejemplo"
 }
 ~~~
 
