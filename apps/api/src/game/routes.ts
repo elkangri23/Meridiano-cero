@@ -5,13 +5,13 @@ import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
 import { createSessionStore, tokenDigest } from '../auth/store.ts';
 import { cookieToken, matches } from '../auth/session-security.ts';
-import { caseSummary, findCase, listCases, findDefinitionById, applyDifficulty, definitionForRun, caseMeta } from './catalog.ts';
+import { caseSummary, findCase, listCases, findDefinitionById, applyDifficulty, applyExplorationMode, definitionForRun, caseMeta } from './catalog.ts';
 import { initialPlayerView } from './initial-view.ts';
 import { createStoredRun, deleteStoredRun, readStoredRun, readFullRun, lookupRunCreation, RunStoreError } from './runs.ts';
 import { ENGINE_VERSION, type Action } from '@meridiano/engine';
 import type { Difficulty } from '@meridiano/case-schema';
 import { GDD_CRIME_TYPES } from '@meridiano/case-schema';
-import type { ContentRating, CrimeType } from '@meridiano/contracts';
+import type { ContentRating, CrimeType, ExplorationMode } from '@meridiano/contracts';
 import { commitAction, commitLoad } from './transitions.ts';
 import { playerViewDto } from './player-view.ts';
 import { loadRunTimeline } from './timeline.ts';
@@ -44,14 +44,20 @@ function parseContentRating(value: unknown): ContentRating | undefined {
   return value;
 }
 
-function createBody(value: unknown): { caseId: string; idempotencyKey: string; difficulty: Difficulty; crimeType?: CrimeType | undefined; contentRating?: ContentRating | undefined } {
+function parseExplorationMode(value: unknown): ExplorationMode {
+  if (value === undefined) return 'guided';
+  if (typeof value !== 'string' || !['guided', 'free'].includes(value)) throw new RunStoreError('INVALID_REQUEST');
+  return value as ExplorationMode;
+}
+
+function createBody(value: unknown): { caseId: string; idempotencyKey: string; difficulty: Difficulty; explorationMode: ExplorationMode; crimeType?: CrimeType | undefined; contentRating?: ContentRating | undefined } {
   if (!isRecord(value)) throw new RunStoreError('INVALID_REQUEST');
-  const allowed = new Set(['caseId', 'difficulty', 'idempotencyKey', 'crimeType', 'contentRating']);
+  const allowed = new Set(['caseId', 'difficulty', 'explorationMode', 'idempotencyKey', 'crimeType', 'contentRating']);
   if (!Object.keys(value).every(key => allowed.has(key))) throw new RunStoreError('INVALID_REQUEST');
-  const { caseId, idempotencyKey, difficulty, crimeType, contentRating } = value;
+  const { caseId, idempotencyKey, difficulty, explorationMode, crimeType, contentRating } = value;
   if (typeof caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(caseId) ||
       !isIdempotencyKey(idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
-  return { caseId, idempotencyKey, difficulty: parseDifficulty(difficulty), crimeType: parseCrimeType(crimeType), contentRating: parseContentRating(contentRating) };
+  return { caseId, idempotencyKey, difficulty: parseDifficulty(difficulty), explorationMode: parseExplorationMode(explorationMode), crimeType: parseCrimeType(crimeType), contentRating: parseContentRating(contentRating) };
 }
 
 /** Delito y contenido elegidos deben coincidir con el expediente: son
@@ -260,7 +266,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
   app.post('/api/v1/runs', { onRequest: authorize }, async (request, reply) => {
     const body = createBody(request.body);
     await assertCreationParams(database, body.caseId, body.crimeType, body.contentRating);
-    const definition = applyDifficulty(await findCase(database.orm, body.caseId), body.difficulty);
+    const definition = applyExplorationMode(applyDifficulty(await findCase(database.orm, body.caseId), body.difficulty), body.explorationMode);
     const created = await available(() => createStoredRun(database, digest(request), definition, body.idempotencyKey, expectedProfile(request)));
     // La vista es la actual (en un replay puede haber progreso posterior).
     const run = await available(() => readFullRun(database, digest(request), created.run.id));
@@ -294,8 +300,9 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     // Motores antiguos: se conserva la vista inicial (503 si no es inicial virgen).
     if (run.engineVersion !== ENGINE_VERSION) return initialPlayerView(database.orm, run);
     // La definición gobierna con los parámetros persistidos de esta partida
-    // (dificultad y plazo elegidos al crearla), no con los del catálogo.
-    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes);
+    // (dificultad, plazo y modo de exploración elegidos al crearla), no con
+    // los del catálogo.
+    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes, run.explorationMode);
     const manualCount = await available(() => saveCount(database, run.id));
     // La cronología del informe final solo existe en partidas cerradas: se
     // reconstruye desde los registros de operaciones de la rama actual.

@@ -15,7 +15,7 @@ function fullRun(overrides: Record<string, unknown> = {}) {
   const stored: StoredRun = {
     id: base.id, ownerId: 'owner-1', definitionId: base.definitionId, definitionHash: base.definitionHash,
     engineVersion: ENGINE_VERSION, revision: 1, branchId: '33333333-3333-4333-8333-333333333333',
-    status: 'active', difficulty: 'easy', deadlineMinutes: 5760, engineState: base,
+    status: 'active', difficulty: 'easy', deadlineMinutes: 5760, explorationMode: 'guided', engineState: base,
   };
   return { ...base, ...stored, ...overrides };
 }

@@ -2,9 +2,9 @@
 // públicos a partir de la definición del caso y el estado del motor.
 // No serializa nunca EngineEvent.payload ni CaseRun internos.
 import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
-import { evidenceText, REMOTE_CHANNEL_LABELS, teamMember } from '@meridiano/case-schema';
-import { isPublicBatchStep, type CommunicationRecordDto, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
-import { availableOffers, completeFinalReport, ENGINE_VERSION, liveObjectives, type EngineEvent } from '@meridiano/engine';
+import { evidenceText, REMOTE_CHANNEL_LABELS, teamMember, GEOGRAPHIC_CATALOG, getCity, touristInfoFor, visitCityId, visitLocationName } from '@meridiano/case-schema';
+import { isPublicBatchStep, type AtlasCityDto, type CommunicationRecordDto, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
+import { availableOffers, completeFinalReport, ENGINE_VERSION, liveObjectives, visibleCaseCityIds, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
 import { briefingForDefinition, metaForDefinition } from './catalog.ts';
 import { npcChatForDefinition } from './npc-chat.ts';
@@ -68,11 +68,65 @@ function viewObjects(definition: CaseDefinition, run: FullRun): PlayerViewDto['o
   });
 }
 
-/** Ciudades que la vista enseña: en modo guiado todas; en libre, solo la
- * actual hasta que se descubre el mapa. */
-function visibleCitiesFor(definition: CaseDefinition, run: FullRun, city: CaseDefinition['cities'][number]): CaseDefinition['cities'] {
-  if (definition.explorationMode === 'guided') return definition.cities;
-  return run.discoveries.includes('map') ? definition.cities : [city];
+/** Ciudades que la vista enseña: en modo guiado todas; en libre, la
+ * inicial, la actual y las descubiertas investigando o viajando (la regla
+ * vive en el motor, `visibleCaseCityIds`, para que la vista y las ofertas
+ * no discrepen). */
+function visibleCitiesFor(definition: CaseDefinition, run: FullRun): CaseDefinition['cities'] {
+  const visible = new Set(visibleCaseCityIds(definition, run));
+  return definition.cities.filter(city => visible.has(city.id));
+}
+
+/** Atlas A.C.M.E. (GDD §5): todas las ciudades admitidas del catálogo de
+ * geografía, con su tipo —escenario investigable del expediente o destino
+ * turístico/cultural— y si el jugador ya las conoce. Los destinos
+ * turísticos son información pública del atlas y siempre se listan; una
+ * ciudad del expediente no descubierta en modo libre no se lista. */
+export function atlasFor(definition: CaseDefinition, run: CaseRun): AtlasCityDto[] {
+  const visible = new Set(visibleCaseCityIds(definition, run));
+  const caseIds = new Set(definition.cities.map(city => city.id));
+  return GEOGRAPHIC_CATALOG.map(city => {
+    const defCity = definition.cities.find(item => item.id === city.id);
+    const isCase = caseIds.has(city.id);
+    return {
+      id: city.id,
+      name: defCity?.name ?? city.name,
+      country: defCity?.country ?? city.countryName,
+      kind: isCase ? 'case' as const : 'tourist' as const,
+      discovered: isCase ? visible.has(city.id) : true,
+    };
+  });
+}
+
+/** Ciudad pública de la posición: del expediente si es del caso, del
+ * catálogo si es una admitida fuera de él. El país es el del expediente
+ * para una ciudad del caso y el nombre completo del catálogo para una
+ * turística (el código 'ES' no coincide con el atlas y el validador
+ * rechazaría la vista). */
+function positionCity(definition: CaseDefinition, run: FullRun): PlayerViewDto['position']['city'] {
+  const caseCity = definition.cities.find(item => item.id === run.position.cityId);
+  const geoCity = caseCity ?? getCity(run.position.cityId);
+  if (!geoCity) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  const geo = getCity(geoCity.id);
+  return { id: geoCity.id, name: geoCity.name, country: caseCity?.country ?? geo?.countryName ?? geoCity.country };
+}
+
+/** Posición pública de la partida: ciudad y lugar. En una ciudad admitida
+ * fuera del expediente el lugar es sintético (`visit:<ciudad>`) y se
+ * proyecta con la información turística del catálogo; no es un escenario
+ * investigable, así que no se busca en la definición. */
+function publicPosition(definition: CaseDefinition, run: FullRun): PlayerViewDto['position'] {
+  const city = positionCity(definition, run);
+  const visitCity = visitCityId(run.position.locationId);
+  if (visitCity) {
+    const geo = getCity(visitCity);
+    if (!geo || geo.id !== city.id) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+    const info = touristInfoFor(geo.id);
+    return { city, location: { id: run.position.locationId, name: visitLocationName(geo), description: info?.summary ?? '' } };
+  }
+  const location = definition.locations.find(item => item.id === run.position.locationId);
+  if (!location || location.cityId !== city.id) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  return { city, location: { id: location.id, name: location.name, description: location.description } };
 }
 
 /** Evidencias reveladas por un análisis del laboratorio, en orden de
@@ -94,18 +148,16 @@ function analysisResultsOf(run: FullRun): string[] {
  * llama desde `official_results`, porque la vista es síncrona. */
 export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number, timeline: PublicEvent[] = [], officialResult: PlayerViewDto['officialResult'] = null): PlayerViewDto {
   if (run.engineVersion !== ENGINE_VERSION) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-  const city = definition.cities.find(item => item.id === run.position.cityId);
-  const location = definition.locations.find(item => item.id === run.position.locationId);
-  if (!city || !location || location.cityId !== city.id) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  const position = publicPosition(definition, run);
 
-  const visibleCities = visibleCitiesFor(definition, run, city);
+  const visibleCities = visibleCitiesFor(definition, run);
   // Objetivos en vivo (lote 2): la misma evaluación que el informe final,
   // pero en esta revisión. La descripción es la del expediente; el estado
   // sale de las detenciones y los objetos recuperados del motor.
   const achievedObjectives = new Set(liveObjectives(definition, run));
   const discoveredIds = new Set(run.discoveries);
   const locations = definition.locations
-    .filter(item => item.id === location.id || discoveredIds.has(item.id))
+    .filter(item => item.id === position.location.id || discoveredIds.has(item.id))
     .map(item => ({ id: item.id, name: item.name, description: item.description }));
   const objects = viewObjects(definition, run);
 
@@ -119,12 +171,13 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     // Dificultad elegida al crear la partida: la cabecera la enseña junto
     // al reloj (antes no viajaba en la vista y la web no podía mostrarla).
     difficulty: run.difficulty,
+    // Modo de exploración elegido al crear (GDD §5): la web lo enseña en
+    // la cabecera y el atlas se comporta según él.
+    explorationMode: definition.explorationMode,
     clock: { minute: run.minute, deadlineMinutes: definition.deadlineMinutes },
-    position: {
-      city: { id: city.id, name: city.name, country: city.country },
-      location: { id: location.id, name: location.name, description: location.description },
-    },
+    position,
     cities: visibleCities.map(item => ({ id: item.id, name: item.name, country: item.country })),
+    atlas: atlasFor(definition, run),
     locations,
     objects,
     dossier: [...run.discoveries],
@@ -244,11 +297,13 @@ const eventSummaries: Record<string, EventNamer> = {
     ? 'Orden concedida.'
     : 'Una solicitud ha dado resultado.',
   travel: (definition, payload) => {
-    const city = definition.cities.find(item => item.id === payload.toCityId)?.name ?? String(payload.toCityId ?? '');
+    const city = definition.cities.find(item => item.id === payload.toCityId)?.name
+      ?? getCity(String(payload.toCityId ?? ''))?.name ?? String(payload.toCityId ?? '');
     return 'Viaje a ' + city + '.';
   },
   travel_interrupted: (definition, payload) => {
-    const city = definition.cities.find(item => item.id === payload.toCityId)?.name ?? String(payload.toCityId ?? '');
+    const city = definition.cities.find(item => item.id === payload.toCityId)?.name
+      ?? getCity(String(payload.toCityId ?? ''))?.name ?? String(payload.toCityId ?? '');
     return 'Viaje a ' + city + ' interrumpido.';
   },
   wait: (_definition, payload) => 'Espera de ' + String(payload.minutes ?? '') + ' minutos.',

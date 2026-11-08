@@ -38,12 +38,15 @@ export interface StoredRun {
   /** Dificultad elegida al crear (migración 0007) y su plazo en minutos. */
   difficulty: 'easy' | 'normal' | 'hard';
   deadlineMinutes: number;
+  /** Modo de exploración elegido al crear (migración 0012, GDD §5). */
+  explorationMode: 'guided' | 'free';
   engineState: unknown;
 }
 export const runColumns = `id, owner_id AS "ownerId", definition_id AS "definitionId",
   definition_hash AS "definitionHash", engine_version AS "engineVersion",
   revision, branch_id AS "branchId", engine_state AS "engineState",
   difficulty, deadline_minutes AS "deadlineMinutes",
+  exploration_mode AS "explorationMode",
   engine_state->>'status' AS status`;
 // El estado autoritativo vive en engine_state (así lo lee run-list.ts); runs no
 // tiene columna status. Sin este alias, StoredRun.status era undefined y los
@@ -102,10 +105,10 @@ export async function createStoredRun(database: Database, sessionDigest: string,
   const candidate = structuredClone(definition);
   const structureValid = validateCaseDefinition(candidate).valid;
   const definitionHash = structureValid ? preparedHash(candidate) : undefined;
-  // El resumen cubre los parámetros efectivos (expediente, dificultad y
-  // plazo): reintentar la misma clave con otra dificultad es conflicto, no
-  // un replay silencioso de la primera creación.
-  const requestDigest = createHash('sha256').update(JSON.stringify(['create_run', candidate.id, candidate.difficulty, candidate.deadlineMinutes])).digest('hex');
+  // El resumen cubre los parámetros efectivos (expediente, dificultad,
+  // plazo y modo de exploración): reintentar la misma clave con otro modo
+  // es conflicto, no un replay silencioso de la primera creación.
+  const requestDigest = createHash('sha256').update(JSON.stringify(['create_run', candidate.id, candidate.difficulty, candidate.deadlineMinutes, candidate.explorationMode])).digest('hex');
   return inSession(database, sessionDigest, async (client, ownerId) => {
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [JSON.stringify([ownerId, idempotencyKey])]);
     const previous = await client.query<{ request_digest: string; run_id: string }>(
@@ -122,9 +125,9 @@ export async function createStoredRun(database: Database, sessionDigest: string,
     const id = randomUUID();
     const state = createInitialRun(candidate, ownerId, id, definitionHash);
     const result = await client.query<StoredRun>(
-      `INSERT INTO runs(id, owner_id, definition_id, definition_hash, engine_version, branch_id, difficulty, deadline_minutes, engine_state)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING ${columns}`,
-      [id, ownerId, candidate.id, definitionHash, state.engineVersion, randomUUID(), candidate.difficulty, candidate.deadlineMinutes, JSON.stringify(state)]);
+      `INSERT INTO runs(id, owner_id, definition_id, definition_hash, engine_version, branch_id, difficulty, deadline_minutes, exploration_mode, engine_state)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING ${columns}`,
+      [id, ownerId, candidate.id, definitionHash, state.engineVersion, randomUUID(), candidate.difficulty, candidate.deadlineMinutes, candidate.explorationMode, JSON.stringify(state)]);
     await client.query('INSERT INTO run_creations(owner_id, idempotency_key, request_digest, run_id) VALUES ($1,$2,$3,$4)',
       [ownerId, idempotencyKey, requestDigest, id]);
     const run = result.rows[0];
@@ -249,7 +252,7 @@ export async function readFullRun(database: Database, sessionDigest: string, run
     const stored = await ownedRun(client, ownerId, runId);
     const state = stored.engineState as CaseRun;
     if (stored.engineVersion === ENGINE_VERSION) assertRunShape(state);
-    return { ...state, id: stored.id, ownerId: stored.ownerId, definitionId: stored.definitionId, definitionHash: stored.definitionHash, engineVersion: stored.engineVersion, revision: stored.revision, branchId: stored.branchId, status: stored.status, difficulty: stored.difficulty, deadlineMinutes: stored.deadlineMinutes, engineState: stored.engineState };
+    return { ...state, id: stored.id, ownerId: stored.ownerId, definitionId: stored.definitionId, definitionHash: stored.definitionHash, engineVersion: stored.engineVersion, revision: stored.revision, branchId: stored.branchId, status: stored.status, difficulty: stored.difficulty, deadlineMinutes: stored.deadlineMinutes, explorationMode: stored.explorationMode, engineState: stored.engineState };
   });
 }
 

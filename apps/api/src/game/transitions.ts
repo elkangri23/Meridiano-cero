@@ -33,7 +33,7 @@ async function lockedRun(client: PoolClient, ownerId: string, runId: string): Pr
     ...state,
     id: row.id, ownerId: row.ownerId, definitionId: row.definitionId, definitionHash: row.definitionHash,
     engineVersion: row.engineVersion, revision: row.revision, branchId: row.branchId, status: row.status,
-    difficulty: row.difficulty, deadlineMinutes: row.deadlineMinutes,
+    difficulty: row.difficulty, deadlineMinutes: row.deadlineMinutes, explorationMode: row.explorationMode,
     engineState: row.engine_state,
   };
 }
@@ -106,6 +106,7 @@ async function persistAction(
     id: run.id, ownerId, definitionId: run.definitionId, definitionHash: run.definitionHash,
     engineVersion: result.run.engineVersion, revision: newRevision, branchId: run.branchId,
     status: result.run.status, difficulty: run.difficulty, deadlineMinutes: run.deadlineMinutes,
+    explorationMode: run.explorationMode,
     engineState: result.run,
   };
   await client.query(
@@ -194,7 +195,7 @@ export async function commitAction(
   return inSession(database, digest, async (client, ownerId) => {
     const run = await lockedRun(client, ownerId, runId);
     if (run.status === 'closed') throw new RunStoreError('RUN_CLOSED');
-    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes);
+    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes, run.explorationMode);
     const manualCount = await manualSaveCount(client, runId);
     // Resultado oficial de este contenido para el perfil (DEC-020): el
     // de otra partida anterior si existe; si esta acción cierra el caso,
@@ -295,6 +296,7 @@ async function persistLoad(
     id: run.id, ownerId, definitionId: run.definitionId, definitionHash: run.definitionHash,
     engineVersion: restored.engineVersion, revision: newRevision, branchId: newBranchId,
     status: restored.status, difficulty: run.difficulty, deadlineMinutes: run.deadlineMinutes,
+    explorationMode: run.explorationMode,
     engineState: restored,
   };
   return { operationId, newBranchId, newRun };
@@ -311,7 +313,7 @@ export async function commitLoad(
   return inSession(database, digest, async (client, ownerId) => {
     const run = await lockedRun(client, ownerId, runId);
     if (run.status === 'closed') throw new RunStoreError('RUN_CLOSED');
-    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes);
+    const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes, run.explorationMode);
     const loadDigest = createHash('sha256').update(JSON.stringify(['load', saveId])).digest('hex');
 
     // Replay por idempotencia ANTES de rechazar una revisión vieja.

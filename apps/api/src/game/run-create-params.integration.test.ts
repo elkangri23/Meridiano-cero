@@ -76,4 +76,33 @@ describe('Crear partida con delito y contenido (GDD §3/§14)', () => {
     expect(unknown.statusCode).toBe(400);
     expect(unknown.json().error.code).toBe('INVALID_REQUEST');
   });
+
+  it('crear en modo libre devuelve la vista inicial con solo Madrid y el atlas completo', async () => {
+    const response = await create({ caseId: 'astrolabio-tres-ciudades', idempotencyKey: randomUUID(), difficulty: 'normal', explorationMode: 'free' });
+    expect(response.statusCode).toBe(201);
+    const view = response.json();
+    expect(view.explorationMode).toBe('free');
+    expect(view.cities.map((city: { id: string }) => city.id)).toEqual(['madrid']);
+    expect(view.atlas).toHaveLength(9);
+    expect(view.atlas.find((city: { id: string }) => city.id === 'paris')).toMatchObject({ kind: 'case', discovered: false });
+    expect(view.atlas.find((city: { id: string }) => city.id === 'barcelona')).toMatchObject({ kind: 'tourist', discovered: true });
+  });
+
+  it('reintento con la misma clave y el mismo modo devuelve la misma partida; con otro modo es 409', async () => {
+    const key = randomUUID();
+    const first = await create({ caseId: 'astrolabio-tres-ciudades', idempotencyKey: key, difficulty: 'normal', explorationMode: 'free' });
+    expect(first.statusCode).toBe(201);
+    const replay = await create({ caseId: 'astrolabio-tres-ciudades', idempotencyKey: key, difficulty: 'normal', explorationMode: 'free' });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json().runId).toBe(first.json().runId);
+    const conflict = await create({ caseId: 'astrolabio-tres-ciudades', idempotencyKey: key, difficulty: 'normal', explorationMode: 'guided' });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json().error.code).toBe('IDEMPOTENCY_CONFLICT');
+  });
+
+  it('modo de exploración inválido es 400 INVALID_REQUEST', async () => {
+    const response = await create({ caseId: 'astrolabio-tres-ciudades', idempotencyKey: randomUUID(), explorationMode: 'abierto' });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('INVALID_REQUEST');
+  });
 });

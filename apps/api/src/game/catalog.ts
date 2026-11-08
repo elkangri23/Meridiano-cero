@@ -3,7 +3,7 @@ import { validateCaseDefinition } from '@meridiano/case-schema';
 import { deadlineMinutesForDifficulty, type Difficulty } from '@meridiano/case-schema';
 import type { CaseDefinition } from '@meridiano/case-schema';
 import type { CaseSummary } from '@meridiano/contracts';
-import type { ContentRating, CrimeType } from '@meridiano/contracts';
+import type { ContentRating, CrimeType, ExplorationMode } from '@meridiano/contracts';
 import { astrolabioDefinition } from '@meridiano/engine';
 import type { Database } from '../database/connection.ts';
 import { generatedCases } from '../database/schema.ts';
@@ -59,14 +59,28 @@ export function applyDifficulty(definition: CaseDefinition, difficulty: Difficul
   return effective;
 }
 
+/**
+ * Modo de exploración elegido al crear la partida (GDD §5): independiente
+ * de la dificultad (REQ-G03-02). Se aplica a la definición efectiva como la
+ * dificultad, para que el motor y la vista usen el modo de la partida y no
+ * el del expediente (todos traen 'guided').
+ */
+export function applyExplorationMode(definition: CaseDefinition, explorationMode: ExplorationMode) {
+  const effective = structuredClone(definition);
+  effective.explorationMode = explorationMode;
+  return effective;
+}
+
 /** Definición que gobierna una partida ya creada: el expediente con los
- * parámetros persistidos en su fila (dificultad y plazo). La definición se
- * recarga del catálogo en cada petición; sin aplicar la fila, el plazo
- * elegido al crear se perdería al recargar. */
-export async function definitionForRun(db: Orm, definitionId: string, difficulty: Difficulty, deadlineMinutes: number) {
+ * parámetros persistidos en su fila (dificultad, plazo y modo de
+ * exploración). La definición se recarga del catálogo en cada petición; sin
+ * aplicar la fila, el plazo y el modo elegidos al crear se perderían al
+ * recargar. */
+export async function definitionForRun(db: Orm, definitionId: string, difficulty: Difficulty, deadlineMinutes: number, explorationMode: ExplorationMode) {
   const definition = await findDefinitionById(db, definitionId);
   definition.difficulty = difficulty;
   definition.deadlineMinutes = deadlineMinutes;
+  definition.explorationMode = explorationMode;
   return definition;
 }
 

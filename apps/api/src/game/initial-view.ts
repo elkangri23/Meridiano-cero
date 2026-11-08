@@ -4,6 +4,7 @@ import type { InitialPlayerViewDto } from '@meridiano/contracts';
 import { createInitialRun, ENGINE_VERSION } from '@meridiano/engine';
 import type { Database } from '../database/connection.ts';
 import { findCase, metaForDefinition } from './catalog.ts';
+import { atlasFor } from './player-view.ts';
 import { RunStoreError, type StoredRun } from './runs.ts';
 
 /** Fallo cerrado hasta entregar proyección de transiciones, guardados y conversación. */
@@ -22,12 +23,16 @@ export async function initialPlayerView(db: Database['orm'], run: StoredRun): Pr
     throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
   }
   const publicLocation = { id: location.id, name: location.name, description: location.description };
-  const cities = definition.explorationMode === 'guided' ? definition.cities : [city];
+  // El modo de exploración es el de la fila, no el del expediente: las
+  // partidas anteriores a la migración 0012 son guiadas por defecto.
+  const effective = { ...definition, explorationMode: run.explorationMode ?? 'guided' };
+  const cities = effective.explorationMode === 'guided' ? definition.cities : [city];
   return {
     schemaVersion: 1, runId: run.id, branchId: run.branchId, version: run.revision,
-    status: 'active', difficulty: run.difficulty, clock: { minute: 0, deadlineMinutes: run.deadlineMinutes },
+    status: 'active', difficulty: run.difficulty, explorationMode: effective.explorationMode, clock: { minute: 0, deadlineMinutes: run.deadlineMinutes },
     position: { city: { id: city.id, name: city.name, country: city.country }, location: { ...publicLocation } },
     cities: cities.map(item => ({ id: item.id, name: item.name, country: item.country })),
+    atlas: atlasFor(effective, initial),
     locations: [publicLocation], objects: [], dossier: [], conversation: [], communications: [], pendingRequests: [],
     warrants: [], detentions: [], batch: null, finalReport: null, officialResult: null,
     // Objetivos en vivo (lote 2): al empezar, todos pendientes (la partida
