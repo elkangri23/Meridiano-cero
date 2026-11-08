@@ -143,7 +143,10 @@ test.describe('E2E pulido cosmético', () => {
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
     await page.getByTestId('preview-cancel').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
-    await expect(page.getByRole('status', { name: 'Acción cancelada.' })).toBeVisible();
+    // El aviso es un `role="status"` (región en vivo): Chromium no le
+    // calcula nombre accesible desde el contenido, así que `getByRole`
+    // con `name` no lo encuentra nunca; se comprueba por su texto.
+    await expect(page.locator('.game-notice')).toContainText('Acción cancelada.');
     // Al recargar, la consola sigue donde se quedó, no en el texto genérico.
     await page.reload();
     await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
