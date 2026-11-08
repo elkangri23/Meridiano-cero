@@ -12,6 +12,7 @@
 // él, el comportamiento es el de siempre (caso fijo).
 import { RECURRENT_NPCS, REMOTE_CHANNEL_LABELS } from './npc-catalog.js';
 import { teamMember } from './team.js';
+import type { LocaleKey } from './locales/es.js';
 
 /**
  * Textos narrativos de un expediente generado (T4-08). El caso fijo los
@@ -83,15 +84,16 @@ export function evidenceText(evidenceId: string, texts?: CaseTexts): string | un
 }
 
 /** Informe final: resultado y motivo del cierre, en español. Viven en el
- * índice de este paquete (`REPORT_RESULT_TEXT`, `REPORT_REASON_TEXT`,
+ * índice de este paquete (`REPORT_RESULT_KEYS`, `REPORT_REASON_KEYS`,
  * `reportResultText`, `reportReasonText`); este módulo no los re-exporta
  * para no cerrar un ciclo con el índice. */
 
-/** Etiqueta legible de cada tipo de acción irregular (GDD §14). */
-export const IRREGULAR_KIND_TEXT: Record<string, string> = {
-  force_entry: 'Acceso forzado',
-  bribe: 'Soborno',
-  impersonate: 'Suplantación',
+/** Claves de las etiquetas de acción irregular (GDD §14, i18n): el texto
+ * vive en `locales/es.ts` y la web lo resuelve con `t()`. */
+export const IRREGULAR_KIND_KEYS: Record<string, LocaleKey> = {
+  force_entry: 'labels.irregular.force_entry',
+  bribe: 'labels.irregular.bribe',
+  impersonate: 'labels.irregular.impersonate',
 };
 
 /** Objetivos del caso fijo, como frases: la descripción es la que trae la

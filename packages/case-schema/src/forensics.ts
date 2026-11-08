@@ -6,7 +6,7 @@
 import type { CaseDefinition, Evidence, MechanicsAnalysis } from './types.js';
 import { isForensicType, type ForensicType } from '@meridiano/contracts';
 
-export { FORENSIC_TYPES, FORENSIC_TYPE_LABELS, isForensicType, type ForensicType } from '@meridiano/contracts';
+export { FORENSIC_TYPES, FORENSIC_TYPE_KEYS, isForensicType, type ForensicType } from '@meridiano/contracts';
 
 /** Tipo forense que corresponde al tipo de evidencia que se examina.
 // Es la derivación para expedientes antiguos, cuya mecánica no declara el

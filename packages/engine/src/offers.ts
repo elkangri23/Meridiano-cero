@@ -1,5 +1,5 @@
 import type { CaseDefinition, CaseRun, NPC } from '@meridiano/case-schema';
-import { ARREST_COORDINATION_MINUTES, arrestTypeOf, FORENSIC_TYPE_LABELS, forensicTypeForAnalysis } from '@meridiano/case-schema';
+import { ARREST_COORDINATION_MINUTES, arrestTypeOf, FORENSIC_TYPE_KEYS, resolveMessage, forensicTypeForAnalysis } from '@meridiano/case-schema';
 import type { Action } from './types.js';
 import { isFixedCase, fixedSuspect, ORIGINAL_OBJECT } from './fixed-case.js';
 import { knowsEvidence, canCollect, queryRule, inspectedEvidence, listQueryIds, listInspectableElements, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
@@ -137,7 +137,7 @@ function analyzeOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
       .filter(rule => generatedAnalysis(def, run, rule.inputEvidenceId))
       .map((rule): ActionOffer => {
         const type = forensicTypeForAnalysis(def, rule);
-        return { id: `analyze:${rule.inputEvidenceId}`, label: `Análisis de ${FORENSIC_TYPE_LABELS[type].toLowerCase()} — ${rule.inputEvidenceId}`,
+        return { id: `analyze:${rule.inputEvidenceId}`, label: `Análisis de ${resolveMessage('es', FORENSIC_TYPE_KEYS[type]).toLowerCase()} — ${rule.inputEvidenceId}`,
           detail: `El resultado tarda ${rule.delayMinutes} min`, forensicType: type,
           action: { type: 'analyze', params: { evidenceId: rule.inputEvidenceId } } };
       });
@@ -145,7 +145,7 @@ function analyzeOffer(def: CaseDefinition, run: CaseRun): ActionOffer[] {
   if (!isFixedCase(def) || !run.inventory.includes(FIXED_ANALYSIS_RULE.inputEvidenceId)
     || run.discoveries.includes(FIXED_ANALYSIS_RULE.resultEvidenceId)) return [];
   const type = forensicTypeForAnalysis(def, FIXED_ANALYSIS_RULE);
-  return [{ id: `analyze:${FIXED_ANALYSIS_RULE.inputEvidenceId}`, label: `Análisis de ${FORENSIC_TYPE_LABELS[type].toLowerCase()} — ${FIXED_ANALYSIS_RULE.inputEvidenceId}`,
+  return [{ id: `analyze:${FIXED_ANALYSIS_RULE.inputEvidenceId}`, label: `Análisis de ${resolveMessage('es', FORENSIC_TYPE_KEYS[type]).toLowerCase()} — ${FIXED_ANALYSIS_RULE.inputEvidenceId}`,
     detail: `El resultado tarda ${FIXED_ANALYSIS_RULE.delayMinutes} min`, forensicType: type,
     action: { type: 'analyze', params: { evidenceId: FIXED_ANALYSIS_RULE.inputEvidenceId } } }];
 }

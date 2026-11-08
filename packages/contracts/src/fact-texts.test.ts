@@ -10,8 +10,11 @@ import {
   objectiveText, travelText,
 } from './fact-texts.js';
 import {
-  REPORT_REASON_TEXT, REPORT_RESULT_TEXT, reportReasonText, reportResultText,
+  REPORT_REASON_KEYS, REPORT_RESULT_KEYS, reportReasonText, reportResultText,
 } from './index.js';
+import { createTranslator } from './i18n.js';
+
+const t = createTranslator('es').t;
 
 const lookup = {
   locationName: (id: string) => ({ 'MAD-SALA': 'Sala de embalaje', 'PAR-ARCH': 'Archivo de conservación', 'LIS-ALM': 'Almacén de depósito' }[id]),
@@ -133,24 +136,26 @@ describe('textos legibles del caso fijo', () => {
 
   it('el informe final se lee en español: resultado, motivo y objetivos', () => {
     // El motor devuelve identificadores en inglés; la pantalla nunca los enseña tal cual.
-    expect(Object.keys(REPORT_RESULT_TEXT).sort()).toEqual(['complete', 'incorrect', 'partial', 'unresolved']);
-    expect(reportResultText('complete')).toBe('completado');
-    expect(reportResultText('partial')).toBe('parcial');
-    expect(reportResultText('incorrect')).toBe('incorrecto');
-    expect(reportResultText('unresolved')).toBe('sin resolver');
-    expect(Object.keys(REPORT_REASON_TEXT).sort()).toEqual(['deadline', 'finished', 'withdrawn']);
-    expect(reportReasonText('finished')).toBe('finalizado');
-    expect(reportReasonText('deadline')).toBe('plazo agotado');
-    expect(reportReasonText('withdrawn')).toBe('retirado por A.C.M.E.');
+    expect(Object.keys(REPORT_RESULT_KEYS).sort()).toEqual(['complete', 'incorrect', 'partial', 'unresolved']);
+    expect(reportResultText('complete', t)).toBe('completado');
+    expect(reportResultText('partial', t)).toBe('parcial');
+    expect(reportResultText('incorrect', t)).toBe('incorrecto');
+    expect(reportResultText('unresolved', t)).toBe('sin resolver');
+    expect(Object.keys(REPORT_REASON_KEYS).sort()).toEqual(['deadline', 'finished', 'withdrawn']);
+    expect(reportReasonText('finished', t)).toBe('finalizado');
+    expect(reportReasonText('deadline', t)).toBe('plazo agotado');
+    expect(reportReasonText('withdrawn', t)).toBe('retirado por A.C.M.E.');
     expect(Object.keys(OBJECTIVE_TEXT).sort()).toEqual(['obj-detener', 'obj-recuperar']);
     expect(objectiveText('obj-detener')).toBe('Detener a Inés con orden válida');
     expect(objectiveText('obj-recuperar')).toBe('Recuperar el astrolabio original');
     // Sin texto no se oculta el valor: se devuelve tal cual (casos generados).
-    expect(reportResultText('desconocido')).toBe('desconocido');
-    expect(reportReasonText('desconocido')).toBe('desconocido');
+    expect(reportResultText('desconocido', t)).toBe('desconocido');
+    expect(reportReasonText('desconocido', t)).toBe('desconocido');
     expect(objectiveText('obj-desconocido')).toBe('obj-desconocido');
     // Nada en español a medias: ningún texto del informe lleva literales en inglés.
-    for (const text of [...Object.values(REPORT_RESULT_TEXT), ...Object.values(REPORT_REASON_TEXT), ...Object.values(OBJECTIVE_TEXT)]) {
+    const resolved = [...Object.values(REPORT_RESULT_KEYS), ...Object.values(REPORT_REASON_KEYS)]
+      .map(key => t(key));
+    for (const text of [...resolved, ...Object.values(OBJECTIVE_TEXT)]) {
       expect(text).not.toMatch(/\b(complete|partial|incorrect|unresolved|finished|deadline)\b|obj-/);
     }
   });

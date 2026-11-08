@@ -2,6 +2,7 @@
 // SPEC-007: Generación, simulación e intercambio
 
 import type { ContentRating, CrimeType } from '@meridiano/contracts';
+import type { LocaleKey, TranslateFn } from '@meridiano/contracts';
 export type { ContentRating, CrimeType } from '@meridiano/contracts';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
@@ -43,32 +44,37 @@ export function crimeAllowedForRating(crimeType: CrimeType, contentRating: Conte
   return !GENERAL_ONLY_CRIMES.includes(crimeType);
 }
 
-export const CRIME_TYPE_LABELS: Record<CrimeType, string> = {
-  robo: 'Robo internacional',
-  desaparicion: 'Desaparición',
-  fraude: 'Fraude',
-  espionaje: 'Espionaje',
-  sabotaje: 'Sabotaje',
-  'misterio-historico': 'Misterio histórico',
-  extorsion: 'Extorsión',
-  contrabando: 'Contrabando',
-  corrupcion: 'Corrupción',
-  falsificacion: 'Falsificación',
-  homicidio: 'Homicidio',
-  secuestro: 'Secuestro',
-  aleatorio: 'Aleatorio',
+/** Claves de las etiquetas de delito y contenido (i18n): el texto vive en
+ * `locales/es.ts` y la web lo resuelve con `t()`. Antes eran mapas con el
+ * texto en español aquí; el cambio es solo de forma: los valores no
+ * cambian. */
+export const CRIME_TYPE_KEYS: Record<CrimeType, LocaleKey> = {
+  robo: 'labels.crime.robo',
+  desaparicion: 'labels.crime.desaparicion',
+  fraude: 'labels.crime.fraude',
+  espionaje: 'labels.crime.espionaje',
+  sabotaje: 'labels.crime.sabotaje',
+  'misterio-historico': 'labels.crime.misterio-historico',
+  extorsion: 'labels.crime.extorsion',
+  contrabando: 'labels.crime.contrabando',
+  corrupcion: 'labels.crime.corrupcion',
+  falsificacion: 'labels.crime.falsificacion',
+  homicidio: 'labels.crime.homicidio',
+  secuestro: 'labels.crime.secuestro',
+  aleatorio: 'labels.crime.aleatorio',
 };
 
-export const CONTENT_RATING_LABELS: Record<ContentRating, string> = {
-  familiar: 'Familiar',
-  general: 'General',
+export const CONTENT_RATING_KEYS: Record<ContentRating, LocaleKey> = {
+  familiar: 'labels.rating.familiar',
+  general: 'labels.rating.general',
 };
 
 /** Etiqueta de un expediente: delito y contenido siempre juntos y por
  * separado («Robo internacional · Familiar»). «Robo Familiar» no es un
- * delito: es delito=robo + contenido=Familiar (GDD §3/§14). */
-export function caseLabel(crimeType: CrimeType, contentRating: ContentRating): string {
-  return `${CRIME_TYPE_LABELS[crimeType]} · ${CONTENT_RATING_LABELS[contentRating]}`;
+ * delito: es delito=robo + contenido=Familiar (GDD §3/§14). La traducción
+ * la resuelve quien llama, con el idioma del jugador. */
+export function caseLabel(crimeType: CrimeType, contentRating: ContentRating, t: TranslateFn): string {
+  return `${t(CRIME_TYPE_KEYS[crimeType])} · ${t(CONTENT_RATING_KEYS[contentRating])}`;
 }
 
 export interface CatalogParams {

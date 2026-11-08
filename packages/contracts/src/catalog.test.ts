@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { validateCatalogParams, getBudgetForParams, getSuggestedDuration, deadlineMinutesForDifficulty, ALLOWED_REGIONS, ALLOWED_CRIME_TYPES, GDD_CRIME_TYPES, CRIME_TYPE_LABELS, CONTENT_RATING_LABELS, caseLabel } from './catalog.js';
+import { validateCatalogParams, getBudgetForParams, getSuggestedDuration, deadlineMinutesForDifficulty, ALLOWED_REGIONS, ALLOWED_CRIME_TYPES, GDD_CRIME_TYPES, CRIME_TYPE_KEYS, CONTENT_RATING_KEYS, caseLabel } from './catalog.js';
+import { createTranslator } from './i18n.js';
+
+const t = createTranslator('es').t;
 
 describe('catalog', () => {
   it('acepta parámetros válidos', () => {
@@ -122,23 +125,23 @@ describe('catalog', () => {
     expect([...GDD_CRIME_TYPES]).toEqual(['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'extorsion', 'contrabando', 'corrupcion', 'falsificacion', 'homicidio', 'secuestro', 'aleatorio']);
   });
 
-  it('cada delito del GDD tiene etiqueta en español', () => {
+  it('cada delito del GDD tiene clave de etiqueta y se resuelve en español', () => {
     for (const crime of GDD_CRIME_TYPES) {
-      expect((CRIME_TYPE_LABELS[crime] ?? '').length).toBeGreaterThan(0);
+      expect(t(CRIME_TYPE_KEYS[crime]).length).toBeGreaterThan(0);
     }
-    expect(CRIME_TYPE_LABELS.robo).toBe('Robo internacional');
-    expect(CRIME_TYPE_LABELS['misterio-historico']).toBe('Misterio histórico');
-    expect(CRIME_TYPE_LABELS.aleatorio).toBe('Aleatorio');
+    expect(t(CRIME_TYPE_KEYS.robo)).toBe('Robo internacional');
+    expect(t(CRIME_TYPE_KEYS['misterio-historico'])).toBe('Misterio histórico');
+    expect(t(CRIME_TYPE_KEYS.aleatorio)).toBe('Aleatorio');
   });
 
   it('caseLabel muestra delito y contenido por separado, nunca mezclados', () => {
-    expect(caseLabel('robo', 'familiar')).toBe('Robo internacional · Familiar');
-    expect(caseLabel('fraude', 'general')).toBe('Fraude · General');
-    expect(caseLabel('robo', 'familiar')).not.toBe('Robo Familiar');
+    expect(caseLabel('robo', 'familiar', t)).toBe('Robo internacional · Familiar');
+    expect(caseLabel('fraude', 'general', t)).toBe('Fraude · General');
+    expect(caseLabel('robo', 'familiar', t)).not.toBe('Robo Familiar');
   });
 
-  it('CONTENT_RATING_LABELS distingue Familiar y General', () => {
-    expect(CONTENT_RATING_LABELS.familiar).toBe('Familiar');
-    expect(CONTENT_RATING_LABELS.general).toBe('General');
+  it('CONTENT_RATING_KEYS distingue Familiar y General', () => {
+    expect(t(CONTENT_RATING_KEYS.familiar)).toBe('Familiar');
+    expect(t(CONTENT_RATING_KEYS.general)).toBe('General');
   });
 });

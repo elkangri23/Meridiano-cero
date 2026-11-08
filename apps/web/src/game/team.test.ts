@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { initialView } from '../archive/initial-fixture';
-import { briefingAnswer, ELENA_REFUSAL, evaluateAnswer, explainAnswer, medalLabel, organizeAnswer, routesAnswer, TEAM_MEMBERS, TEAM_SERVICE_LABELS, teamRequestText, teamServiceAnswer } from './team';
+import { briefingAnswer, ELENA_REFUSAL, evaluateAnswer, explainAnswer, medalLabel, organizeAnswer, routesAnswer, TEAM_MEMBERS, TEAM_SERVICE_KEYS, teamRequestText, teamServiceAnswer } from './team';
 import type { CareerProfileDto, PlayerViewDto } from '@meridiano/contracts';
+import { createTranslator } from '@meridiano/contracts';
+
+const t = createTranslator('es').t;
 
 function viewWith(overrides: Partial<PlayerViewDto>): PlayerViewDto {
   return { ...initialView, ...overrides };
@@ -25,8 +28,8 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
     expect(TEAM_MEMBERS.find(member => member.id === 'elena')?.name).toBe('Elena Vázquez');
     expect(TEAM_MEMBERS.find(member => member.id === 'david')?.name).toBe('David Nakamura');
     expect(TEAM_MEMBERS.find(member => member.id === 'clara')?.name).toBe('Clara Beaumont');
-    expect(TEAM_SERVICE_LABELS.briefing).toBe('Preguntar sobre el encargo');
-    expect(TEAM_SERVICE_LABELS.coordinate).toBe('Coordinar una detención');
+    expect(t(TEAM_SERVICE_KEYS.briefing)).toBe('Preguntar sobre el encargo');
+    expect(t(TEAM_SERVICE_KEYS.coordinate)).toBe('Coordinar una detención');
   });
 
   it('Margaret recuerda el encargo y los objetivos con su estado, sin valorar cómo va', () => {
@@ -75,14 +78,14 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
   });
 
   it('las frases de petición son fijas y no llevan la solución', () => {
-    expect(teamRequestText('briefing')).toBe('¿Qué me puedes decir del encargo?');
-    expect(teamRequestText('explain', 'EV-03')).toContain('EV-03');
-    expect(teamRequestText('organize')).toBe('¿Puedes organizar el expediente?');
-    expect(teamRequestText('evaluate')).toBe('¿Cómo va mi carrera?');
+    expect(teamRequestText('briefing', undefined, t)).toBe('¿Qué me puedes decir del encargo?');
+    expect(teamRequestText('explain', 'EV-03', t)).toContain('EV-03');
+    expect(teamRequestText('organize', undefined, t)).toBe('¿Puedes organizar el expediente?');
+    expect(teamRequestText('evaluate', undefined, t)).toBe('¿Cómo va mi carrera?');
   });
 
   it('Margaret evalúa la carrera solo con el perfil oficial, sin valorar el caso en curso', () => {
-    const answer = evaluateAnswer(careerWith({}));
+    const answer = evaluateAnswer(careerWith({}), t);
     expect(answer).toContain('rango Detective');
     expect(answer).toContain('140 puntos');
     expect(answer).toContain('2 casos');
@@ -90,27 +93,27 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
     expect(answer).toContain('Prestigio ejemplar');
     expect(answer).not.toMatch(/vas bien|buen camino|culpable|Inés/i);
     // Sin casos cerrados, lo dice sin inventar.
-    expect(evaluateAnswer(careerWith({ totalCases: 0, completedCases: 0, points: 0, rank: 'Aspirante', medals: [] })))
+    expect(evaluateAnswer(careerWith({ totalCases: 0, completedCases: 0, points: 0, rank: 'Aspirante', medals: [] }), t))
       .toContain('Aún no tienes casos cerrados');
     // teamServiceAnswer pide el perfil: sin él no hay evaluación.
-    expect(teamServiceAnswer('evaluate', viewWith({}))).toBeNull();
-    expect(teamServiceAnswer('evaluate', viewWith({}), undefined, null)).toBeNull();
-    expect(teamServiceAnswer('evaluate', viewWith({}), undefined, careerWith({}))).toContain('rango Detective');
-    expect(medalLabel('medalla-plata')).toBe('Medalla de plata');
-    expect(medalLabel(null)).toBe('Sin medalla');
+    expect(teamServiceAnswer('evaluate', viewWith({}), undefined, undefined, t)).toBeNull();
+    expect(teamServiceAnswer('evaluate', viewWith({}), undefined, null, t)).toBeNull();
+    expect(teamServiceAnswer('evaluate', viewWith({}), undefined, careerWith({}), t)).toContain('rango Detective');
+    expect(medalLabel('medalla-plata', t)).toBe('Medalla de plata');
+    expect(medalLabel(null, t)).toBe('Sin medalla');
   });
 
   it('Margaret cuenta la suspensión activa y cómo se resuelve', () => {
     const answer = evaluateAnswer(careerWith({
       sanctions: [{ id: 'suspension-abc', caseId: 'generado-1', reason: 'A.C.M.E. retiró el caso por conducta irregular',
         severity: 'suspension', imposedAt: 90, active: true }],
-    }));
+    }), t);
     expect(answer).toContain('1 suspensión activa');
     expect(answer).toContain('Un caso limpio la resuelve');
     const resolved = evaluateAnswer(careerWith({
       sanctions: [{ id: 'suspension-abc', caseId: 'generado-1', reason: 'A.C.M.E. retiró el caso por conducta irregular',
         severity: 'suspension', imposedAt: 90, resolvedAt: 300, active: false }],
-    }));
+    }), t);
     expect(resolved).toContain('ya la resolviste con casos limpios');
   });
 });

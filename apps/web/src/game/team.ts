@@ -1,4 +1,5 @@
 import type { CareerProfileDto, PlayerViewDto } from '@meridiano/contracts';
+import type { LocaleKey, TranslateFn } from '@meridiano/contracts';
 
 /** Equipo recurrente A.C.M.E. (GDD §8) en la web: módulo PURO, sin importar
  * case-schema (la regla de aislamiento de la web). El catálogo de miembros
@@ -14,31 +15,33 @@ export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'coordinate' | '
 export interface TeamMemberDisplay {
   id: TeamMemberId;
   name: string;
-  role: string;
-  blurb: string;
+  /** Claves i18n: la web las resuelve con `t()` (nombres propios no se traducen). */
+  role: LocaleKey;
+  blurb: LocaleKey;
 }
 
 export const TEAM_MEMBERS: readonly TeamMemberDisplay[] = [
-  { id: 'margaret', name: 'Margaret Sullivan', role: 'Directora',
-    blurb: 'Presenta los casos y responde preguntas sobre el encargo.' },
-  { id: 'richter', name: 'Dr. Samuel Richter', role: 'Laboratorio forense',
-    blurb: 'Explica los análisis ya completados, solo con lo que la prueba permite decir.' },
-  { id: 'elena', name: 'Elena Vázquez', role: 'Inteligencia',
-    blurb: 'Consulta los registros de la partida: identidades, viajes, pruebas y lugares.' },
-  { id: 'david', name: 'David Nakamura', role: 'Viajes y detenciones',
-    blurb: 'Coordina detenciones con las autoridades y consulta las rutas de viaje.' },
-  { id: 'clara', name: 'Clara Beaumont', role: 'Expedientes',
-    blurb: 'Organiza el expediente: pruebas, solicitudes, órdenes y objetivos.' },
+  { id: 'margaret', name: 'Margaret Sullivan', role: 'team.role.margaret',
+    blurb: 'team.blurb.margaret' },
+  { id: 'richter', name: 'Dr. Samuel Richter', role: 'team.role.richter',
+    blurb: 'team.blurb.richter' },
+  { id: 'elena', name: 'Elena Vázquez', role: 'team.role.elena',
+    blurb: 'team.blurb.elena' },
+  { id: 'david', name: 'David Nakamura', role: 'team.role.david',
+    blurb: 'team.blurb.david' },
+  { id: 'clara', name: 'Clara Beaumont', role: 'team.role.clara',
+    blurb: 'team.blurb.clara' },
 ];
 
-export const TEAM_SERVICE_LABELS: Record<TeamServiceId, string> = {
-  briefing: 'Preguntar sobre el encargo',
-  explain: 'Explicar un análisis',
-  lookup: 'Consulta de inteligencia',
-  coordinate: 'Coordinar una detención',
-  routes: 'Consultar rutas de viaje',
-  organize: 'Organizar el expediente',
-  evaluate: 'Evaluar mi carrera',
+/** Claves i18n de las etiquetas de servicio (el texto vive en `locales/es.ts`). */
+export const TEAM_SERVICE_KEYS: Record<TeamServiceId, LocaleKey> = {
+  briefing: 'labels.teamService.briefing',
+  explain: 'labels.teamService.explain',
+  lookup: 'labels.teamService.lookup',
+  coordinate: 'labels.teamService.coordinate',
+  routes: 'labels.teamService.routes',
+  organize: 'labels.teamService.organize',
+  evaluate: 'labels.teamService.evaluate',
 };
 
 /** Elena Vázquez como interlocutora: la misma consulta determinista que la
@@ -57,42 +60,42 @@ export const TEAM_GREETING = 'Soy Margaret Sullivan, directora de A.C.M.E. Pregu
  * necesita además el perfil (`career`): sin perfil cargado no hay
  * evaluación (null); con el perfil vacío, la respuesta dice que la
  * carrera empieza con el primer cierre. */
-export function teamServiceAnswer(serviceId: TeamServiceId, view: PlayerViewDto, targetId?: string, career?: CareerProfileDto | null): string | null {
+export function teamServiceAnswer(serviceId: TeamServiceId, view: PlayerViewDto, targetId: string | undefined, career: CareerProfileDto | null | undefined, t: TranslateFn): string | null {
   switch (serviceId) {
     case 'briefing': return briefingAnswer(view);
     case 'explain': return targetId ? explainAnswer(view, targetId) : null;
     case 'routes': return routesAnswer(view);
     case 'organize': return organizeAnswer(view);
-    case 'evaluate': return career ? evaluateAnswer(career) : null;
+    case 'evaluate': return career ? evaluateAnswer(career, t) : null;
     default: return null;
   }
 }
 
 /** La frase con la que el jugador pide el servicio: texto fijo para los
  * servicios deterministas (la consulta de Elena lleva la pregunta real). */
-export function teamRequestText(serviceId: TeamServiceId, targetId?: string): string {
+export function teamRequestText(serviceId: TeamServiceId, targetId: string | undefined, t: TranslateFn): string {
   switch (serviceId) {
-    case 'briefing': return '¿Qué me puedes decir del encargo?';
-    case 'explain': return `¿Qué dice el análisis ${targetId ?? ''}?`;
-    case 'routes': return '¿Qué rutas de viaje hay desde aquí?';
-    case 'organize': return '¿Puedes organizar el expediente?';
-    case 'evaluate': return '¿Cómo va mi carrera?';
-    case 'coordinate': return 'Coordinar una detención.';
-    case 'lookup': return 'Consulta de inteligencia.';
+    case 'briefing': return t('team.request.briefing');
+    case 'explain': return t('team.request.explain', { targetId: targetId ?? '' });
+    case 'routes': return t('team.request.routes');
+    case 'organize': return t('team.request.organize');
+    case 'evaluate': return t('team.request.evaluate');
+    case 'coordinate': return t('team.request.coordinate');
+    case 'lookup': return t('team.request.lookup');
   }
 }
 
 /** Etiqueta legible de una medalla de carrera. */
-export function medalLabel(medal: string | null): string {
-  if (medal === 'medalla-oro') return 'Medalla de oro';
-  if (medal === 'medalla-plata') return 'Medalla de plata';
-  return 'Sin medalla';
+export function medalLabel(medal: string | null, t: TranslateFn): string {
+  if (medal === 'medalla-oro') return t('labels.medal.gold');
+  if (medal === 'medalla-plata') return t('labels.medal.silver');
+  return t('labels.medal.none');
 }
 
 /** Margaret evalúa la carrera: solo el perfil oficial (rango, puntos,
  * casos, medallas, reputación y sanciones activas). Nunca valora el caso
  * en curso ni dice si se va bien: la carrera solo cuenta cierres. */
-export function evaluateAnswer(career: CareerProfileDto): string {
+export function evaluateAnswer(career: CareerProfileDto, t: TranslateFn): string {
   if (career.totalCases === 0) {
     return 'Aún no tienes casos cerrados. Tu carrera empieza con el primer informe oficial: cierra un caso y te diré tu rango, tus puntos y tu reputación.';
   }
@@ -100,7 +103,7 @@ export function evaluateAnswer(career: CareerProfileDto): string {
   parts.push(`Tu carrera: rango ${career.rank}, ${career.points} puntos en ${career.totalCases} ${career.totalCases === 1 ? 'caso' : 'casos'} (${career.completedCases} ${career.completedCases === 1 ? 'resuelto' : 'resueltos'}).`);
   parts.push(`Prestigio ${career.prestigeLabel.toLowerCase()}, integridad ${career.integrityLabel.toLowerCase()}, confianza ${career.trustLabel.toLowerCase()}.`);
   if (career.medals.length > 0) {
-    parts.push('Medallas: ' + career.medals.map(medalLabel).join(', ') + '.');
+    parts.push('Medallas: ' + career.medals.map(medal => medalLabel(medal, t)).join(', ') + '.');
   }
   const active = career.sanctions.filter(sanction => sanction.active);
   if (active.length > 0) {

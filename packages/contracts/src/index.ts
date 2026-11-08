@@ -1,3 +1,5 @@
+import type { LocaleKey, TranslateFn } from './i18n.js';
+
 /** Solo estado público de proceso; no acredita DB, sesión ni juego operativo. */
 export interface HealthResponse { status: 'ok' }
 
@@ -293,11 +295,11 @@ export function isSessionDto(value: unknown): value is SessionDto {
  * significa «sin alias» y entonces se enseña el displayName de la cuenta.
  * El avatar es una elección cerrada (sin subida de imágenes). */
 export const DETECTIVE_AVATARS = [
-  { id: 'detective', label: 'Detective' },
-  { id: 'archivista', label: 'Archivista' },
-  { id: 'forense', label: 'Forense' },
-  { id: 'inspector', label: 'Inspector' },
-  { id: 'rastreador', label: 'Rastreador' },
+  { id: 'detective', label: 'labels.avatar.detective' },
+  { id: 'archivista', label: 'labels.avatar.archivista' },
+  { id: 'forense', label: 'labels.avatar.forense' },
+  { id: 'inspector', label: 'labels.avatar.inspector' },
+  { id: 'rastreador', label: 'labels.avatar.rastreador' },
 ] as const;
 export type DetectiveAvatar = (typeof DETECTIVE_AVATARS)[number]['id'];
 export function isDetectiveAvatar(value: unknown): value is DetectiveAvatar {
@@ -423,27 +425,31 @@ export function isCareerProfileDto(value: unknown): value is CareerProfileDto {
  * devuelve tal cual: nunca se oculta el resultado por no tener texto.
  * Viven en contracts (no en case-schema) para que la web pueda usarlos
  * sin romper la regla web-isolation. */
-export const REPORT_RESULT_TEXT: Record<string, string> = {
-  complete: 'completado',
-  partial: 'parcial',
-  incorrect: 'incorrecto',
-  unresolved: 'sin resolver',
+/** Claves de los resultados y motivos del informe final (i18n): el texto
+ * vive en `locales/es.ts` y la web lo resuelve con `t()`. */
+export const REPORT_RESULT_KEYS: Record<string, LocaleKey> = {
+  complete: 'labels.report.complete',
+  partial: 'labels.report.partial',
+  incorrect: 'labels.report.incorrect',
+  unresolved: 'labels.report.unresolved',
 };
 
-export const REPORT_REASON_TEXT: Record<string, string> = {
-  finished: 'finalizado',
-  deadline: 'plazo agotado',
-  withdrawn: 'retirado por A.C.M.E.',
+export const REPORT_REASON_KEYS: Record<string, LocaleKey> = {
+  finished: 'labels.reason.finished',
+  deadline: 'labels.reason.deadline',
+  withdrawn: 'labels.reason.withdrawn',
 };
 
 /** Frase de un resultado del informe final. */
-export function reportResultText(result: string): string {
-  return REPORT_RESULT_TEXT[result] ?? result;
+export function reportResultText(result: string, t: TranslateFn): string {
+  const key = REPORT_RESULT_KEYS[result];
+  return key ? t(key) : result;
 }
 
 /** Frase de un motivo de cierre del informe final. */
-export function reportReasonText(reason: string): string {
-  return REPORT_REASON_TEXT[reason] ?? reason;
+export function reportReasonText(reason: string, t: TranslateFn): string {
+  const key = REPORT_REASON_KEYS[reason];
+  return key ? t(key) : reason;
 }
 function summaryState(value: Record<string, unknown>): boolean {
   return (value.status === 'active' || value.status === 'closed') &&
@@ -1233,8 +1239,8 @@ export {
   validateCatalogParams, getBudgetForParams, getSuggestedDuration,
   deadlineMinutesForDifficulty, DIFFICULTY_DEADLINE_FACTOR, DIFFICULTY_BUDGET,
   DIFFICULTY_DURATION, GDD_CRIME_TYPES, GENERAL_ONLY_CRIMES, ALLOWED_REGIONS,
-  ALLOWED_CRIME_TYPES, crimeAllowedForRating, CRIME_TYPE_LABELS,
-  CONTENT_RATING_LABELS, caseLabel,
+  ALLOWED_CRIME_TYPES, crimeAllowedForRating, CRIME_TYPE_KEYS,
+  CONTENT_RATING_KEYS, caseLabel,
   type CatalogParams, type CatalogValidationResult, type Duration,
   type Difficulty, type ExplorationMode, type ContentMode,
 } from './catalog.js';
@@ -1246,6 +1252,16 @@ export {
   getChannelCost, searchNPCs,
   type NPCProfile, type CommunicationChannel, type QueryType,
 } from './npc-catalog.js';
+
+// Sistema de locales (`i18n.ts` + `locales/`): el español es el idioma
+// de referencia y cualquier otro cae a él cuando no traduce una clave.
+export {
+  createTranslator, formatMessage, resolveMessage, SUPPORTED_LANGUAGES,
+  type LocaleKey, type TranslateVars, type TranslateFn, type Translator,
+} from './i18n.js';
+export { ES_MESSAGES } from './locales/es.js';
+export { EN_MESSAGES } from './locales/en.js';
+export { FR_MESSAGES } from './locales/fr.js';
 
 // Preferencias de presentación persistentes (`preferences.ts`).
 export {
@@ -1265,7 +1281,7 @@ export {
 // Textos legibles del caso fijo y de los generados (`fact-texts.ts`).
 export {
   EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, OBJECTIVE_TEXT,
-  IRREGULAR_KIND_TEXT, evidenceText, npcKnowledgeFacts, npcGreeting, npcRefusal,
+  IRREGULAR_KIND_KEYS, evidenceText, npcKnowledgeFacts, npcGreeting, npcRefusal,
   discoveryText, conversationRecordText, travelText, objectiveText,
   isKnowledgeLabelText, knowledgeContentAnchors, hasKnowledgeContent,
   type KnowledgeContentWorld, type KnowledgeContentAnchors, type DiscoveryLookup,
@@ -1275,7 +1291,7 @@ export {
 // Vocabulario forense (`forensics.ts`): solo tipos y etiquetas. La
 // derivación por evidencia o regla vive en `@meridiano/case-schema`.
 export {
-  FORENSIC_TYPES, FORENSIC_TYPE_LABELS, isForensicType, type ForensicType,
+  FORENSIC_TYPES, FORENSIC_TYPE_KEYS, isForensicType, type ForensicType,
 } from './forensics.js';
 
 // Equipo recurrente A.C.M.E. (`team.ts`).
