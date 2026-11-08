@@ -33,21 +33,42 @@ export function useWindows() {
   });
   const [moving, setMoving] = useState<WindowId | null>(null);
   const openerRefs = useRef<Partial<Record<WindowId, HTMLElement | null>>>({});
+  // Contador por ventana (§15): abrir o restaurar incrementa su contador y
+  // la ventana mueve el foco a su título; así el foco no se queda en el
+  // botón que abrió algo que ya no está visible.
+  const [focusSeq, setFocusSeq] = useState<Record<WindowId, number>>(() => {
+    const seq = {} as Record<WindowId, number>;
+    (Object.keys(initialPositions) as WindowId[]).forEach(id => { seq[id] = 0; });
+    return seq;
+  });
+  // Última ventana minimizada (§15): al minimizar, el foco va a su botón
+  // «Restaurar» de la barra de minimizadas (el botón Minimizar desaparece).
+  const [lastMinimized, setLastMinimized] = useState<WindowId | null>(null);
 
   const open = useCallback((id: WindowId, opener: HTMLElement | null) => {
     openerRefs.current[id] = opener;
     setWindows(current => ({ ...current, [id]: { ...current[id], open: true, minimized: false } }));
+    setFocusSeq(current => ({ ...current, [id]: current[id] + 1 }));
+    setLastMinimized(current => (current === id ? null : current));
   }, []);
   const close = useCallback((id: WindowId) => {
     setWindows(current => ({ ...current, [id]: { ...current[id], open: false, minimized: false } }));
     setMoving(current => (current === id ? null : current));
-    openerRefs.current[id]?.focus();
+    setLastMinimized(current => (current === id ? null : current));
+    // El foco vuelve a quien abrió la ventana; si se abrió sola (charla,
+    // laboratorio, terminal), al botón de la barra que la abre.
+    const opener = openerRefs.current[id];
+    if (opener) opener.focus();
+    else document.querySelector<HTMLElement>(`[data-testid="toolbar-${id}"]`)?.focus();
   }, []);
   const minimize = useCallback((id: WindowId) => {
     setWindows(current => ({ ...current, [id]: { ...current[id], minimized: true } }));
+    setLastMinimized(id);
   }, []);
   const restore = useCallback((id: WindowId) => {
     setWindows(current => ({ ...current, [id]: { ...current[id], minimized: false } }));
+    setFocusSeq(current => ({ ...current, [id]: current[id] + 1 }));
+    setLastMinimized(current => (current === id ? null : current));
   }, []);
   const moveBy = useCallback((id: WindowId, dx: number, dy: number) => {
     setWindows(current => {
@@ -68,7 +89,7 @@ export function useWindows() {
     setMoving(null);
   }, []);
 
-  return { windows, moving, setMoving, open, close, minimize, restore, moveBy, resetLayout };
+  return { windows, moving, setMoving, open, close, minimize, restore, moveBy, resetLayout, focusSeq, lastMinimized };
 }
 
 interface GameWindowProps {
@@ -76,6 +97,7 @@ interface GameWindowProps {
   title: string;
   state: WindowState;
   moving: WindowId | null;
+  focusSeqs: Record<WindowId, number>;
   onMoveStart: (id: WindowId) => void;
   onMoveEnd: () => void;
   onMoveBy: (id: WindowId, dx: number, dy: number) => void;
@@ -90,14 +112,22 @@ interface GameWindowProps {
  * flechas desplazan, Enter termina, Escape cancela), minimizable y cerrable.
  * En pantalla estrecha se apila a ancho completo (sin coordenadas).
  */
-export function GameWindow({ id, title, state, moving, onMoveStart, onMoveEnd, onMoveBy, onMinimize, onRestore, onClose, children }: GameWindowProps) {
+export function GameWindow({ id, title, state, moving, focusSeqs, onMoveStart, onMoveEnd, onMoveBy, onMinimize, onRestore, onClose, children }: GameWindowProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; baseX: number; baseY: number } | null>(null);
   const isMoving = moving === id;
+  const focusSeq = focusSeqs[id];
 
   useEffect(() => {
     if (isMoving) titleRef.current?.focus();
   }, [isMoving]);
+
+  // Al abrir o restaurar, el foco entra en la ventana (su título): quien
+  // navega con teclado no tiene que buscarla. Con el ratón no se ve el
+  // contorno (focus-visible solo se aplica al tabular).
+  useEffect(() => {
+    if (state.open && !state.minimized && focusSeq > 0) titleRef.current?.focus();
+  }, [state.open, state.minimized, focusSeq]);
 
   function onTitlePointerDown(event: PointerEvent<HTMLHeadingElement>) {
     if (event.button !== 0 || isMoving) return;
@@ -144,11 +174,15 @@ export function GameWindow({ id, title, state, moving, onMoveStart, onMoveEnd, o
   </section>;
 }
 
-export function MinimizedBar({ windows, onRestore }: { windows: Record<WindowId, WindowState>; onRestore: (id: WindowId) => void }) {
+export function MinimizedBar({ windows, lastMinimized, onRestore }: { windows: Record<WindowId, WindowState>; lastMinimized: WindowId | null; onRestore: (id: WindowId) => void }) {
   const minimized = (Object.keys(windows) as WindowId[]).filter(id => windows[id].open && windows[id].minimized);
+  // Al minimizar, el foco sigue al botón «Restaurar» de esa ventana.
+  useEffect(() => {
+    if (lastMinimized) document.querySelector<HTMLElement>(`[data-testid="minimized-restore-${lastMinimized}"]`)?.focus();
+  }, [lastMinimized]);
   if (!minimized.length) return null;
   const labels: Record<WindowId, string> = { map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio', comms: 'Central de comunicaciones', team: 'Equipo A.C.M.E.', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia' };
   return <div className="game-minimized-bar" role="group" aria-label="Ventanas minimizadas">
-    {minimized.map(id => <button key={id} type="button" onClick={() => onRestore(id)}>Restaurar {labels[id]}</button>)}
+    {minimized.map(id => <button key={id} type="button" data-testid={`minimized-restore-${id}`} onClick={() => onRestore(id)}>Restaurar {labels[id]}</button>)}
   </div>;
 }

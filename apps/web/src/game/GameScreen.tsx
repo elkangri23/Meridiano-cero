@@ -23,6 +23,7 @@ import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, useWindows } from './windows';
 import type { WindowId } from './windows';
+import { effectiveReducedMotion, objectiveStateText, trapTabKey, useSystemReducedMotion } from './accessibility';
 import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
 import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_LABELS, getNPC, IRREGULAR_KIND_TEXT, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/case-schema';
@@ -467,7 +468,7 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
     <p className="game-overline" id="objectives-heading">Objetivos</p>
     <ul>{view.objectives.map(objective =>
       <li key={objective.id} data-testid={`objective-${objective.id}`} data-achieved={objective.achieved}>
-        <span aria-hidden="true">{objective.achieved ? '✓' : '○'}</span> {objective.description}
+        <span aria-hidden="true">{objective.achieved ? '✓' : '○'}</span> <span className="game-sr-only">{objectiveStateText(objective.achieved)}: </span>{objective.description}
       </li>)}
     </ul>
   </section>;
@@ -482,7 +483,7 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
 function SceneSection({ view, disabled, clockPulse, onOffer, onOpenLab }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void }) {
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   const grouped = groupOffers(view.offers);
-  return <section className="game-scene" aria-labelledby="scene-heading">
+  return <section className="game-scene" id="game-scene" tabIndex={-1} aria-labelledby="scene-heading">
     <div className="game-scene-top"><span>Localización {String(locationIndex).padStart(2, '0')}</span><span>{view.position.city.name.toUpperCase()} · {view.position.city.country}</span></div>
     <SceneArt locationId={view.position.location.id} />
     <div className="game-scene-caption"><div><p className="game-overline">{view.position.city.name}</p><h2 id="scene-heading">{view.position.location.name}</h2></div>{clockPulse && <SceneHourglass delta={clockPulse.delta} animKey={clockPulse.key} />}</div>
@@ -494,9 +495,9 @@ function SceneSection({ view, disabled, clockPulse, onOffer, onOpenLab }: { view
 
 /** Escribe el texto de forma progresiva, como en una máquina de escribir
  * (estilo MS-DOS): el resultado de la última acción aparece poco a poco en
- * vez de hacerlo de golpe. Con movimiento reducido se muestra entero. */
-function useTypewriter(text: string, active: boolean): string {
-  const reduced = useMemo(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
+ * vez de hacerlo de golpe. Con movimiento reducido (interruptor manual o
+ * sistema) se muestra entero. */
+function useTypewriter(text: string, active: boolean, reduced: boolean): string {
   const [shown, setShown] = useState(0);
   useEffect(() => {
     if (reduced) { setShown(text.length); return; }
@@ -535,27 +536,41 @@ function ConsoleLogItem({ entry, isLast, summaryTyped, detailTyped, typing }: { 
     {isLast && typing && <span className="game-typing-cursor" aria-hidden="true">▌</span>}</li>;
 }
 
-function ConsoleSection({ log, orderHistory, readBar }: { log: LogEntry[]; orderHistory: string[]; readBar?: ReactNode }) {
+/** Texto que anuncia el lector de pantalla (§15): la última entrada
+ * entera, solo cuando termina de escribirse y solo si el interruptor está
+ * activo. Así no se repite la narración entera en cada cambio pequeño. */
+function narrationAnnounceText(last: LogEntry | undefined, typing: boolean, enabled: boolean): string {
+  if (!enabled || typing || !last) return '';
+  return last.detail ? `${last.summary} ${last.detail}` : last.summary;
+}
+
+function ConsoleSection({ log, orderHistory, readBar, reducedMotion, announceNarration }: { log: LogEntry[]; orderHistory: string[]; readBar?: ReactNode; reducedMotion: boolean; announceNarration: boolean }) {
   const listRef = useRef<HTMLOListElement>(null);
   const last = log[log.length - 1];
   // La última entrada se escribe progresivamente: primero el resumen y,
   // cuando termina, el detalle de los descubrimientos.
-  const summaryTyped = useTypewriter(last?.summary ?? '', true);
-  const detailTyped = useTypewriter(last?.detail ?? '', !!last && summaryTyped === last.summary);
+  const summaryTyped = useTypewriter(last?.summary ?? '', true, reducedMotion);
+  const detailTyped = useTypewriter(last?.detail ?? '', !!last && summaryTyped === last.summary, reducedMotion);
   const lastTyping = isLastEntryTyping(last, summaryTyped, detailTyped);
   useEffect(() => {
     const list = listRef.current;
     if (list) list.scrollTop = list.scrollHeight;
   }, [log, summaryTyped, detailTyped]);
+  // Anuncio para lectores de pantalla (§15): la lista NO es aria-live (el
+  // efecto máquina de escribir anunciaría el texto a trozos); una región
+  // oculta anuncia la última entrada entera solo cuando termina de
+  // escribirse.
+  const announceText = narrationAnnounceText(last, lastTyping, announceNarration);
   return <section className="game-console" aria-labelledby="console-heading">
     <p className="game-overline">Cuaderno de campo</p>
     <h2 id="console-heading">Consola narrativa</h2>
     {readBar}
-    <ol ref={listRef} aria-live="polite">
+    <ol ref={listRef}>
       {log.length === 0 && <li>La investigación comienza. Inspecciona la escena o elige una acción.</li>}
       {log.map((entry, index) => <ConsoleLogItem key={index} entry={entry} isLast={index === log.length - 1}
         summaryTyped={summaryTyped} detailTyped={detailTyped} typing={lastTyping} />)}
     </ol>
+    <p className="game-sr-only" aria-live="polite" data-testid="narration-announcer">{announceText}</p>
     <span className="game-narrative-cursor" aria-hidden="true">_</span>
     {orderHistory.length > 0 && <details><summary>Historial de órdenes</summary><ol>{orderHistory.map((item, index) => <li key={index}>{item}</li>)}</ol></details>}
   </section>;
@@ -900,8 +915,10 @@ function PreviewDialog({ phase, confirmRef, onConfirm, onCancel }: {
   phase: Extract<OrderPhase, { kind: 'preview' }>; confirmRef: RefObject<HTMLButtonElement | null>;
   onConfirm: () => void; onCancel: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   return <div className="game-preview-backdrop">
-    <div className="game-preview" role="dialog" aria-modal="true" aria-labelledby="preview-heading" data-testid="preview-dialog">
+    <div className="game-preview" role="dialog" aria-modal="true" aria-labelledby="preview-heading" data-testid="preview-dialog"
+      ref={dialogRef} onKeyDown={event => { if (dialogRef.current) trapTabKey(event, dialogRef.current); }}>
       <h2 id="preview-heading">Confirmar acción</h2>
       <p><strong>{phase.offer.label}</strong>{phase.offer.detail ? ` · ${phase.offer.detail}` : ''}</p>
       {phase.response.preview
@@ -929,7 +946,7 @@ function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolea
   return <div>
     <p className="game-overline">Atlas A.C.M.E.</p>
     <h4>Tres ciudades, un expediente</h4>
-    <div className="game-atlas" aria-hidden="true"><div className="game-atlas-land" />{view.cities.map(city => {
+    <div className="game-atlas" role="img" aria-label={`Mapa esquemático de las ciudades del expediente: ${view.cities.map(city => city.name).join(', ')}.`}><div className="game-atlas-land" />{view.cities.map(city => {
       const position = atlasPositions[city.id];
       if (!position) return null;
       return <span key={city.id} className="game-atlas-city" style={{ left: position.x + '%', top: position.y + '%' }}>{city.name}</span>;
@@ -998,7 +1015,7 @@ function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boo
     <h2>Así quedó la investigación</h2>
     <p>Minuto {summary.minute} de {summary.deadlineMinutes} · quedan {summary.remainingMinutes} min · Estás en {summary.currentCity}, {summary.currentLocation}.</p>
     <h4>Objetivos</h4>
-    <ul>{summary.objectives.map(objective => <li key={objective.description}>{objective.achieved ? '✓' : '○'} {objective.description}</li>)}</ul>
+    <ul>{summary.objectives.map(objective => <li key={objective.description}>{objective.achieved ? '✓' : '○'} <span className="game-sr-only">{objectiveStateText(objective.achieved)}: </span>{objective.description}</li>)}</ul>
     <h4>Ciudades visitadas</h4>
     <p>{summary.visitedCities.join(', ')}</p>
     <h4>Últimos hallazgos</h4>
@@ -1547,9 +1564,12 @@ function AudioSettingsSection({ audio, tts, voices, ttsSupported, onAudio, onTTS
   </>;
 }
 
-function SettingsContent({ identity, textScale, highContrast, palette, onScale, onContrast, onPalette, profile, onProfileSaved, audio, tts, voices, ttsSupported, onAudio, onTTS }: {
+function SettingsContent({ identity, textScale, highContrast, palette, accessibility, fontMode, onScale, onContrast, onPalette, onAccessibility, onFontMode, profile, onProfileSaved, audio, tts, voices, ttsSupported, onAudio, onTTS }: {
   identity: SessionDto | null; textScale: number; highContrast: boolean; palette: PaletteMode;
+  accessibility: PresentationPreferences['accessibility']; fontMode: PresentationPreferences['fontMode'];
   onScale: (value: number) => void; onContrast: (value: boolean) => void; onPalette: (value: PaletteMode) => void;
+  onAccessibility: (patch: Partial<PresentationPreferences['accessibility']>) => void;
+  onFontMode: (value: PresentationPreferences['fontMode']) => void;
   profile: DetectiveProfileDto | null; onProfileSaved: (profile: DetectiveProfileDto) => void;
   audio: PresentationPreferences['audio']; tts: PresentationPreferences['tts']; voices: TTSVoice[]; ttsSupported: boolean;
   onAudio: (patch: Partial<PresentationPreferences['audio']>) => void;
@@ -1661,6 +1681,18 @@ function SettingsContent({ identity, textScale, highContrast, palette, onScale, 
     </label>
     <label className="game-setting"><span>Alto contraste</span><input type="checkbox" checked={highContrast} onChange={event => onContrast(event.target.checked)} /></label>
     <PaletteSetting palette={palette} onPalette={onPalette} />
+    <h4>Accesibilidad</h4>
+    <label className="game-setting"><span>Reducir movimiento</span><input type="checkbox" data-testid="a11y-reduced-motion" checked={accessibility.reducedMotion} onChange={event => onAccessibility({ reducedMotion: event.target.checked })} /></label>
+    <label className="game-setting"><span>Foco visible marcado</span><input type="checkbox" data-testid="a11y-focus-visible" checked={accessibility.focusVisible} onChange={event => onAccessibility({ focusVisible: event.target.checked })} /></label>
+    <label className="game-setting"><span>Enlace de salto a la escena</span><input type="checkbox" data-testid="a11y-skip-nav" checked={accessibility.skipNav} onChange={event => onAccessibility({ skipNav: event.target.checked })} /></label>
+    <label className="game-setting"><span>Anunciar la narración</span><input type="checkbox" data-testid="a11y-announce-narration" checked={accessibility.announceNarration} onChange={event => onAccessibility({ announceNarration: event.target.checked })} /></label>
+    <label className="game-setting"><span>Fuente</span>
+      <select data-testid="a11y-font-mode" value={fontMode} onChange={event => onFontMode(event.target.value as PresentationPreferences['fontMode'])}>
+        <option value="retro">Retro (monoespaciada)</option>
+        <option value="accessible">Legible (sans-serif)</option>
+      </select>
+    </label>
+    <p className="game-panel-note">Reducir movimiento apaga las animaciones del juego (reloj de arena, avión del viaje, cursor que parpadea); si tu sistema ya lo pide, también se aplica sin tocar nada aquí. El foco marcado es un contorno dorado grueso; apagado, el foco sigue visible pero fino. El enlace de salto aparece al tabular al entrar en la partida y lleva directo a la escena. Anunciar la narración hace que el lector de pantalla lea la última entrada de la consola cuando termina de escribirse. La fuente legible cambia la letra monoespaciada por una sans-serif.</p>
     <p className="game-panel-note">Estos ajustes se guardan en este navegador y afectan solo a la presentación. También puedes usar el zoom de tu navegador.</p>
     <h4>Audio y voz</h4>
     <AudioSettingsSection audio={audio} tts={tts} voices={voices} ttsSupported={ttsSupported} onAudio={onAudio} onTTS={onTTS} />
@@ -1795,6 +1827,10 @@ export function GameScreen() {
   // Preferencias persistentes (§15): escala, contraste y paleta se guardan
   // en localStorage y se aplican en <html>/<main> al cambiar.
   const { preferences, updatePreferences } = usePreferences();
+  // Movimiento reducido (§15): el interruptor manual manda si difiere del
+  // sistema; el sistema vale cuando el manual está apagado.
+  const systemReducedMotion = useSystemReducedMotion();
+  const reducedMotion = effectiveReducedMotion(preferences.accessibility.reducedMotion, systemReducedMotion);
   // Audio y TTS (GDD §15): todo el cableado vive en `useGameAudio` (ver
   // abajo): el motor de música en ./music (WebAudio puro, sin imports de
   // paquetes) y el controlador TTS en case-schema (importado aquí, donde
@@ -2514,7 +2550,7 @@ export function GameScreen() {
   const closed = view.status === 'closed';
   const busy = busyOffer !== null || orderPhase.kind !== 'idle';
   const windowProps = {
-    moving: windows.moving, onMoveStart: windows.setMoving, onMoveEnd: () => windows.setMoving(null),
+    moving: windows.moving, focusSeqs: windows.focusSeq, onMoveStart: windows.setMoving, onMoveEnd: () => windows.setMoving(null),
     onMoveBy: windows.moveBy, onMinimize: windows.minimize, onRestore: windows.restore, onClose: windows.close,
   };
 
@@ -2522,6 +2558,7 @@ export function GameScreen() {
   const lastLogText = lastLogTextOf(log);
 
   return <main className="game" data-testid="game-screen" style={{ fontSize: `${16 * preferences.textScale / 100}px` }}>
+    {preferences.accessibility.skipNav && <a className="game-skip-link" href="#game-scene">Saltar a la escena</a>}
     <HeaderSection view={view} caseTitle={caseTitle} detective={detectiveDisplayName(detectiveProfile, identity)}
       avatar={detectiveAvatarName(detectiveProfile)} clockPulse={timeFeedback.clockPulse} onLogout={identity ? () => {
       void archiveApi.logout(identity.csrfToken, new AbortController().signal).finally(() => navigate('/'));
@@ -2536,7 +2573,7 @@ export function GameScreen() {
       <IntroButton view={view} onOpen={() => setIntroOpen(true)} />
       {resumeAvailable(view) && <button type="button" onClick={() => setResumeOpen(true)}>Resumen</button>}
       {(Object.keys(windowLabels) as WindowId[]).map(id => (
-        <button key={id} type="button" aria-pressed={windows.windows[id].open}
+        <button key={id} type="button" data-testid={`toolbar-${id}`} aria-pressed={windows.windows[id].open}
           onClick={event => { if (id === 'team') openTeam(event.currentTarget); else windows.open(id, event.currentTarget); }}>{windowLabels[id]}</button>
       ))}
       <button type="button" onClick={windows.resetLayout}>Restablecer distribución</button>
@@ -2545,7 +2582,7 @@ export function GameScreen() {
 
     <ObjectivesSection view={view} />
     <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} onOpenLab={() => windows.open('lab', null)} />
-    <ConsoleSection log={log} orderHistory={orderHistory} readBar={<ReadAloudBar text={lastLogText} canRead={audioTts.canRead}
+    <ConsoleSection log={log} orderHistory={orderHistory} reducedMotion={reducedMotion} announceNarration={preferences.accessibility.announceNarration} readBar={<ReadAloudBar text={lastLogText} canRead={audioTts.canRead}
       speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} noVoices={audioTts.noVoices} onRead={() => void audioTts.speak(lastLogText)}
       onRepeat={() => void audioTts.speak(audioTts.lastText)} onPauseResume={audioTts.pauseOrResume} onStop={audioTts.stop} />} />
     <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
@@ -2557,7 +2594,7 @@ export function GameScreen() {
       onConfirm={() => void confirmPreview()} onCancel={cancelOrder} />}
     {orderPhase.kind === 'committing' && <p className="game-notice" role="status">Confirmando… No cierres la pestaña.</p>}
 
-    <MinimizedBar windows={windows.windows} onRestore={windows.restore} />
+    <MinimizedBar windows={windows.windows} lastMinimized={windows.lastMinimized} onRestore={windows.restore} />
 
     <GameWindow id="map" title="Mapa" state={windows.windows.map} {...windowProps}>
       <MapContent view={view} busy={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
@@ -2587,8 +2624,11 @@ export function GameScreen() {
     </GameWindow>
     <GameWindow id="settings" title="Ajustes" state={windows.windows.settings} {...windowProps}>
       <SettingsContent identity={identity} textScale={preferences.textScale} highContrast={preferences.highContrast}
-        palette={preferences.palette} onScale={value => updatePreferences({ textScale: value })}
+        palette={preferences.palette} accessibility={preferences.accessibility} fontMode={preferences.fontMode}
+        onScale={value => updatePreferences({ textScale: value })}
         onContrast={value => updatePreferences({ highContrast: value })} onPalette={value => updatePreferences({ palette: value })}
+        onAccessibility={patch => updatePreferences({ accessibility: { ...preferences.accessibility, ...patch } })}
+        onFontMode={value => updatePreferences({ fontMode: value })}
         profile={detectiveProfile} onProfileSaved={setDetectiveProfile}
         audio={preferences.audio} tts={preferences.tts} voices={audioTts.voices}
         ttsSupported={audioTts.ttsSupported}

@@ -8,7 +8,7 @@ import { applyPreferences, paletteLabels } from './preferences';
  * que el test añada otra violación web-isolation; la forma real la cubre el
  * test de la librería). */
 type Palette = 'default' | 'protanopia' | 'deuteranopia' | 'tritanopia' | 'high-contrast';
-function prefs(patch: { palette?: Palette; highContrast?: boolean }) {
+function prefs(patch: { palette?: Palette; highContrast?: boolean; fontMode?: 'retro' | 'accessible'; accessibility?: { reducedMotion?: boolean; focusVisible?: boolean; skipNav?: boolean; announceNarration?: boolean } }) {
   return {
     version: 1 as const,
     fontMode: 'retro' as const,
@@ -18,8 +18,8 @@ function prefs(patch: { palette?: Palette; highContrast?: boolean }) {
     language: 'es' as const,
     audio: { musicVolume: 60, effectsVolume: 70, narrationVolume: 80, muted: false, musicEnabled: true, effectsEnabled: true },
     tts: { enabled: false, voice: 'auto', rate: 1, autoRead: false },
-    accessibility: { reducedMotion: false, focusVisible: true, skipNav: true, announceNarration: true },
     ...patch,
+    accessibility: { reducedMotion: false, focusVisible: true, skipNav: true, announceNarration: true, ...patch.accessibility },
   };
 }
 
@@ -67,5 +67,29 @@ describe('Preferencias persistentes (§15)', () => {
     applyPreferences(prefs({ palette: 'protanopia', highContrast: false }));
     expect(classes.has('game-high-contrast')).toBe(false);
     expect(classes.has('palette-protanopia')).toBe(true);
+  });
+
+  it('el movimiento reducido manual pone su clase y se quita al apagarlo', () => {
+    const { classes } = stubDocument();
+    applyPreferences(prefs({ accessibility: { reducedMotion: true } }));
+    expect(classes.has('game-reduced-motion')).toBe(true);
+    applyPreferences(prefs({ accessibility: { reducedMotion: false } }));
+    expect(classes.has('game-reduced-motion')).toBe(false);
+  });
+
+  it('la fuente legible pone su clase y la retro la quita', () => {
+    const { classes } = stubDocument();
+    applyPreferences(prefs({ fontMode: 'accessible' }));
+    expect(classes.has('game-font-accessible')).toBe(true);
+    applyPreferences(prefs({ fontMode: 'retro' }));
+    expect(classes.has('game-font-accessible')).toBe(false);
+  });
+
+  it('el foco discreto solo se activa cuando el foco marcado está apagado', () => {
+    const { classes } = stubDocument();
+    applyPreferences(prefs({ accessibility: { focusVisible: true } }));
+    expect(classes.has('game-focus-subtle')).toBe(false);
+    applyPreferences(prefs({ accessibility: { focusVisible: false } }));
+    expect(classes.has('game-focus-subtle')).toBe(true);
   });
 });

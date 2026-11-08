@@ -30,7 +30,7 @@ body:has(.archive) { background:#000000; color:#ffffff; }
 .archive-session { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; background:var(--panel); border:2px solid var(--edge); padding:12px 16px; }
 .archive-actions { display:flex; flex-wrap:wrap; gap:12px; }
 .archive-connection { display:flex; align-items:center; gap:8px; margin-bottom:12px; padding:8px 12px; background:#000000; border:2px solid var(--gold); }
-.archive-connection .archive-connection-error { color:#ff5555; font-size:.8em; }
+.archive-connection .archive-connection-error { color:var(--error); font-size:.8em; }
 .archive .archive-notice { padding:20px 0; min-height:72px; color:var(--gold); }
 
 /* Lista de partidas. */

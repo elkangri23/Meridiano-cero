@@ -8,7 +8,8 @@ import type { PaletteMode, PresentationPreferences } from '@meridiano/case-schem
  * <html> (las reglas viven en style.css y anulan las variables del juego y
  * del archivo); la escala, como font-size en <main> como ya hacía la
  * pantalla de juego; el alto contraste, como clase en <html> (la regla
- * .game-high-contrast ya existe en game.css). */
+ * .game-high-contrast ya existe en game.css); el movimiento reducido, la
+ * fuente legible y el foco discreto, también como clases en <html> (§15). */
 const store = createPreferenceStore();
 
 export function applyPreferences(preferences: PresentationPreferences): void {
@@ -17,6 +18,13 @@ export function applyPreferences(preferences: PresentationPreferences): void {
   for (const mode of ['protanopia', 'deuteranopia', 'tritanopia'] as const) {
     root.classList.toggle('palette-' + mode, preferences.palette === mode);
   }
+  // Accesibilidad (§15): el movimiento reducido desactiva animaciones y
+  // transiciones del juego (game.css), la fuente legible cambia la familia
+  // tipográfica (style.css) y el foco discreto adelgaza el contorno sin
+  // quitarlo nunca (WCAG 2.4.11: el foco siempre es visible).
+  root.classList.toggle('game-reduced-motion', preferences.accessibility.reducedMotion);
+  root.classList.toggle('game-font-accessible', preferences.fontMode === 'accessible');
+  root.classList.toggle('game-focus-subtle', !preferences.accessibility.focusVisible);
 }
 
 export function usePreferences(): { preferences: PresentationPreferences; updatePreferences: (patch: Partial<PresentationPreferences>) => void } {

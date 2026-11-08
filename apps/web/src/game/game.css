@@ -7,7 +7,7 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game {
   --paper:#ffffff; --muted:#aaaaaa; --gold:#ffff55; --edge:#aaaaaa;
   --panel:#0000aa; --ink:#000000; --teal:#00aaaa; --sky:#55ffff;
-  --rust:#aa5500; --grey:#555555; --error:#ff5555;
+  --rust:#aa5500; --grey:#555555; --error:#ff7777;
   max-width:1440px; margin:16px auto; padding:0 32px;
   font-family:ui-monospace,SFMono-Regular,Consolas,monospace; line-height:1.5; color:var(--paper);
 }
@@ -85,7 +85,11 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-toolbar { display:flex; flex-wrap:wrap; gap:0; margin:8px 0 16px; background:#000000; border:2px solid var(--edge); padding:0; }
 .game-toolbar button { text-align:left; color:var(--muted); background:transparent; border:0; border-left:2px solid transparent; font-size:.8em; padding:12px 14px; line-height:1.5; min-height:44px; }
 .game-toolbar button:hover { background:var(--panel); color:var(--paper); }
-.game-toolbar button[aria-pressed="true"] { background:var(--teal); border-left-color:var(--gold); color:var(--paper); }
+/* Botón activo de la barra (§15): fondo teal oscuro #005555 (blanco sobre
+ * él: 8,64) en vez de var(--teal), que en la paleta por defecto daba 2,86.
+ * La negrita es una segunda marca además del color (no depender solo del
+ * color) y el borde dorado ya estaba. */
+.game-toolbar button[aria-pressed="true"] { background:#005555; border-left-color:var(--gold); color:var(--paper); font-weight:700; }
 
 /* Escena: panel azul con barra superior, arte pixel y pie de escena. */
 .game-scene { border:2px solid var(--edge); background:var(--panel); margin-bottom:16px; }
@@ -158,7 +162,7 @@ body:has(.game) { background:#000000; color:#ffffff; }
 .game-travel-to { right:0; }
 
 /* Ventanas de herramienta: diálogo del prototipo con barra negra. */
-.game-window { position:absolute; z-index:20; width:min(28rem, calc(100vw - 32px)); border:2px solid var(--edge); background:var(--panel); box-shadow:8px 8px 0 #000000; }
+.game-window { position:absolute; z-index:20; width:min(28em, calc(100vw - 32px)); border:2px solid var(--edge); background:var(--panel); box-shadow:8px 8px 0 #000000; }
 .game-window-titlebar { display:flex; align-items:center; justify-content:space-between; gap:8px; background:#000000; color:var(--paper); padding:4px 8px; border-bottom:1px solid var(--edge); cursor:move; }
 .game-window-titlebar h3 { color:var(--paper); margin:0; cursor:move; font-weight:400; }
 .game-window-titlebar h3:focus-visible { outline:3px solid var(--gold); }
@@ -271,3 +275,16 @@ body:has(.game) { background:#000000; color:#ffffff; }
   .game-scene-top { font-size:.65em; }
 }
 @media (prefers-reduced-motion:reduce) { .game *, .game *::before, .game *::after { scroll-behavior:auto; animation:none; transition:none; } }
+/* Movimiento reducido manual (§15): igual que la media query del sistema,
+ * pero por clase en <html>, para quien lo activa en Ajustes aunque su
+ * sistema no lo pida. El interruptor manda si difiere del sistema. */
+html.game-reduced-motion .game *, html.game-reduced-motion .game *::before, html.game-reduced-motion .game *::after { scroll-behavior:auto; animation:none !important; transition:none !important; }
+
+/* Texto solo para lectores de pantalla (§15): equivalentes textuales de
+ * estados que de otro modo serían solo color o símbolo (✓/○). */
+.game-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+
+/* Enlace de salto (§15): invisible hasta recibir el foco con el teclado,
+ * y entonces salta a la escena. Solo existe cuando skipNav está activo. */
+.game-skip-link { position:absolute; left:-9999px; top:0; z-index:60; background:var(--gold); color:#000000; padding:8px 12px; font-weight:700; }
+.game-skip-link:focus { left:8px; top:8px; }

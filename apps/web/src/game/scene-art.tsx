@@ -6,7 +6,9 @@
  * El arte es decorativo: no inventa contenido del caso, solo ilustra el tipo
  * de lugar que la definición ya nombra (sala de embalaje, archivo de
  * conservación, almacén de depósito). Las localizaciones desconocidas usan
- * el arte de Madrid como respaldo.
+ * el arte de Madrid como respaldo. La descripción accesible (§15) dice solo
+ * lo que dibuja el fondo, nunca pruebas del caso que el jugador aún no
+ * descubrió: el contenido del caso está en el texto de la escena.
  */
 
 export type SceneArtId = 'madrid-sala' | 'paris-archivo' | 'lisboa-almacen';
@@ -135,9 +137,17 @@ function LisbonDepositArt() {
   </svg>;
 }
 
+/** Descripción accesible del fondo (§15): lo que dibuja, sin spoilers del
+ * caso. Las pruebas se descubren jugando; el arte no las nombra. */
+export function sceneArtDescription(art: SceneArtId): string {
+  if (art === 'paris-archivo') return 'Ilustración pixel-art de un archivo de conservación: estanterías con cajas y legajos, ventana con tejados y mesa con papeles y lámpara.';
+  if (art === 'lisboa-almacen') return 'Ilustración pixel-art de un almacén de depósito: rejilla de taquillas de custodia, lámpara colgante y una caja grande en primer plano.';
+  return 'Ilustración pixel-art de una sala de embalaje: ventana con vistas a la ciudad, mesa con una caja y un cuadro en la pared.';
+}
+
 export function SceneArt({ locationId }: { locationId: string }) {
   const art = locationArtId(locationId);
-  return <div className="game-scene-art" data-testid="scene-art" data-location={locationId} aria-hidden="true">
+  return <div className="game-scene-art" data-testid="scene-art" data-location={locationId} role="img" aria-label={sceneArtDescription(art)}>
     {art === 'paris-archivo' ? <ParisArchiveArt /> : art === 'lisboa-almacen' ? <LisbonDepositArt /> : <MadridPackingArt />}
   </div>;
 }
