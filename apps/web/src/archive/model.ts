@@ -59,7 +59,7 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
       connectionStatus: wasOnline ? 'reconnecting' : 'offline',
       lastError: 'No se pudo completar la operación. Reintentando...' });
   }
-  
+
   async function reconnect(): Promise<void> {
     if (disposed) return;
     const ticket = begin();
@@ -70,13 +70,13 @@ export function createArchiveModel(api: ArchiveApi, storage: IntentStorage = bro
       if (!identity) { set({ ...blank(), phase: 'signed_out', connectionStatus: 'offline', notice: 'La sesión no está iniciada.' }); return; }
       await page(ticket, identity, 'all', null, []);
       set({ ...state, connectionStatus: 'online', lastError: null });
-    } catch { 
+    } catch {
       if (ticket.current()) {
         set({ ...state, connectionStatus: 'offline', notice: 'No se pudo reconectar. Verifica tu conexión e intenta de nuevo.' });
       }
     }
   }
-  
+
   async function page(ticket: Ticket, identity: SessionDto, filter: Filter, cursor: string | null, previous: readonly (string | null)[]) {
     const [result, catalog, jobs] = await Promise.all([api.list(filter, cursor, ticket.signal), api.cases(ticket.signal), api.generationJobs(ticket.signal)]);
     if (!ticket.current()) return;

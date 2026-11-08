@@ -90,7 +90,7 @@ test.describe('E2E - Accesibilidad básica', () => {
     // Label en sample.ts es "Lectura y contraste"
     await page.click('button:has-text("Lectura y contraste")');
     await expect(page.locator('h2:has-text("Lectura y contraste")')).toBeVisible();
-    
+
     // Probar contraste
     const highContrastCheckbox = page.locator('label:has-text("Contraste reforzado") input');
     await highContrastCheckbox.check();

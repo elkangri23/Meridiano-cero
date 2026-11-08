@@ -56,7 +56,7 @@ function toVoice(voice: any): TTSVoice {
 
 export function createTTSController(): TTSController {
   const synth = getSpeechSynthesis();
-  
+
   let speaking = false;
   let paused = false;
 
@@ -94,7 +94,7 @@ export function createTTSController(): TTSController {
         utterance.onerror = () => { speaking = false; paused = false; };
         utterance.onpause = () => { paused = true; };
         utterance.onresume = () => { paused = false; };
-        
+
         synth.speak(utterance);
         return true;
       } catch {
@@ -112,7 +112,7 @@ export function createTTSController(): TTSController {
         synth.cancel();
         speaking = false;
         paused = false;
-        
+
       }
     },
     getStatus(): TTSStatus {
