@@ -26,8 +26,8 @@ import type { WindowId } from './windows';
 import { effectiveReducedMotion, objectiveStateText, trapTabKey, useSystemReducedMotion } from './accessibility';
 import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto, TranslateFn } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_KEYS, getNPC, IRREGULAR_KIND_KEYS, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/contracts';
-import type { CaseTexts, DiscoveryLookup, ForensicType, LocaleKey, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/contracts';
+import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_KEYS, getNPC, IRREGULAR_KIND_KEYS, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, SUPPORTED_LANGUAGES, travelText } from '@meridiano/contracts';
+import type { CaseTexts, DiscoveryLookup, ForensicType, Language, LocaleKey, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/contracts';
 import { useTranslation } from '../i18n';
 import './game.css';
 
@@ -58,6 +58,10 @@ function evidenceTypeLabel(type: string, t: TranslateFn): string {
 function requestTypeLabel(type: string, t: TranslateFn): string {
   const key = requestTypeKeys[type];
   return key ? t(key) : type;
+}
+function channelLabel(channel: string, t: TranslateFn): string {
+  const key = channelKeys[channel];
+  return key ? t(key) : channel;
 }
 
 /** Dificultad de la partida, tal como se enseña en la cabecera junto al
@@ -1138,16 +1142,17 @@ function LabAnalysisItem({ offer, view, pendingAnalysis, disabled, onAnalyze }: 
   offer: PublicActionOffer; view: PlayerViewDto; pendingAnalysis: PlayerViewDto['pendingRequests'][number] | undefined;
   disabled: boolean; onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
 }) {
+  const t = useTranslation();
   const inputId = typeof offer.action.params.evidenceId === 'string' ? offer.action.params.evidenceId : '';
-  const typeLabel = offer.forensicType && offer.forensicType in FORENSIC_TYPE_LABELS
-    ? FORENSIC_TYPE_LABELS[offer.forensicType as ForensicType]
-    : 'Análisis';
+  const typeLabel = offer.forensicType && offer.forensicType in FORENSIC_TYPE_KEYS
+    ? t(FORENSIC_TYPE_KEYS[offer.forensicType as ForensicType])
+    : t('game.analysisLabel');
   const evidence = view.evidenceTexts[inputId] ?? inputId;
   return <li><span><strong>{typeLabel}</strong><small>{evidence}{offer.detail ? ` · ${offer.detail}` : ''}</small></span>
     {pendingAnalysis
-      ? <span><small>En curso: responde en el minuto {pendingAnalysis.dueMinute} (ahora {view.clock.minute})</small></span>
+      ? <span><small>{t('game.labInProgress', { due: pendingAnalysis.dueMinute, now: view.clock.minute })}</small></span>
       : <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
-        onClick={event => onAnalyze(offer, event.currentTarget)}>Solicitar análisis</button></span>}
+        onClick={event => onAnalyze(offer, event.currentTarget)}>{t('game.labRequestAnalysis')}</button></span>}
   </li>;
 }
 
@@ -1156,6 +1161,7 @@ function LabContent({ view, labOffers, disabled, onAnalyze, onOpenIntel }: {
   labOffers: PublicActionOffer[]; disabled: boolean;
   onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenIntel: () => void;
 }) {
+  const t = useTranslation();
   // Un solo análisis por expediente: una solicitud de tipo análisis en
   // curso es la de la oferta que se enseña, y su resultado es la primera
   // evidencia revelada por un análisis (la vista la trae en
@@ -1163,20 +1169,20 @@ function LabContent({ view, labOffers, disabled, onAnalyze, onOpenIntel }: {
   const pendingAnalysis = view.pendingRequests.find(item => item.type === 'analysis');
   const analysisResult = view.analysisResults[0];
   return <div>
-    <h4>Laboratorio forense</h4>
+    <h4>{t('game.labTitle')}</h4>
     {labOffers.length === 0 && !analysisResult
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin pruebas para analizar. Recoge una prueba y el laboratorio ofrecerá el método que tenga sentido para ella.</p></div>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.labEmpty')}</p></div>
       : <ul className="game-destination-list">{labOffers.map(offer => (
         <LabAnalysisItem key={offer.id} offer={offer} view={view} pendingAnalysis={pendingAnalysis} disabled={disabled} onAnalyze={onAnalyze} />
       ))}</ul>}
-    {analysisResult && <p>Resultado: {view.evidenceTexts[analysisResult] ?? analysisResult}</p>}
-    <p className="game-panel-note">Nota de procedimiento: la ausencia de registro no demuestra inocencia. Un análisis solo dice lo que la prueba permite decir.</p>
-    <p><button type="button" onClick={onOpenIntel}>Abrir la terminal de inteligencia</button></p>
-    <h4>Solicitudes pendientes</h4>
+    {analysisResult && <p>{t('game.labResult', { result: view.evidenceTexts[analysisResult] ?? analysisResult })}</p>}
+    <p className="game-panel-note">{t('game.labNote')}</p>
+    <p><button type="button" onClick={onOpenIntel}>{t('game.openIntelTerminal')}</button></p>
+    <h4>{t('game.pendingRequestsTitle')}</h4>
     {view.pendingRequests.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin solicitudes pendientes. Las consultas tardan 30 min de juego; cada análisis indica su propio tiempo.</p></div>
-      : <ul className="game-destination-list">{view.pendingRequests.map(item => <li key={item.id}><span><strong>{requestTypeLabels[item.type] ?? item.type}</strong><small>Responde en el minuto {item.dueMinute} (ahora {view.clock.minute})</small></span></li>)}</ul>}
-    <p className="game-panel-note">Consultar este panel no consume tiempo.</p>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noPendingRequests')}</p></div>
+      : <ul className="game-destination-list">{view.pendingRequests.map(item => <li key={item.id}><span><strong>{requestTypeLabel(item.type, t)}</strong><small>{t('game.requestDue', { due: item.dueMinute, now: view.clock.minute })}</small></span></li>)}</ul>}
+    <p className="game-panel-note">{t('game.consultNote')}</p>
   </div>;
 }
 
@@ -1187,12 +1193,13 @@ function LabContent({ view, labOffers, disabled, onAnalyze, onOpenIntel }: {
  * (`view.objects` son las pruebas recogidas, nunca la solución ni pruebas
  * no halladas). */
 function CommsContactList({ contacts, caseId }: { contacts: Contact[]; caseId: string }) {
-  if (contacts.length === 0) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Habla primero con alguien en persona para poder contactarlo después.</p></div>;
+  const t = useTranslation();
+  if (contacts.length === 0) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.commsEmpty')}</p></div>;
   return <ul className="game-destination-list">{contacts.map(contact => <li key={contact.id}>
     <Portrait seed={portraitSeed(caseId, contact.id)} name={contact.name} size="small" />
     <span><strong>{contact.name}</strong><small>{contact.channels.length > 0
-      ? contact.channels.map(item => channelLabels[item] ?? item).join(', ')
-      : 'Sin canales remotos: solo en persona'}</small></span>
+      ? contact.channels.map(item => channelLabel(item, t)).join(', ')
+      : t('game.noRemoteChannels')}</small></span>
   </li>)}</ul>;
 }
 
@@ -1201,21 +1208,22 @@ function CommsSendForm({ view, contacts, recipient, channel, channels, documentI
   onRecipient: (value: string) => void; onChannel: (value: string) => void; onDocument: (value: string) => void; onText: (value: string) => void;
   onSend: (event: FormEvent) => void;
 }) {
+  const t = useTranslation();
   return <form onSubmit={onSend} data-testid="comms-form">
-    <label>Destinatario <select data-testid="comms-recipient" value={recipient} onChange={event => onRecipient(event.target.value)}>
-      <option value="">Elige…</option>
+    <label>{t('game.recipient')} <select data-testid="comms-recipient" value={recipient} onChange={event => onRecipient(event.target.value)}>
+      <option value="">{t('game.choose')}</option>
       {contacts.map(contact => <option key={contact.id} value={contact.id}>{contact.name}</option>)}
     </select></label>
-    <label>Canal <select data-testid="comms-channel" value={channel} onChange={event => onChannel(event.target.value)} disabled={channels.length === 0}>
-      {channels.map(item => <option key={item} value={item}>{channelLabels[item] ?? item}</option>)}
+    <label>{t('game.channel')} <select data-testid="comms-channel" value={channel} onChange={event => onChannel(event.target.value)} disabled={channels.length === 0}>
+      {channels.map(item => <option key={item} value={item}>{channelLabel(item, t)}</option>)}
     </select></label>
-    <label>Mensaje <input type="text" data-testid="comms-text" value={text} onChange={event => onText(event.target.value)} maxLength={4000} /></label>
-    <label>Documento <select data-testid="comms-document" value={documentId} onChange={event => onDocument(event.target.value)}>
-      <option value="">Sin documento</option>
+    <label>{t('game.message')} <input type="text" data-testid="comms-text" value={text} onChange={event => onText(event.target.value)} maxLength={4000} /></label>
+    <label>{t('game.document')} <select data-testid="comms-document" value={documentId} onChange={event => onDocument(event.target.value)}>
+      <option value="">{t('game.noDocument')}</option>
       {view.objects.map(item => <option key={item.id} value={item.id}>{view.evidenceTexts[item.id] ?? item.id}</option>)}
     </select></label>
     <button type="submit" data-testid="comms-send" disabled={!recipient || channels.length === 0 || !text.trim() || busy}>
-      {documentId ? 'Enviar documento' : 'Enviar mensaje'}</button>
+      {documentId ? t('game.sendDocument') : t('game.sendMessage')}</button>
   </form>;
 }
 
@@ -1223,16 +1231,17 @@ function CommsHistoryItem({ view, contacts, record, onAskReply }: {
   view: PlayerViewDto; contacts: Contact[]; record: PlayerViewDto['communications'][number];
   onAskReply: (record: PlayerViewDto['communications'][number]) => void;
 }) {
+  const t = useTranslation();
   const name = contacts.find(contact => contact.id === record.recipientId)?.name
     ?? view.npcChat.find(entry => entry.id === record.recipientId)?.name ?? record.recipientId;
   return <li>
-    <span><strong>A {name} por {channelLabels[record.channel] ?? record.channel}</strong>
+    <span><strong>{t('game.commsTo', { name, channel: channelLabel(record.channel, t) })}</strong>
       <small>{record.requestText}</small>
-      {record.documentId && <small>Documento: {view.evidenceTexts[record.documentId] ?? record.documentId}</small>}
-      <small>Enviado min {record.sentMinute} · {record.receivedMinute !== undefined
-        ? `Acuse recibido min ${record.receivedMinute}` : `Acuse sobre el min ${record.dueMinute}`}</small></span>
+      {record.documentId && <small>{t('game.commsDocument', { document: view.evidenceTexts[record.documentId] ?? record.documentId })}</small>}
+      <small>{t('game.commsSent', { sent: record.sentMinute, receipt: record.receivedMinute !== undefined
+        ? t('game.commsReceiptReceived', { minute: record.receivedMinute }) : t('game.commsReceiptDue', { minute: record.dueMinute }) })}</small></span>
     {record.receivedMinute !== undefined && <span> <button type="button" data-testid={`comms-ask-${record.id}`}
-      onClick={() => onAskReply(record)}>Preguntar por la respuesta</button></span>}
+      onClick={() => onAskReply(record)}>{t('game.askForReply')}</button></span>}
   </li>;
 }
 
@@ -1242,22 +1251,23 @@ function CommsContent({ view, contacts, recipient, channel, documentId, text, bu
   onSend: (event: FormEvent) => void;
   onAskReply: (record: PlayerViewDto['communications'][number]) => void;
 }) {
+  const t = useTranslation();
   const selected = contacts.find(contact => contact.id === recipient);
   const channels = selected?.channels ?? [];
   return <div>
-    <h4>Contactos</h4>
+    <h4>{t('game.contactsTitle')}</h4>
     <CommsContactList contacts={contacts} caseId={view.caseId} />
-    <h4>Enviar</h4>
+    <h4>{t('game.sendTitle')}</h4>
     {contacts.length === 0 ? null : <CommsSendForm view={view} contacts={contacts} recipient={recipient} channel={channel}
       channels={channels} documentId={documentId} text={text} busy={busy} onRecipient={onRecipient} onChannel={onChannel}
       onDocument={onDocument} onText={onText} onSend={onSend} />}
-    {documentId && <p className="game-panel-note">Enviar un documento es un trámite: cuesta 30 min de juego.</p>}
-    <h4>Historial</h4>
+    {documentId && <p className="game-panel-note">{t('game.documentCostNote')}</p>}
+    <h4>{t('game.commsHistory')}</h4>
     {view.communications.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin envíos todavía. Lo que envíes quedará aquí registrado.</p></div>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.commsEmptyHistory')}</p></div>
       : <ul className="game-destination-list" data-testid="comms-history">{view.communications.map(record =>
         <CommsHistoryItem key={record.id} view={view} contacts={contacts} record={record} onAskReply={onAskReply} />)}</ul>}
-    <p className="game-panel-note">Escribir un mensaje no cuesta tiempo; enviar un documento cuesta 30 min. El acuse llega a su hora, incluso mientras viajas.</p>
+    <p className="game-panel-note">{t('game.commsNote')}</p>
   </div>;
 }
 
@@ -1274,65 +1284,66 @@ function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, d
   onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
   onDraft: (value: string) => void; onSendElena: (event: FormEvent) => void;
 }) {
+  const t = useTranslation();
   const memberName = (id: string) => TEAM_MEMBERS.find(member => member.id === id)?.name ?? id;
-  const serviceLabel = (id: string) => (TEAM_SERVICE_LABELS as Record<string, string>)[id] ?? id;
+  const serviceLabel = (id: TeamServiceId) => t(TEAM_SERVICE_KEYS[id]);
   return <div>
-    <h4>Miembros</h4>
+    <h4>{t('game.teamMembers')}</h4>
     <ul className="game-destination-list">{TEAM_MEMBERS.map(member => <li key={member.id}>
       <Portrait seed={teamPortraitSeed(member.id)} name={member.name} size="small" />
-      <span><strong>{member.name}</strong><small>{member.role} · {member.blurb}</small></span>
+      <span><strong>{member.name}</strong><small>{t(member.role)} · {t(member.blurb)}</small></span>
       <span>
         {member.id === 'margaret' && <button type="button" data-testid="team-briefing" disabled={busy}
-          onClick={event => onService('margaret', 'briefing', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.briefing}</button>}
+          onClick={event => onService('margaret', 'briefing', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.briefing)}</button>}
         {member.id === 'margaret' && <button type="button" data-testid="team-evaluate" disabled={busy}
-          onClick={event => onService('margaret', 'evaluate', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.evaluate}</button>}
+          onClick={event => onService('margaret', 'evaluate', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.evaluate)}</button>}
         {member.id === 'clara' && <button type="button" data-testid="team-organize" disabled={busy}
-          onClick={event => onService('clara', 'organize', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.organize}</button>}
+          onClick={event => onService('clara', 'organize', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.organize)}</button>}
         {member.id === 'david' && <button type="button" data-testid="team-routes" disabled={busy}
-          onClick={event => onService('david', 'routes', undefined, event.currentTarget)}>{TEAM_SERVICE_LABELS.routes}</button>}
+          onClick={event => onService('david', 'routes', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.routes)}</button>}
       </span>
     </li>)}</ul>
-    <h4>Dr. Samuel Richter — explicar un análisis</h4>
+    <h4>{t('game.richterExplain')}</h4>
     {view.analysisResults.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin análisis completados todavía. Richter solo explica análisis ya terminados.</p></div>
-      : <p><label>Análisis <select data-testid="team-analysis" value={analysisId}
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noAnalysisResults')}</p></div>
+      : <p><label>{t('game.analysisLabel')} <select data-testid="team-analysis" value={analysisId}
         onChange={event => onAnalysis(event.target.value)}>
         {view.analysisResults.map(id => <option key={id} value={id}>{view.evidenceTexts[id] ?? id}</option>)}
       </select></label>
       <span> <button type="button" data-testid="team-explain" disabled={busy || !analysisId}
-        onClick={event => onService('richter', 'explain', analysisId, event.currentTarget)}>{TEAM_SERVICE_LABELS.explain}</button></span></p>}
-    <h4>Elena Vázquez — consulta de inteligencia</h4>
+        onClick={event => onService('richter', 'explain', analysisId, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.explain)}</button></span></p>}
+    <h4>{t('game.elenaQuery')}</h4>
     <form onSubmit={onSendElena} className="game-chat-form">
       <input type="text" data-testid="team-elena-input" value={draft} disabled={elenaBusy} maxLength={4000}
-        placeholder="Pregunta por lo investigado: un sospechoso, una prueba, un lugar…" aria-label="Pregunta para Elena Vázquez"
+        placeholder={t('game.elenaPlaceholder')} aria-label={t('game.elenaAria')}
         onChange={event => onDraft(event.target.value)} />
-      <button type="submit" data-testid="team-elena-send" disabled={!draft.trim() || elenaBusy}>{elenaBusy ? 'Consultando…' : 'Preguntar'}</button>
+      <button type="submit" data-testid="team-elena-send" disabled={!draft.trim() || elenaBusy}>{elenaBusy ? t('game.consulting') : t('game.ask')}</button>
     </form>
     {error && <p className="game-error" role="alert">{error}</p>}
-    <h4>David Nakamura — coordinar una detención</h4>
+    <h4>{t('game.davidDetain')}</h4>
     {detainOffers.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin detenciones que coordinar: hacen falta una orden válida y la ubicación conocida del sospechoso.</p></div>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noDetentions')}</p></div>
       : <ul className="game-destination-list">{detainOffers.map(offer => <li key={offer.id}>
         <span><strong>{offer.label}</strong><small>{offer.detail}</small></span>
         <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={busy}
-          onClick={event => onOffer(offer, event.currentTarget)}>Coordinar</button></span>
+          onClick={event => onOffer(offer, event.currentTarget)}>{t('game.coordinate')}</button></span>
       </li>)}</ul>}
-    <h4>Conversación con el equipo</h4>
+    <h4>{t('game.teamConversation')}</h4>
     {turns.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Pide ayuda a un miembro y su respuesta quedará aquí.</p></div>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.teamEmpty')}</p></div>
       : <ol className="game-chat-turns" data-testid="team-turns" aria-live="polite">
         {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
-          <span className="game-chat-speaker">{turn.from === 'you' ? 'Tú' : memberName(turn.memberId)}</span>
+          <span className="game-chat-speaker">{turn.from === 'you' ? t('game.you') : memberName(turn.memberId)}</span>
           <span>{turn.text}</span>
         </li>)}
       </ol>}
-    <h4>Peticiones registradas</h4>
+    <h4>{t('game.teamRequests')}</h4>
     {view.team.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin peticiones al equipo todavía.</p></div>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.teamNoRequests')}</p></div>
       : <ul className="game-destination-list" data-testid="team-history">{view.team.map(record =>
         <li key={record.id}><span><strong>{memberName(record.memberId)} · {serviceLabel(record.serviceId)}</strong>
-          <small>Minuto {record.minute}{record.targetId ? ` · ${view.evidenceTexts[record.targetId] ?? record.targetId}` : ''}</small></span></li>)}</ul>}
-    <p className="game-panel-note">Pedir ayuda al equipo no consume tiempo: el reloj solo avanza con las gestiones que ya existen (un análisis, coordinar una detención, enviar un documento). El equipo nunca indica si vas bien, ni señala al culpable ni sugiere la siguiente pista.</p>
+          <small>{t('game.teamRecordMinute', { minute: record.minute })}{record.targetId ? ` · ${view.evidenceTexts[record.targetId] ?? record.targetId}` : ''}</small></span></li>)}</ul>}
+    <p className="game-panel-note">{t('game.teamNote')}</p>
   </div>;
 }
 
@@ -1340,14 +1351,15 @@ function SaveList({ saves, atLimit, closed, onLoad, onDelete, onReplace }: {
   saves: SaveListDto | null; atLimit: boolean; closed: boolean;
   onLoad: (save: SaveListItem) => void; onDelete: (save: SaveListItem) => void; onReplace: (save: SaveListItem) => void;
 }) {
-  if (!saves) return <p>Cargando guardados…</p>;
-  if (saves.items.length === 0) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin guardados manuales.</p></div>;
+  const t = useTranslation();
+  if (!saves) return <p>{t('game.loadingSaves')}</p>;
+  if (saves.items.length === 0) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noSaves')}</p></div>;
   return <ul className="game-save-list" data-testid="save-list">
     {saves.items.map(save => <li key={save.saveId}>
       <span><strong>{save.name}</strong><small>{save.cityName} · min {save.minute} · {new Date(save.createdAt).toLocaleString('es-ES')}</small></span>
-      <span> <button type="button" data-testid={`load-${save.saveId}`} disabled={closed} onClick={() => onLoad(save)}>Cargar</button></span>
-      <span> <button type="button" disabled={closed} onClick={() => onDelete(save)}>Borrar</button></span>
-      {atLimit && !closed && <span> <button type="button" onClick={() => onReplace(save)}>Reemplazar con el nuevo</button></span>}
+      <span> <button type="button" data-testid={`load-${save.saveId}`} disabled={closed} onClick={() => onLoad(save)}>{t('game.loadSave')}</button></span>
+      <span> <button type="button" disabled={closed} onClick={() => onDelete(save)}>{t('game.deleteSave')}</button></span>
+      {atLimit && !closed && <span> <button type="button" onClick={() => onReplace(save)}>{t('game.replaceWithNew')}</button></span>}
     </li>)}
   </ul>;
 }
@@ -1356,13 +1368,14 @@ function SaveCreateForm({ savePhase, saveName, closed, canSave, replaceTarget, o
   savePhase: SavePhase; saveName: string; closed: boolean; canSave: boolean; replaceTarget: SaveListItem | null;
   onSaveName: (value: string) => void; onCreate: () => void;
 }) {
+  const t = useTranslation();
   return <form onSubmit={event => { event.preventDefault(); onCreate(); }}>
-    <label>Nombre del guardado <input type="text" data-testid="save-name-input" value={saveName}
+    <label>{t('game.saveName')} <input type="text" data-testid="save-name-input" value={saveName}
       onChange={event => onSaveName(event.target.value)} maxLength={128} /></label>
-    {replaceTarget && <p>Al guardar se reemplazará «{replaceTarget.name}».</p>}
+    {replaceTarget && <p>{t('game.replaceNote', { name: replaceTarget.name })}</p>}
     <button type="submit" data-testid="save-create"
       disabled={closed || !saveName.trim() || savePhase === 'saving' || (!canSave && !replaceTarget)}>
-      {savePhase === 'saving' ? 'Guardando…' : 'Guardar partida'}
+      {savePhase === 'saving' ? t('game.saving') : t('game.saveRun')}
     </button>
   </form>;
 }
@@ -1373,39 +1386,38 @@ function SavesContent({ view, saves, savePhase, saveName, replaceTarget, loadTar
   onLoad: (save: SaveListItem) => void; onDelete: (save: SaveListItem) => void; onReplace: (save: SaveListItem) => void;
   onConfirmLoad: () => void; onCancelLoad: () => void;
 }) {
+  const t = useTranslation();
   const closed = view.status === 'closed';
   const atLimit = view.saveCapabilities.manualCount >= view.saveCapabilities.manualLimit;
   return <div>
-    <p className="game-save-count">Manuales: <strong>{view.saveCapabilities.manualCount}</strong> / {view.saveCapabilities.manualLimit}. Guardar no avanza el reloj.</p>
-    {closed && <p className="game-closed-note" role="status" data-testid="save-closed-notice">Esta partida está cerrada porque el caso ya está
-      resuelto. No se pueden crear guardados nuevos ni cargar uno anterior. Puedes consultar el informe final
-      o empezar una partida nueva desde el archivo.</p>}
+    <p className="game-save-count">{t('game.manualSavesCount')} <strong>{view.saveCapabilities.manualCount}</strong> / {view.saveCapabilities.manualLimit}. {t('game.saveNoClock')}</p>
+    {closed && <p className="game-closed-note" role="status" data-testid="save-closed-notice">{t('game.closedRunNote')}</p>}
     <SaveCreateForm savePhase={savePhase} saveName={saveName} closed={closed} canSave={view.saveCapabilities.canSave}
       replaceTarget={replaceTarget} onSaveName={onSaveName} onCreate={onCreate} />
-    {savePhase === 'saved' && <p role="status">Guardado confirmado por el servidor.</p>}
-    {savePhase === 'failed' && <p role="alert">No se pudo guardar. Reinténtalo.</p>}
-    <h4>Guardados manuales</h4>
+    {savePhase === 'saved' && <p role="status">{t('game.saveConfirmed')}</p>}
+    {savePhase === 'failed' && <p role="alert">{t('game.saveFailed')}</p>}
+    <h4>{t('game.manualSaves')}</h4>
     <SaveList saves={saves} atLimit={atLimit} closed={closed} onLoad={onLoad} onDelete={onDelete} onReplace={onReplace} />
-    {loadTarget && <div className="game-load-confirm" role="dialog" aria-label="Confirmar carga" data-testid="load-confirm">
-      <p>Volverás a «{loadTarget.name}» (min {loadTarget.minute}). Perderás el progreso posterior de la rama actual; el primer resultado oficial se mantiene.</p>
-      <button type="button" data-testid="load-confirm-button" onClick={onConfirmLoad}>Cargar este punto</button>
-      <button type="button" onClick={onCancelLoad}>Cancelar</button>
+    {loadTarget && <div className="game-load-confirm" role="dialog" aria-label={t('game.confirmLoad')} data-testid="load-confirm">
+      <p>{t('game.loadConfirmText', { name: loadTarget.name, minute: loadTarget.minute })}</p>
+      <button type="button" data-testid="load-confirm-button" onClick={onConfirmLoad}>{t('game.loadThisPoint')}</button>
+      <button type="button" onClick={onCancelLoad}>{t('common.cancel')}</button>
     </div>}
   </div>;
 }
 
-function describeEffectiveProvider(data: ConnectionsResponse | null, catalogLabel: (providerId: string) => string): string {
-  if (!data) return 'Cargando proveedor…';
-  if (data.effective.source === 'mock') return 'Mock determinista (se puede jugar sin modelo real).';
+function describeEffectiveProvider(data: ConnectionsResponse | null, catalogLabel: (providerId: string) => string, t: TranslateFn): string {
+  if (!data) return t('settings.effectiveLoading');
+  if (data.effective.source === 'mock') return t('settings.effectiveMock');
   if (data.effective.source === 'admin') {
-    return `${catalogLabel(data.effective.providerId)} (${data.effective.model}) — proveedor del servidor.`;
+    return t('settings.effectiveAdmin', { provider: catalogLabel(data.effective.providerId), model: data.effective.model });
   }
-  return `Tu conexión «${data.effective.connectionName ?? ''}» (${catalogLabel(data.effective.providerId)}, ${data.effective.model}).`;
+  return t('settings.effectiveConnection', { name: data.effective.connectionName ?? '', provider: catalogLabel(data.effective.providerId), model: data.effective.model });
 }
 
-function testSummary(result: ConnectionTestResult): string {
-  if (!result.available) return `no disponible${result.error ? `: ${result.error}` : ''}`;
-  return `disponible (${result.latencyMs ?? '?'} ms)`;
+function testSummary(result: ConnectionTestResult, t: TranslateFn): string {
+  if (!result.available) return t('settings.testUnavailable', { error: result.error ? `: ${result.error}` : '' });
+  return t('settings.testAvailable', { latency: result.latencyMs ?? '?' });
 }
 
 function ConnectionsList({ connections, effectiveId, catalogLabel, testingId, testResults, onUse, onTest, onRemove }: {
@@ -1418,27 +1430,28 @@ function ConnectionsList({ connections, effectiveId, catalogLabel, testingId, te
   onTest: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
+  const t = useTranslation();
   return <ul>{connections.map(connection => {
     const result = testResults[connection.id];
     const inUse = effectiveId === connection.id;
     return <li key={connection.id}>
       <strong>{connection.name}</strong> · {catalogLabel(connection.adapterId)} · {connection.model}
-      {connection.status !== 'active' ? ` · ${connection.status}` : ''}{inUse ? ' · en uso' : ''}
-      {result && <span> · {testSummary(result)}</span>}
+      {connection.status !== 'active' ? ` · ${connection.status}` : ''}{inUse ? t('settings.connectionInUse') : ''}
+      {result && <span> · {testSummary(result, t)}</span>}
       <div>
-        {!inUse && <button type="button" onClick={() => onUse(connection.id)}>Usar</button>}
+        {!inUse && <button type="button" onClick={() => onUse(connection.id)}>{t('settings.useConnection')}</button>}
         <button type="button" disabled={testingId === connection.id} onClick={() => onTest(connection.id)}>
-          {testingId === connection.id ? 'Probando…' : 'Probar'}
+          {testingId === connection.id ? t('settings.testingConnection') : t('settings.testConnection')}
         </button>
-        <button type="button" aria-label={`Borrar ${connection.name}`} onClick={() => onRemove(connection.id)}>Borrar</button>
+        <button type="button" aria-label={t('settings.deleteConnectionAria', { name: connection.name })} onClick={() => onRemove(connection.id)}>{t('settings.deleteConnection')}</button>
       </div>
     </li>;
   })}</ul>;
 }
 
-function validateConnectionForm(selected: ProviderCatalogEntry, connName: string, apiKey: string): string | null {
-  if (!connName.trim()) return 'Ponle un nombre a la conexión.';
-  if (selected.needsKey && !apiKey) return 'Este proveedor necesita tu clave.';
+function validateConnectionForm(selected: ProviderCatalogEntry, connName: string, apiKey: string, t: TranslateFn): string | null {
+  if (!connName.trim()) return t('settings.connectionNameRequired');
+  if (selected.needsKey && !apiKey) return t('settings.connectionKeyRequired');
   return null;
 }
 
@@ -1455,15 +1468,16 @@ function ConnectionProviderFields({ selected, baseUrl, onBaseUrl, model, onModel
   model: string; onModel: (value: string) => void;
   apiKey: string; onApiKey: (value: string) => void;
 }) {
+  const t = useTranslation();
   return <>
-    {selected?.needsBaseUrl && <label className="game-setting"><span>URL del endpoint</span>
+    {selected?.needsBaseUrl && <label className="game-setting"><span>{t('settings.endpointUrl')}</span>
       <input data-testid="ai-connection-base-url" value={baseUrl} onChange={event => onBaseUrl(event.target.value)} maxLength={512} placeholder={selected.defaultBaseUrl} />
     </label>}
-    <label className="game-setting"><span>Modelo</span>
+    <label className="game-setting"><span>{t('settings.model')}</span>
       <input data-testid="ai-connection-model" value={model} onChange={event => onModel(event.target.value)} maxLength={128} placeholder={selected?.defaultModel ?? ''} />
     </label>
-    {selected?.needsKey && <label className="game-setting"><span>Clave</span>
-      <input data-testid="ai-connection-key" type="password" value={apiKey} onChange={event => onApiKey(event.target.value)} maxLength={512} autoComplete="off" placeholder="Tu clave, solo se guarda cifrada" />
+    {selected?.needsKey && <label className="game-setting"><span>{t('settings.apiKey')}</span>
+      <input data-testid="ai-connection-key" type="password" value={apiKey} onChange={event => onApiKey(event.target.value)} maxLength={512} autoComplete="off" placeholder={t('settings.apiKeyPlaceholder')} />
     </label>}
   </>;
 }
@@ -1471,10 +1485,10 @@ function ConnectionProviderFields({ selected, baseUrl, onBaseUrl, model, onModel
 /** Mensaje de error al guardar una conexión: el motivo real del servidor
  * (p. ej. destino no permitido) se muestra tal cual; el genérico solo queda
  * para el resto de fallos. */
-function connectionSaveErrorMessage(error: unknown): string {
-  if (error instanceof ConnectionsError && error.kind === 'session') return 'La sesión caducó. Vuelve a entrar.';
+function connectionSaveErrorMessage(error: unknown, t: TranslateFn): string {
+  if (error instanceof ConnectionsError && error.kind === 'session') return t('settings.sessionExpired');
   if (error instanceof ConnectionsError && error.detail) return error.detail;
-  return 'No se pudo guardar la conexión. Revisa los datos (el nombre no puede repetirse).';
+  return t('settings.connectionSaveFailed');
 }
 
 function AddConnectionForm({ catalog, csrfToken, onSaved, formMessage, formError, onFormMessage, onFormError }: {
@@ -1511,10 +1525,11 @@ function AddConnectionForm({ catalog, csrfToken, onSaved, formMessage, formError
     onFormMessage('');
   }
 
+  const t = useTranslation();
   async function saveConnection(event: FormEvent) {
     event.preventDefault();
     if (!selected || saving) return;
-    const validationError = validateConnectionForm(selected, connName, apiKey);
+    const validationError = validateConnectionForm(selected, connName, apiKey, t);
     if (validationError) { onFormError(validationError); return; }
     setSaving(true);
     onFormError('');
@@ -1533,24 +1548,24 @@ function AddConnectionForm({ catalog, csrfToken, onSaved, formMessage, formError
       setBaseUrl(selected.needsBaseUrl ? selected.defaultBaseUrl : '');
       setModel(selected.defaultModel);
       setApiKey('');
-      onFormMessage('Conexión guardada y activada.');
+      onFormMessage(t('settings.connectionSaved'));
       await onSaved();
     } catch (error) {
-      onFormError(connectionSaveErrorMessage(error));
+      onFormError(connectionSaveErrorMessage(error, t));
     } finally {
       setSaving(false);
     }
   }
 
   return <form onSubmit={saveConnection}>
-    <label className="game-setting"><span>Proveedor</span>
+    <label className="game-setting"><span>{t('settings.provider')}</span>
       <select data-testid="ai-connection-adapter" value={adapterId} onChange={event => onAdapterChange(event.target.value)}>
         {catalog.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
       </select>
     </label>
     {selected && <p className="game-panel-note">{selected.hint}</p>}
-    <label className="game-setting"><span>Nombre</span>
-      <input data-testid="ai-connection-name" value={connName} onChange={event => setConnName(event.target.value)} maxLength={100} placeholder="Mi Ollama" />
+    <label className="game-setting"><span>{t('settings.connectionName')}</span>
+      <input data-testid="ai-connection-name" value={connName} onChange={event => setConnName(event.target.value)} maxLength={100} placeholder={t('settings.connectionNamePlaceholder')} />
     </label>
     <ConnectionProviderFields
       selected={selected}
@@ -1558,7 +1573,7 @@ function AddConnectionForm({ catalog, csrfToken, onSaved, formMessage, formError
       model={model} onModel={setModel}
       apiKey={apiKey} onApiKey={setApiKey}
     />
-    <p><button data-testid="ai-connection-save" type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar conexión'}</button></p>
+    <p><button data-testid="ai-connection-save" type="submit" disabled={saving}>{saving ? t('game.saving') : t('settings.saveConnection')}</button></p>
     {formMessage && <p role="status">{formMessage}</p>}
     {formError && <p role="alert">{formError}</p>}
   </form>;
@@ -1573,34 +1588,36 @@ function AudioSettingsSection({ audio, tts, voices, ttsSupported, onAudio, onTTS
   onAudio: (patch: Partial<PresentationPreferences['audio']>) => void;
   onTTS: (patch: Partial<PresentationPreferences['tts']>) => void;
 }) {
+  const t = useTranslation();
   const voiceValue = voices.some(voice => voice.name === tts.voice) ? tts.voice : 'auto';
   return <>
-    <label className="game-setting"><span>Silenciar todo</span><input type="checkbox" data-testid="audio-muted" checked={audio.muted} onChange={event => onAudio({ muted: event.target.checked })} /></label>
-    <label className="game-setting"><span>Música retro</span><input type="checkbox" data-testid="audio-music-enabled" checked={audio.musicEnabled} onChange={event => onAudio({ musicEnabled: event.target.checked })} /></label>
-    <label className="game-setting"><span>Volumen de música</span><input type="range" data-testid="audio-music-volume" min={0} max={100} value={audio.musicVolume} onChange={event => onAudio({ musicVolume: Number(event.target.value) })} /></label>
-    <label className="game-setting"><span>Efectos de sonido</span><input type="checkbox" data-testid="audio-effects-enabled" checked={audio.effectsEnabled} onChange={event => onAudio({ effectsEnabled: event.target.checked })} /></label>
-    <label className="game-setting"><span>Volumen de efectos</span><input type="range" data-testid="audio-effects-volume" min={0} max={100} value={audio.effectsVolume} onChange={event => onAudio({ effectsVolume: Number(event.target.value) })} /></label>
-    <label className="game-setting"><span>Volumen de narración</span><input type="range" data-testid="audio-narration-volume" min={0} max={100} value={audio.narrationVolume} onChange={event => onAudio({ narrationVolume: Number(event.target.value) })} /></label>
+    <label className="game-setting"><span>{t('settings.muteAll')}</span><input type="checkbox" data-testid="audio-muted" checked={audio.muted} onChange={event => onAudio({ muted: event.target.checked })} /></label>
+    <label className="game-setting"><span>{t('settings.music')}</span><input type="checkbox" data-testid="audio-music-enabled" checked={audio.musicEnabled} onChange={event => onAudio({ musicEnabled: event.target.checked })} /></label>
+    <label className="game-setting"><span>{t('settings.musicVolume')}</span><input type="range" data-testid="audio-music-volume" min={0} max={100} value={audio.musicVolume} onChange={event => onAudio({ musicVolume: Number(event.target.value) })} /></label>
+    <label className="game-setting"><span>{t('settings.effects')}</span><input type="checkbox" data-testid="audio-effects-enabled" checked={audio.effectsEnabled} onChange={event => onAudio({ effectsEnabled: event.target.checked })} /></label>
+    <label className="game-setting"><span>{t('settings.effectsVolume')}</span><input type="range" data-testid="audio-effects-volume" min={0} max={100} value={audio.effectsVolume} onChange={event => onAudio({ effectsVolume: Number(event.target.value) })} /></label>
+    <label className="game-setting"><span>{t('settings.narrationVolume')}</span><input type="range" data-testid="audio-narration-volume" min={0} max={100} value={audio.narrationVolume} onChange={event => onAudio({ narrationVolume: Number(event.target.value) })} /></label>
     {!ttsSupported
-      ? <p className="game-panel-note" data-testid="tts-unsupported">Tu navegador no ofrece síntesis de voz: la lectura en voz alta no está disponible, pero todo el texto sigue aquí.</p>
+      ? <p className="game-panel-note" data-testid="tts-unsupported">{t('settings.ttsUnsupported')}</p>
       : <>
-        <label className="game-setting"><span>Leer en voz alta</span><input type="checkbox" data-testid="tts-enabled" checked={tts.enabled} onChange={event => onTTS({ enabled: event.target.checked })} /></label>
-        <label className="game-setting"><span>Voz</span>
+        <label className="game-setting"><span>{t('settings.ttsEnabled')}</span><input type="checkbox" data-testid="tts-enabled" checked={tts.enabled} onChange={event => onTTS({ enabled: event.target.checked })} /></label>
+        <label className="game-setting"><span>{t('settings.ttsVoice')}</span>
           <select data-testid="tts-voice" value={voiceValue} disabled={!tts.enabled} onChange={event => onTTS({ voice: event.target.value })}>
-            <option value="auto">Automática (español si la hay)</option>
+            <option value="auto">{t('settings.ttsVoiceAuto')}</option>
             {voices.map(voice => <option key={voice.name} value={voice.name}>{voice.name} ({voice.lang})</option>)}
           </select>
         </label>
-        {voices.length === 0 && <p className="game-panel-note">Aún no hay voces cargadas: se completan solas cuando el sistema las ofrece.</p>}
-        <label className="game-setting"><span>Velocidad</span><input type="range" data-testid="tts-rate" min={0.5} max={2} step={0.1} value={tts.rate} disabled={!tts.enabled} onChange={event => onTTS({ rate: Number(event.target.value) })} /></label>
-        <label className="game-setting"><span>Leer automáticamente la narración y los diálogos</span><input type="checkbox" data-testid="tts-autoread" checked={tts.autoRead} disabled={!tts.enabled} onChange={event => onTTS({ autoRead: event.target.checked })} /></label>
+        {voices.length === 0 && <p className="game-panel-note">{t('settings.ttsNoVoices')}</p>}
+        <label className="game-setting"><span>{t('settings.ttsRate')}</span><input type="range" data-testid="tts-rate" min={0.5} max={2} step={0.1} value={tts.rate} disabled={!tts.enabled} onChange={event => onTTS({ rate: Number(event.target.value) })} /></label>
+        <label className="game-setting"><span>{t('settings.ttsAutoRead')}</span><input type="checkbox" data-testid="tts-autoread" checked={tts.autoRead} disabled={!tts.enabled} onChange={event => onTTS({ autoRead: event.target.checked })} /></label>
       </>}
-    <p className="game-panel-note">La música y los efectos son decorativos: nada importante se comunica solo por sonido. La música empieza tras tu primer gesto en la página, nunca sola al cargar.</p>
+    <p className="game-panel-note">{t('settings.audioHelp')}</p>
   </>;
 }
 
-function SettingsContent({ identity, textScale, highContrast, palette, accessibility, fontMode, onScale, onContrast, onPalette, onAccessibility, onFontMode, profile, onProfileSaved, audio, tts, voices, ttsSupported, onAudio, onTTS }: {
-  identity: SessionDto | null; textScale: number; highContrast: boolean; palette: PaletteMode;
+function SettingsContent({ identity, language, onLanguage, textScale, highContrast, palette, accessibility, fontMode, onScale, onContrast, onPalette, onAccessibility, onFontMode, profile, onProfileSaved, audio, tts, voices, ttsSupported, onAudio, onTTS }: {
+  identity: SessionDto | null; language: Language; onLanguage: (value: Language) => void;
+  textScale: number; highContrast: boolean; palette: PaletteMode;
   accessibility: PresentationPreferences['accessibility']; fontMode: PresentationPreferences['fontMode'];
   onScale: (value: number) => void; onContrast: (value: boolean) => void; onPalette: (value: PaletteMode) => void;
   onAccessibility: (patch: Partial<PresentationPreferences['accessibility']>) => void;
@@ -1610,6 +1627,7 @@ function SettingsContent({ identity, textScale, highContrast, palette, accessibi
   onAudio: (patch: Partial<PresentationPreferences['audio']>) => void;
   onTTS: (patch: Partial<PresentationPreferences['tts']>) => void;
 }) {
+  const t = useTranslation();
   const [data, setData] = useState<ConnectionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -1632,11 +1650,11 @@ function SettingsContent({ identity, textScale, highContrast, palette, accessibi
     try {
       setData(await aiConnectionsApi.list(signal, { csrfToken }));
     } catch {
-      setLoadError('No se pudo cargar la configuración de IA.');
+      setLoadError(t('settings.aiLoadError'));
     } finally {
       setLoading(false);
     }
-  }, [csrfToken]);
+  }, [csrfToken, t]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1680,16 +1698,23 @@ function SettingsContent({ identity, textScale, highContrast, palette, accessibi
   }
 
   return <div>
-    <h4>Proveedor de IA</h4>
-    <p data-testid="settings-ai-effective">Actual: <strong>{describeEffectiveProvider(data, catalogLabel)}</strong></p>
-    {loading && <p role="status">Cargando conexiones…</p>}
+    <h4>{t('settings.language')}</h4>
+    <label className="game-setting"><span>{t('settings.language')}</span>
+      <select data-testid="settings-language" value={language} onChange={event => onLanguage(event.target.value as Language)}>
+        {SUPPORTED_LANGUAGES.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+      </select>
+    </label>
+    <p className="game-panel-note">{t('settings.languageHelp')}</p>
+    <h4>{t('settings.aiProvider')}</h4>
+    <p data-testid="settings-ai-effective">{t('settings.aiEffective')} <strong>{describeEffectiveProvider(data, catalogLabel, t)}</strong></p>
+    {loading && <p role="status">{t('settings.aiLoading')}</p>}
     {loadError && <p role="alert">{loadError}</p>}
     {data && <>
-      <p className="game-panel-note">Tu conexión personal manda sobre el proveedor del servidor. Cada persona paga sus propios tokens; sin conexión personal, juega con el proveedor del servidor.</p>
-      <h4>Mis conexiones</h4>
+      <p className="game-panel-note">{t('settings.aiPersonalNote')}</p>
+      <h4>{t('settings.myConnections')}</h4>
       <div data-testid="ai-connections-list">
         {data.connections.length === 0
-          ? <p className="game-panel-note">Todavía no tienes conexiones propias.</p>
+          ? <p className="game-panel-note">{t('settings.aiNoConnections')}</p>
           : <ConnectionsList
               connections={data.connections}
               effectiveId={data.effective.connectionId}
@@ -1701,35 +1726,35 @@ function SettingsContent({ identity, textScale, highContrast, palette, accessibi
               onRemove={id => void removeConnection(id)}
             />}
       </div>
-      {data.effective.source === 'personal' && <p><button type="button" onClick={() => void useServerDefault()}>Usar el proveedor del servidor</button></p>}
-      <h4>Añadir conexión</h4>
+      {data.effective.source === 'personal' && <p><button type="button" onClick={() => void useServerDefault()}>{t('settings.aiUseServer')}</button></p>}
+      <h4>{t('settings.addConnection')}</h4>
       {csrfToken && <AddConnectionForm
         catalog={data.catalog} csrfToken={csrfToken} onSaved={() => reload(new AbortController().signal)}
         formMessage={formMessage} formError={formError} onFormMessage={setFormMessage} onFormError={setFormError}
       />}
     </>}
-    <h4>Presentación</h4>
-    <label className="game-setting"><span>Tamaño de texto</span>
+    <h4>{t('settings.presentation')}</h4>
+    <label className="game-setting"><span>{t('settings.textSize')}</span>
       <select value={textScale} onChange={event => onScale(Number(event.target.value))}>
         {[100, 125, 150, 175, 200].map(scale => <option key={scale} value={scale}>{scale}%</option>)}
       </select>
     </label>
-    <label className="game-setting"><span>Alto contraste</span><input type="checkbox" checked={highContrast} onChange={event => onContrast(event.target.checked)} /></label>
+    <label className="game-setting"><span>{t('settings.highContrast')}</span><input type="checkbox" checked={highContrast} onChange={event => onContrast(event.target.checked)} /></label>
     <PaletteSetting palette={palette} onPalette={onPalette} />
-    <h4>Accesibilidad</h4>
-    <label className="game-setting"><span>Reducir movimiento</span><input type="checkbox" data-testid="a11y-reduced-motion" checked={accessibility.reducedMotion} onChange={event => onAccessibility({ reducedMotion: event.target.checked })} /></label>
-    <label className="game-setting"><span>Foco visible marcado</span><input type="checkbox" data-testid="a11y-focus-visible" checked={accessibility.focusVisible} onChange={event => onAccessibility({ focusVisible: event.target.checked })} /></label>
-    <label className="game-setting"><span>Enlace de salto a la escena</span><input type="checkbox" data-testid="a11y-skip-nav" checked={accessibility.skipNav} onChange={event => onAccessibility({ skipNav: event.target.checked })} /></label>
-    <label className="game-setting"><span>Anunciar la narración</span><input type="checkbox" data-testid="a11y-announce-narration" checked={accessibility.announceNarration} onChange={event => onAccessibility({ announceNarration: event.target.checked })} /></label>
-    <label className="game-setting"><span>Fuente</span>
+    <h4>{t('settings.accessibility')}</h4>
+    <label className="game-setting"><span>{t('settings.reducedMotion')}</span><input type="checkbox" data-testid="a11y-reduced-motion" checked={accessibility.reducedMotion} onChange={event => onAccessibility({ reducedMotion: event.target.checked })} /></label>
+    <label className="game-setting"><span>{t('settings.focusVisible')}</span><input type="checkbox" data-testid="a11y-focus-visible" checked={accessibility.focusVisible} onChange={event => onAccessibility({ focusVisible: event.target.checked })} /></label>
+    <label className="game-setting"><span>{t('settings.skipNav')}</span><input type="checkbox" data-testid="a11y-skip-nav" checked={accessibility.skipNav} onChange={event => onAccessibility({ skipNav: event.target.checked })} /></label>
+    <label className="game-setting"><span>{t('settings.announceNarration')}</span><input type="checkbox" data-testid="a11y-announce-narration" checked={accessibility.announceNarration} onChange={event => onAccessibility({ announceNarration: event.target.checked })} /></label>
+    <label className="game-setting"><span>{t('settings.font')}</span>
       <select data-testid="a11y-font-mode" value={fontMode} onChange={event => onFontMode(event.target.value as PresentationPreferences['fontMode'])}>
-        <option value="retro">Retro (monoespaciada)</option>
-        <option value="accessible">Legible (sans-serif)</option>
+        <option value="retro">{t('settings.fontRetro')}</option>
+        <option value="accessible">{t('settings.fontAccessible')}</option>
       </select>
     </label>
-    <p className="game-panel-note">Reducir movimiento apaga las animaciones del juego (reloj de arena, avión del viaje, cursor que parpadea); si tu sistema ya lo pide, también se aplica sin tocar nada aquí. El foco marcado es un contorno dorado grueso; apagado, el foco sigue visible pero fino. El enlace de salto aparece al tabular al entrar en la partida y lleva directo a la escena. Anunciar la narración hace que el lector de pantalla lea la última entrada de la consola cuando termina de escribirse. La fuente legible cambia la letra monoespaciada por una sans-serif.</p>
-    <p className="game-panel-note">Estos ajustes se guardan en este navegador y afectan solo a la presentación. También puedes usar el zoom de tu navegador.</p>
-    <h4>Audio y voz</h4>
+    <p className="game-panel-note">{t('settings.accessibilityHelp')}</p>
+    <p className="game-panel-note">{t('settings.savedHereHelp')}</p>
+    <h4>{t('settings.audioVoice')}</h4>
     <AudioSettingsSection audio={audio} tts={tts} voices={voices} ttsSupported={ttsSupported} onAudio={onAudio} onTTS={onTTS} />
     <ProfileSection identity={identity} profile={profile} onSaved={onProfileSaved} />
   </div>;
@@ -1753,8 +1778,8 @@ function signedDelta(delta: number): string {
 }
 
 /** Sufijo de medalla para una línea de resultado oficial, o vacío. */
-function medalSuffix(medal: string | null | undefined): string {
-  return medal ? ` · ${medalLabel(medal)}` : '';
+function medalSuffix(medal: string | null | undefined, t: TranslateFn): string {
+  return medal ? ` · ${medalLabel(medal, t)}` : '';
 }
 
 /** Consecuencias de carrera del cierre (GDD §13, DEC-020): el cierre
@@ -1762,58 +1787,63 @@ function medalSuffix(medal: string | null | undefined): string {
  * el de práctica recuerda el oficial existente; una partida cerrada antes
  * de la carrera no tiene resultado oficial. */
 function CareerConsequences({ officialResult }: { officialResult: PlayerViewDto['officialResult'] }) {
+  const t = useTranslation();
   return <>
-    <h4>Consecuencias de carrera</h4>
-    {!officialResult && <p>Esta partida se cerró antes de que existiera la carrera y no tiene resultado oficial.</p>}
+    <h4>{t('game.careerConsequences')}</h4>
+    {!officialResult && <p>{t('game.careerNoResult')}</p>}
     {officialResult?.isThisRun && <>
-      <p>Resultado oficial: <strong>{reportResultText(officialResult.result)}</strong> · {officialResult.points} puntos{medalSuffix(officialResult.medal)} · Rango: {officialResult.rankBefore} → {officialResult.rankAfter}</p>
-      <p>Prestigio {signedDelta(officialResult.prestigeDelta)} · Integridad {signedDelta(officialResult.integrityDelta)} · Confianza {signedDelta(officialResult.trustDelta)}</p>
-      <p>Este cierre fija tu resultado oficial en este expediente: las próximas partidas del mismo caso serán de práctica y no cambiarán tu carrera.</p>
+      <p>{t('game.careerOfficialResult')}: <strong>{reportResultText(officialResult.result, t)}</strong> · {officialResult.points} {t('game.careerPoints')}{medalSuffix(officialResult.medal, t)} · {t('game.careerRank')}: {officialResult.rankBefore} → {officialResult.rankAfter}</p>
+      <p>{t('game.careerDeltas', { prestige: signedDelta(officialResult.prestigeDelta), integrity: signedDelta(officialResult.integrityDelta), trust: signedDelta(officialResult.trustDelta) })}</p>
+      <p>{t('game.careerOfficialNote')}</p>
     </>}
     {officialResult && !officialResult.isThisRun && <>
-      <p>Esta partida es de práctica: tu resultado oficial en «{officialResult.caseTitle}» es «{reportResultText(officialResult.result)}» ({officialResult.points} puntos{officialResult.medal ? `, ${medalLabel(officialResult.medal)}` : ''}), y este cierre no cambia tu carrera.</p>
+      <p>{t('game.careerPracticeLine', {
+        caseTitle: officialResult.caseTitle, result: reportResultText(officialResult.result, t), points: officialResult.points,
+        medal: officialResult.medal ? `, ${medalLabel(officialResult.medal, t)}` : '',
+      })}</p>
     </>}
   </>;
 }
 
 function ReportContent({ view }: { view: PlayerViewDto }) {
-  if (!view.finalReport) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>El informe final estará disponible al cerrar el caso.</p></div>;
+  const t = useTranslation();
+  if (!view.finalReport) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.reportNotAvailable')}</p></div>;
   const report = view.finalReport;
   const objectiveDescription = (id: string) =>
     view.objectives.find(objective => objective.id === id)?.description ?? objectiveText(id);
   return <div>
-    <p className="game-report-result">Resultado: <strong>{reportResultText(report.result)}</strong> · Motivo: {reportReasonText(report.reason)} · Minuto: {report.minute}</p>
-    <h4>La verdad del caso</h4>
-    <p>Responsable: <strong>{report.truth.culpritName}</strong></p>
-    {report.truth.objectLabel && <p>Objeto sustraído: {report.truth.objectLabel}</p>}
-    <h4>Pruebas decisivas</h4>
-    <ReportList items={report.truth.keyEvidence.map(entry => entry.text)} empty="Sin pruebas decisivas registradas." />
+    <p className="game-report-result">{t('game.reportResult')}: <strong>{reportResultText(report.result, t)}</strong> · {t('game.reportReason')}: {reportReasonText(report.reason, t)} · {t('game.reportMinute')}: {report.minute}</p>
+    <h4>{t('game.reportTruth')}</h4>
+    <p>{t('game.reportCulprit')}: <strong>{report.truth.culpritName}</strong></p>
+    {report.truth.objectLabel && <p>{t('game.reportStolenObject', { label: report.truth.objectLabel })}</p>}
+    <h4>{t('game.reportKeyEvidence')}</h4>
+    <ReportList items={report.truth.keyEvidence.map(entry => entry.text)} empty={t('game.reportNoKeyEvidence')} />
     {report.timeline.length > 0 && <>
-      <h4>Cronología</h4>
+      <h4>{t('game.reportTimeline')}</h4>
       <ul className="game-report-objectives">{report.timeline.map(entry =>
         <li key={entry.sequence}>[min {entry.minute}] {entry.summary}</li>)}</ul>
     </>}
-    <h4>Pruebas halladas</h4>
-    <ReportList items={report.evidenceFound.map(entry => entry.text)} empty="No se halló ninguna prueba." />
-    <h4>Pruebas omitidas</h4>
-    <ReportList items={report.evidenceMissed.map(entry => entry.text)} empty="No quedó ninguna prueba por descubrir." />
-    <h4>Detenciones</h4>
+    <h4>{t('game.reportEvidenceFound')}</h4>
+    <ReportList items={report.evidenceFound.map(entry => entry.text)} empty={t('game.reportNoEvidenceFound')} />
+    <h4>{t('game.reportEvidenceMissed')}</h4>
+    <ReportList items={report.evidenceMissed.map(entry => entry.text)} empty={t('game.reportNoEvidenceMissed')} />
+    <h4>{t('game.reportDetentions')}</h4>
     <ReportList
       items={report.detentions.map(detention =>
-        `${detention.suspectName} — ${detention.correct ? 'correcta' : 'errónea'}${detention.withWarrant ? ' · con orden' : ' · sin orden'}`)}
-      empty="No se detuvo a nadie." />
-    <h4>Conducta irregular</h4>
+        `${detention.suspectName} — ${detention.correct ? t('game.reportDetentionCorrect') : t('game.reportDetentionWrong')}${detention.withWarrant ? t('game.reportDetentionWithWarrant') : t('game.reportDetentionWithoutWarrant')}`)}
+      empty={t('game.reportNoDetentions')} />
+    <h4>{t('game.reportIrregular')}</h4>
     <ReportList
       items={(report.irregularActs ?? []).map(act =>
-        `${IRREGULAR_KIND_TEXT[act.kind] ?? act.kind} — ${act.targetName} · min ${act.minute}${act.seen ? ' · te vieron' : ' · nadie te vio'}`)}
-      empty="Sin acciones irregulares registradas." />
-    <h4>Puntuación</h4>
+        `${IRREGULAR_KIND_KEYS[act.kind] ? t(IRREGULAR_KIND_KEYS[act.kind]) : act.kind} — ${act.targetName} · min ${act.minute}${act.seen ? t('game.reportIrregularSeen') : t('game.reportIrregularUnseen')}`)}
+      empty={t('game.reportNoIrregular')} />
+    <h4>{t('game.reportScore')}</h4>
     <ul className="game-report-objectives">{report.score.breakdown.map(entry =>
       <li key={entry.label}>{entry.label}: {entry.points > 0 ? `+${entry.points}` : entry.points}</li>)}</ul>
-    <p>Total: <strong>{report.score.total} / {report.score.max}</strong></p>
+    <p>{t('game.reportTotal')}: <strong>{report.score.total} / {report.score.max}</strong></p>
     <CareerConsequences officialResult={view.officialResult} />
-    <h4>Objetivos logrados</h4>
-    <ReportList items={report.objectivesAchieved.map(objectiveDescription)} empty="Ningún objetivo registrado." />
+    <h4>{t('game.reportObjectives')}</h4>
+    <ReportList items={report.objectivesAchieved.map(objectiveDescription)} empty={t('game.reportNoObjectives')} />
   </div>;
 }
 
@@ -1836,6 +1866,7 @@ function UnavailableScreen({ phase, notice }: { phase: ScreenPhase; notice: stri
 export function GameScreen() {
   const { runId } = useParams();
   const navigate = useNavigate();
+  const t = useTranslation();
   const windows = useWindows();
   const generation = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -2300,18 +2331,18 @@ export function GameScreen() {
     if (serviceId === 'evaluate') {
       const profile = await ensureCareer();
       if (!profile) return;
-      answer = teamServiceAnswer(serviceId, view, targetId, profile);
+      answer = teamServiceAnswer(serviceId, view, targetId, profile, t);
     } else {
-      answer = teamServiceAnswer(serviceId, view, targetId);
+      answer = teamServiceAnswer(serviceId, view, targetId, undefined, t);
     }
     if (!answer) return;
     const name = TEAM_MEMBERS.find(member => member.id === memberId)?.name ?? memberId;
     const offer: PublicActionOffer = { id: `team:${memberId}:${serviceId}${targetId ? `:${targetId}` : ''}`,
-      label: `${TEAM_SERVICE_LABELS[serviceId]} con ${name}`,
+      label: t('game.teamServiceWith', { service: t(TEAM_SERVICE_KEYS[serviceId]), name }),
       action: { type: 'team', params: { memberId, serviceId, ...(targetId ? { targetId } : {}) } } };
     const key = `meridiano:team:${runId}`;
     const turns: TeamTurn[] = [...teamTurns,
-      { memberId, from: 'you', text: teamRequestText(serviceId, targetId) },
+      { memberId, from: 'you', text: teamRequestText(serviceId, targetId, t) },
       { memberId, from: 'team', text: answer }];
     setTeamTurns(turns);
     saveTeam(key, turns, teamElenaMemory);
@@ -2570,7 +2601,7 @@ export function GameScreen() {
     if (!runId || !identity || !view || !commRecipient || !commText.trim()) return;
     const name = contacts.find(contact => contact.id === commRecipient)?.name ?? commRecipient;
     const offer: PublicActionOffer = { id: `communicate:${commRecipient}:${commChannel}`,
-      label: `Contactar con ${name} por ${channelLabels[commChannel] ?? commChannel}`,
+      label: t('game.contactVia', { name, channel: channelLabel(commChannel, t) }),
       action: { type: 'communicate', params: { channel: commChannel, recipientId: commRecipient, requestText: commText.trim(),
         ...(commDocument ? { documentId: commDocument } : {}) } } };
     setCommText('');
@@ -2658,7 +2689,8 @@ export function GameScreen() {
         onReplace={setReplaceTarget} onConfirmLoad={() => void confirmLoad()} onCancelLoad={() => setLoadTarget(null)} />
     </GameWindow>
     <GameWindow id="settings" title="Ajustes" state={windows.windows.settings} {...windowProps}>
-      <SettingsContent identity={identity} textScale={preferences.textScale} highContrast={preferences.highContrast}
+      <SettingsContent identity={identity} language={preferences.language} onLanguage={value => updatePreferences({ language: value })}
+        textScale={preferences.textScale} highContrast={preferences.highContrast}
         palette={preferences.palette} accessibility={preferences.accessibility} fontMode={preferences.fontMode}
         onScale={value => updatePreferences({ textScale: value })}
         onContrast={value => updatePreferences({ highContrast: value })} onPalette={value => updatePreferences({ palette: value })}
