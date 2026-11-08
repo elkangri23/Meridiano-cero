@@ -49,6 +49,19 @@ describe('T3: frontera HTTP de la pantalla de juego', () => {
     respond({ items: [{ ...caseItem, solution: 'SYNTHETIC_PRIVATE' }], nextCursor: null });
     await expect(gameApi.catalog(signal())).rejects.toEqual(new GameError('invalid'));
   });
+  it('carrera lista el perfil y rechaza rangos inventados', async () => {
+    const emptyCareer = {
+      rank: 'Aspirante', points: 0, prestige: 0, integrity: 0, trust: 0,
+      prestigeLabel: 'Discreta', integrityLabel: 'Discreta', trustLabel: 'Discreta',
+      totalCases: 0, completedCases: 0, medals: [], countries: [], places: [],
+      sanctions: [], results: [],
+    };
+    const fetcher = respond(emptyCareer);
+    expect(await gameApi.career(signal())).toEqual(emptyCareer);
+    expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/career');
+    respond({ ...emptyCareer, rank: 'Superinspector' });
+    await expect(gameApi.career(signal())).rejects.toEqual(new GameError('invalid'));
+  });
   it('preview envía confirm:false con CSRF e identidad, sin versión ni clave', async () => {
     const fetcher = respond({ ...actionResponse, outcome: 'confirmation_required', requiresConfirmation: true });
     expect(await gameApi.preview(initialView.runId, action, session, signal())).toMatchObject({ outcome: 'confirmation_required' });

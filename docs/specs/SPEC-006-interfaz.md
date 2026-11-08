@@ -29,6 +29,14 @@ Laboratorio y comunicaciones muestran solicitudes pendientes y hora de respuesta
 
 Órdenes requieren sospechoso y pruebas elegidas. Detención presenta identificación y coordinación, sin combate. Finalizar pide confirmación; informe final explica verdad y omisiones solo tras cierre.
 
+## Carrera y reputación (GDD §13, SPEC-008, T5-04)
+
+Vista de carrera en el archivo del detective: rango, puntos, casos cerrados y resueltos, medallas, países y lugares descubiertos, etiquetas de reputación (prestigio, integridad, confianza) y sanciones. La vista carga bajo demanda desde `GET /api/v1/career`; sin sesión no se enseña.
+
+Margaret evalúa la carrera desde la ventana del equipo («Evaluar mi carrera»): rango, puntos, casos, etiquetas y suspensiones activas con cómo se resuelven. Nunca valora el caso en curso ni indica si se va bien.
+
+El informe final muestra la sección «Consecuencias de carrera»: el cierre oficial con puntos, medalla y cambio de rango; el cierre de práctica con el resultado oficial existente y la frase de que no cambia la carrera; una partida cerrada antes de la carrera, sin resultado oficial, con frase honesta. El rango es honorífico: ninguna herramienta se bloquea por rango, desde el primer caso.
+
 ## Retratos de personajes
 
 Cada personaje visible tiene retrato pixel-art procedural y determinista (GDD §2, REQ-G02-03): se ve en la escena junto a su acción de hablar, en grande en la ventana de conversación, en la lista de miembros del equipo y en los contactos de la central. La semilla es `caso:npc` (o `team:miembro`); los NPC del caso fijo y el equipo llevan rasgos elegidos a mano y los generados se derivan de su semilla, así que dos personajes distintos no comparten cara y el mismo personaje siempre se ve igual. El retrato no es interactivo ni esconde pistas (sin pixel hunting): no se puede clicar y no revela nada del caso. Los colores no dependen solo del tono: cada vocabulario (piel, pelo, ojos, ropa) se distingue también por luminancia, y el borde sigue el color de borde del tema, así que el retrato se distingue con alto contraste y con cada paleta de daltonismo.

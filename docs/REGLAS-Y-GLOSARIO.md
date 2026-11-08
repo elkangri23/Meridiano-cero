@@ -20,8 +20,8 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - **Detención automática:** detención coordinada con las autoridades por orden de A.C.M.E., sin que el detective viaje a detener en persona. Cuesta 30 min y exige orden válida y ubicación conocida (la orden identifica al sospechoso).
 - **Detención en persona:** detención que hace el detective en la ciudad y el lugar del sospechoso. Cuesta 15 min y exige lo mismo que la automática, más conocer la identidad del sospechoso y la presencia.
 - **Equipo A.C.M.E.:** equipo recurrente de la agencia (Margaret Sullivan, Dr. Samuel Richter, Elena Vázquez, David Nakamura y Clara Beaumont). Pedirles ayuda es gratis y queda registrado; solo responden con lo que ya consta en el expediente, sin indicar si se va bien ni señalar al culpable.
-- **Primer resultado oficial:** primer cierre de caso que cuenta para carrera y reputación.
-- **Carrera / reputación:** progreso del detective; idempotente, sin duplicación por repeticiones.
+- **Primer resultado oficial:** primer cierre de caso que cuenta para carrera y reputación. Las repeticiones del mismo caso son práctica y no cambian la carrera ni duplican recompensas.
+- **Carrera / reputación:** progreso del detective (rango, puntos, medallas, países y lugares, reputación con etiquetas); idempotente, sin duplicación por repeticiones. El rango es honorífico y no bloquea herramientas. Una suspensión por retirada se resuelve con el primer caso limpio posterior y no destruye guardados.
 - **Archivo:** listado de partidas propias con filtros y paginación.
 - **Localizador de creación:** mecanismo para recuperar una creación perdida por conexión sin duplicar partida.
 

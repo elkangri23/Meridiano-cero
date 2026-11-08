@@ -1,9 +1,12 @@
-import { isActionResponseDto, isCaseListDto, isPlayerViewDto, isSaveLoadResponseDto } from '@meridiano/contracts';
-import type { ActionResponseDto, CaseSummary, PlayerViewDto, PublicActionOffer, SaveLoadResponseDto, SessionDto } from '@meridiano/contracts';
+import { isActionResponseDto, isCareerProfileDto, isCaseListDto, isPlayerViewDto, isSaveLoadResponseDto } from '@meridiano/contracts';
+import type { ActionResponseDto, CareerProfileDto, CaseSummary, PlayerViewDto, PublicActionOffer, SaveLoadResponseDto, SessionDto } from '@meridiano/contracts';
 
 export interface GameApi {
   view(runId: string, signal: AbortSignal): Promise<PlayerViewDto>;
   catalog(signal: AbortSignal): Promise<CaseSummary[]>;
+  /** Perfil de carrera del detective (GDD §13): lo usa la evaluación de
+   * Margaret en la ventana del equipo. */
+  career(signal: AbortSignal): Promise<CareerProfileDto>;
   preview(runId: string, action: PublicActionOffer['action'], identity: SessionDto, signal: AbortSignal): Promise<ActionResponseDto>;
   commit(runId: string, action: PublicActionOffer['action'], expectedVersion: number, idempotencyKey: string, identity: SessionDto, signal: AbortSignal): Promise<ActionResponseDto>;
   saves(runId: string, signal: AbortSignal): Promise<SaveListDto>;
@@ -125,6 +128,12 @@ export const gameApi: GameApi = {
     const body = await read(await request('/api/v1/cases', signal));
     if (!isCaseListDto(body)) throw new GameError('invalid');
     return body.items;
+  },
+
+  async career(signal: AbortSignal): Promise<CareerProfileDto> {
+    const body = await read(await request('/api/v1/career', signal));
+    if (!isCareerProfileDto(body)) throw new GameError('invalid');
+    return body;
   },
 
   async preview(runId: string, action: PublicActionOffer['action'], identity: SessionDto, signal: AbortSignal): Promise<ActionResponseDto> {

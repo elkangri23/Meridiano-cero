@@ -18,6 +18,7 @@ function api() {
     cancelGenerationJob: vi.fn<ArchiveApi['cancelGenerationJob']>(),
     exportCase: vi.fn<ArchiveApi['exportCase']>(),
     importCase: vi.fn<ArchiveApi['importCase']>(),
+    career: vi.fn<ArchiveApi['career']>().mockResolvedValue(null),
     me: vi.fn<ArchiveApi['me']>().mockResolvedValue(identity), connect: vi.fn<ArchiveApi['connect']>().mockResolvedValue(identity),
     list: vi.fn<ArchiveApi['list']>().mockResolvedValue(page), logout: vi.fn<ArchiveApi['logout']>().mockResolvedValue() };
 }

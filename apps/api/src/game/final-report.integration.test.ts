@@ -30,6 +30,9 @@ describe('informe final completo por HTTP (GDD §12)', () => {
   });
   afterAll(async () => {
     await app.close();
+    // Los cierres crean filas en official_results (GDD §13, FK a profiles):
+    // borrarlas antes que el perfil o la limpieza viola la FK.
+    await owner.pool.query('DELETE FROM official_results WHERE owner_id=$1', [player.id]);
     await owner.pool.query('DELETE FROM operation_records WHERE owner_id=$1', [player.id]);
     await owner.pool.query('DELETE FROM manual_saves WHERE owner_id=$1', [player.id]);
     await owner.pool.query('DELETE FROM run_creations WHERE owner_id=$1', [player.id]);

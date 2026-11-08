@@ -15,6 +15,8 @@ import type { ContentRating, CrimeType } from '@meridiano/contracts';
 import { commitAction, commitLoad } from './transitions.ts';
 import { playerViewDto } from './player-view.ts';
 import { loadRunTimeline } from './timeline.ts';
+import { loadCareerProfile, loadOfficialResultForContent } from './career.ts';
+import { contentHashForDefinition } from '@meridiano/case-schema/server';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { manualSaves, operationRecords } from '../database/schema.ts';
 import type { CaseRun } from '@meridiano/case-schema';
@@ -255,7 +257,9 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     // La vista es la actual (en un replay puede haber progreso posterior).
     const run = await available(() => readFullRun(database, digest(request), created.run.id));
     const manualCount = await available(() => saveCount(database, run.id));
-    const view = playerViewDto(definition, run, manualCount);
+    const owner = await authorize(request);
+    const official = await available(() => loadOfficialResultForContent(database.pool, owner.profileId, contentHashForDefinition(definition), run.id));
+    const view = playerViewDto(definition, run, manualCount, [], official);
     return reply.code(created.replayed ? 200 : 201).send({ ...view, replayed: created.replayed });
   });
   // DELETE /api/v1/runs/:runId - Borrar una partida propia (activa o
@@ -290,7 +294,18 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     const timeline = run.status === 'closed'
       ? await available(() => loadRunTimeline((sql, params) => database.pool.query(sql, params), run.id, run.branchId))
       : [];
-    return playerViewDto(definition, run, manualCount, timeline);
+    const owner = await authorize(request);
+    const official = await available(() => loadOfficialResultForContent(database.pool, owner.profileId, contentHashForDefinition(definition), run.id));
+    return playerViewDto(definition, run, manualCount, timeline, official);
+  });
+
+  // GET /api/v1/career - Perfil de carrera del detective (GDD §13):
+  // rango, puntos, reputación, medallas, casos, países, lugares,
+  // sanciones y resultados oficiales, derivados de `official_results`.
+  // Sin resultados oficiales, el perfil está vacío (rango Aspirante).
+  app.get('/api/v1/career', { onRequest: authorize }, async request => {
+    const owner = await authorize(request);
+    return available(() => loadCareerProfile(database.pool, owner.profileId));
   });
 
   // POST /api/v1/runs/:runId/action - Preview (confirm=false) o confirmación.

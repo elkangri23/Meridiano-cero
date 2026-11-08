@@ -75,10 +75,24 @@ function visibleCitiesFor(definition: CaseDefinition, run: FullRun, city: CaseDe
   return run.discoveries.includes('map') ? definition.cities : [city];
 }
 
+/** Evidencias reveladas por un análisis del laboratorio, en orden de
+ * revelación: el motor registra el método en `evidenceRecords`, así que
+ * el laboratorio enseña el resultado sin re-derivar la regla y sin tocar
+ * el dossier (que lleva el hallazgo como `EV-xx`). */
+function analysisResultsOf(run: FullRun): string[] {
+  return Object.entries(run.evidenceRecords ?? {})
+    .filter(([, record]) => record.method === 'analyze')
+    .sort(([, a], [, b]) => a.revealedMinute - b.revealedMinute)
+    .map(([id]) => id);
+}
+
 /** Vista completa de una partida v14. Para motores antiguos, usar initialPlayerView.
  * `timeline` es la cronología de la rama actual (registros de operaciones);
- * solo se rellena en partidas cerradas, donde el informe final la enseña. */
-export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number, timeline: PublicEvent[] = []): PlayerViewDto {
+ * solo se rellena en partidas cerradas, donde el informe final la enseña.
+ * `officialResult` es el resultado oficial de este contenido para el
+ * perfil (DEC-020): null si aún no hay cierre oficial; lo carga quien
+ * llama desde `official_results`, porque la vista es síncrona. */
+export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number, timeline: PublicEvent[] = [], officialResult: PlayerViewDto['officialResult'] = null): PlayerViewDto {
   if (run.engineVersion !== ENGINE_VERSION) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
   const city = definition.cities.find(item => item.id === run.position.cityId);
   const location = definition.locations.find(item => item.id === run.position.locationId);
@@ -135,14 +149,7 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
       const text = evidenceText(evidence.id, definition.texts);
       return text ? [[evidence.id, text]] : [];
     })),
-    // Evidencias reveladas por un análisis del laboratorio, en orden de
-    // revelación: el motor registra el método en `evidenceRecords`, así
-    // que el laboratorio enseña el resultado sin re-derivar la regla y sin
-    // tocar el dossier (que lleva el hallazgo como `EV-xx`).
-    analysisResults: Object.entries(run.evidenceRecords ?? {})
-      .filter(([, record]) => record.method === 'analyze')
-      .sort(([, a], [, b]) => a.revealedMinute - b.revealedMinute)
-      .map(([id]) => id),
+    analysisResults: analysisResultsOf(run),
     pendingRequests: run.pendingRequests.map(request => {
       const payload = (request.payload ?? {}) as Record<string, unknown>;
       const method = payload.method;
@@ -156,7 +163,7 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     detentions: [...run.detentions],
     batch: batchSteps(run.pendingBatch),
     finalReport: publicFinalReport(definition, run, timeline),
-    officialResult: null,
+    officialResult,
     objectives: definition.objectives.map(objective => ({
       id: objective.id,
       description: objective.description,
@@ -274,6 +281,7 @@ const eventSummaries: Record<string, EventNamer> = {
     const service = String(payload.serviceId ?? '');
     const what: Record<string, string> = {
       briefing: 'sobre el encargo',
+      evaluate: 'que evaluara tu carrera',
       explain: 'que te explicara un análisis',
       lookup: 'en inteligencia',
       routes: 'por las rutas de viaje',

@@ -115,7 +115,7 @@ export interface TeamMember {
  * `coordinate` no es un servicio del motor: coordinar una detención es la
  * acción `detain` que ya existe y la ventana del equipo solo la enseña a
  * través de David. */
-export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'routes' | 'organize';
+export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'routes' | 'organize' | 'evaluate';
 
 /** Una petición al equipo A.C.M.E. (GDD §8): quién, qué servicio, sobre
  * qué (solo `explain`, con el id del análisis completado) y cuándo. El

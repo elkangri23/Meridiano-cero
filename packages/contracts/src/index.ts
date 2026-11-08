@@ -65,6 +65,81 @@ export interface FinalReport {
   score: FinalReportScore;
 }
 
+/** Resultado oficial de un expediente para un perfil (DEC-020, GDD §13):
+ * el primer cierre definitivo persistido. Los cierres posteriores del
+ * mismo contenido son práctica: el resultado oficial no cambia y la
+ * carrera no vuelve a otorgar puntos ni medallas. `isThisRun` dice si el
+ * resultado oficial lo produjo esta partida (true) o una anterior del
+ * mismo contenido (false: esta partida es de práctica). */
+export interface OfficialResultDto {
+  caseId: string;
+  caseTitle: string;
+  contentHash: string;
+  result: 'complete' | 'partial' | 'incorrect' | 'unresolved';
+  reason: 'finished' | 'deadline' | 'withdrawn';
+  minute: number;
+  points: number;
+  medal: string | null;
+  prestigeDelta: number;
+  integrityDelta: number;
+  trustDelta: number;
+  irregularActs: number;
+  countries: string[];
+  places: string[];
+  rankBefore: string;
+  rankAfter: string;
+  isThisRun: boolean;
+  createdAt: string;
+}
+
+/** Un resultado oficial dentro del perfil de carrera (resumen). */
+export interface CareerResultSummaryDto {
+  caseId: string;
+  caseTitle: string;
+  result: 'complete' | 'partial' | 'incorrect' | 'unresolved';
+  reason: 'finished' | 'deadline' | 'withdrawn';
+  minute: number;
+  points: number;
+  medal: string | null;
+  createdAt: string;
+}
+
+/** Una suspensión de carrera (GDD §13): solo la retirada de un caso la
+ * crea. `active` es true mientras ningún caso limpio posterior la haya
+ * resuelto; `imposedAt`/`resolvedAt` son minutos de cierre de su
+ * expediente, no un reloj global. */
+export interface CareerSanctionDto {
+  id: string;
+  caseId: string;
+  reason: string;
+  severity: 'suspension';
+  imposedAt: number;
+  resolvedAt?: number;
+  active: boolean;
+}
+
+/** Perfil de carrera del detective (GDD §13): rango, puntos, dimensiones
+ * de reputación (con su valor y su etiqueta cualitativa), casos, medallas,
+ * países y lugares visitados, sanciones y resultados oficiales. Se deriva
+ * de los resultados oficiales; no hay agregado mutable aparte. */
+export interface CareerProfileDto {
+  rank: string;
+  points: number;
+  prestige: number;
+  integrity: number;
+  trust: number;
+  prestigeLabel: string;
+  integrityLabel: string;
+  trustLabel: string;
+  totalCases: number;
+  completedCases: number;
+  medals: string[];
+  countries: string[];
+  places: string[];
+  sanctions: CareerSanctionDto[];
+  results: CareerResultSummaryDto[];
+}
+
 /** Delito de un expediente (GDD §3). Tres cosas distintas que no hay que
  * mezclar: `crimeType` es el delito (robo, desaparición, fraude…);
  * `contentRating` es el nivel de contenido (Familiar/General, GDD §14); y
@@ -245,6 +320,130 @@ function isoDate(value: unknown): boolean {
   if (typeof value !== 'string' || value.length !== 24) return false;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date.toISOString() === value;
+}
+const CAREER_RANKS = ['Aspirante', 'Detective', 'Sargento', 'Inspector'];
+const CAREER_MEDALS = ['medalla-oro', 'medalla-plata'];
+const REPUTATION_LABELS = ['Ejemplar', 'Sólida', 'Discreta', 'Dudosa', 'Dañada'];
+const CASE_RESULTS = ['complete', 'partial', 'incorrect', 'unresolved'];
+const CLOSE_REASONS = ['finished', 'deadline', 'withdrawn'];
+function careerInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value);
+}
+function careerHash(value: unknown): boolean {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+}
+function careerMedal(value: unknown): boolean {
+  return value === null || (typeof value === 'string' && CAREER_MEDALS.includes(value));
+}
+function careerCaseId(value: unknown): boolean {
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
+}
+/** Identidad de un resultado de carrera: caso, título, resultado y motivo. */
+function careerCaseResult(record: Record<string, unknown>): boolean {
+  return careerCaseId(record.caseId) && shortText(record.caseTitle) &&
+    typeof record.result === 'string' && CASE_RESULTS.includes(record.result) &&
+    typeof record.reason === 'string' && CLOSE_REASONS.includes(record.reason);
+}
+function officialResultDeltas(record: Record<string, unknown>): boolean {
+  return nonNegativeInteger(record.minute) && nonNegativeInteger(record.points) && careerMedal(record.medal) &&
+    careerInteger(record.prestigeDelta) && careerInteger(record.integrityDelta) && careerInteger(record.trustDelta) &&
+    nonNegativeInteger(record.irregularActs);
+}
+function officialResultContext(record: Record<string, unknown>): boolean {
+  return stringList(record.countries, 100, 128) && stringList(record.places, 1000, 128) &&
+    typeof record.rankBefore === 'string' && CAREER_RANKS.includes(record.rankBefore) &&
+    typeof record.rankAfter === 'string' && CAREER_RANKS.includes(record.rankAfter) &&
+    typeof record.isThisRun === 'boolean' && isoDate(record.createdAt);
+}
+export function isOfficialResultDto(value: unknown): value is OfficialResultDto {
+  if (!dtoRecord(value, 'caseId,caseTitle,contentHash,countries,createdAt,integrityDelta,irregularActs,isThisRun,medal,minute,places,points,prestigeDelta,rankAfter,rankBefore,reason,result,trustDelta')) return false;
+  const record = value as Record<string, unknown>;
+  return careerCaseResult(record) && careerHash(record.contentHash) &&
+    officialResultDeltas(record) && officialResultContext(record);
+}
+function isCareerResultSummaryDto(value: unknown): value is CareerResultSummaryDto {
+  if (!dtoRecord(value, 'caseId,caseTitle,createdAt,medal,minute,points,reason,result')) return false;
+  const record = value as Record<string, unknown>;
+  return careerCaseResult(record) && nonNegativeInteger(record.minute) && nonNegativeInteger(record.points) &&
+    careerMedal(record.medal) && isoDate(record.createdAt);
+}
+function sanctionKeys(value: unknown): boolean {
+  const keys = Object.keys(value as Record<string, unknown>).sort().join(',');
+  return keys === 'active,caseId,id,imposedAt,reason,severity' ||
+    keys === 'active,caseId,id,imposedAt,reason,resolvedAt,severity';
+}
+function sanctionId(value: unknown): boolean {
+  return typeof value === 'string' && value.length > 0 && value.length <= 128;
+}
+function sanctionFields(record: Record<string, unknown>): boolean {
+  return careerCaseId(record.caseId) && shortText(record.reason) &&
+    record.severity === 'suspension' && nonNegativeInteger(record.imposedAt) &&
+    (record.resolvedAt === undefined || nonNegativeInteger(record.resolvedAt));
+}
+function isCareerSanctionDto(value: unknown): value is CareerSanctionDto {
+  if (typeof value !== 'object' || value === null || !sanctionKeys(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (!sanctionId(record.id) || !sanctionFields(record)) return false;
+  return typeof record.active === 'boolean';
+}
+function careerRankAndPoints(record: Record<string, unknown>): boolean {
+  return typeof record.rank === 'string' && CAREER_RANKS.includes(record.rank) &&
+    nonNegativeInteger(record.points) &&
+    careerInteger(record.prestige) && careerInteger(record.integrity) && careerInteger(record.trust);
+}
+function careerLabels(record: Record<string, unknown>): boolean {
+  return typeof record.prestigeLabel === 'string' && REPUTATION_LABELS.includes(record.prestigeLabel) &&
+    typeof record.integrityLabel === 'string' && REPUTATION_LABELS.includes(record.integrityLabel) &&
+    typeof record.trustLabel === 'string' && REPUTATION_LABELS.includes(record.trustLabel);
+}
+function careerCounts(record: Record<string, unknown>): boolean {
+  return nonNegativeInteger(record.totalCases) && nonNegativeInteger(record.completedCases) &&
+    (record.completedCases as number) <= (record.totalCases as number);
+}
+function careerMedals(record: Record<string, unknown>): boolean {
+  return Array.isArray(record.medals) && record.medals.length <= 2 &&
+    record.medals.every(item => typeof item === 'string' && CAREER_MEDALS.includes(item));
+}
+function careerCollections(record: Record<string, unknown>): boolean {
+  return stringList(record.countries, 100, 128) && stringList(record.places, 1000, 128) &&
+    Array.isArray(record.sanctions) && record.sanctions.length <= 100 && record.sanctions.every(isCareerSanctionDto) &&
+    Array.isArray(record.results) && record.results.length <= 1000 && record.results.every(isCareerResultSummaryDto) &&
+    new Set((record.results as CareerResultSummaryDto[]).map(item => item.caseId)).size === (record.results as unknown[]).length;
+}
+export function isCareerProfileDto(value: unknown): value is CareerProfileDto {
+  if (!dtoRecord(value, 'completedCases,countries,integrity,integrityLabel,medals,places,points,prestige,prestigeLabel,rank,results,sanctions,totalCases,trust,trustLabel')) return false;
+  const record = value as Record<string, unknown>;
+  return careerRankAndPoints(record) && careerLabels(record) && careerCounts(record) &&
+    careerMedals(record) && careerCollections(record);
+}
+
+/** Informe final: resultado y motivo del cierre, en español. El motor
+ * trabaja con identificadores en inglés (`complete`, `finished`…); la
+ * pantalla del jugador nunca los enseña tal cual. Un valor desconocido se
+ * devuelve tal cual: nunca se oculta el resultado por no tener texto.
+ * Viven en contracts (no en case-schema) para que la web pueda usarlos
+ * sin romper la regla web-isolation. */
+export const REPORT_RESULT_TEXT: Record<string, string> = {
+  complete: 'completado',
+  partial: 'parcial',
+  incorrect: 'incorrecto',
+  unresolved: 'sin resolver',
+};
+
+export const REPORT_REASON_TEXT: Record<string, string> = {
+  finished: 'finalizado',
+  deadline: 'plazo agotado',
+  withdrawn: 'retirado por A.C.M.E.',
+};
+
+/** Frase de un resultado del informe final. */
+export function reportResultText(result: string): string {
+  return REPORT_RESULT_TEXT[result] ?? result;
+}
+
+/** Frase de un motivo de cierre del informe final. */
+export function reportReasonText(reason: string): string {
+  return REPORT_REASON_TEXT[reason] ?? reason;
 }
 function summaryState(value: Record<string, unknown>): boolean {
   return (value.status === 'active' || value.status === 'closed') &&
@@ -539,7 +738,11 @@ export interface PlayerViewDto {
    * esta revisión, según el estado del motor. La descripción es la del
    * expediente; un objetivo sin condición conocida queda siempre pendiente. */
   objectives: Array<{ id: string; description: string; achieved: boolean }>;
-  officialResult: null;
+  /** Resultado oficial de este contenido para el perfil (DEC-020): el
+   * primer cierre definitivo persistido, o null si aún no hay cierre
+   * oficial de este expediente. Los cierres posteriores son práctica y
+   * enseñan este mismo resultado con `isThisRun: false`. */
+  officialResult: OfficialResultDto | null;
   /** Acciones intentables desde el estado actual (motor). La UI las ofrece como
    * botones y las envía a interpret; el motor valida cada una al confirmarla. */
   offers: PublicActionOffer[];
@@ -879,7 +1082,7 @@ function publicTeamRecord(value: unknown): value is TeamRecordDto {
   if (!boundedString(value.id, 128)) return false;
   if (value.targetId !== undefined && !boundedString(value.targetId, 128)) return false;
   if (!['margaret', 'richter', 'elena', 'david', 'clara'].includes(value.memberId as string)) return false;
-  if (!['briefing', 'explain', 'lookup', 'routes', 'organize'].includes(value.serviceId as string)) return false;
+  if (!['briefing', 'evaluate', 'explain', 'lookup', 'routes', 'organize'].includes(value.serviceId as string)) return false;
   return nonNegativeInteger(value.minute);
 }
 function publicTeam(value: unknown): value is TeamRecordDto[] {
@@ -905,7 +1108,7 @@ function generalCollections(value: Record<string, unknown>): boolean {
 function generalReports(value: Record<string, unknown>): boolean {
   if (!publicBatch(value.batch)) return false;
   if (value.finalReport !== null && !publicFinalReport(value.finalReport)) return false;
-  return value.officialResult === null;
+  return value.officialResult === null || isOfficialResultDto(value.officialResult);
 }
 function playerViewIdentity(value: Record<string, unknown>): boolean {
   if (value.schemaVersion !== 1 || !uuid(value.runId) || !uuid(value.branchId)) return false;

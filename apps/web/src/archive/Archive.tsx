@@ -9,6 +9,7 @@ import type { DetectiveProfileDto, SessionDto } from '@meridiano/contracts';
 import { archiveApi } from './client';
 import { profileApi } from '../auth/client';
 import { avatarLabel, ProfileSection } from '../auth/ProfileSection';
+import { CareerSection } from './CareerSection';
 import { createArchiveModel } from './model';
 import type { ArchiveState, ConnectionStatus } from './model';
 import './archive.css';
@@ -162,6 +163,7 @@ function Archive() {
         <h2>Mi perfil de detective</h2>
         <ProfileSection identity={identity} profile={detectiveProfile} onSaved={setDetectiveProfile} />
       </section>}
+      {state.profile && <CareerSection />}
       <footer><Link to="/glosario">Glosario y reglas</Link> · Un detective por partida · Las consultas del archivo no avanzan el reloj del caso.</footer>
     </main>
   );
