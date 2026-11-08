@@ -449,12 +449,17 @@ function summaryState(value: Record<string, unknown>): boolean {
   return (value.status === 'active' || value.status === 'closed') &&
     typeof value.version === 'number' && Number.isSafeInteger(value.version) && value.version > 0 && isoDate(value.createdAt);
 }
+function runSummaryIdentity(value: Record<string, unknown>): boolean {
+  return uuid(value.runId) && typeof value.caseId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value.caseId);
+}
+function runSummaryFields(value: Record<string, unknown>): boolean {
+  return (value.caseTitle === null || shortText(value.caseTitle)) &&
+    typeof value.difficulty === 'string' && ['easy', 'normal', 'hard'].includes(value.difficulty) &&
+    typeof value.minute === 'number' && Number.isSafeInteger(value.minute) && value.minute >= 0;
+}
 function runSummary(value: unknown): value is RunSummaryDto {
   if (!dtoRecord(value, 'caseId,caseTitle,createdAt,difficulty,minute,runId,status,version')) return false;
-  if (!uuid(value.runId) || typeof value.caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.caseId)) return false;
-  if (value.caseTitle !== null && !shortText(value.caseTitle)) return false;
-  if (typeof value.difficulty !== 'string' || !['easy', 'normal', 'hard'].includes(value.difficulty)) return false;
-  if (typeof value.minute !== 'number' || !Number.isSafeInteger(value.minute) || value.minute < 0) return false;
+  if (!runSummaryIdentity(value) || !runSummaryFields(value)) return false;
   return summaryState(value);
 }
 function pageCursor(value: unknown): boolean {
@@ -1095,11 +1100,14 @@ function generalChatCollections(value: Record<string, unknown>): boolean {
   if (!publicEvidenceTexts(value.evidenceTexts)) return false;
   return publicOffers(value.offers);
 }
+function generalStringLists(value: Record<string, unknown>): boolean {
+  return stringList(value.dossier, 1000, 128) && stringList(value.conversation, 1000, 16000) &&
+    stringList(value.warrants, 100, 128) && stringList(value.detentions, 100, 128) &&
+    stringList(value.analysisResults, 100, 128);
+}
 function generalCollections(value: Record<string, unknown>): boolean {
   if (!publicObjects(value.objects) || !publicRequests(value.pendingRequests)) return false;
-  if (!stringList(value.dossier, 1000, 128) || !stringList(value.conversation, 1000, 16000)) return false;
-  if (!stringList(value.warrants, 100, 128) || !stringList(value.detentions, 100, 128)) return false;
-  if (!stringList(value.analysisResults, 100, 128)) return false;
+  if (!generalStringLists(value)) return false;
   if (!publicMisconduct(value.misconduct)) return false;
   if (!publicTeam(value.team)) return false;
   if (!publicObjectives(value.objectives)) return false;
