@@ -2,13 +2,9 @@ import { useEffect, useState } from 'react';
 import type { CareerProfileDto } from '@meridiano/contracts';
 import { reportReasonText, reportResultText } from '@meridiano/contracts';
 import { archiveApi } from './client';
-
-/** Etiqueta legible de una medalla de carrera. */
-function medalLabel(medal: string): string {
-  if (medal === 'medalla-oro') return 'Medalla de oro';
-  if (medal === 'medalla-plata') return 'Medalla de plata';
-  return medal;
-}
+import { medalLabel } from '../game/team';
+import { useTranslation } from '../i18n';
+import type { TranslateFn } from '@meridiano/contracts';
 
 /** Lista unida por comas, o el texto de vacío cuando no hay nada. */
 function joinOrNone(values: string[], none: string): string {
@@ -16,21 +12,25 @@ function joinOrNone(values: string[], none: string): string {
 }
 
 function CareerSanctions({ sanctions }: { sanctions: CareerProfileDto['sanctions'] }) {
+  const t = useTranslation();
   if (sanctions.length === 0) return null;
   return <>
-    <h3>Sanciones</h3>
+    <h3>{t('career.sanctions')}</h3>
     <ul>{sanctions.map(sanction =>
-      <li key={sanction.id}>{sanction.reason} · {sanction.active ? 'activa' : 'resuelta'}</li>)}</ul>
+      <li key={sanction.id}>{sanction.reason} · {sanction.active ? t('career.sanctionActive') : t('career.sanctionResolved')}</li>)}</ul>
   </>;
 }
 
-function CareerResults({ results }: { results: CareerProfileDto['results'] }) {
+function CareerResults({ results, t }: { results: CareerProfileDto['results']; t: TranslateFn }) {
   return <>
-    <h3>Resultados oficiales</h3>
+    <h3>{t('career.results')}</h3>
     {results.length === 0
-      ? <p>Aún no tienes casos cerrados. Tu carrera empieza con el primer informe oficial.</p>
+      ? <p>{t('career.noResults')}</p>
       : <ul>{results.map(result =>
-        <li key={result.caseId}>{result.caseTitle} — {reportResultText(result.result)} · {reportReasonText(result.reason)} · min {result.minute} · {result.points} puntos{result.medal ? ` · ${medalLabel(result.medal)}` : ''}</li>)}</ul>}
+        <li key={result.caseId}>{t('career.resultLine', {
+          title: result.caseTitle, result: reportResultText(result.result, t), reason: reportReasonText(result.reason, t),
+          minute: result.minute, points: result.points, medal: result.medal ? ` · ${medalLabel(result.medal, t)}` : '',
+        })}</li>)}</ul>}
   </>;
 }
 
@@ -40,6 +40,7 @@ function CareerResults({ results }: { results: CareerProfileDto['results'] }) {
  * oficiales; sin cierres, el perfil está vacío (rango Aspirante, cero
  * casos): la carrera empieza con el primer informe oficial. */
 export function CareerSection() {
+  const t = useTranslation();
   const [career, setCareer] = useState<CareerProfileDto | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -54,19 +55,19 @@ export function CareerSection() {
   }, []);
 
   return (
-    <section className="archive-list" aria-label="Carrera" data-testid="career-section">
-      <p className="archive-overline">Carrera</p>
-      <h2>Mi carrera</h2>
-      {failed && <p role="alert">No se pudo cargar tu carrera.</p>}
-      {!failed && !career && <p>Cargando carrera…</p>}
+    <section className="archive-list" aria-label={t('career.title')} data-testid="career-section">
+      <p className="archive-overline">{t('career.title')}</p>
+      <h2>{t('career.title')}</h2>
+      {failed && <p role="alert">{t('career.loadError')}</p>}
+      {!failed && !career && <p>{t('career.loading')}</p>}
       {career && <>
-        <p data-testid="career-rank">Rango: <strong>{career.rank}</strong> · <span data-testid="career-points">{career.points} puntos</span> · <span data-testid="career-cases">{career.totalCases} {career.totalCases === 1 ? 'caso' : 'casos'}</span> ({career.completedCases} {career.completedCases === 1 ? 'resuelto' : 'resueltos'})</p>
-        <p>Prestigio: {career.prestigeLabel} · Integridad: {career.integrityLabel} · Confianza: {career.trustLabel}</p>
-        <p>Medallas: {joinOrNone(career.medals.map(medalLabel), 'ninguna todavía')}</p>
-        <p>Países: {joinOrNone(career.countries, 'ninguno todavía')}</p>
-        <p>Lugares: {joinOrNone(career.places, 'ninguno todavía')}</p>
+        <p data-testid="career-rank">{t('career.rank')} <strong>{career.rank}</strong> · <span data-testid="career-points">{t('career.points', { points: career.points })}</span> · <span data-testid="career-cases">{career.totalCases} {t(career.totalCases === 1 ? 'career.caseSingular' : 'career.casePlural')}</span> ({career.completedCases} {t(career.completedCases === 1 ? 'career.resolvedSingular' : 'career.resolvedPlural')})</p>
+        <p>{t('career.reputation', { prestige: career.prestigeLabel, integrity: career.integrityLabel, trust: career.trustLabel })}</p>
+        <p>{t('career.medals', { list: joinOrNone(career.medals.map(medal => medalLabel(medal, t)), t('career.noneFeminine')) })}</p>
+        <p>{t('career.countries', { list: joinOrNone(career.countries, t('career.noneMasculine')) })}</p>
+        <p>{t('career.places', { list: joinOrNone(career.places, t('career.noneMasculine')) })}</p>
         <CareerSanctions sanctions={career.sanctions} />
-        <CareerResults results={career.results} />
+        <CareerResults results={career.results} t={t} />
       </>}
     </section>
   );

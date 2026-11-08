@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { CaseSummary } from '@meridiano/contracts';
-import { deadlineMinutesForDifficulty, GDD_CRIME_TYPES, CRIME_TYPE_LABELS, caseLabel } from '@meridiano/contracts';
+import type { CaseSummary, LocaleKey } from '@meridiano/contracts';
+import { deadlineMinutesForDifficulty, GDD_CRIME_TYPES, CRIME_TYPE_KEYS, CONTENT_RATING_KEYS, caseLabel } from '@meridiano/contracts';
 import type { ContentRating, CrimeType } from '@meridiano/contracts';
 import type { ArchiveState, createArchiveModel } from './model';
 import type { Difficulty } from './creation';
 import { displayCaseTitle } from './case-title';
+import { useTranslation } from '../i18n';
 
 type Props = { state: ArchiveState; model: ReturnType<typeof createArchiveModel> };
-const difficultyOptions: { id: Difficulty; label: string; note: string }[] = [
-  { id: 'easy', label: 'Fácil', note: 'El doble de tiempo para resolver el caso.' },
-  { id: 'normal', label: 'Normal', note: 'El plazo con el que se diseñó el expediente.' },
-  { id: 'hard', label: 'Difícil', note: 'La mitad de tiempo. Para quien ya conoce el caso.' },
+const difficultyOptions: { id: Difficulty; labelKey: LocaleKey; noteKey: LocaleKey }[] = [
+  { id: 'easy', labelKey: 'labels.difficulty.easy', noteKey: 'newRun.difficulty.easyNote' },
+  { id: 'normal', labelKey: 'labels.difficulty.normal', noteKey: 'newRun.difficulty.normalNote' },
+  { id: 'hard', labelKey: 'labels.difficulty.hard', noteKey: 'newRun.difficulty.hardNote' },
 ];
 const hours = (minutes: number) => `${Math.round(minutes / 60)} h`;
 const difficulties: Difficulty[] = ['easy', 'normal', 'hard'];
@@ -21,7 +22,8 @@ function randomOf<T>(items: readonly T[]): T | undefined {
   return items[Math.floor(Math.random() * items.length)];
 }
 export function NewRun({ state, model }: Props) {
-  return <section className="archive-create" aria-labelledby="new-run-title"><p className="archive-overline">Nueva investigación</p><h2 id="new-run-title">Nueva partida</h2><p>Elige un delito y una dificultad para empezar a investigar.</p><CreationContent state={state} model={model} /><CaseExchange state={state} model={model} /></section>;
+  const t = useTranslation();
+  return <section className="archive-create" aria-labelledby="new-run-title"><p className="archive-overline">{t('newRun.overline')}</p><h2 id="new-run-title">{t('newRun.title')}</h2><p>{t('newRun.intro')}</p><CreationContent state={state} model={model} /><CaseExchange state={state} model={model} /></section>;
 }
 /** Descarga del expediente propio (DEC-011): el fichero contiene la
  * solución, así que solo lo ve su dueño y nunca sale en la proyección. */
@@ -38,6 +40,7 @@ async function downloadExport(model: ReturnType<typeof createArchiveModel>, case
 /** Entrada de importar: un fichero .json de expediente; el servidor lo
  * valida (v1.5) antes de registrarlo en el catálogo. */
 function CaseExchange({ state, model }: Props) {
+  const t = useTranslation();
   const busy = state.phase === 'loading';
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -46,9 +49,9 @@ function CaseExchange({ state, model }: Props) {
     event.target.value = '';
   }
   return <div>
-    <h3>Importar expediente</h3>
-    <p>Trae un expediente exportado por otro jugador: se valida antes de entrar en el catálogo y solo se puede jugar si pasa la validación.</p>
-    <label>Expediente (.json) <input type="file" accept=".json,application/json" disabled={busy} onChange={event => void onFile(event)} /></label>
+    <h3>{t('newRun.importTitle')}</h3>
+    <p>{t('newRun.importHelp')}</p>
+    <label>{t('newRun.importLabel')} <input type="file" accept=".json,application/json" disabled={busy} onChange={event => void onFile(event)} /></label>
   </div>;
 }
 function openCreatedRun(previousPhase: string, phase: string, runId: string | null, navigate: (path: string) => void): void {
@@ -73,6 +76,7 @@ function useCrimeChoice(playableCrimes: CrimeType[]) {
   return { crime, resolvedCrime, surprised, chooseCrime, markSurprised, resetChoice };
 }
 function CreationContent({ state, model }: Props) {
+  const t = useTranslation();
   const [content, setContent] = useState<ContentRating>('familiar');
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const [caseId, setCaseId] = useState<string | null>(null);
@@ -123,48 +127,55 @@ function CreationContent({ state, model }: Props) {
     <CrimeField playableCrimes={playableCrimes} crime={crime} resolvedCrime={resolvedCrime} busy={busy} surprised={surprised} selectedCase={selectedCase} onChoose={chooseCrimeAndReset} onSurprise={surprise} />
     <ContentField content={content} busy={busy} hasGeneral={hasGeneral} onChange={chooseContent} />
     {matchingCases.length > 1 && <CaseField cases={matchingCases} selectedCase={selectedCase} busy={busy} onChange={setCaseId} />}
-    {selectedCase && <p>Expediente: {displayCaseTitle(selectedCase.title)} — {caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.</p>}
+    {selectedCase && <p>{t('newRun.caseLine', { title: displayCaseTitle(selectedCase.title), label: caseLabel(selectedCase.crimeType, selectedCase.contentRating, t) })}</p>}
     <ExportOwnCaseButton model={model} selectedCase={selectedCase} busy={busy} />
-    {!selectedCase && state.cases.length > 0 && <p>Todavía no hay expedientes validados de este delito y contenido.</p>}
-    <button type="submit" disabled={busy || !selectedCase}>Empezar partida</button>{state.cases.length === 0 && <p>No hay expedientes disponibles.</p>}
+    {!selectedCase && state.cases.length > 0 && <p>{t('newRun.noMatching')}</p>}
+    <button type="submit" disabled={busy || !selectedCase}>{t('newRun.start')}</button>{state.cases.length === 0 && <p>{t('newRun.noCases')}</p>}
   </form>;
 }
 type DifficultyFieldProps = { busy: boolean; difficulty: Difficulty; selectedCase: { deadlineMinutes: number } | undefined; onChange: (next: Difficulty) => void };
 function ExportOwnCaseButton({ model, selectedCase, busy }: { model: ReturnType<typeof createArchiveModel>; selectedCase: CaseSummary | undefined; busy: boolean }) {
+  const t = useTranslation();
   if (!selectedCase?.ownedByMe) return null;
-  return <p><button type="button" disabled={busy} onClick={() => void downloadExport(model, selectedCase.caseId)}>Exportar expediente</button> La descarga contiene el expediente completo, incluida la solución. Compártela solo con quien quieras que lo juegue.</p>;
+  return <p><button type="button" disabled={busy} onClick={() => void downloadExport(model, selectedCase.caseId)}>{t('newRun.export')}</button>{t('newRun.exportHelp')}</p>;
 }
 function DifficultyField({ busy, difficulty, selectedCase, onChange }: DifficultyFieldProps) {
-  return <fieldset disabled={busy} className="difficulty-field"><legend>Dificultad</legend><div className="difficulty-options">{difficultyOptions.map(option => <label key={option.id}><input type="radio" name="difficulty" value={option.id} checked={difficulty === option.id} onChange={() => onChange(option.id)} /> <span><strong>{option.label}{selectedCase ? ` · plazo ${hours(deadlineMinutesForDifficulty(selectedCase.deadlineMinutes, option.id))}` : ''}</strong> — {option.note}</span></label>)}</div></fieldset>;
+  const t = useTranslation();
+  return <fieldset disabled={busy} className="difficulty-field"><legend>{t('newRun.difficulty')}</legend><div className="difficulty-options">{difficultyOptions.map(option => <label key={option.id}><input type="radio" name="difficulty" value={option.id} checked={difficulty === option.id} onChange={() => onChange(option.id)} /> <span><strong>{t(option.labelKey)}{selectedCase ? t('newRun.deadline', { hours: hours(deadlineMinutesForDifficulty(selectedCase.deadlineMinutes, option.id)) }) : ''}</strong> — {t(option.noteKey)}</span></label>)}</div></fieldset>;
 }
 type PhaseViewProps = Props & { busy: boolean; onPrepareAnother: () => void };
 function CreationPhaseView({ state, model, busy, onPrepareAnother }: PhaseViewProps) {
-  if (state.creation.phase === 'created') return <div><p>Partida creada · referencia {state.creation.runId?.slice(0, 8)}</p><div className="archive-actions"><Link to={'/runs/' + state.creation.runId}>Jugar ahora</Link><button type="button" disabled={busy} onClick={onPrepareAnother}>Preparar otra creación</button></div></div>;
-  if (state.creation.phase === 'blocked') return <div><p>No se puede leer o conservar la referencia local. Actualiza la sesión o revisa el almacenamiento de esta pestaña antes de crear.</p><div className="archive-actions"><button type="button" disabled={busy} onClick={() => { void model.discardCreation(); }}>Descartar y empezar de nuevo</button></div></div>;
+  const t = useTranslation();
+  if (state.creation.phase === 'created') return <div><p>{t('newRun.created', { ref: state.creation.runId?.slice(0, 8) ?? '' })}</p><div className="archive-actions"><Link to={'/runs/' + state.creation.runId}>{t('newRun.playNow')}</Link><button type="button" disabled={busy} onClick={onPrepareAnother}>{t('newRun.prepareAnother')}</button></div></div>;
+  if (state.creation.phase === 'blocked') return <div><p>{t('newRun.blocked')}</p><div className="archive-actions"><button type="button" disabled={busy} onClick={() => { void model.discardCreation(); }}>{t('newRun.discard')}</button></div></div>;
   if (state.creation.phase === 'uncertain' || state.creation.phase === 'sending') return <PendingCreation state={state} model={model} />;
   return null;
 }
 type CrimeFieldProps = { playableCrimes: CrimeType[]; crime: CrimeType; resolvedCrime: CrimeType; busy: boolean; surprised: boolean; selectedCase: { crimeType: CrimeType; contentRating: ContentRating } | undefined; onChoose: (next: CrimeType) => void; onSurprise: () => void };
 function CrimeField({ playableCrimes, crime, resolvedCrime, busy, surprised, selectedCase, onChoose, onSurprise }: CrimeFieldProps) {
-  return <><fieldset disabled={busy}><legend>Delito</legend>{GDD_CRIME_TYPES.map(item => {
+  const t = useTranslation();
+  return <><fieldset disabled={busy}><legend>{t('newRun.crime')}</legend>{GDD_CRIME_TYPES.map(item => {
     const playable = item === 'aleatorio' ? playableCrimes.length > 0 : playableCrimes.includes(item);
-    return <label key={item}><input type="radio" name="crime" value={item} checked={crime === item} disabled={!playable} onChange={() => onChoose(item)} /> {CRIME_TYPE_LABELS[item]}{item === 'aleatorio' && crime === 'aleatorio' && resolvedCrime ? ` → ${CRIME_TYPE_LABELS[resolvedCrime]}` : ''}{!playable ? ' · Sin expedientes validados todavía' : ''}</label>;
+    return <label key={item}><input type="radio" name="crime" value={item} checked={crime === item} disabled={!playable} onChange={() => onChoose(item)} /> {t(CRIME_TYPE_KEYS[item])}{item === 'aleatorio' && crime === 'aleatorio' && resolvedCrime ? ` → ${t(CRIME_TYPE_KEYS[resolvedCrime])}` : ''}{!playable ? t('newRun.noValidated') : ''}</label>;
   })}</fieldset>
-  <p><button type="button" disabled={busy || playableCrimes.length === 0} onClick={onSurprise}>SORPRÉNDEME</button> Aleatoriza expediente y dificultad entre todo lo disponible, incluidos los casos generados.{surprised && selectedCase ? ` Ha elegido: ${caseLabel(selectedCase.crimeType, selectedCase.contentRating)}.` : ''}</p></>;
+  <p><button type="button" disabled={busy || playableCrimes.length === 0} onClick={onSurprise}>{t('newRun.surprise')}</button>{t('newRun.surpriseHelp')}{surprised && selectedCase ? t('newRun.surprisePicked', { label: caseLabel(selectedCase.crimeType, selectedCase.contentRating, t) }) : ''}</p></>;
 }
 type ContentFieldProps = { content: ContentRating; busy: boolean; hasGeneral: boolean; onChange: (next: ContentRating) => void };
 function ContentField({ content, busy, hasGeneral, onChange }: ContentFieldProps) {
-  return <fieldset disabled={busy}><legend>Contenido</legend>
-    <label><input type="radio" name="content" value="familiar" checked={content === 'familiar'} onChange={() => onChange('familiar')} /> Familiar — sin asesinatos ni temas perturbadores.</label>
-    <label><input type="radio" name="content" value="general" checked={content === 'general'} disabled={!hasGeneral} onChange={() => onChange('general')} /> General{hasGeneral ? ' — temas serios permitidos, sin detalle explícito ni gore.' : ' · Sin expedientes validados todavía — el único expediente disponible es apto para Familiar.'}</label>
+  const t = useTranslation();
+  return <fieldset disabled={busy}><legend>{t('newRun.content')}</legend>
+    <label><input type="radio" name="content" value="familiar" checked={content === 'familiar'} onChange={() => onChange('familiar')} /> {t(CONTENT_RATING_KEYS.familiar)} — {t('newRun.contentFamiliarNote')}</label>
+    <label><input type="radio" name="content" value="general" checked={content === 'general'} disabled={!hasGeneral} onChange={() => onChange('general')} /> {t(CONTENT_RATING_KEYS.general)}{hasGeneral ? t('newRun.contentGeneralHelp') : t('newRun.contentGeneralEmpty')}</label>
   </fieldset>;
 }
 type CaseFieldProps = { cases: { caseId: string; title: string; crimeType: CrimeType; contentRating: ContentRating }[]; selectedCase: { caseId: string } | undefined; busy: boolean; onChange: (caseId: string) => void };
 function CaseField({ cases, selectedCase, busy, onChange }: CaseFieldProps) {
-  return <fieldset disabled={busy}><legend>Expediente</legend>{cases.map(item => <label key={item.caseId}><input type="radio" name="case" value={item.caseId} checked={selectedCase?.caseId === item.caseId} onChange={() => onChange(item.caseId)} /> {displayCaseTitle(item.title)} — {caseLabel(item.crimeType, item.contentRating)}</label>)}</fieldset>;
+  const t = useTranslation();
+  return <fieldset disabled={busy}><legend>{t('newRun.case')}</legend>{cases.map(item => <label key={item.caseId}><input type="radio" name="case" value={item.caseId} checked={selectedCase?.caseId === item.caseId} onChange={() => onChange(item.caseId)} /> {t('newRun.caseOption', { title: displayCaseTitle(item.title), label: caseLabel(item.crimeType, item.contentRating, t) })}</label>)}</fieldset>;
 }
 function PendingCreation({ state, model }: Props) {
+  const t = useTranslation();
   const busy = state.phase === 'loading';
-  const title = state.cases.find(item => item.caseId === state.creation.caseId)?.title ?? 'Expediente pendiente';
-  return <div><p>{title} · Creación pendiente de confirmar. No se asignará otra referencia automáticamente.</p><div className="archive-actions"><button type="button" disabled={busy} onClick={() => { void model.recoverCreation(); }}>Comprobar creación</button><button type="button" disabled={busy} onClick={() => { void model.recoverCreation(true); }}>Reintentar misma creación</button><button type="button" disabled={busy} onClick={() => { void model.discardCreation(); }}>Descartar y empezar de nuevo</button></div></div>;
+  const title = state.cases.find(item => item.caseId === state.creation.caseId)?.title ?? t('newRun.pendingTitle');
+  return <div><p>{t('newRun.pending', { title })}</p><div className="archive-actions"><button type="button" disabled={busy} onClick={() => { void model.recoverCreation(); }}>{t('newRun.checkCreation')}</button><button type="button" disabled={busy} onClick={() => { void model.recoverCreation(true); }}>{t('newRun.retryCreation')}</button><button type="button" disabled={busy} onClick={() => { void model.discardCreation(); }}>{t('newRun.discard')}</button></div></div>;
 }

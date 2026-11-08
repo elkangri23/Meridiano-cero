@@ -1,22 +1,23 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { CRIME_TYPE_LABELS, GDD_CRIME_TYPES } from '@meridiano/contracts';
-import type { ContentRating, CrimeType, GenerationJobDto } from '@meridiano/contracts';
+import { CRIME_TYPE_KEYS, GDD_CRIME_TYPES, CONTENT_RATING_KEYS } from '@meridiano/contracts';
+import type { ContentRating, CrimeType, GenerationJobDto, LocaleKey } from '@meridiano/contracts';
 import type { ArchiveState } from './model';
 import type { createArchiveModel } from './model';
 import { displayCaseTitle } from './case-title';
+import { useTranslation } from '../i18n';
 
 type Props = { state: ArchiveState; model: ReturnType<typeof createArchiveModel> };
 
-const STATUS_LABELS: Record<GenerationJobDto['status'], string> = {
-  queued: 'En cola',
-  running: 'Generando',
-  done: 'Listo',
-  failed: 'Fallido',
-  cancelled: 'Cancelado',
+const STATUS_KEYS: Record<GenerationJobDto['status'], LocaleKey> = {
+  queued: 'labels.generation.queued',
+  running: 'labels.generation.running',
+  done: 'labels.generation.done',
+  failed: 'labels.generation.failed',
+  cancelled: 'labels.generation.cancelled',
 };
-const DURATION_LABELS = { short: 'Corta', medium: 'Media', long: 'Larga' } as const;
-type Duration = keyof typeof DURATION_LABELS;
+const DURATION_KEYS = { short: 'labels.duration.short', medium: 'labels.duration.medium', long: 'labels.duration.long' } as const;
+type Duration = keyof typeof DURATION_KEYS;
 
 function stageProgress(job: GenerationJobDto): { done: number; total: number; current: string | null } {
   const progress = job.progress as { stages?: Array<{ stage: number; name: string; status: string }> };
@@ -27,19 +28,26 @@ function stageProgress(job: GenerationJobDto): { done: number; total: number; cu
 }
 
 function JobItem({ job, caseTitle, busy, onCancel }: { job: GenerationJobDto; caseTitle: string | null; busy: boolean; onCancel: (jobId: string) => void }) {
+  const t = useTranslation();
   const progress = stageProgress(job);
   const active = job.status === 'queued' || job.status === 'running';
   return <li>
-    <p>{CRIME_TYPE_LABELS[job.crimeType]} · {job.contentRating === 'familiar' ? 'Familiar' : 'General'} · {DURATION_LABELS[job.duration]} — {STATUS_LABELS[job.status]}
-      {active && ` · Etapa ${progress.done}/${progress.total}${progress.current ? ` · ${progress.current}` : ''}`}
+    <p>{t('generation.jobLine', {
+      crime: t(CRIME_TYPE_KEYS[job.crimeType]),
+      rating: t(job.contentRating === 'familiar' ? CONTENT_RATING_KEYS.familiar : CONTENT_RATING_KEYS.general),
+      duration: t(DURATION_KEYS[job.duration]),
+      status: t(STATUS_KEYS[job.status]),
+      stage: active ? t('generation.stage', { done: progress.done, total: progress.total, current: progress.current ? ` · ${progress.current}` : '' }) : '',
+    })}
     </p>
-    {job.status === 'done' && <p>Expediente listo{caseTitle ? `: ${displayCaseTitle(caseTitle)}` : ''}. Ya está en el catálogo: elígelo arriba en «Nueva partida».</p>}
-    {job.status === 'failed' && <p>No se pudo generar el caso{job.error ? `: ${job.error}` : '.'} Los borradores inválidos se rechazan, no se ofrecen.</p>}
-    {active && <button type="button" disabled={busy} onClick={() => onCancel(job.jobId)}>Cancelar</button>}
+    {job.status === 'done' && <p>{t('generation.jobDone', { title: caseTitle ? `: ${displayCaseTitle(caseTitle)}` : '' })}</p>}
+    {job.status === 'failed' && <p>{t('generation.jobFailed', { error: job.error ? `: ${job.error}` : '.' })}</p>}
+    {active && <button type="button" disabled={busy} onClick={() => onCancel(job.jobId)}>{t('common.cancel')}</button>}
   </li>;
 }
 
 export function GenerationPanel({ state, model }: Props) {
+  const t = useTranslation();
   const [crime, setCrime] = useState<CrimeType | 'aleatorio'>('aleatorio');
   const [content, setContent] = useState<ContentRating>('familiar');
   const [duration, setDuration] = useState<Duration>('medium');
@@ -61,25 +69,25 @@ export function GenerationPanel({ state, model }: Props) {
     });
   }
   return <section className="archive-create" aria-labelledby="generation-title">
-    <p className="archive-overline">Generador de casos</p>
-    <h2 id="generation-title">Generar un caso nuevo</h2>
-    <p>La IA escribe un expediente nuevo (delito, sospechosos, pistas y solución) y solo entra en el catálogo si pasa la validación y se puede jugar de punta a punta. Generar tarda unos minutos. Límites: una generación a la vez y tres al día.</p>
+    <p className="archive-overline">{t('generation.overline')}</p>
+    <h2 id="generation-title">{t('generation.title')}</h2>
+    <p>{t('generation.intro')}</p>
     <form onSubmit={submit}>
-      <fieldset disabled={busy || active}><legend>Delito</legend>
-        <label><input type="radio" name="gen-crime" value="aleatorio" checked={crime === 'aleatorio'} onChange={() => setCrime('aleatorio')} /> Sorpréndeme — sortea entre los 12 delitos.</label>
-        {GDD_CRIME_TYPES.filter(item => item !== 'aleatorio').map(item => <label key={item}><input type="radio" name="gen-crime" value={item} checked={crime === item} onChange={() => setCrime(item)} /> {CRIME_TYPE_LABELS[item]}</label>)}
+      <fieldset disabled={busy || active}><legend>{t('newRun.crime')}</legend>
+        <label><input type="radio" name="gen-crime" value="aleatorio" checked={crime === 'aleatorio'} onChange={() => setCrime('aleatorio')} /> {t('generation.surprise')}</label>
+        {GDD_CRIME_TYPES.filter(item => item !== 'aleatorio').map(item => <label key={item}><input type="radio" name="gen-crime" value={item} checked={crime === item} onChange={() => setCrime(item)} /> {t(CRIME_TYPE_KEYS[item])}</label>)}
       </fieldset>
-      <fieldset disabled={busy || active}><legend>Contenido</legend>
-        <label><input type="radio" name="gen-content" value="familiar" checked={content === 'familiar'} onChange={() => setContent('familiar')} /> Familiar — sin asesinatos ni temas perturbadores.</label>
-        <label><input type="radio" name="gen-content" value="general" checked={content === 'general'} onChange={() => setContent('general')} /> General — temas serios permitidos, sin detalle explícito ni gore.</label>
+      <fieldset disabled={busy || active}><legend>{t('newRun.content')}</legend>
+        <label><input type="radio" name="gen-content" value="familiar" checked={content === 'familiar'} onChange={() => setContent('familiar')} /> {t(CONTENT_RATING_KEYS.familiar)} — {t('newRun.contentFamiliarNote')}</label>
+        <label><input type="radio" name="gen-content" value="general" checked={content === 'general'} onChange={() => setContent('general')} /> {t(CONTENT_RATING_KEYS.general)} — {t('generation.generalNote')}</label>
       </fieldset>
-      <fieldset disabled={busy || active}><legend>Duración</legend>
-        {(Object.keys(DURATION_LABELS) as Duration[]).map(item => <label key={item}><input type="radio" name="gen-duration" value={item} checked={duration === item} onChange={() => setDuration(item)} /> {DURATION_LABELS[item]}</label>)}
+      <fieldset disabled={busy || active}><legend>{t('generation.duration')}</legend>
+        {(Object.keys(DURATION_KEYS) as Duration[]).map(item => <label key={item}><input type="radio" name="gen-duration" value={item} checked={duration === item} onChange={() => setDuration(item)} /> {t(DURATION_KEYS[item])}</label>)}
       </fieldset>
-      <button type="submit" disabled={busy || active}>Generar caso</button>
+      <button type="submit" disabled={busy || active}>{t('generation.submit')}</button>
     </form>
     {state.jobs.length > 0 && <div>
-      <h3>Mis generaciones</h3>
+      <h3>{t('generation.myJobs')}</h3>
       <ul>
         {state.jobs.map(job => <JobItem key={job.jobId} job={job} caseTitle={job.caseId ? state.cases.find(item => item.caseId === job.caseId)?.title ?? null : null} busy={busy} onCancel={jobId => void model.cancelGeneration(jobId)} />)}
       </ul>
