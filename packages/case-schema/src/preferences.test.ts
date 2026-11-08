@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createDefaultPreferences, normalizePreferences, clampScale, clampVolume, clampRate,
-  createPreferenceStore,
+  createPreferenceStore, type StorageLike, type PresentationPreferences,
 } from './preferences.js';
 
 describe('preferences', () => {
@@ -39,7 +39,7 @@ describe('preferences', () => {
   });
 
   it('normalizePreferences rellene valores invalidos con defaults', () => {
-    const p = normalizePreferences({ fontMode: 'bold', textScale: 'alto', palette: 'rojo', language: 'x' } as any);
+    const p = normalizePreferences({ fontMode: 'bold', textScale: 'alto', palette: 'rojo', language: 'x' } as unknown as Partial<PresentationPreferences>);
     expect(p.fontMode).toBe('retro');
     expect(p.textScale).toBe(100);
     expect(p.palette).toBe('default');
@@ -103,12 +103,12 @@ describe('preferences', () => {
 
   it('createPreferenceStore load es tolerante a JSON corrupto', () => {
     const store = createPreferenceStore();
-    store.save({} as any); // guardado directo de JSON invalido
+    store.save({} as unknown as PresentationPreferences); // guardado directo de JSON invalido
     // Sobrescribimos con JSON basura manualmente
     const raw = '{invalid';
     const map = new Map<string, string>();
     map.set('meridiano-cero-preferences-v1', raw);
-    const broken: any = {
+    const broken: StorageLike = {
       getItem: (k: string) => map.get(k) ?? null,
       setItem: (k: string, v: string) => { map.set(k, v); },
       removeItem: (k: string) => { map.delete(k); },
@@ -125,7 +125,7 @@ describe('preferences', () => {
   });
 
   it('createPreferenceStore save falla con storage que lanza', () => {
-    const throwing: any = {
+    const throwing: StorageLike = {
       getItem: () => { throw new Error('boom'); },
       setItem: () => { throw new Error('boom'); },
       removeItem: () => { throw new Error('boom'); },
@@ -137,7 +137,7 @@ describe('preferences', () => {
   });
 
   it('normalizePreferences aplica prefers-reduced-motion del sistema', () => {
-    const p = normalizePreferences({ accessibility: { reducedMotion: true } } as any);
+    const p = normalizePreferences({ accessibility: { reducedMotion: true } } as unknown as Partial<PresentationPreferences>);
     expect(p.accessibility.reducedMotion).toBe(true);
   });
 });

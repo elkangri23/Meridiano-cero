@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { planMigrations, runHealthReport, checkSaveCompatibility, RUNBOOK_CLEAN_INSTALL, RUNBOOK_MIGRATION_UPGRADE, RUNBOOK_ROLLBACK } from './migration-health.js';
 
-function createMockDb(_overrides: Record<string, any> = {}) {
+function createMockDb() {
   const baseMigrations = [
     { name: '0000_base', hash: 'hash0000' },
     { name: '0001_local_profile', hash: 'hash0001' },
@@ -16,7 +16,7 @@ function createMockDb(_overrides: Record<string, any> = {}) {
   ];
 
   return {
-    query: vi.fn().mockImplementation((sql: string, params?: any[]) => {
+    query: vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
       const sqlLower = sql.toLowerCase();
       if (sqlLower.includes('select 1')) return Promise.resolve({ rows: [{ '?': 1 }] });
       if (sqlLower.includes('select name, hash from base_migrations')) return Promise.resolve({ rows: baseMigrations });

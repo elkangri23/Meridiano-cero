@@ -29,16 +29,45 @@ export async function hashPassword(password: string): Promise<string> {
   return `$${ITERATIONS}$${saltB64}$${hashB64}`;
 }
 
+interface ParsedHash {
+  iterations: number;
+  salt: Uint8Array<ArrayBuffer>;
+  expectedHash: Uint8Array<ArrayBuffer>;
+}
+
+/** Descompone un hash `$iteraciones$sal$hash` (base64) o devuelve null si no es válido. */
+function parseStoredHash(storedHash: string): ParsedHash | null {
+  const parts = storedHash.split('$');
+  if (parts.length !== 4 || parts[0] !== '') return null;
+  const [, iterationsStr, saltStr, hashStr] = parts;
+  if (!iterationsStr || !saltStr || !hashStr) return null;
+  const iterations = parseInt(iterationsStr, 10);
+  if (!Number.isFinite(iterations)) return null;
+  return {
+    iterations,
+    salt: Uint8Array.from(atob(saltStr), c => c.charCodeAt(0)),
+    expectedHash: Uint8Array.from(atob(hashStr), c => c.charCodeAt(0)),
+  };
+}
+
+/** Comparación en tiempo constante. */
+function constantTimeEqual(a: Uint8Array<ArrayBuffer>, b: Uint8Array<ArrayBuffer>): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x !== undefined && y !== undefined) {
+      diff |= x ^ y;
+    }
+  }
+  return diff === 0;
+}
+
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   try {
-    const parts = storedHash.split('$');
-    if (parts.length !== 4 || parts[0] !== '') return false;
-    const [, iterationsStr, saltStr, hashStr] = parts;
-    if (!iterationsStr || !saltStr || !hashStr) return false;
-    const iterations = parseInt(iterationsStr, 10);
-    if (!Number.isFinite(iterations)) return false;
-    const salt = Uint8Array.from(atob(saltStr), c => c.charCodeAt(0));
-    const expectedHash = Uint8Array.from(atob(hashStr), c => c.charCodeAt(0));
+    const parsed = parseStoredHash(storedHash);
+    if (parsed === null) return false;
 
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
@@ -49,23 +78,13 @@ export async function verifyPassword(password: string, storedHash: string): Prom
       ['deriveBits'],
     );
     const derivedBits = await crypto.subtle.deriveBits(
-      { name: ALGORITHM, salt, iterations, hash: HASH_ALGORITHM },
+      { name: ALGORITHM, salt: parsed.salt, iterations: parsed.iterations, hash: HASH_ALGORITHM },
       keyMaterial,
       KEY_LENGTH * 8,
     );
     const actualHash = new Uint8Array(derivedBits);
 
-    // Comparación en tiempo constante
-    if (actualHash.length !== expectedHash.length) return false;
-    let diff = 0;
-    for (let i = 0; i < actualHash.length; i++) {
-      const a = actualHash[i];
-      const b = expectedHash[i];
-      if (a !== undefined && b !== undefined) {
-        diff |= a ^ b;
-      }
-    }
-    return diff === 0;
+    return constantTimeEqual(actualHash, parsed.expectedHash);
   } catch {
     return false;
   }

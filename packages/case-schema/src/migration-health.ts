@@ -3,6 +3,11 @@
 
 // import { readDatabaseUrl } from './config.js'; // Comentado para evitar dependencia circular en tests
 
+/** Cliente mínimo de base de datos: solo la consulta que usan estas funciones. */
+interface DbQueryClient {
+  query: (sql: string, params?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }>;
+}
+
 export interface MigrationPlan {
   pending: string[];
   applied: string[];
@@ -17,7 +22,7 @@ export interface HealthReport {
   timestamp: string;
 }
 
-export async function planMigrations(db: any): Promise<MigrationPlan> {
+export async function planMigrations(db: DbQueryClient): Promise<MigrationPlan> {
   // Obtener migraciones del filesystem
   const fsFiles = await getMigrationFiles();
   // Obtener migraciones aplicadas
@@ -38,10 +43,10 @@ export async function planMigrations(db: any): Promise<MigrationPlan> {
   return { pending, applied: applied.map(m => m.name), compatible };
 }
 
-export async function getAppliedMigrations(db: any): Promise<{ name: string; hash: string }[]> {
+export async function getAppliedMigrations(db: DbQueryClient): Promise<{ name: string; hash: string }[]> {
   try {
     const result = await db.query('SELECT name, hash FROM base_migrations ORDER BY name');
-    return result.rows;
+    return result.rows.map(row => ({ name: String(row.name ?? ''), hash: String(row.hash ?? '') }));
   } catch {
     return [];
   }
@@ -58,53 +63,61 @@ async function getMigrationFiles(): Promise<{ name: string; hash: string; sql: s
   ];
 }
 
-export async function runHealthReport(db: any): Promise<HealthReport> {
-  const timestamp = new Date().toISOString();
-
-  // Database connectivity
-  let connected = false;
+async function checkConnectivity(db: DbQueryClient): Promise<boolean> {
   try {
     await db.query('SELECT 1');
-    connected = true;
+    return true;
   } catch {
-    connected = false;
+    return false;
   }
+}
 
-  // Migrations
+async function checkSchemaCompatibility(db: DbQueryClient): Promise<boolean> {
+  const expectedEngineVersion = 14; // v14 del motor
+  try {
+    const v = await db.query('SELECT MAX(engine_version) as v FROM runs');
+    const actual = v.rows[0]?.v ? parseInt(String(v.rows[0].v), 10) : 0;
+    return actual <= expectedEngineVersion;
+  } catch {
+    return false;
+  }
+}
+
+async function countPartitions(db: DbQueryClient): Promise<{ runs: number; activeRuns: number }> {
+  try {
+    const r = await db.query('SELECT COUNT(*) as c FROM runs');
+    const runs = parseInt(String(r.rows[0]?.c ?? '0'), 10);
+    const a = await db.query('SELECT COUNT(*) as c FROM runs WHERE finished_at IS NULL');
+    const activeRuns = parseInt(String(a.rows[0]?.c ?? '0'), 10);
+    return { runs, activeRuns };
+  } catch {
+    return { runs: 0, activeRuns: 0 };
+  }
+}
+
+function healthStatus(connected: boolean, compatible: boolean, schemaCompatible: boolean): HealthReport['status'] {
+  if (connected && compatible && schemaCompatible) return 'healthy';
+  if (connected) return 'degraded';
+  return 'unhealthy';
+}
+
+export async function runHealthReport(db: DbQueryClient): Promise<HealthReport> {
+  const timestamp = new Date().toISOString();
+
+  const connected = await checkConnectivity(db);
   const applied = await getAppliedMigrations(db);
   const plan = await planMigrations(db);
+  const schemaCompatible = await checkSchemaCompatibility(db);
+  const partitions = await countPartitions(db);
 
   // Schema version (engine_version esperado)
   const expectedEngineVersion = 14; // v14 del motor
-  let schemaCompatible = true;
-  try {
-    const v = await db.query('SELECT MAX(engine_version) as v FROM runs');
-    const actual = v.rows[0]?.v ? parseInt(v.rows[0].v, 10) : 0;
-    schemaCompatible = actual <= expectedEngineVersion;
-  } catch {
-    schemaCompatible = false;
-  }
-
-  // Partitions
-  let runs = 0, activeRuns = 0;
-  try {
-    const r = await db.query('SELECT COUNT(*) as c FROM runs');
-    runs = parseInt(r.rows[0].c, 10);
-    const a = await db.query('SELECT COUNT(*) as c FROM runs WHERE finished_at IS NULL');
-    activeRuns = parseInt(a.rows[0].c, 10);
-  } catch {
-    // ignore
-  }
-
-  const status: HealthReport['status'] = connected && plan.compatible && schemaCompatible
-    ? 'healthy'
-    : (connected ? 'degraded' : 'unhealthy');
 
   return {
-    status,
+    status: healthStatus(connected, plan.compatible, schemaCompatible),
     database: { connected, migrationsApplied: applied.length, pending: plan.pending.length },
     schema: { compatible: schemaCompatible, version: expectedEngineVersion },
-    partitions: { runs, activeRuns },
+    partitions,
     timestamp,
   };
 }
@@ -117,7 +130,7 @@ export interface SaveCompatibilityResult {
 }
 
 export async function checkSaveCompatibility(
-  db: any,
+  db: DbQueryClient,
   runId: string,
   currentEngineVersion: number,
 ): Promise<SaveCompatibilityResult> {
@@ -130,14 +143,15 @@ export async function checkSaveCompatibility(
       return { compatible: false, runId, reason: 'RUN_NOT_FOUND' };
     }
     const run = result.rows[0];
-    if (run.finished_at) {
+    if (run === undefined || run.finished_at) {
       return { compatible: false, runId, reason: 'RUN_FINISHED' };
     }
-    if (run.engine_version > currentEngineVersion) {
+    const engineVersion = Number(run.engine_version ?? 0);
+    if (engineVersion > currentEngineVersion) {
       return { compatible: false, runId, reason: 'ENGINE_VERSION_FUTURE', migrationNeeded: 'downgrade not supported' };
     }
-    if (run.engine_version < currentEngineVersion) {
-      return { compatible: true, runId, reason: 'MIGRATION_REQUIRED', migrationNeeded: `upgrade from v${run.engine_version} to v${currentEngineVersion}` };
+    if (engineVersion < currentEngineVersion) {
+      return { compatible: true, runId, reason: 'MIGRATION_REQUIRED', migrationNeeded: `upgrade from v${engineVersion} to v${currentEngineVersion}` };
     }
     return { compatible: true, runId };
   } catch (error) {

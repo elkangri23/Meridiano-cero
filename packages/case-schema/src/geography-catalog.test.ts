@@ -23,7 +23,7 @@ describe('geography-catalog', () => {
   it('getRoute devuelve duraciones positivas', () => {
     const route = getRoute('madrid', 'paris');
     expect(route).toBeDefined();
-    expect(route!.minutes).toBeGreaterThan(0);
+    expect(route?.minutes ?? 0).toBeGreaterThan(0);
   });
 
   it('getRoute es simétrico', () => {
@@ -31,7 +31,7 @@ describe('geography-catalog', () => {
     const b = getRoute('paris', 'madrid');
     expect(a).toBeDefined();
     expect(b).toBeDefined();
-    expect(a!.minutes).toBe(b!.minutes);
+    expect(a?.minutes).toBe(b?.minutes);
   });
 
   it('getRoute devuelvo undefined para ruta inexistente', () => {

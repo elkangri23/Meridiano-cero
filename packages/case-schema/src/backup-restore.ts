@@ -42,6 +42,11 @@ export interface RPO_RTO_Metrics {
   compliance: 'pass' | 'fail' | 'warn';
 }
 
+/** Cliente mínimo de base de datos: solo la consulta que usan estas funciones. */
+interface DbQueryClient {
+  query: (sql: string, params?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }>;
+}
+
 const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   schedule: '0 3 * * *',
   retentionDays: 30,
@@ -55,7 +60,7 @@ export function createBackupConfig(overrides: Partial<BackupConfig> = {}): Backu
 }
 
 export async function runFullBackup(
-  db: any,
+  db: DbQueryClient,
   config: BackupConfig,
 ): Promise<BackupMetadata> {
   const start = Date.now();
@@ -76,7 +81,7 @@ export async function runFullBackup(
   }
 
   if (config.encryptionKey) {
-    finalDump = await encrypt(finalDump, config.encryptionKey);
+    finalDump = await encrypt(finalDump);
     encrypted = true;
   }
 
@@ -99,14 +104,13 @@ export async function runFullBackup(
 }
 
 export async function runIncrementalBackup(
-  db: any,
+  db: DbQueryClient,
   config: BackupConfig,
-  since: Date,
 ): Promise<BackupMetadata> {
   const start = Date.now();
   const backupId = `backup_inc_${new Date().toISOString().replace(/[:.]/g, '-')}`;
 
-  const tables = await getModifiedTables(db, since);
+  const tables = await getModifiedTables(db);
   const dump = await dumpTables(db, tables);
   const sizeBytes = Buffer.byteLength(dump, 'utf8');
   const checksum = await computeChecksum(dump);
@@ -121,7 +125,7 @@ export async function runIncrementalBackup(
   }
 
   if (config.encryptionKey) {
-    finalDump = await encrypt(finalDump, config.encryptionKey);
+    finalDump = await encrypt(finalDump);
     encrypted = true;
   }
 
@@ -144,7 +148,7 @@ export async function runIncrementalBackup(
 }
 
 export async function restoreBackup(
-  db: any,
+  db: DbQueryClient,
   config: BackupConfig,
   backupId: string,
 ): Promise<RestoreResult> {
@@ -161,7 +165,7 @@ export async function restoreBackup(
 
     let finalDump = dump;
     if (storedMeta.encrypted && config.encryptionKey) {
-      finalDump = await decrypt(finalDump, config.encryptionKey);
+      finalDump = await decrypt(finalDump);
     }
     if (storedMeta.compressed) {
       finalDump = decompress(finalDump);
@@ -189,7 +193,7 @@ export async function restoreBackup(
 }
 
 export async function measureRPO_RTO(
-  _db: any,
+  _db: DbQueryClient,
   config: BackupConfig,
   targetRPOSeconds: number = 86400,
   targetRTOSeconds: number = 3600,
@@ -217,22 +221,22 @@ export async function measureRPO_RTO(
   };
 }
 
-async function getAllTables(db: any): Promise<string[]> {
+async function getAllTables(db: DbQueryClient): Promise<string[]> {
   try {
     const result = await db.query(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT LIKE 'pg_%'`
     );
-    return result.rows.map((r: any) => r.tablename);
+    return result.rows.map((r) => String(r.tablename ?? ''));
   } catch {
     return ['profiles', 'sessions', 'runs', 'run_creations', 'base_migrations', 'detective_profiles', 'instances'];
   }
 }
 
-async function getModifiedTables(db: any, _since: Date): Promise<string[]> {
+async function getModifiedTables(db: DbQueryClient): Promise<string[]> {
   return await getAllTables(db);
 }
 
-async function dumpTables(db: any, tables: string[]): Promise<string> {
+async function dumpTables(db: DbQueryClient, tables: string[]): Promise<string> {
   let dump = `-- Backup ${new Date().toISOString()}\n`;
   for (const table of tables) {
     try {
@@ -265,12 +269,12 @@ function decompress(data: string): string {
   return data;
 }
 
-async function encrypt(_data: string, _key: string): Promise<string> {
-  return _data;
+async function encrypt(data: string): Promise<string> {
+  return data;
 }
 
-async function decrypt(_data: string, _key: string): Promise<string> {
-  return _data;
+async function decrypt(data: string): Promise<string> {
+  return data;
 }
 
 async function storeBackup(config: BackupConfig, id: string, data: string): Promise<void> {
@@ -322,7 +326,7 @@ async function loadBackupMetadata(config: BackupConfig, id: string): Promise<Bac
   return { id, timestamp: '', type: 'full', sizeBytes: 0, durationMs: 0, tables: [], checksum: '', encrypted: false, compressed: false, destination: config.destination };
 }
 
-async function restoreTables(db: any, dump: string): Promise<void> {
+async function restoreTables(db: DbQueryClient, dump: string): Promise<void> {
   const statements = dump.split(';').filter(s => s.trim() && !s.trim().startsWith('--'));
   await db.query('BEGIN');
   try {

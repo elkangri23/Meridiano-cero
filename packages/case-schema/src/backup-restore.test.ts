@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { createBackupConfig, runFullBackup, measureRPO_RTO, recordRestoreTest, computeChecksum } from './backup-restore.js';
 
 function createMockDb(tables: string[] = ['profiles', 'sessions', 'runs']) {
-  const data: Record<string, any[]> = {
+  const data: Record<string, Array<Record<string, unknown>>> = {
     profiles: [{ id: 'u1', local_key: 'dev', display_name: 'Test', role: 'player' }],
-    sessions: [{ token_hash: 'abc123', profile_id: 'u1', csrf_token: 'csrf', created_at: new Date(), expires_at: new Date(Date.now() + 86400000) }],
-    runs: [{ id: 'r1', owner_id: 'u1', definition_id: 'def1', definition_hash: 'hash', engine_version: 14, revision: 1, branch_id: 'b1', engine_state: {}, created_at: new Date(), updated_at: new Date() }],
+    sessions: [{ token_hash: 'abc123', profile_id: 'u1', csrf_token: 'csrf', created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 86400000).toISOString() }],
+    runs: [{ id: 'r1', owner_id: 'u1', definition_id: 'def1', definition_hash: 'hash', engine_version: 14, revision: 1, branch_id: 'b1', engine_state: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }],
   };
   return {
     query: vi.fn().mockImplementation((sql: string) => {
@@ -55,7 +55,7 @@ describe('backup-restore', () => {
   it('runIncrementalBackup genera metadata incremental', async () => {
     const { runIncrementalBackup } = await import('./backup-restore.js');
     const db = createMockDb();
-    const meta = await runIncrementalBackup(db, config, new Date(Date.now() - 86400000));
+    const meta = await runIncrementalBackup(db, config);
     expect(meta.id).toMatch(/^backup_inc_\d{4}-\d{2}-\d{2}T/);
     expect(meta.type).toBe('incremental');
   });
