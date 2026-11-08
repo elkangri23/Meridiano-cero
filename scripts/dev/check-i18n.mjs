@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join, relative, resolve } from 'node:path';
+import { join, relative } from 'node:path';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const localesDir = join(root, 'packages/contracts/src/locales');
@@ -26,7 +26,7 @@ function localeKeys(path) {
   const keys = [];
   const duplicates = [];
   const seen = new Set();
-  for (const match of text.matchAll(/^  '([^']+)':/gm)) {
+  for (const match of text.matchAll(/^ {2}'([^']+)':/gm)) {
     const key = match[1];
     if (seen.has(key)) duplicates.push(key);
     seen.add(key);
