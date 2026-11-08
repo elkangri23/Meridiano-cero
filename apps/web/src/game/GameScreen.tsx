@@ -18,16 +18,17 @@ import { portraitSeed, teamPortraitSeed } from './portraits';
 import { createMusicEngine, type EffectKind } from './music';
 import { groupOffers } from './scene-offers';
 import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
-import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_LABELS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
+import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
-import { GameWindow, MinimizedBar, useWindows } from './windows';
+import { GameWindow, MinimizedBar, WINDOW_KEYS, useWindows } from './windows';
 import type { WindowId } from './windows';
 import { effectiveReducedMotion, objectiveStateText, trapTabKey, useSystemReducedMotion } from './accessibility';
-import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto } from '@meridiano/contracts';
+import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto, TranslateFn } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_LABELS, getNPC, IRREGULAR_KIND_TEXT, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/contracts';
-import type { CaseTexts, DiscoveryLookup, ForensicType, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/contracts';
+import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_KEYS, getNPC, IRREGULAR_KIND_KEYS, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, travelText } from '@meridiano/contracts';
+import type { CaseTexts, DiscoveryLookup, ForensicType, LocaleKey, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/contracts';
+import { useTranslation } from '../i18n';
 import './game.css';
 
 type OrderPhase =
@@ -42,19 +43,18 @@ type OrderPhase =
 type ScreenPhase = 'loading' | 'ready' | 'signed_out' | 'not_found' | 'error';
 type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
 
-const windowLabels: Record<WindowId, string> = {
-  map: 'Mapa', dossier: 'Dossier', lab: 'Laboratorio', comms: 'Central de comunicaciones', team: 'Equipo A.C.M.E.', saves: 'Guardados', settings: 'Ajustes', report: 'Informe final', chat: 'Conversación', intel: 'Terminal de inteligencia',
-};
-const channelLabels: Record<string, string> = { call: 'Llamada', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Correo', fax: 'Fax' };
-const requestTypeLabels: Record<string, string> = { analysis: 'Análisis', query: 'Consulta', request: 'Solicitud' };
-const evidenceTypeLabels: Record<string, string> = { object: 'objeto', observation: 'observación', testimony: 'testimonio', analysis: 'análisis', record: 'registro' };
+/** Claves i18n de los canales, tipos de solicitud y tipos de evidencia
+ * (el texto vive en `locales/es.ts`). */
+const channelKeys: Record<string, LocaleKey> = { call: 'labels.channel.call', whatsapp: 'labels.channel.whatsapp', sms: 'labels.channel.sms', email: 'labels.channel.email', fax: 'labels.channel.fax' };
+const requestTypeKeys: Record<string, LocaleKey> = { analysis: 'labels.request.analysis', query: 'labels.request.query', request: 'labels.request.request' };
+const evidenceTypeKeys: Record<string, LocaleKey> = { object: 'labels.evidence.object', observation: 'labels.evidence.observation', testimony: 'labels.evidence.testimony', analysis: 'labels.evidence.analysis', record: 'labels.evidence.record' };
 
 /** Dificultad de la partida, tal como se enseña en la cabecera junto al
  * reloj («Normal · 48 horas»): la etiqueta que la verificación no encontró
  * porque la vista del jugador no traía el dato. */
-const difficultyLabels: Record<PlayerViewDto['difficulty'], string> = { easy: 'Fácil', normal: 'Normal', hard: 'Difícil' };
-function difficultyLabel(difficulty: PlayerViewDto['difficulty']): string {
-  return difficultyLabels[difficulty];
+const difficultyKeys: Record<PlayerViewDto['difficulty'], LocaleKey> = { easy: 'labels.difficulty.easy', normal: 'labels.difficulty.normal', hard: 'labels.difficulty.hard' };
+function difficultyLabel(difficulty: PlayerViewDto['difficulty'], t: TranslateFn): string {
+  return t(difficultyKeys[difficulty]);
 }
 
 /** Nombre del detective que se enseña en la cabecera: el alias si lo hay,
@@ -64,8 +64,8 @@ function detectiveDisplayName(profile: DetectiveProfileDto | null, identity: Ses
 }
 
 /** Etiqueta del avatar que se enseña en la cabecera. */
-function detectiveAvatarName(profile: DetectiveProfileDto | null): string {
-  return profile ? avatarLabel(profile.avatar) : 'Detective';
+function detectiveAvatarName(profile: DetectiveProfileDto | null, t: TranslateFn): string {
+  return profile ? avatarLabel(profile.avatar, t) : t('labels.avatar.detective');
 }
 
 /** Si la partida admite el resumen al retomar (en curso y ya empezada). */
@@ -77,28 +77,29 @@ function resumeAvailable(view: PlayerViewDto): boolean {
  * librería se enseña como 'Predeterminada' porque el alto contraste tiene
  * su propio interruptor. */
 function PaletteSetting({ palette, onPalette }: { palette: PaletteMode; onPalette: (value: PaletteMode) => void }) {
-  return <label className="game-setting"><span>Paleta de daltonismo</span>
+  const t = useTranslation();
+  return <label className="game-setting"><span>{t('settings.palette')}</span>
     <select value={palette === 'high-contrast' ? 'default' : palette} onChange={event => onPalette(event.target.value as PaletteMode)}>
       {(['default', 'protanopia', 'deuteranopia', 'tritanopia'] as const).map(mode => <option key={mode} value={mode}>{paletteLabels[mode]}</option>)}
     </select>
   </label>;
 }
 
-const gameErrorMessages: Record<GameErrorKind, string> = {
-  session: 'La sesión caducó. Vuelve al archivo e inicia sesión de nuevo.',
-  not_found: 'La partida no existe o no pertenece a tu cuenta.',
-  version_conflict: 'La partida cambió en otra pestaña. Se ha actualizado la vista; vuelve a intentarlo.',
-  run_closed: 'La partida ya está cerrada.',
-  save_incompatible: 'Ese guardado no es compatible con esta partida.',
-  save_limit: 'Ya tienes 10 guardados manuales. Borra o reemplaza uno para crear otro.',
-  invalid: 'La respuesta del servidor no es válida.',
-  unavailable: 'No se pudo contactar con el servidor. Reinténtalo.',
+const gameErrorKeys: Record<GameErrorKind, LocaleKey> = {
+  session: 'game.error.session',
+  not_found: 'game.error.not_found',
+  version_conflict: 'game.error.version_conflict',
+  run_closed: 'game.error.run_closed',
+  save_incompatible: 'game.error.save_incompatible',
+  save_limit: 'game.error.save_limit',
+  invalid: 'game.error.invalid',
+  unavailable: 'game.error.unavailable',
 };
 
-function errorMessage(error: unknown): string {
-  if (error instanceof GameError) return gameErrorMessages[error.kind];
-  if (error instanceof AiError) return error.kind === 'budget_exceeded' ? 'La orden es demasiado larga.' : 'La IA no responde. Puedes seguir con las acciones disponibles.';
-  return 'Error inesperado.';
+function errorMessage(error: unknown, t: TranslateFn): string {
+  if (error instanceof GameError) return t(gameErrorKeys[error.kind]);
+  if (error instanceof AiError) return error.kind === 'budget_exceeded' ? t('game.error.aiTooLong') : t('game.error.aiDown');
+  return t('game.error.unexpected');
 }
 
 /** Contacto de la central (GDD §10): un personaje con el que ya se habló
@@ -304,16 +305,16 @@ function actionResultDetail(response: ActionResponseDto, previous: PlayerViewDto
 }
 
 /** Aviso de estado tras una acción confirmada. */
-function noticeForOutcome(response: ActionResponseDto, offerLabel: string): string {
-  if (response.outcome === 'case_closed') return `Caso cerrado: ${offerLabel}. El informe final está disponible.`;
-  if (response.outcome === 'impossible') return `No se pudo: ${response.reason ?? offerLabel}.`;
-  if (response.outcome === 'clarification_required') return response.question ?? 'Hace falta aclarar la orden.';
-  return `${offerLabel} · Reloj: ${response.clock.minute} min.`;
+function noticeForOutcome(response: ActionResponseDto, offerLabel: string, t: TranslateFn): string {
+  if (response.outcome === 'case_closed') return t('game.notice.caseClosed', { label: offerLabel });
+  if (response.outcome === 'impossible') return t('game.notice.impossible', { reason: response.reason ?? offerLabel });
+  if (response.outcome === 'clarification_required') return response.question ?? t('game.notice.clarificationNeeded');
+  return t('game.notice.done', { label: offerLabel, minute: response.clock.minute });
 }
 
-function previewOutcome(response: ActionResponseDto, offer: PublicActionOffer, key: string): OrderPhase {
-  if (response.outcome === 'impossible') return { kind: 'error', message: response.reason ?? 'Acción no disponible.' };
-  if (response.outcome === 'clarification_required') return { kind: 'clarification', question: response.question ?? 'Hace falta aclarar la orden.', original: offer.label };
+function previewOutcome(response: ActionResponseDto, offer: PublicActionOffer, key: string, t: TranslateFn): OrderPhase {
+  if (response.outcome === 'impossible') return { kind: 'error', message: response.reason ?? t('game.notice.actionUnavailable') };
+  if (response.outcome === 'clarification_required') return { kind: 'clarification', question: response.question ?? t('game.notice.clarificationNeeded'), original: offer.label };
   return { kind: 'preview', offer, response, key };
 }
 
@@ -340,7 +341,8 @@ function HourglassIcon({ animKey }: { animKey: number }) {
  * parecía estático: ahora es grande (30 px) y gira en bucle mientras dura
  * el pulso, para que se vea de verdad. */
 function Hourglass({ delta, animKey }: { delta: number; animKey: number }) {
-  return <span className="game-hourglass" data-testid="hourglass" role="status" aria-label={`El reloj avanza ${delta} minutos`}>
+  const t = useTranslation();
+  return <span className="game-hourglass" data-testid="hourglass" role="status" aria-label={t('game.hourglassAria', { delta })}>
     <HourglassIcon animKey={animKey} />
     <span>+{delta} min</span>
   </span>;
@@ -349,38 +351,40 @@ function Hourglass({ delta, animKey }: { delta: number; animKey: number }) {
 /** Reloj de arena grande en la escena: el tiempo avanza donde está la
  * mirada del jugador, no solo en la cabecera. Mismo pulso y mismo estilo. */
 function SceneHourglass({ delta, animKey }: { delta: number; animKey: number }) {
-  return <span className="game-hourglass game-hourglass-scene" data-testid="hourglass-scene" role="status" aria-label={`El reloj avanza ${delta} minutos`}>
+  const t = useTranslation();
+  return <span className="game-hourglass game-hourglass-scene" data-testid="hourglass-scene" role="status" aria-label={t('game.hourglassAria', { delta })}>
     <HourglassIcon animKey={animKey} />
-    <span>El reloj avanza {delta} min</span>
+    <span>{t('game.hourglassScene', { delta })}</span>
   </span>;
 }
 
 function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, onLogout }: { view: PlayerViewDto; caseTitle: string | null; detective: string; avatar: string; clockPulse: { key: number; delta: number } | null; onLogout: (() => void) | null }) {
+  const t = useTranslation();
   return <header className="game-header">
     <div className="game-agency">
       <div className="game-brand">
         <span className="game-mark" aria-hidden="true">M<span>0</span></span>
-        <div><p className="game-overline">Agencia de investigación internacional</p><h1>Meridiano cero</h1></div>
+        <div><p className="game-overline">{t('game.agency')}</p><h1>Meridiano cero</h1></div>
       </div>
       <div className="game-detective">
-        <span className="game-avatar" title={`Avatar: ${avatar}`} aria-hidden="true">{avatar.slice(0, 1).toUpperCase()}</span>
-        <div><strong>Detective: {detective}</strong><small>Referencia: {view.runId.slice(0, 8)} · Revisión {view.version}</small></div>
+        <span className="game-avatar" title={t('profile.avatar') + `: ${avatar}`} aria-hidden="true">{avatar.slice(0, 1).toUpperCase()}</span>
+        <div><strong>{t('game.detectiveLine', { name: detective })}</strong><small>{t('game.refLine', { ref: view.runId.slice(0, 8), version: view.version })}</small></div>
       </div>
       <div className="game-header-actions">
-        <Link to="/">Archivo</Link>
-        {onLogout && <button type="button" onClick={onLogout}>Cerrar sesión</button>}
+        <Link to="/">{t('archive.title')}</Link>
+        {onLogout && <button type="button" onClick={onLogout}>{t('archive.logout')}</button>}
       </div>
     </div>
     <div className="game-case-strip">
-      <div><p className="game-overline">Expediente</p><strong>{caseTitle ?? view.caseId}</strong></div>
-      <div><p className="game-overline">Delito</p><strong>{caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating)}</strong></div>
-      <div><p className="game-overline">Destino actual</p><strong>{view.position.city.name}, {view.position.city.country}</strong></div>
-      <div><p className="game-overline">Dificultad</p><strong data-testid="difficulty">{difficultyLabel(view.difficulty)} · {Math.round(view.clock.deadlineMinutes / 60)} horas</strong></div>
-      <div className={`game-clock${clockPulse ? ' game-clock-pulse' : ''}`} data-testid="clock" aria-label={`Reloj del caso: ${view.clock.minute} minutos de ${view.clock.deadlineMinutes}`}>
-        <p className="game-overline">Tiempo transcurrido / plazo</p>
+      <div><p className="game-overline">{t('archive.col.case')}</p><strong>{caseTitle ?? view.caseId}</strong></div>
+      <div><p className="game-overline">{t('archive.col.crime')}</p><strong>{caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating, t)}</strong></div>
+      <div><p className="game-overline">{t('game.currentCity')}</p><strong>{view.position.city.name}, {view.position.city.country}</strong></div>
+      <div><p className="game-overline">{t('archive.col.difficulty')}</p><strong data-testid="difficulty">{t('game.difficultyLine', { label: difficultyLabel(view.difficulty, t), hours: Math.round(view.clock.deadlineMinutes / 60) })}</strong></div>
+      <div className={`game-clock${clockPulse ? ' game-clock-pulse' : ''}`} data-testid="clock" aria-label={t('game.clockAria', { minute: view.clock.minute, deadline: view.clock.deadlineMinutes })}>
+        <p className="game-overline">{t('game.clockLabel')}</p>
         <strong>{view.clock.minute} min<span> / {view.clock.deadlineMinutes} min</span></strong>
         {clockPulse && <Hourglass delta={clockPulse.delta} animKey={clockPulse.key} />}
-        <small>{view.status === 'closed' ? 'Cerrada' : 'Activa'} · El reloj avanza solo al actuar</small>
+        <small>{view.status === 'closed' ? t('common.closed') : t('common.active')}{t('game.clockNote')}</small>
       </div>
     </div>
   </header>;
@@ -416,21 +420,25 @@ function SceneOfferList({ offers, disabled, onOffer }: { offers: PublicActionOff
  * las órdenes y detenciones nombran a la persona, y cada evidencia lleva su
  * tipo en español (antes se veían `warrant:ines`, `ines` y `EV-06` solos). */
 function SceneMeta({ view }: { view: PlayerViewDto }) {
+  const t = useTranslation();
+  const evidenceLabel = (type: string) => { const key = evidenceTypeKeys[type]; return key ? t(key) : type; };
+  const requestLabel = (type: string) => { const key = requestTypeKeys[type]; return key ? t(key) : type; };
   return <div className="game-scene-meta">
-    {view.objects.length > 0 && <p>En tu poder: {view.objects.map(item => `${item.id} (${evidenceTypeLabels[item.type] ?? item.type})`).join(', ')}</p>}
-    {view.pendingRequests.length > 0 && <p>Solicitudes pendientes: {view.pendingRequests.map(item => `${requestTypeLabels[item.type] ?? item.type} (min ${item.dueMinute})`).join(', ')}</p>}
-    {view.warrants.length > 0 && <p>Órdenes: {view.warrants.map(warrantText).join(', ')}</p>}
-    {view.detentions.length > 0 && <p>Detenciones: {view.detentions.map(id => getNPC(id)?.name ?? id).join(', ')}</p>}
+    {view.objects.length > 0 && <p>{t('game.inPossession', { items: view.objects.map(item => `${item.id} (${evidenceLabel(item.type)})`).join(', ') })}</p>}
+    {view.pendingRequests.length > 0 && <p>{t('game.pendingRequests', { items: view.pendingRequests.map(item => `${requestLabel(item.type)} (min ${item.dueMinute})`).join(', ') })}</p>}
+    {view.warrants.length > 0 && <p>{t('game.warrants', { items: view.warrants.map(warrantText).join(', ') })}</p>}
+    {view.detentions.length > 0 && <p>{t('game.detentions', { items: view.detentions.map(id => getNPC(id)?.name ?? id).join(', ') })}</p>}
   </div>;
 }
 
 /** Acciones de la escena, agrupadas: quién hay aquí, viajes y el resto. */
 function SceneActions({ view, grouped, disabled, onOffer, onOpenLab }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void }) {
+  const t = useTranslation();
   const finishOffer = grouped.finish;
-  if (view.status === 'closed') return <p className="game-scene-closed">La partida está cerrada. Consulta el informe final.</p>;
+  if (view.status === 'closed') return <p className="game-scene-closed">{t('game.closedNote')}</p>;
   return <>
     {(grouped.talk.length > 0 || grouped.inspect.length > 0) && <div className="game-scene-group">
-      <p className="game-overline">En esta escena</p>
+      <p className="game-overline">{t('game.inScene')}</p>
       {grouped.talk.map(offer => (
         <SceneNpcOffer key={offer.id} offer={offer} view={view} disabled={disabled} onOffer={onOffer} />
       ))}
@@ -440,16 +448,16 @@ function SceneActions({ view, grouped, disabled, onOffer, onOpenLab }: { view: P
       ))}
     </div>}
     {grouped.lab.length > 0 && <div className="game-scene-group">
-      <p className="game-overline">Laboratorio</p>
+      <p className="game-overline">{t(WINDOW_KEYS.lab)}</p>
       <p><button type="button" data-testid="open-lab" disabled={disabled} onClick={onOpenLab}>
-        {grouped.lab.length === 1 ? 'Hay un análisis disponible en el Laboratorio' : `Hay ${grouped.lab.length} análisis disponibles en el Laboratorio`}</button></p>
+        {grouped.lab.length === 1 ? t('game.labOne') : t('game.labMany', { count: grouped.lab.length })}</button></p>
     </div>}
     {grouped.travel.length > 0 && <div className="game-scene-group">
-      <p className="game-overline">Viajes</p>
+      <p className="game-overline">{t('game.travel')}</p>
       <SceneOfferList offers={grouped.travel} disabled={disabled} onOffer={onOffer} />
     </div>}
     {(grouped.other.length > 0 || finishOffer) && <div className="game-scene-group">
-      <p className="game-overline">Otras acciones</p>
+      <p className="game-overline">{t('game.otherActions')}</p>
       <SceneOfferList offers={grouped.other} disabled={disabled} onOffer={onOffer} />
       {finishOffer && <p><button type="button" className="game-primary-button" data-testid="offer-finish" disabled={disabled}
         onClick={event => onOffer(finishOffer, event.currentTarget)}>{finishOffer.label}</button></p>}
@@ -464,11 +472,12 @@ function SceneActions({ view, grouped, disabled, onOffer, onOpenLab }: { view: P
  * evaluación que el informe final, pero en vivo); las frases son las del
  * expediente, sin spoilers más allá de lo que ellas mismas dicen. */
 function ObjectivesSection({ view }: { view: PlayerViewDto }) {
+  const t = useTranslation();
   return <section className="game-objectives" aria-labelledby="objectives-heading" data-testid="objectives-panel">
-    <p className="game-overline" id="objectives-heading">Objetivos</p>
+    <p className="game-overline" id="objectives-heading">{t('game.objectives')}</p>
     <ul>{view.objectives.map(objective =>
       <li key={objective.id} data-testid={`objective-${objective.id}`} data-achieved={objective.achieved}>
-        <span aria-hidden="true">{objective.achieved ? '✓' : '○'}</span> <span className="game-sr-only">{objectiveStateText(objective.achieved)}: </span>{objective.description}
+        <span aria-hidden="true">{objective.achieved ? '✓' : '○'}</span> <span className="game-sr-only">{objectiveStateText(objective.achieved, t)}: </span>{objective.description}
       </li>)}
     </ul>
   </section>;
@@ -481,10 +490,11 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
  * sale una sola vez y con su mismo testid, así que la caja de texto libre
  * queda para las órdenes creativas. */
 function SceneSection({ view, disabled, clockPulse, onOffer, onOpenLab }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void }) {
+  const t = useTranslation();
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   const grouped = groupOffers(view.offers);
   return <section className="game-scene" id="game-scene" tabIndex={-1} aria-labelledby="scene-heading">
-    <div className="game-scene-top"><span>Localización {String(locationIndex).padStart(2, '0')}</span><span>{view.position.city.name.toUpperCase()} · {view.position.city.country}</span></div>
+    <div className="game-scene-top"><span>{t('game.location', { num: String(locationIndex).padStart(2, '0') })}</span><span>{view.position.city.name.toUpperCase()} · {view.position.city.country}</span></div>
     <SceneArt locationId={view.position.location.id} />
     <div className="game-scene-caption"><div><p className="game-overline">{view.position.city.name}</p><h2 id="scene-heading">{view.position.location.name}</h2></div>{clockPulse && <SceneHourglass delta={clockPulse.delta} animKey={clockPulse.key} />}</div>
     <p className="game-scene-description">{view.position.location.description}</p>
@@ -545,6 +555,7 @@ function narrationAnnounceText(last: LogEntry | undefined, typing: boolean, enab
 }
 
 function ConsoleSection({ log, orderHistory, readBar, reducedMotion, announceNarration }: { log: LogEntry[]; orderHistory: string[]; readBar?: ReactNode; reducedMotion: boolean; announceNarration: boolean }) {
+  const t = useTranslation();
   const listRef = useRef<HTMLOListElement>(null);
   const last = log[log.length - 1];
   // La última entrada se escribe progresivamente: primero el resumen y,
@@ -562,17 +573,17 @@ function ConsoleSection({ log, orderHistory, readBar, reducedMotion, announceNar
   // escribirse.
   const announceText = narrationAnnounceText(last, lastTyping, announceNarration);
   return <section className="game-console" aria-labelledby="console-heading">
-    <p className="game-overline">Cuaderno de campo</p>
-    <h2 id="console-heading">Consola narrativa</h2>
+    <p className="game-overline">{t('game.fieldNotes')}</p>
+    <h2 id="console-heading">{t('game.console')}</h2>
     {readBar}
     <ol ref={listRef}>
-      {log.length === 0 && <li>La investigación comienza. Inspecciona la escena o elige una acción.</li>}
+      {log.length === 0 && <li>{t('game.consoleEmpty')}</li>}
       {log.map((entry, index) => <ConsoleLogItem key={index} entry={entry} isLast={index === log.length - 1}
         summaryTyped={summaryTyped} detailTyped={detailTyped} typing={lastTyping} />)}
     </ol>
     <p className="game-sr-only" aria-live="polite" data-testid="narration-announcer">{announceText}</p>
     <span className="game-narrative-cursor" aria-hidden="true">_</span>
-    {orderHistory.length > 0 && <details><summary>Historial de órdenes</summary><ol>{orderHistory.map((item, index) => <li key={index}>{item}</li>)}</ol></details>}
+    {orderHistory.length > 0 && <details><summary>{t('game.orderHistory')}</summary><ol>{orderHistory.map((item, index) => <li key={index}>{item}</li>)}</ol></details>}
   </section>;
 }
 
@@ -580,8 +591,9 @@ function ConsoleSection({ log, orderHistory, readBar, reducedMotion, announceNar
  * visible y el juego no se bloquea; solo se explica por qué no suena. La
  * condición vive aquí para no engordar la complejidad de quien lo usa. */
 function NoVoicesNotice({ show, testId }: { show?: boolean | undefined; testId: string }) {
+  const t = useTranslation();
   if (!show) return null;
-  return <p className="game-notice" role="status" data-testid={testId}>No hay voces disponibles en este navegador o sistema para leer en voz alta.</p>;
+  return <p className="game-notice" role="status" data-testid={testId}>{t('game.noVoices')}</p>;
 }
 
 /** Barra de lectura en voz alta de la consola (GDD §15): leer la última
@@ -591,11 +603,12 @@ function ReadAloudBar({ text, canRead, speaking, paused, hasLast, noVoices, onRe
   text: string; canRead: boolean; speaking: boolean; paused: boolean; hasLast: boolean; noVoices?: boolean;
   onRead: () => void; onRepeat: () => void; onPauseResume: () => void; onStop: () => void;
 }) {
-  return <div className="game-read-bar" role="group" aria-label="Lectura en voz alta">
-    <button type="button" data-testid="tts-read" disabled={!canRead || !text} onClick={onRead}>Leer</button>
-    <button type="button" data-testid="tts-repeat" disabled={!canRead || !hasLast} onClick={onRepeat}>Repetir</button>
-    <button type="button" data-testid="tts-pause" disabled={!speaking && !paused} onClick={onPauseResume}>{paused ? 'Reanudar' : 'Pausar'}</button>
-    <button type="button" data-testid="tts-stop" disabled={!speaking && !paused} onClick={onStop}>Detener</button>
+  const t = useTranslation();
+  return <div className="game-read-bar" role="group" aria-label={t('game.readAloud')}>
+    <button type="button" data-testid="tts-read" disabled={!canRead || !text} onClick={onRead}>{t('game.read')}</button>
+    <button type="button" data-testid="tts-repeat" disabled={!canRead || !hasLast} onClick={onRepeat}>{t('game.repeat')}</button>
+    <button type="button" data-testid="tts-pause" disabled={!speaking && !paused} onClick={onPauseResume}>{paused ? t('game.resume') : t('game.pause')}</button>
+    <button type="button" data-testid="tts-stop" disabled={!speaking && !paused} onClick={onStop}>{t('game.stop')}</button>
     <NoVoicesNotice show={noVoices} testId="tts-no-voices" />
   </div>;
 }
