@@ -22,15 +22,16 @@ describe('createTranslator', () => {
     expect(t('common.confirm')).toBe('Confirmar');
     expect(t('common.minutes', { count: 10 })).toBe('10 min');
   });
-  it('en inglés cae al español porque en.json está vacío (sin traducir)', () => {
+  it('en inglés resuelve en inglés y no marca ausencias (traducido)', () => {
     const { t, missingKeys } = createTranslator('en');
-    expect(t('common.confirm')).toBe('Confirmar');
-    expect(t('settings.language')).toBe('Idioma');
-    expect(missingKeys()).toContain('common.confirm');
+    expect(t('common.confirm')).toBe('Confirm');
+    expect(t('settings.language')).toBe('Language');
+    expect(missingKeys()).toEqual([]);
   });
-  it('en francés también cae al español', () => {
-    const { t } = createTranslator('fr');
-    expect(t('common.cancel')).toBe('Cancelar');
+  it('en francés resuelve en francés y no marca ausencias (traducido)', () => {
+    const { t, missingKeys } = createTranslator('fr');
+    expect(t('common.cancel')).toBe('Annuler');
+    expect(missingKeys()).toEqual([]);
   });
   it('una clave inexistente devuelve la clave y avisa una sola vez', () => {
     const onMissing = vi.fn();
@@ -51,8 +52,8 @@ describe('createTranslator', () => {
 describe('resolveMessage', () => {
   it('resuelve en el idioma elegido cuando existe, si no en español', () => {
     expect(resolveMessage('es', 'common.cancel')).toBe('Cancelar');
-    expect(resolveMessage('en', 'common.cancel')).toBe('Cancelar');
-    expect(resolveMessage('fr', 'common.cancel')).toBe('Cancelar');
+    expect(resolveMessage('en', 'common.cancel')).toBe('Cancel');
+    expect(resolveMessage('fr', 'common.cancel')).toBe('Annuler');
     expect(resolveMessage('en', 'no.existe')).toBe('no.existe');
   });
 });
@@ -64,10 +65,11 @@ describe('locales', () => {
       expect(value.length, key).toBeGreaterThan(0);
     }
   });
-  it('el selector ofrece español e inglés con su nombre nativo', () => {
+  it('el selector ofrece español, inglés y francés con su nombre nativo', () => {
     expect(SUPPORTED_LANGUAGES).toEqual([
       { id: 'es', label: 'Español' },
       { id: 'en', label: 'English' },
+      { id: 'fr', label: 'Français' },
     ]);
   });
 });

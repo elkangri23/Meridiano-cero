@@ -54,7 +54,7 @@ export function Prototype() {
     setNotice(t('prototype.notice.interpreting'));
     const controller = new AbortController();
     try {
-      const result = await aiApi.interpret(text, { location: sampleView.position.cityId, description: sampleView.conversation[0] ?? 'Sin descripción' }, tools.map(item => ({ id: item.id, label: t(item.labelKey) })), controller.signal);
+      const result = await aiApi.interpret(text, { location: sampleView.position.cityId, description: t('prototype.sampleConversation') }, tools.map(item => ({ id: item.id, label: t(item.labelKey) })), controller.signal);
       setInterpretation(result);
       applyInterpretation(result);
     } catch (e) {
@@ -73,11 +73,11 @@ export function Prototype() {
     <header className="agency-header"><div className="agency-brand"><span className="agency-mark" aria-hidden="true">M<span>0</span></span><div><p className="overline">{t('prototype.agency')}</p><h1>MERIDIANO CERO</h1></div></div><div className="detective"><span className="avatar" aria-hidden="true">D</span><div><strong>{t('prototype.detective')}</strong><small>{t('prototype.sampleAccount')}</small></div></div></header>
     <section className="case-strip" aria-label={t('prototype.caseStrip')}>
       <div><p className="overline">{t('prototype.caseOverline')}</p><strong>{t('prototype.caseTitle')}</strong></div>
-      <div className="current-city"><p className="overline">{t('prototype.currentCity')}</p><strong>Madrid, España</strong></div>
+      <div className="current-city"><p className="overline">{t('prototype.currentCity')}</p><strong>Madrid, {t('engine.country.es')}</strong></div>
       <div className="case-clock"><p className="overline">{t('prototype.clockLabel')}</p><strong><time>{clockLabel(sampleView.minute)}</time><span> / {clockLabel(sampleView.deadlineMinutes)}</span></strong><small>{t('prototype.clockNote')}</small></div>
     </section>
     <div className="investigation-grid">
-      <div className="scene-column"><Scene /><section className="narrative" aria-labelledby="narrative-title"><p className="overline" id="narrative-title">{t('prototype.fieldNotes')}</p>{sampleView.conversation.map((line, index) => <p key={index}>{line}</p>)}<span className="narrative-cursor" aria-hidden="true">_</span></section></div>
+      <div className="scene-column"><Scene /><section className="narrative" aria-labelledby="narrative-title"><p className="overline" id="narrative-title">{t('prototype.fieldNotes')}</p><p>{t('prototype.sampleConversation')}</p><span className="narrative-cursor" aria-hidden="true">_</span></section></div>
       <aside className="tools-column" aria-label={t('prototype.toolsAria')}>
         <nav className="tool-navigation" aria-label={t('prototype.openTool')}>{tools.map(item => <button key={item.id} type="button" aria-pressed={tool === item.id} onClick={() => { setTool(item.id); }}><span aria-hidden="true">{item.short}</span>{t(item.labelKey)}</button>)}</nav>
         <div className="tool-content"><ToolPanel tool={tool} draft={prepare} contrast={contrast} setContrast={setContrast} scale={scale} setScale={setScale} readableFont={readableFont} setReadableFont={setReadableFont} /></div>

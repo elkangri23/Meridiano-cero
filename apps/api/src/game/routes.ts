@@ -9,8 +9,8 @@ import { caseSummary, findCase, listCases, findDefinitionById, applyDifficulty, 
 import { initialPlayerView } from './initial-view.ts';
 import { createStoredRun, deleteStoredRun, readStoredRun, readFullRun, lookupRunCreation, RunStoreError } from './runs.ts';
 import { ENGINE_VERSION, type Action } from '@meridiano/engine';
-import type { Difficulty } from '@meridiano/case-schema';
-import { GDD_CRIME_TYPES } from '@meridiano/case-schema';
+import type { Difficulty, Language } from '@meridiano/case-schema';
+import { GDD_CRIME_TYPES, parseLanguage } from '@meridiano/case-schema';
 import type { ContentRating, CrimeType, ExplorationMode } from '@meridiano/contracts';
 import { commitAction, commitLoad } from './transitions.ts';
 import { playerViewDto } from './player-view.ts';
@@ -247,6 +247,13 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     if (!token) throw new RunStoreError('SESSION_REQUIRED');
     return tokenDigest(token);
   }
+  /** Idioma de la petición (cabecera `x-meridiano-language`): cualquier
+   * otro valor o su ausencia es español. Viaja por petición, sin
+   * persistirse: cambiarlo en Ajustes vuelve a pedir la vista en el
+   * idioma nuevo. */
+  function requestLanguage(request: FastifyRequest): Language {
+    return parseLanguage(request.headers['x-meridiano-language']);
+  }
   app.get<{ Querystring: Record<string, unknown> }>('/api/v1/cases', { onRequest: authorize }, async request => {
     const { limit, cursor, ...extra } = request.query;
     if (Object.keys(extra).length || cursor !== undefined ||
@@ -255,14 +262,14 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     }
     const owner = await authorize(request);
     // Un caso en el catálogo actual: no hay segunda página ni cursores emitidos.
-    return { items: await listCases(database.orm, owner.profileId), nextCursor: null };
+    return { items: await listCases(database.orm, owner.profileId, requestLanguage(request)), nextCursor: null };
   });
   app.get<{ Params: { caseId: string } }>('/api/v1/cases/:caseId', { onRequest: authorize }, async request => {
     const owner = await authorize(request);
-    return caseSummary(database.orm, request.params.caseId, owner.profileId);
+    return caseSummary(database.orm, request.params.caseId, owner.profileId, requestLanguage(request));
   });
   app.get<{ Querystring: Record<string, unknown> }>('/api/v1/runs', { onRequest: authorize }, request =>
-    available(() => listStoredRuns(database, digest(request), request.query)));
+    available(() => listStoredRuns(database, digest(request), request.query, requestLanguage(request))));
   app.post('/api/v1/runs', { onRequest: authorize }, async (request, reply) => {
     const body = createBody(request.body);
     await assertCreationParams(database, body.caseId, body.crimeType, body.contentRating);
@@ -272,8 +279,8 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     const run = await available(() => readFullRun(database, digest(request), created.run.id));
     const manualCount = await available(() => saveCount(database, run.id));
     const owner = await authorize(request);
-    const official = await available(() => loadOfficialResultForContent(database.pool, owner.profileId, contentHashForDefinition(definition), run.id));
-    const view = playerViewDto(definition, run, manualCount, [], official);
+    const official = await available(() => loadOfficialResultForContent(database.pool, owner.profileId, contentHashForDefinition(definition), run.id, requestLanguage(request)));
+    const view = playerViewDto(definition, run, manualCount, [], official, requestLanguage(request));
     return reply.code(created.replayed ? 200 : 201).send({ ...view, replayed: created.replayed });
   });
   // DELETE /api/v1/runs/:runId - Borrar una partida propia (activa o
@@ -298,7 +305,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
   app.get<{ Params: { runId: string } }>('/api/v1/runs/:runId', { onRequest: authorize }, async request => {
     const run = await available(() => readFullRun(database, digest(request), request.params.runId));
     // Motores antiguos: se conserva la vista inicial (503 si no es inicial virgen).
-    if (run.engineVersion !== ENGINE_VERSION) return initialPlayerView(database.orm, run);
+    if (run.engineVersion !== ENGINE_VERSION) return initialPlayerView(database.orm, run, requestLanguage(request));
     // La definición gobierna con los parámetros persistidos de esta partida
     // (dificultad, plazo y modo de exploración elegidos al crearla), no con
     // los del catálogo.
@@ -310,8 +317,8 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       ? await available(() => loadRunTimeline((sql, params) => database.pool.query(sql, params), run.id, run.branchId))
       : [];
     const owner = await authorize(request);
-    const official = await available(() => loadOfficialResultForContent(database.pool, owner.profileId, contentHashForDefinition(definition), run.id));
-    return playerViewDto(definition, run, manualCount, timeline, official);
+    const official = await available(() => loadOfficialResultForContent(database.pool, owner.profileId, contentHashForDefinition(definition), run.id, requestLanguage(request)));
+    return playerViewDto(definition, run, manualCount, timeline, official, requestLanguage(request));
   });
 
   // GET /api/v1/career - Perfil de carrera del detective (GDD §13):
@@ -320,7 +327,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
   // Sin resultados oficiales, el perfil está vacío (rango Aspirante).
   app.get('/api/v1/career', { onRequest: authorize }, async request => {
     const owner = await authorize(request);
-    return available(() => loadCareerProfile(database.pool, owner.profileId));
+    return available(() => loadCareerProfile(database.pool, owner.profileId, requestLanguage(request)));
   });
 
   // POST /api/v1/runs/:runId/action - Preview (confirm=false) o confirmación.
@@ -332,7 +339,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     { onRequest: authorize },
     async (request, reply) => {
       const body = actionBody(request.body);
-      const result = await available(() => commitAction(database, digest(request), request.params.runId, body));
+      const result = await available(() => commitAction(database, digest(request), request.params.runId, body, requestLanguage(request)));
       return reply.send(result);
     }
   );
@@ -592,7 +599,7 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
     async (request, reply) => {
       const body = loadBody(request.body);
       const result = await available(() =>
-        commitLoad(database, digest(request), request.params.runId, request.params.saveId, body));
+        commitLoad(database, digest(request), request.params.runId, request.params.saveId, body, requestLanguage(request)));
       return reply.send(result);
     }
   );

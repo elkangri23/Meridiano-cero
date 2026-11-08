@@ -7,7 +7,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { confirmAction, ENGINE_VERSION, resolveAction, type Action, type ActionResult } from '@meridiano/engine';
-import type { CaseRun } from '@meridiano/case-schema';
+import type { CaseRun, Language } from '@meridiano/case-schema';
 import { contentHashForDefinition } from '@meridiano/case-schema/server';
 import { isIdempotencyKey, type ActionResponseDto, type OfficialResultDto, type PublicEvent, type SaveLoadResponseDto } from '@meridiano/contracts';
 import type { Database } from '../database/connection.ts';
@@ -58,9 +58,9 @@ type StoredActionResult = {
   reason?: string;
 };
 
-function toResponse(definition: Definition, run: FullRun, manualCount: number, result: ActionResult, officialResult: OfficialResultDto | null = null): ActionResponseDto {
-  const view = playerViewDto(definition, run, manualCount, [], officialResult);
-  const base: ActionResponseDto = { ...view, outcome: result.status, events: projectEvents(definition, result.events) };
+function toResponse(definition: Definition, run: FullRun, manualCount: number, result: ActionResult, officialResult: OfficialResultDto | null = null, language: Language = 'es'): ActionResponseDto {
+  const view = playerViewDto(definition, run, manualCount, [], officialResult, language);
+  const base: ActionResponseDto = { ...view, outcome: result.status, events: projectEvents(definition, result.events, language) };
   if (result.status === 'confirmation_required') return { ...base, preview: result.preview };
   if (result.status === 'case_closed') return { ...base, report: result.report };
   if (result.status === 'clarification_required') return { ...base, question: result.question };
@@ -83,11 +83,14 @@ type AppliedResult = Extract<ActionResult, { status: 'applied' | 'case_closed' |
 
 async function persistAction(
   client: PoolClient, ownerId: string, run: FullRun, definition: Definition,
-  result: AppliedResult, opKey: string, requestDigest: string,
+  result: AppliedResult, opKey: string, requestDigest: string, language: Language = 'es',
 ): Promise<{ operationId: string; events: ActionResponseDto['events']; newRun: FullRun; stored: StoredActionResult }> {
   const newRevision = run.revision + 1;
   const operationId = randomUUID();
-  const events = projectEvents(definition, result.events);
+  // Los resúmenes de eventos se guardan en el idioma de esta petición:
+  // una repetición por idempotencia los devuelve tal cual, aunque la
+  // vista se reproyecte en otro idioma (límite documentado).
+  const events = projectEvents(definition, result.events, language);
   const stored: StoredActionResult = {
     outcome: result.status,
     operationId,
@@ -124,9 +127,9 @@ async function persistAction(
   return { operationId, events, newRun, stored };
 }
 
-function previewActionResponse(definition: Definition, run: FullRun, manualCount: number, action: Action, officialResult: OfficialResultDto | null = null): ActionResponseDto {
-  const preview = resolveAction(definition, pureRun(run), action);
-  return { ...toResponse(definition, run, manualCount, preview, officialResult), requiresConfirmation: preview.status === 'confirmation_required' };
+function previewActionResponse(definition: Definition, run: FullRun, manualCount: number, action: Action, officialResult: OfficialResultDto | null = null, language: Language = 'es'): ActionResponseDto {
+  const preview = resolveAction(definition, pureRun(run), action, language);
+  return { ...toResponse(definition, run, manualCount, preview, officialResult, language), requiresConfirmation: preview.status === 'confirmation_required' };
 }
 
 /** Cronología de la rama actual para proyectar una partida cerrada: vacía
@@ -138,8 +141,8 @@ async function closedRunTimeline(
   return run.status === 'closed' ? loadRunTimeline(query, run.id, run.branchId) : [];
 }
 
-function replayActionResponse(definition: Definition, run: FullRun, manualCount: number, stored: StoredActionResult, timeline: PublicEvent[] = [], officialResult: OfficialResultDto | null = null): ActionResponseDto {
-  const view = playerViewDto(definition, run, manualCount, timeline, officialResult);
+function replayActionResponse(definition: Definition, run: FullRun, manualCount: number, stored: StoredActionResult, timeline: PublicEvent[] = [], officialResult: OfficialResultDto | null = null, language: Language = 'es'): ActionResponseDto {
+  const view = playerViewDto(definition, run, manualCount, timeline, officialResult, language);
   const { outcome, events, operationId, report, pausedAt, reason } = stored;
   // El informe que se enseña es el de la vista (completo y con cronología),
   // no el guardado en el registro de la acción, que es el del motor sin
@@ -160,9 +163,9 @@ function isNoTransition(result: ActionResult): result is Extract<ActionResult, {
 function appliedActionResponse(
   definition: Definition, newRun: FullRun, manualCount: number, result: AppliedResult,
   operationId: string, events: ActionResponseDto['events'], stored: StoredActionResult,
-  timeline: PublicEvent[] = [], officialResult: OfficialResultDto | null = null,
+  timeline: PublicEvent[] = [], officialResult: OfficialResultDto | null = null, language: Language = 'es',
 ): ActionResponseDto {
-  const view = playerViewDto(definition, newRun, manualCount, timeline, officialResult);
+  const view = playerViewDto(definition, newRun, manualCount, timeline, officialResult, language);
   const fullReport = view.finalReport ?? stored.report;
   return {
     ...view, outcome: result.status, events, operationId,
@@ -177,10 +180,10 @@ function appliedActionResponse(
  * devuelve el que ya se cargó al inicio. */
 async function officialAfterAction(
   client: PoolClient, ownerId: string, contentHash: string, runId: string,
-  status: string, official: OfficialResultDto | null,
+  status: string, official: OfficialResultDto | null, language: Language = 'es',
 ): Promise<OfficialResultDto | null> {
   if (status !== 'case_closed') return official;
-  return loadOfficialResultForContent(client, ownerId, contentHash, runId);
+  return loadOfficialResultForContent(client, ownerId, contentHash, runId, language);
 }
 
 export async function commitAction(
@@ -188,6 +191,7 @@ export async function commitAction(
   digest: string,
   runId: string,
   input: { action: Action; confirm?: boolean; expectedVersion?: number; idempotencyKey?: string },
+  language: Language = 'es',
 ): Promise<ActionResponseDto> {
   if (input.idempotencyKey !== undefined && !isIdempotencyKey(input.idempotencyKey)) {
     throw new RunStoreError('INVALID_REQUEST');
@@ -201,11 +205,11 @@ export async function commitAction(
     // de otra partida anterior si existe; si esta acción cierra el caso,
     // se recarga tras persistir para traer el recién registrado.
     const contentHash = contentHashForDefinition(definition);
-    let official = await loadOfficialResultForContent(client, ownerId, contentHash, run.id);
+    let official = await loadOfficialResultForContent(client, ownerId, contentHash, run.id, language);
 
     // Preview explícito: solo lectura, sin persistencia ni registro.
     if (input.confirm === false) {
-      return previewActionResponse(definition, run, manualCount, input.action, official);
+      return previewActionResponse(definition, run, manualCount, input.action, official, language);
     }
 
     // Replay por idempotencia ANTES de rechazar una revisión vieja (GUARDADOS.md).
@@ -213,26 +217,26 @@ export async function commitAction(
       const stored = await findActionReplay(client, runId, input.idempotencyKey, actionDigest(input.action, input.expectedVersion));
       if (stored) {
         const timeline = await closedRunTimeline((sql, params) => client.query(sql, params), run);
-        return replayActionResponse(definition, run, manualCount, stored, timeline, official);
+        return replayActionResponse(definition, run, manualCount, stored, timeline, official, language);
       }
     }
     if (input.expectedVersion !== undefined && input.expectedVersion !== run.revision) {
       throw new RunStoreError('VERSION_CONFLICT');
     }
 
-    const result = confirmAction(definition, pureRun(run), input.action);
+    const result = confirmAction(definition, pureRun(run), input.action, language);
     // Sin transición: no persiste, no registra operación, no avanza revisión.
-    if (isNoTransition(result)) return toResponse(definition, run, manualCount, result, official);
+    if (isNoTransition(result)) return toResponse(definition, run, manualCount, result, official, language);
     // applied | case_closed | batch_paused: el estado cambió; persistir.
     if (result.run.version <= run.version) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
     const { operationId, events, newRun, stored } = await persistAction(
       client, ownerId, run, definition, result,
-      input.idempotencyKey ?? randomUUID(), actionDigest(input.action, input.expectedVersion));
+      input.idempotencyKey ?? randomUUID(), actionDigest(input.action, input.expectedVersion), language);
     // La cronología se carga tras persistir, así la acción de cierre ya
     // está en los registros y el informe la incluye desde el primer momento.
     const timeline = await closedRunTimeline((sql, params) => client.query(sql, params), newRun);
-    official = await officialAfterAction(client, ownerId, contentHash, run.id, result.status, official);
-    return appliedActionResponse(definition, newRun, manualCount, result, operationId, events, stored, timeline, official);
+    official = await officialAfterAction(client, ownerId, contentHash, run.id, result.status, official, language);
+    return appliedActionResponse(definition, newRun, manualCount, result, operationId, events, stored, timeline, official, language);
   });
 }
 
@@ -308,6 +312,7 @@ export async function commitLoad(
   runId: string,
   saveId: string,
   input: { expectedVersion: number; idempotencyKey: string },
+  language: Language = 'es',
 ): Promise<SaveLoadResponseDto> {
   if (!isIdempotencyKey(input.idempotencyKey)) throw new RunStoreError('INVALID_REQUEST');
   return inSession(database, digest, async (client, ownerId) => {
@@ -320,8 +325,8 @@ export async function commitLoad(
     const replayed = await findLoadReplay(client, runId, input.idempotencyKey, loadDigest);
     if (replayed) {
       const manualCount = await manualSaveCount(client, runId);
-      const official = await loadOfficialResultForContent(client, ownerId, contentHashForDefinition(definition), run.id);
-      const view = playerViewDto(definition, run, manualCount, [], official);
+      const official = await loadOfficialResultForContent(client, ownerId, contentHashForDefinition(definition), run.id, language);
+      const view = playerViewDto(definition, run, manualCount, [], official, language);
       return { ...view, operationId: replayed.operationId, newBranchId: replayed.newBranchId };
     }
     if (input.expectedVersion !== run.revision) throw new RunStoreError('VERSION_CONFLICT');
@@ -334,8 +339,8 @@ export async function commitLoad(
     const { operationId, newBranchId, newRun } = await persistLoad(
       client, ownerId, run, restored, input.idempotencyKey, loadDigest);
     const manualCount = await manualSaveCount(client, runId);
-    const official = await loadOfficialResultForContent(client, ownerId, contentHashForDefinition(definition), run.id);
-    const view = playerViewDto(definition, newRun, manualCount, [], official);
+    const official = await loadOfficialResultForContent(client, ownerId, contentHashForDefinition(definition), run.id, language);
+    const view = playerViewDto(definition, newRun, manualCount, [], official, language);
     return { ...view, operationId, newBranchId };
   });
 }

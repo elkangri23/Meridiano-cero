@@ -1,6 +1,7 @@
 import { appendRequest } from './requests.js';
 import { EngineStateError } from './state-error.js';
 import type { CaseDefinition, CaseRun, ScheduledResult } from '@meridiano/case-schema';
+import { resolveMessage, type Language } from '@meridiano/case-schema';
 import type { ActionResult } from './types.js';
 import { fixedSuspect, isFixedCase } from './fixed-case.js';
 import { knowsEvidence } from './fixed-evidence.js';
@@ -43,8 +44,8 @@ export function knownSuspect(def: CaseDefinition, run: CaseRun, id: string): boo
   return references.some(evidence => knowsEvidence(run, evidence));
 }
 
-export function requestWarrant(def: CaseDefinition, run: CaseRun, params: Record<string, unknown>): ActionResult {
-  const fail = (): ActionResult => ({ status: 'impossible', run, events: [], reason: 'Solicitud no disponible.' });
+export function requestWarrant(def: CaseDefinition, run: CaseRun, params: Record<string, unknown>, language: Language = 'es'): ActionResult {
+  const fail = (): ActionResult => ({ status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.requestUnavailable') });
   if (Object.keys(params).sort().join(',') !== 'evidenceIds,suspectId') return fail();
   if (typeof params.suspectId !== 'string') return fail();
   const suspect = isFixedCase(def) ? fixedSuspect(params.suspectId) : generatedSuspect(def, params.suspectId);
@@ -52,7 +53,7 @@ export function requestWarrant(def: CaseDefinition, run: CaseRun, params: Record
   const evidenceIds = selectedEvidence(def, run, params.evidenceIds);
   if (!evidenceIds) return fail();
   if (run.pendingRequests.some(request => sameWarrant(request, suspect.id, evidenceIds, def))) {
-    return { status: 'impossible', run, events: [], reason: 'Solicitud ya en curso.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.requestInProgress') };
   }
   const id = `req-${run.version + 1}`;
   const request: ScheduledResult = { id, dueMinute: run.minute + 30, type: 'warrant', payload: { suspectId: suspect.id, evidenceIds } };

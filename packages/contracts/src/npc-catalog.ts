@@ -1,5 +1,8 @@
 // Catálogo de NPCs recurrentes, canales y consultas (T5-03)
 // SPEC-008: NPC y gestiones con conocimiento/tiempos definidos
+import { resolveMessage } from './i18n.js';
+import type { LocaleKey } from './locales/es.js';
+import type { Language } from './preferences.js';
 
 export interface NPCProfile {
   id: string;
@@ -29,6 +32,25 @@ export const REMOTE_CHANNELS: readonly RemoteChannel[] = ['call', 'whatsapp', 's
 export const REMOTE_CHANNEL_LABELS: Record<RemoteChannel, string> = {
   call: 'llamada', whatsapp: 'WhatsApp', sms: 'SMS', email: 'correo', fax: 'fax',
 };
+
+/** Claves i18n de las etiquetas de canal remoto (la forma de etiqueta
+ * lleva mayúscula inicial: «Llamada», «Correo»). */
+export const REMOTE_CHANNEL_KEYS: Record<RemoteChannel, LocaleKey> = {
+  call: 'labels.channel.call', whatsapp: 'labels.channel.whatsapp', sms: 'labels.channel.sms',
+  email: 'labels.channel.email', fax: 'labels.channel.fax',
+};
+
+/** Etiqueta de un canal remoto en el idioma pedido (forma de etiqueta). */
+export function remoteChannelLabel(channel: RemoteChannel, language: Language): string {
+  return resolveMessage(language, REMOTE_CHANNEL_KEYS[channel]);
+}
+
+/** Etiqueta de un canal dentro de una frase («por llamada»): en minúscula
+ * salvo nombres propios (WhatsApp, SMS), que no se tocan. */
+export function remoteChannelInSentence(channel: RemoteChannel, language: Language): string {
+  const label = remoteChannelLabel(channel, language);
+  return channel === 'whatsapp' || channel === 'sms' ? label : label.toLowerCase();
+}
 
 export interface QueryType {
   id: string;

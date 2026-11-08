@@ -8,9 +8,9 @@
 // posteriores del mismo contenido son práctica y no cambian nada.
 // Cargar un guardado antes del primer cierre no crea resultado oficial,
 // así que cambiar decisiones sigue siendo posible hasta cerrar.
-import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
+import type { CaseDefinition, CaseRun, FinalReport, Language } from '@meridiano/case-schema';
 import {
-  deriveCareerProfile, getCity, outcomeFromReport,
+  caseText, deriveCareerProfile, getCity, outcomeFromReport,
   rankForTotals, reputationLabel, type CareerResultEntry,
 } from '@meridiano/case-schema';
 import { contentHashForDefinition } from '@meridiano/case-schema/server';
@@ -72,8 +72,8 @@ async function loadOfficialRows(queryable: Queryable, ownerId: string): Promise<
 }
 
 /** Título del expediente: el mismo que enseña el catálogo. */
-export function caseTitleForDefinition(definition: CaseDefinition): string {
-  return definition.briefing?.title ?? 'El astrolabio de las tres ciudades';
+export function caseTitleForDefinition(definition: CaseDefinition, language: Language = 'es'): string {
+  return caseText(definition.id, 'briefing.title', language) ?? definition.briefing?.title ?? 'El astrolabio de las tres ciudades';
 }
 
 /** Países y lugares visitados al cerrar: los lugares descubiertos (más
@@ -133,11 +133,13 @@ export async function recordOfficialResult(
   return { recorded: inserted.rows.length === 1, contentHash };
 }
 
-function entryForRow(row: OfficialResultRow): CareerResultEntry {
+function entryForRow(row: OfficialResultRow, language: Language = 'es'): CareerResultEntry {
   const first = row.firstResult;
   return {
     caseId: first.caseId,
-    caseTitle: first.caseTitle,
+    // El título guardado es el español de cuando se cerró el caso; al
+    // leerlo se traduce con el locale del expediente, sin tocar la fila.
+    caseTitle: caseText(first.caseId, 'briefing.title', language) ?? first.caseTitle,
     contentHash: row.contentHash,
     result: first.result,
     reason: first.reason,
@@ -156,7 +158,7 @@ function entryForRow(row: OfficialResultRow): CareerResultEntry {
 
 /** Rango antes y después de un resultado oficial, por el orden de
  * creación: los deltas acumulados hasta (sin) ese resultado. */
-function ranksForEntry(rows: OfficialResultRow[], index: number): { rankBefore: string; rankAfter: string } {
+function ranksForEntry(rows: OfficialResultRow[], index: number, language: Language = 'es'): { rankBefore: string; rankAfter: string } {
   const sum = (upto: number): { prestige: number; integrity: number; trust: number } => {
     let prestige = 0;
     let integrity = 0;
@@ -172,8 +174,8 @@ function ranksForEntry(rows: OfficialResultRow[], index: number): { rankBefore: 
   const before = sum(index);
   const after = sum(index + 1);
   return {
-    rankBefore: rankForTotals(before.prestige, before.integrity, before.trust),
-    rankAfter: rankForTotals(after.prestige, after.integrity, after.trust),
+    rankBefore: rankForTotals(before.prestige, before.integrity, before.trust, language),
+    rankAfter: rankForTotals(after.prestige, after.integrity, after.trust, language),
   };
 }
 
@@ -182,7 +184,7 @@ function ranksForEntry(rows: OfficialResultRow[], index: number): { rankBefore: 
  * lo produjo esta partida (su operación de cierre); si lo produjo otra
  * partida del mismo contenido, esta es de práctica. */
 export async function loadOfficialResultForContent(
-  queryable: Queryable, ownerId: string, contentHash: string, runId?: string,
+  queryable: Queryable, ownerId: string, contentHash: string, runId?: string, language: Language = 'es',
 ): Promise<OfficialResultDto | null> {
   const rows = await loadOfficialRows(queryable, ownerId);
   const index = rows.findIndex(row => row.contentHash === contentHash);
@@ -190,7 +192,7 @@ export async function loadOfficialResultForContent(
   const row = rows.at(index);
   if (!row) return null;
   const first = row.firstResult;
-  const { rankBefore, rankAfter } = ranksForEntry(rows, index);
+  const { rankBefore, rankAfter } = ranksForEntry(rows, index, language);
   let isThisRun = false;
   if (runId) {
     const operation = await queryable.query(
@@ -199,7 +201,7 @@ export async function loadOfficialResultForContent(
   }
   return {
     caseId: first.caseId,
-    caseTitle: first.caseTitle,
+    caseTitle: caseText(first.caseId, 'briefing.title', language) ?? first.caseTitle,
     contentHash: row.contentHash,
     result: first.result,
     reason: first.reason,
@@ -222,19 +224,19 @@ export async function loadOfficialResultForContent(
 /** Perfil de carrera completo del detective, derivado de sus resultados
  * oficiales. Sin resultados oficiales, el perfil está vacío (rango
  * Aspirante, cero casos): la carrera empieza con el primer cierre. */
-export async function loadCareerProfile(queryable: Queryable, ownerId: string): Promise<CareerProfileDto> {
+export async function loadCareerProfile(queryable: Queryable, ownerId: string, language: Language = 'es'): Promise<CareerProfileDto> {
   const rows = await loadOfficialRows(queryable, ownerId);
-  const entries = rows.map(entryForRow);
-  const derived = deriveCareerProfile(entries);
+  const entries = rows.map(row => entryForRow(row, language));
+  const derived = deriveCareerProfile(entries, language);
   return {
     rank: derived.rank,
     points: derived.points,
     prestige: derived.prestige,
     integrity: derived.integrity,
     trust: derived.trust,
-    prestigeLabel: reputationLabel(derived.prestige),
-    integrityLabel: reputationLabel(derived.integrity),
-    trustLabel: reputationLabel(derived.trust),
+    prestigeLabel: reputationLabel(derived.prestige, language),
+    integrityLabel: reputationLabel(derived.integrity, language),
+    trustLabel: reputationLabel(derived.trust, language),
     totalCases: derived.totalCases,
     completedCases: derived.completedCases,
     medals: derived.medals,

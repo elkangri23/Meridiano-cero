@@ -13,6 +13,12 @@ function respond(body: unknown, status = 200) {
 }
 afterEach(() => { vi.unstubAllGlobals(); });
 
+/** Cabeceras de la petición capturada, como objeto plano (el cliente las envía como Headers). */
+function headersOf(init: RequestInit | undefined): Record<string, string> {
+  const raw = init?.headers;
+  return raw instanceof Headers ? Object.fromEntries(raw.entries()) : { ...(raw as Record<string, string> | undefined) };
+}
+
 describe('T3: frontera HTTP del archivo', () => {
   it('lista válida mantiene mismo origen, no-store y URL de filtro controlada', async () => {
     const fetcher = respond(page);
@@ -42,7 +48,8 @@ describe('T3: frontera HTTP del archivo', () => {
   it('entrada local explícita usa cuerpo vacío y conserva CSRF solo en respuesta validada', async () => {
     const fetcher = respond(session);
     expect(await archiveApi.connect(signal())).toEqual(session);
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: '{}' });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'content-type': 'application/json', 'x-meridiano-language': 'es' });
   });
   it.each([
     { ...session, token: null }, { ...session, csrfToken: '' },
@@ -68,14 +75,16 @@ describe('T3: frontera HTTP del archivo', () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 })); vi.stubGlobal('fetch', fetcher);
     await archiveApi.logout(session.csrfToken, signal());
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/auth/logout');
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-csrf-token': session.csrfToken } });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'x-csrf-token': session.csrfToken, 'x-meridiano-language': 'es' });
     respond({}, 503); await expect(archiveApi.logout(session.csrfToken, signal())).rejects.toEqual(new ArchiveError('unavailable'));
   });
   it('envío de creación usa identidad/CSRF y cuerpo mínimo, sin leer la proyección como progreso', async () => {
     const fetcher = respond({ syntheticIgnored: true }, 201);
     await archiveApi.create('synthetic', 'synthetic-original-key', session, signal());
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/runs');
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken }, body: JSON.stringify({ caseId: 'synthetic', idempotencyKey: 'synthetic-original-key' }) });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ caseId: 'synthetic', idempotencyKey: 'synthetic-original-key' }) });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'content-type': 'application/json', 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken, 'x-meridiano-language': 'es' });
   });
   it('creación con dificultad la envía en el cuerpo; sin ella no se inventa ninguna', async () => {
     const fetcher = respond({ syntheticIgnored: true }, 201);
@@ -91,7 +100,8 @@ describe('T3: frontera HTTP del archivo', () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 })); vi.stubGlobal('fetch', fetcher);
     await archiveApi.deleteRun(id, session, signal());
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/runs/' + id);
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'DELETE', headers: { 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken }, body: JSON.stringify({ confirm: true }) });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'DELETE', body: JSON.stringify({ confirm: true }) });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'content-type': 'application/json', 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken, 'x-meridiano-language': 'es' });
     respond(null, 404);
     await expect(archiveApi.deleteRun(id, session, signal())).resolves.toBeUndefined();
     respond({}, 503);
@@ -125,7 +135,8 @@ describe('T4-08: frontera HTTP de generación', () => {
     const fetcher = respond(job, 201);
     expect(await archiveApi.createGenerationJob({ crimeType: 'fraude', contentRating: 'familiar', duration: 'short' }, session, signal())).toEqual(job);
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/generation/jobs');
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken }, body: JSON.stringify({ crimeType: 'fraude', contentRating: 'familiar', duration: 'short' }) });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ crimeType: 'fraude', contentRating: 'familiar', duration: 'short' }) });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'content-type': 'application/json', 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken, 'x-meridiano-language': 'es' });
   });
   it('crear job sin delito no inventa ninguno (el servidor sortea)', async () => {
     const fetcher = respond(job, 201);
@@ -142,7 +153,8 @@ describe('T4-08: frontera HTTP de generación', () => {
     const fetcher = respond(cancelled);
     expect(await archiveApi.cancelGenerationJob(id, session, signal())).toEqual(cancelled);
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/generation/jobs/' + id + '/cancel');
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-csrf-token': session.csrfToken } });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'content-type': 'application/json', 'x-csrf-token': session.csrfToken, 'x-expected-profile-id': id, 'x-meridiano-language': 'es' });
   });
 });
 
@@ -171,7 +183,8 @@ describe('T4-05: frontera HTTP de intercambio de expedientes', () => {
     const fetcher = respond(imported, 201);
     expect(await archiveApi.importCase('{"version":"1.0.0"}', session, signal())).toEqual(imported);
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/cases/import');
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', headers: { 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken }, body: '{"version":"1.0.0"}' });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: '{"version":"1.0.0"}' });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'content-type': 'application/json', 'x-expected-profile-id': id, 'x-csrf-token': session.csrfToken, 'x-meridiano-language': 'es' });
   });
   it('importar un fichero inválido conserva el motivo 400 del servidor', async () => {
     respond({ error: { code: 'VALIDATION_ERROR', message: 'Checksum no coincide: posible corrupción de datos' } }, 400);

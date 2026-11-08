@@ -26,7 +26,7 @@
 //   acceso restringido es el del lugar de recuperación con orden, y se
 //   fuerza con `force_entry`.
 import type { CaseDefinition, CaseRun, IrregularKind, MisconductRecord } from '@meridiano/case-schema';
-import { IRREGULAR_MINUTES, isIrregularKind } from '@meridiano/case-schema';
+import { IRREGULAR_MINUTES, isIrregularKind, caseText, resolveMessage, type Language } from '@meridiano/case-schema';
 import type { Action, ActionPreview, ActionResult, EngineEvent } from './types.js';
 import { isFixedCase } from './fixed-case.js';
 import { knowsEvidence, revealTalk } from './fixed-evidence.js';
@@ -55,8 +55,9 @@ function recoveryLocation(def: CaseDefinition): { locationId: string; cityId: st
   return { locationId: recovery.locationId, cityId: recovery.cityId };
 }
 
-function locationName(def: CaseDefinition, locationId: string): string {
-  return def.locations.find(location => location.id === locationId)?.name ?? locationId;
+function locationName(def: CaseDefinition, locationId: string, language: Language = 'es'): string {
+  return caseText(def.id, 'location.' + locationId + '.name', language)
+    ?? def.locations.find(location => location.id === locationId)?.name ?? locationId;
 }
 
 function npcName(def: CaseDefinition, npcId: string): string {
@@ -83,25 +84,25 @@ export interface IrregularPlan {
 /** El plan de un acto irregular: si se puede intentar, quién podría
  * verlo y cómo se llama el objetivo. Lo usan las ofertas, la vista previa
  * y el handler, para que los tres digan lo mismo. */
-export function irregularPlan(def: CaseDefinition, run: CaseRun, kind: IrregularKind, targetId: string): IrregularPlan {
-  if (run.status !== 'active') return { ok: false, reason: 'La partida ya está cerrada.' };
-  return kind === 'force_entry' ? forceEntryPlan(def, run, targetId) : npcPlan(def, run, kind, targetId);
+export function irregularPlan(def: CaseDefinition, run: CaseRun, kind: IrregularKind, targetId: string, language: Language = 'es'): IrregularPlan {
+  if (run.status !== 'active') return { ok: false, reason: resolveMessage(language, 'engine.reason.runClosed') };
+  return kind === 'force_entry' ? forceEntryPlan(def, run, targetId, language) : npcPlan(def, run, kind, targetId, language);
 }
 
-function forceEntryPlan(def: CaseDefinition, run: CaseRun, targetId: string): IrregularPlan {
+function forceEntryPlan(def: CaseDefinition, run: CaseRun, targetId: string, language: Language): IrregularPlan {
   const recovery = recoveryLocation(def);
-  if (!recovery || recovery.locationId !== targetId) return { ok: false, reason: 'Acceso no disponible.' };
-  if (run.position.locationId !== targetId) return { ok: false, reason: 'No estás en ese lugar.' };
-  if (run.warrants.includes('warrant:access')) return { ok: false, reason: 'Ya tienes orden de acceso.' };
-  if (run.discoveries.includes('forced-entry')) return { ok: false, reason: 'El acceso ya está forzado.' };
+  if (!recovery || recovery.locationId !== targetId) return { ok: false, reason: resolveMessage(language, 'engine.reason.accessUnavailable') };
+  if (run.position.locationId !== targetId) return { ok: false, reason: resolveMessage(language, 'engine.reason.notThere') };
+  if (run.warrants.includes('warrant:access')) return { ok: false, reason: resolveMessage(language, 'engine.reason.accessWarrantHave') };
+  if (run.discoveries.includes('forced-entry')) return { ok: false, reason: resolveMessage(language, 'engine.reason.accessForced') };
   return { ok: true, witnesses: def.npcs.filter(npc => npc.cityId === recovery.cityId).map(npc => npc.id),
-    targetLabel: locationName(def, targetId) };
+    targetLabel: locationName(def, targetId, language) };
 }
 
-function npcPlan(def: CaseDefinition, run: CaseRun, kind: IrregularKind, targetId: string): IrregularPlan {
+function npcPlan(def: CaseDefinition, run: CaseRun, kind: IrregularKind, targetId: string, language: Language): IrregularPlan {
   const npc = def.npcs.find(item => item.id === targetId);
-  if (!npc || npc.cityId !== run.position.cityId) return { ok: false, reason: 'Personaje no accesible.' };
-  if (!hasUnrevealedTalkFacts(def, run, targetId)) return { ok: false, reason: 'Ya te ha contado todo lo que sabe.' };
+  if (!npc || npc.cityId !== run.position.cityId) return { ok: false, reason: resolveMessage(language, 'engine.reason.npcUnavailable') };
+  if (!hasUnrevealedTalkFacts(def, run, targetId)) return { ok: false, reason: resolveMessage(language, 'engine.reason.npcToldAll') };
   const others = def.npcs.filter(item => item.cityId === npc.cityId && item.id !== targetId).map(item => item.id);
   return { ok: true, witnesses: kind === 'impersonate' ? [targetId, ...others] : others,
     targetLabel: npcName(def, targetId) };
@@ -141,37 +142,38 @@ function revealIrregularTalk(def: CaseDefinition, run: CaseRun, npcId: string): 
   return { run: { ...current, npcRelations: run.npcRelations }, revealedEvidence };
 }
 
-function irregularDescription(def: CaseDefinition, run: CaseRun, kind: IrregularKind, targetId: string, witnesses: string[]): string {
+function irregularDescription(def: CaseDefinition, run: CaseRun, kind: IrregularKind, targetId: string, witnesses: string[], language: Language): string {
   const seen = witnessedCount(run);
-  const target = irregularTargetName(def, kind, targetId);
-  const witnessNames = witnesses.map(id => npcName(def, id));
+  const target = irregularTargetName(def, kind, targetId, language);
+  const witnessNames = witnesses.map(id => npcName(def, id)).join(resolveMessage(language, 'engine.irregular.witnessJoin'));
   const seenText = seen === 0
-    ? 'Aún no te han visto ninguna vez.'
-    : `Ya te han visto ${seen} ${seen === 1 ? 'vez' : 'veces'}.`;
-  const withdrawalText = `A la ${WITNESSED_WITHDRAWAL_COUNT}.ª vez que te vean, A.C.M.E. retirará el caso.`;
+    ? resolveMessage(language, 'engine.irregular.seenNone')
+    : seen === 1
+      ? resolveMessage(language, 'engine.irregular.seenOnce')
+      : resolveMessage(language, 'engine.irregular.seenMany', { count: seen });
+  const withdrawalText = resolveMessage(language, 'engine.irregular.withdrawal', { count: WITNESSED_WITHDRAWAL_COUNT });
+  const vars = { target, minutes: IRREGULAR_MINUTES, seen: seenText, withdrawal: withdrawalText };
   if (kind === 'force_entry') {
-    const who = witnessNames.length === 0 ? 'Nadie está en esa ciudad para verte.'
-      : `Te pueden ver ${witnessNames.join(' y ')}.`;
-    return `Forzar el acceso a ${target} (${IRREGULAR_MINUTES} min). ${who} Si te ven, A.C.M.E. te advertirá y dejarán de cooperar contigo. ` +
-      `${seenText} ${withdrawalText} Lo que recuperes tras forzar el acceso no será admisible.`;
+    const who = witnessNames.length === 0
+      ? resolveMessage(language, 'engine.irregular.whoNobodyCity')
+      : resolveMessage(language, 'engine.irregular.whoSome', { names: witnessNames });
+    return resolveMessage(language, 'engine.irregular.forceDescription', { ...vars, who });
   }
-  const who = witnesses.length === 0 ? 'Nadie más está en esta ciudad para verte.'
-    : `Te pueden ver ${witnessNames.join(' y ')}.`;
-  const taint = 'Lo que te cuente no será admisible como prueba.';
+  const who = witnesses.length === 0
+    ? resolveMessage(language, 'engine.irregular.whoNobodyElse')
+    : resolveMessage(language, 'engine.irregular.whoSome', { names: witnessNames });
   if (kind === 'bribe') {
-    return `Sobornar a ${target} (${IRREGULAR_MINUTES} min). ${who} Si te ven, A.C.M.E. te advertirá y dejarán de cooperar contigo. ` +
-      `${seenText} ${withdrawalText} ${taint}`;
+    return resolveMessage(language, 'engine.irregular.bribeDescription', { ...vars, who });
   }
-  return `Suplantar a alguien hablando con ${target} (${IRREGULAR_MINUTES} min). ${target} acabará dándose cuenta. ${who} ` +
-    `Si te ven, A.C.M.E. te advertirá y dejarán de cooperar contigo. ${seenText} ${withdrawalText} ${taint}`;
+  return resolveMessage(language, 'engine.irregular.impersonateDescription', { ...vars, who });
 }
 
-export function irregularPreview(def: CaseDefinition, run: CaseRun, action: Action): ActionPreview | undefined {
+export function irregularPreview(def: CaseDefinition, run: CaseRun, action: Action, language: Language = 'es'): ActionPreview | undefined {
   if (!isIrregularParams(action.params)) return undefined;
-  const plan = irregularPlan(def, run, action.params.kind, action.params.targetId);
+  const plan = irregularPlan(def, run, action.params.kind, action.params.targetId, language);
   if (!plan.ok || !plan.witnesses) return undefined;
   return { actionType: 'irregular', estimatedMinutes: IRREGULAR_MINUTES, estimatedEndTime: run.minute + IRREGULAR_MINUTES,
-    description: irregularDescription(def, run, action.params.kind, action.params.targetId, plan.witnesses) };
+    description: irregularDescription(def, run, action.params.kind, action.params.targetId, plan.witnesses, language) };
 }
 
 function irregularRecordText(kind: IrregularKind, targetId: string, minute: number): string {
@@ -182,24 +184,24 @@ function irregularRecordText(kind: IrregularKind, targetId: string, minute: numb
  * pasó con él: solo lo que ese personaje sabe de verdad (lo que le hiciste
  * o lo que vio). El director los usa si el jugador pregunta por ello; no
  * inventan nada del caso. */
-export function misconductFactsForNpc(def: CaseDefinition, run: CaseRun, npcId: string): Array<{ id: string; text: string }> {
+export function misconductFactsForNpc(def: CaseDefinition, run: CaseRun, npcId: string, language: Language = 'es'): Array<{ id: string; text: string }> {
   const facts: Array<{ id: string; text: string }> = [];
   for (const record of misconductOf(run)) {
-    const target = irregularTargetName(def, record.kind, record.targetId);
+    const target = irregularTargetName(def, record.kind, record.targetId, language);
     if (record.targetId === npcId) {
       facts.push({ id: `misconduct:${record.id}`,
         text: record.kind === 'force_entry'
-          ? `El detective forzó el acceso a ${target} en el minuto ${record.minute}.`
+          ? resolveMessage(language, 'engine.misconduct.forceTarget', { target, minute: record.minute })
           : record.kind === 'bribe'
-            ? `El detective intentó sobornarme en el minuto ${record.minute}.`
-            : `El detective intentó suplantar a alguien hablando conmigo en el minuto ${record.minute}.` });
+            ? resolveMessage(language, 'engine.misconduct.bribeTarget', { minute: record.minute })
+            : resolveMessage(language, 'engine.misconduct.impersonateTarget', { minute: record.minute }) });
     } else if (record.seenBy.includes(npcId)) {
       facts.push({ id: `misconduct:${record.id}`,
         text: record.kind === 'force_entry'
-          ? `Vi al detective forzar el acceso a ${target} en el minuto ${record.minute}.`
+          ? resolveMessage(language, 'engine.misconduct.forceSeen', { target, minute: record.minute })
           : record.kind === 'bribe'
-            ? `Vi al detective sobornar a ${irregularTargetName(def, record.kind, record.targetId)} en el minuto ${record.minute}.`
-            : `Vi al detective suplantar a alguien hablando con ${irregularTargetName(def, record.kind, record.targetId)} en el minuto ${record.minute}.` });
+            ? resolveMessage(language, 'engine.misconduct.bribeSeen', { target: irregularTargetName(def, record.kind, record.targetId, language), minute: record.minute })
+            : resolveMessage(language, 'engine.misconduct.impersonateSeen', { target: irregularTargetName(def, record.kind, record.targetId, language), minute: record.minute }) });
     }
   }
   return facts;
@@ -229,18 +231,18 @@ function applySeenConsequences(current: CaseRun, record: MisconductRecord, witne
 
 /** Retirada del caso por A.C.M.E.: la partida se cierra con el informe de
  * retirada y el evento que la cronología enseña. */
-function closeWithdrawn(def: CaseDefinition, current: CaseRun, events: EngineEvent[], minute: number): ActionResult {
-  const report = buildFinalReport(def, current, 'withdrawn');
+function closeWithdrawn(def: CaseDefinition, current: CaseRun, events: EngineEvent[], minute: number, language: Language): ActionResult {
+  const report = buildFinalReport(def, current, 'withdrawn', language);
   const closedRun: CaseRun = { ...current, status: 'closed', finalReport: report };
   return { status: 'case_closed', run: closedRun,
     events: [...events, { ordinal: 0, minute, type: 'case_withdrawn', payload: { reason: 'withdrawn' } }], report };
 }
 
-export function submitIrregular(def: CaseDefinition, run: CaseRun, params: Record<string, unknown>): ActionResult {
+export function submitIrregular(def: CaseDefinition, run: CaseRun, params: Record<string, unknown>, language: Language = 'es'): ActionResult {
   const refuse = (reason: string): ActionResult => ({ status: 'impossible', run, events: [], reason });
-  if (!isIrregularParams(params)) return refuse('Acción irregular no disponible.');
-  const plan = irregularPlan(def, run, params.kind, params.targetId);
-  if (!plan.ok || !plan.witnesses) return refuse(plan.reason ?? 'Acción irregular no disponible.');
+  if (!isIrregularParams(params)) return refuse(resolveMessage(language, 'engine.reason.irregularUnavailable'));
+  const plan = irregularPlan(def, run, params.kind, params.targetId, language);
+  if (!plan.ok || !plan.witnesses) return refuse(plan.reason ?? resolveMessage(language, 'engine.reason.irregularUnavailable'));
   const witnesses = plan.witnesses;
   const seen = witnesses.length > 0;
   const record: MisconductRecord = { id: nextMisconductId(run), kind: params.kind, targetId: params.targetId,
@@ -254,6 +256,6 @@ export function submitIrregular(def: CaseDefinition, run: CaseRun, params: Recor
   const events = [{ ordinal: 0, minute: run.minute, type: 'irregular',
     payload: { kind: params.kind, targetId: params.targetId, seenBy: [...witnesses] } }];
 
-  if (seen && witnessedCount(current) >= WITNESSED_WITHDRAWAL_COUNT) return closeWithdrawn(def, current, events, run.minute);
+  if (seen && witnessedCount(current) >= WITNESSED_WITHDRAWAL_COUNT) return closeWithdrawn(def, current, events, run.minute, language);
   return { status: 'applied', run: current, events };
 }

@@ -1,4 +1,5 @@
 import type { CaseRun } from '@meridiano/case-schema';
+import { resolveMessage, type Language } from '@meridiano/case-schema';
 import type { Action, ActionResult, BatchStep, EngineEvent } from './types.js';
 import { createBatchSteps, dependenciesApplied, parsePendingBatch } from './pending-batch.js';
 
@@ -12,7 +13,7 @@ function pause(run: CaseRun, steps: BatchStep[], step: BatchStep, events: Engine
     run: { ...run, version: run.version + 1, pendingBatch: steps.map(value => JSON.stringify(value)) },
     events: [...events, event(run, 'batch_paused', { stepOrdinal: step.ordinal })] };
 }
-function executeSteps(run: CaseRun, steps: BatchStep[], execute: Execute): ActionResult {
+function executeSteps(run: CaseRun, steps: BatchStep[], execute: Execute, language: Language): ActionResult {
   let current = run;
   const events: EngineEvent[] = [];
   for (const step of steps) {
@@ -24,27 +25,27 @@ function executeSteps(run: CaseRun, steps: BatchStep[], execute: Execute): Actio
     }
     const result = execute(current, step.action);
     if (result.status === 'case_closed') return { ...result, run: { ...result.run, pendingBatch: null }, events: [...events, ...result.events] };
-    if (result.status !== 'applied') return pause(current, steps, step, events, 'reason' in result ? result.reason : 'Paso no disponible.');
+    if (result.status !== 'applied') return pause(current, steps, step, events, 'reason' in result ? result.reason : resolveMessage(language, 'engine.reason.stepUnavailable'));
     step.status = 'applied'; current = result.run; events.push(...result.events);
   }
   return { status: 'applied', run: { ...current, version: current.version + 1, pendingBatch: null },
     events: [...events, event(current, 'batch_completed', {})] };
 }
 
-export function startBatch(run: CaseRun, params: Record<string, unknown>, execute: Execute): ActionResult {
+export function startBatch(run: CaseRun, params: Record<string, unknown>, execute: Execute, language: Language = 'es'): ActionResult {
   const steps = createBatchSteps(params);
-  if (!steps) return { status: 'impossible', run, events: [], reason: 'Lote inválido: de 1 a 8 pasos admitidos con dependencias previas.' };
-  return executeSteps(run, steps, execute);
+  if (!steps) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.batchInvalid') };
+  return executeSteps(run, steps, execute, language);
 }
 
-export function decideBatch(run: CaseRun, params: Record<string, unknown>, execute: Execute): ActionResult {
+export function decideBatch(run: CaseRun, params: Record<string, unknown>, execute: Execute, language: Language = 'es'): ActionResult {
   const decision = params.decision;
   if (!Object.hasOwn(params, 'decision') || !Object.keys(params).every(key => key === 'decision') || typeof decision !== 'string' || !['cancel', 'continue_independent'].includes(decision)) {
-    return { status: 'impossible', run, events: [], reason: 'Decisión inválida.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.decisionInvalid') };
   }
-  if (!run.pendingBatch) return { status: 'impossible', run, events: [], reason: 'No hay lote pendiente.' };
+  if (!run.pendingBatch) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.noBatch') };
   const steps = parsePendingBatch(run.pendingBatch);
   if (decision === 'cancel') return { status: 'applied', run: { ...run, version: run.version + 1, pendingBatch: null },
     events: [event(run, 'batch_cancelled', { stepsCancelled: steps.filter(step => step.status === 'pending').length })] };
-  return executeSteps(run, steps, execute);
+  return executeSteps(run, steps, execute, language);
 }

@@ -1,4 +1,4 @@
-import { isCareerProfileDto, isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto, isGenerationJobDto, isGenerationJobListDto, isCaseImportResultDto } from '@meridiano/contracts';
+import { createPreferenceStore, isCareerProfileDto, isPlayerViewDto, isRunListDto, isSessionDto, isCaseListDto, isRunCreationLookupDto, isGenerationJobDto, isGenerationJobListDto, isCaseImportResultDto } from '@meridiano/contracts';
 import type { CareerProfileDto, PlayerViewDto, RunListDto, SessionDto, CaseListDto, RunCreationLookupDto, CrimeType, ContentRating, GenerationJobDto, GenerationJobListDto, CaseImportResultDto } from '@meridiano/contracts';
 
 export type Filter = 'all' | 'active' | 'closed';
@@ -64,8 +64,12 @@ async function boundedJson(response: Response): Promise<unknown> {
 }
 
 async function request(path: string, signal: AbortSignal, init: RequestInit = {}): Promise<Response> {
+  // El idioma viaja en cada llamada del archivo (la lista de casos enseña
+  // títulos): se lee del almacén en cada petición, sin recargar.
+  const headers = new Headers(init.headers);
+  headers.set('x-meridiano-language', createPreferenceStore().load().language);
   try {
-    return await fetch(path, { ...init, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+    return await fetch(path, { ...init, headers, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
       signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]) });
   } catch { throw new ArchiveError('unavailable'); }
 }

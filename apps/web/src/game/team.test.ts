@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { initialView } from '../archive/initial-fixture';
-import { briefingAnswer, ELENA_REFUSAL, evaluateAnswer, explainAnswer, medalLabel, organizeAnswer, routesAnswer, TEAM_MEMBERS, TEAM_SERVICE_KEYS, teamRequestText, teamServiceAnswer } from './team';
+import { briefingAnswer, elenaRefusal, evaluateAnswer, explainAnswer, medalLabel, organizeAnswer, routesAnswer, TEAM_MEMBERS, TEAM_SERVICE_KEYS, teamRequestText, teamServiceAnswer } from './team';
 import type { CareerProfileDto, PlayerViewDto } from '@meridiano/contracts';
 import { createTranslator } from '@meridiano/contracts';
 
 const t = createTranslator('es').t;
+const tFr = createTranslator('fr').t;
 
 function viewWith(overrides: Partial<PlayerViewDto>): PlayerViewDto {
   return { ...initialView, ...overrides };
@@ -37,7 +38,7 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
       paragraphs: ['Han robado el astrolabio original en Madrid.'] },
       objectives: [{ id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: true },
         { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false }] });
-    const answer = briefingAnswer(view);
+    const answer = briefingAnswer(view, t);
     expect(answer).toContain('Han robado el astrolabio original en Madrid.');
     expect(answer).toContain('Detener a Inés con orden válida (logrado)');
     expect(answer).toContain('Recuperar el astrolabio original (pendiente)');
@@ -47,7 +48,7 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
   it('Richter explica el análisis con su texto y el recordatorio de procedimiento', () => {
     const view = viewWith({ evidenceTexts: { 'EV-03': 'La huella técnica es compatible con una herramienta de la serie HV-17.' },
       objects: [{ id: 'EV-03', type: 'analysis', origin: 'lab', minute: 90, admissible: true }] });
-    const answer = explainAnswer(view, 'EV-03');
+    const answer = explainAnswer(view, 'EV-03', t);
     expect(answer).toContain('La huella técnica es compatible con una herramienta de la serie HV-17.');
     expect(answer).toContain('Un análisis solo dice lo que la prueba permite decir.');
     expect(answer).not.toMatch(/culpable|Inés/i);
@@ -58,23 +59,38 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
       evidenceTexts: { 'EV-02': 'La cerradura de la vitrina tiene residuo de herramienta.' },
       pendingRequests: [{ id: 'req-1', type: 'analysis', dueMinute: 120 }],
       objectives: [{ id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false }] });
-    const answer = organizeAnswer(view);
+    const answer = organizeAnswer(view, t);
     expect(answer).toContain('La cerradura de la vitrina tiene residuo de herramienta. (admisible)');
-    expect(answer).toContain('analysis (responde en el minuto 120)');
+    expect(answer).toContain('Análisis (responde en el minuto 120)');
     expect(answer).toContain('Recuperar el astrolabio original (pendiente)');
   });
 
   it('David enumera solo las rutas que la vista ofrece desde la ciudad actual', () => {
     const view = viewWith({ offers: [{ id: 'travel:paris', label: 'Viajar a París',
       action: { type: 'travel', params: { destination: 'paris' } }, detail: '2 h 15 min' }] });
-    expect(routesAnswer(view)).toContain('Viajar a París');
-    expect(routesAnswer(view)).toContain('2 h 15 min');
-    expect(routesAnswer(viewWith({ offers: [] }))).toContain('no hay rutas de viaje disponibles');
+    expect(routesAnswer(view, t)).toContain('Viajar a París');
+    expect(routesAnswer(view, t)).toContain('2 h 15 min');
+    expect(routesAnswer(viewWith({ offers: [] }), t)).toContain('no hay rutas de viaje disponibles');
   });
 
   it('la negativa de Elena es la misma que la de la terminal: sin registro, sin inventar', () => {
-    expect(ELENA_REFUSAL).toContain('Sin registro en los archivos consultados');
-    expect(ELENA_REFUSAL).toContain('no demuestra inocencia');
+    expect(elenaRefusal(t)).toContain('Sin registro en los archivos consultados');
+    expect(elenaRefusal(t)).toContain('no demuestra inocencia');
+    // En francés, la misma negativa sale en francés.
+    expect(elenaRefusal(tFr)).toContain('Aucun enregistrement dans les archives consultées');
+  });
+
+  it('en francés, Margaret recuerda el encargo con los objetivos en francés', () => {
+    const view = viewWith({ briefing: { speaker: 'Margaret Sullivan', title: 'El astrolabio robado',
+      paragraphs: ['Han robado el astrolabio original en Madrid.'] },
+      objectives: [{ id: 'obj-detener', description: 'Arrêter Inés avec un mandat valide', achieved: true },
+        { id: 'obj-recuperar', description: 'Récupérer l\'astrolabe original', achieved: false }] });
+    const answer = briefingAnswer(view, tFr);
+    expect(answer).toContain('Objectifs :');
+    expect(answer).toContain('Arrêter Inés avec un mandat valide (réussi)');
+    expect(answer).toContain('Récupérer l\'astrolabe original (en attente)');
+    expect(teamServiceAnswer('evaluate', viewWith({}), undefined, careerWith({ totalCases: 0, completedCases: 0, points: 0, rank: 'Aspirante', medals: [] }), tFr))
+      .toContain('Tu n\'as pas encore de dossier clos');
   });
 
   it('las frases de petición son fijas y no llevan la solución', () => {

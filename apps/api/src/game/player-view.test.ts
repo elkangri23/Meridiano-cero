@@ -96,6 +96,47 @@ describe('resúmenes de eventos de la consola', () => {
   });
 });
 
+describe('vista del jugador en francés (T5-05)', () => {
+  it('objetivos, dossier, charla y ofertas salen en francés y la vista valida el contrato', () => {
+    const view = playerViewDto(astrolabioDefinition, fullRun(), 0, [], null, 'fr');
+    expect(view.objectives).toEqual([
+      { id: 'obj-detener', description: 'Arrêter Inés avec un mandat valide', achieved: false },
+      { id: 'obj-recuperar', description: 'Récupérer l\'astrolabe original', achieved: false },
+    ]);
+    expect(view.briefing?.title).toBe('L\'astrolabe des trois villes');
+    expect(view.evidenceTexts['EV-02']).toBe('La serrure de la vitrine porte des résidus d\'outil.');
+    expect(view.position.city).toEqual({ id: 'madrid', name: 'Madrid', country: 'Espagne' });
+    expect(view.cities.map(city => city.country)).toEqual(['Espagne', 'France', 'Portugal']);
+    expect(view.position.location).toMatchObject({ id: 'MAD-SALA', name: 'Salle d\'emballage' });
+    expect(view.offers.map(offer => offer.label)).toContain('Inspecter Salle d\'emballage');
+    expect(view.offers.map(offer => offer.label)).toContain('Clore le dossier et présenter le rapport');
+    const ines = view.npcChat.find(entry => entry.id === 'ines');
+    expect(ines).toMatchObject({ refusal: 'Je ne vais pas témoigner sur le vol.' });
+    expect(isPlayerViewDto(view)).toBe(true);
+  });
+
+  it('los resúmenes de eventos salen en francés, con el canal en minúscula en la frase', () => {
+    const engineEvents: EngineEvent[] = [
+      { ordinal: 1, minute: 10, type: 'collect', payload: { evidenceId: 'EV-06' } },
+      { ordinal: 2, minute: 20, type: 'communicate', payload: { recipientId: 'tomas', channel: 'call' } },
+      { ordinal: 3, minute: 30, type: 'irregular', payload: { kind: 'bribe', targetId: 'lucia', seenBy: [] } },
+      { ordinal: 4, minute: 40, type: 'detain', payload: { suspectId: 'ines', mode: 'automatic' } },
+    ];
+    const summaries = projectEvents(astrolabioDefinition, engineEvents, 'fr').map(item => item.summary);
+    expect(summaries[0]).toContain('Ramassé :');
+    expect(summaries[1]).toBe('Message envoyé à Tomás Ríos par appel.');
+    expect(summaries[2]).toBe('Tu as soudoyé Lucía. Personne ne t\'a vu.');
+    expect(summaries[3]).toBe('Les autorités ont arrêté Inés Valera sur ordre de l\'A.C.M.E.');
+  });
+
+  it('en español la vista sigue diciendo exactamente lo mismo que antes', () => {
+    const view = playerViewDto(astrolabioDefinition, fullRun(), 0);
+    expect(view.position.city).toEqual({ id: 'madrid', name: 'Madrid', country: 'España' });
+    expect(view.objectives[0]?.description).toBe('Detener a Inés con orden válida');
+    expect(isPlayerViewDto(view)).toBe(true);
+  });
+});
+
 describe('objetivos en vivo de la vista del jugador', () => {
   it('al empezar, los dos objetivos están pendientes y la vista valida el contrato', () => {
     const view = playerViewDto(astrolabioDefinition, fullRun(), 0);

@@ -4,7 +4,7 @@
 // IA. La cronología NO se construye aquí (el motor no tiene acceso a los
 // registros de operaciones): `buildFinalReport` la deja vacía y la API la
 // rellena al proyectar una partida cerrada.
-import { evidenceText } from '@meridiano/case-schema';
+import { evidenceText, caseText, resolveMessage, type Language } from '@meridiano/case-schema';
 import { fixedSuspect, isFixedCase, ORIGINAL_OBJECT, ORIGINAL_OBJECT_LABEL } from './fixed-case.js';
 import { knowsEvidence } from './fixed-evidence.js';
 import { irregularActsForReport, misconductOf, IRREGULAR_SCORE_PENALTY } from './misconduct.js';
@@ -75,28 +75,28 @@ function keyEvidenceIds(def: CaseDefinition): string[] {
   return [...new Set([...combo, ...(recoveryEvidence ? [recoveryEvidence] : [])])];
 }
 
-function truthForDefinition(def: CaseDefinition): FinalReport['truth'] {
+function truthForDefinition(def: CaseDefinition, language: Language = 'es'): FinalReport['truth'] {
   const recovery = isFixedCase(def)
-    ? { objectId: ORIGINAL_OBJECT, label: ORIGINAL_OBJECT_LABEL }
+    ? { objectId: ORIGINAL_OBJECT, label: caseText(def.id, 'object.label', language) ?? ORIGINAL_OBJECT_LABEL }
     : def.mechanics?.recovery
-      ? { objectId: def.mechanics.recovery.objectId, label: def.mechanics.recovery.label }
+      ? { objectId: def.mechanics.recovery.objectId, label: caseText(def.id, 'object.label', language) ?? def.mechanics.recovery.label }
       : { objectId: null, label: null };
   return {
     culpritId: def.solution,
     culpritName: suspectName(def, def.solution),
     objectId: recovery.objectId,
     objectLabel: recovery.label,
-    keyEvidence: keyEvidenceIds(def).map(id => ({ id, text: evidenceText(id, def.texts) ?? id })),
+    keyEvidence: keyEvidenceIds(def).map(id => ({ id, text: evidenceText(id, def.texts, def.id, language) ?? id })),
   };
 }
 
 // ── Pruebas halladas y omitidas ──────────────────────────────────────────────
 
-function evidenceLists(def: CaseDefinition, run: CaseRun): Pick<FinalReport, 'evidenceFound' | 'evidenceMissed'> {
+function evidenceLists(def: CaseDefinition, run: CaseRun, language: Language = 'es'): Pick<FinalReport, 'evidenceFound' | 'evidenceMissed'> {
   const found: FinalReport['evidenceFound'] = [];
   const missed: FinalReport['evidenceMissed'] = [];
   for (const evidence of def.evidence) {
-    const entry = { id: evidence.id, text: evidenceText(evidence.id, def.texts) ?? evidence.id };
+    const entry = { id: evidence.id, text: evidenceText(evidence.id, def.texts, def.id, language) ?? evidence.id };
     if (knowsEvidence(run, evidence.id)) found.push(entry);
     else missed.push(entry);
   }
@@ -134,6 +134,7 @@ export function scoreForReport(
   run: CaseRun,
   achieved: string[],
   reason: FinalReport['reason'],
+  language: Language = 'es',
 ): FinalReport['score'] {
   const objectivesPoints = def.objectives.length === 0
     ? 0
@@ -159,31 +160,31 @@ export function scoreForReport(
     total,
     max: SCORE_MAX,
     breakdown: [
-      { label: 'Objetivos logrados', points: objectivesPoints },
-      { label: 'Pruebas halladas', points: evidencePoints },
-      { label: 'Detención correcta', points: detentionPoints },
-      { label: 'Detenciones erróneas', points: wrongPoints },
-      { label: 'Conducta irregular', points: irregularPoints },
-      { label: 'Tiempo restante', points: timePoints },
+      { label: resolveMessage(language, 'engine.report.scoreObjectives'), points: objectivesPoints },
+      { label: resolveMessage(language, 'engine.report.scoreEvidence'), points: evidencePoints },
+      { label: resolveMessage(language, 'engine.report.scoreDetention'), points: detentionPoints },
+      { label: resolveMessage(language, 'engine.report.scoreWrongDetentions'), points: wrongPoints },
+      { label: resolveMessage(language, 'engine.report.scoreIrregular'), points: irregularPoints },
+      { label: resolveMessage(language, 'engine.report.scoreTime'), points: timePoints },
     ],
   };
 }
 
-export function buildFinalReport(def: CaseDefinition, run: CaseRun, reason: FinalReport['reason']): FinalReport {
+export function buildFinalReport(def: CaseDefinition, run: CaseRun, reason: FinalReport['reason'], language: Language = 'es'): FinalReport {
   const achieved = liveObjectives(def, run);
   return {
     result: result(def, run, achieved),
     objectivesAchieved: achieved,
     reason,
     minute: run.minute,
-    truth: truthForDefinition(def),
+    truth: truthForDefinition(def, language),
     // La cronología vive en los registros de operaciones: la API la
     // rellena al proyectar una partida cerrada (ver `completeFinalReport`).
     timeline: [],
-    ...evidenceLists(def, run),
+    ...evidenceLists(def, run, language),
     detentions: detentionEntries(def, run),
-    irregularActs: irregularActsForReport(def, run),
-    score: scoreForReport(def, run, achieved, reason),
+    irregularActs: irregularActsForReport(def, run, language),
+    score: scoreForReport(def, run, achieved, reason, language),
   };
 }
 
@@ -221,12 +222,19 @@ function copyFinalReport(report: FinalReport): FinalReport {
  * informe guardado en el estado es el antiguo de 4 campos (partidas
  * cerradas antes de esta entrega), se reconstruye desde la definición y el
  * estado congelado de la partida — determinista, mismo resultado que al
- * cerrar — en vez de enseñar un informe incompleto. */
-export function completeFinalReport(def: CaseDefinition, run: CaseRun): FinalReport | null {
+ * cerrar — en vez de enseñar un informe incompleto. En un idioma distinto
+ * de español se reconstruye siempre en ese idioma (el guardado es español):
+ * la reconstrucción es determinista desde definición + estado, así que el
+ * contenido es el mismo que al cerrar, solo traducido. */
+export function completeFinalReport(def: CaseDefinition, run: CaseRun, language: Language = 'es'): FinalReport | null {
   if (run.status !== 'closed' || !run.finalReport) return null;
   // El informe guardado puede ser el antiguo de 4 campos: el tipo lo
   // declara completo, así que se comprueba en runtime sobre `unknown`.
   const stored: unknown = run.finalReport;
+  const rawReason = (stored as { reason?: unknown }).reason;
+  const storedReason = rawReason === 'deadline' ? 'deadline' as const
+    : rawReason === 'withdrawn' ? 'withdrawn' as const : 'finished' as const;
+  if (language !== 'es') return buildFinalReport(def, run, storedReason, language);
   if (isCompleteFinalReport(stored)) {
     const copied = copyFinalReport(stored);
     // Informes guardados antes de las acciones irregulares no traen la
@@ -236,6 +244,6 @@ export function completeFinalReport(def: CaseDefinition, run: CaseRun): FinalRep
     }
     return copied;
   }
-  const reason = (stored as { reason?: unknown }).reason === 'deadline' ? 'deadline' as const : 'finished' as const;
+  const reason = storedReason;
   return buildFinalReport(def, run, reason);
 }

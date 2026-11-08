@@ -1,5 +1,7 @@
 // Catálogo geográfico verificable para T5-02
 // SPEC-008: destinos culturales separados de pistas y buscador accesible
+import { resolveMessage } from './i18n.js';
+import type { Language } from './preferences.js';
 
 export interface GeographicCity {
   id: string;
@@ -99,6 +101,15 @@ export function getCity(id: string): GeographicCity | undefined {
 
 export function getRoute(fromCityId: string, toCityId: string): TravelRoute | undefined {
   return DEFAULT_TRAVEL_ROUTES.find(route => route.fromCityId === fromCityId && route.toCityId === toCityId);
+}
+
+/** Nombre de un país por su código ISO, en el idioma pedido
+ * (`engine.country.es/fr/pt`): el catálogo guarda el nombre español. */
+export function localizedCountryName(code: string, language: Language): string {
+  const key = 'engine.country.' + code.toLowerCase();
+  const resolved = resolveMessage(language, key);
+  // Código sin traducción conocida: mejor el código que la clave cruda.
+  return resolved === key ? code : resolved;
 }
 
 export function getReachableCities(fromCityId: string): GeographicCity[] {

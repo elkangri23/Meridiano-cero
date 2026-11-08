@@ -1,4 +1,4 @@
-import { isActionResponseDto, isCareerProfileDto, isCaseListDto, isPlayerViewDto, isSaveLoadResponseDto } from '@meridiano/contracts';
+import { createPreferenceStore, isActionResponseDto, isCareerProfileDto, isCaseListDto, isPlayerViewDto, isSaveLoadResponseDto } from '@meridiano/contracts';
 import type { ActionResponseDto, CareerProfileDto, CaseSummary, PlayerViewDto, PublicActionOffer, SaveLoadResponseDto, SessionDto } from '@meridiano/contracts';
 
 export interface GameApi {
@@ -52,8 +52,12 @@ async function boundedJson(response: Response): Promise<unknown> {
 }
 
 async function request(path: string, signal: AbortSignal, init: RequestInit = {}): Promise<Response> {
+  // El idioma viaja en cada llamada de juego: se lee del almacén en cada
+  // petición, para que el cambio en Ajustes aplique sin recargar.
+  const headers = new Headers(init.headers);
+  headers.set('x-meridiano-language', createPreferenceStore().load().language);
   try {
-    return await fetch(path, { ...init, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+    return await fetch(path, { ...init, headers, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
       signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]) });
   } catch { throw new GameError('unavailable'); }
 }

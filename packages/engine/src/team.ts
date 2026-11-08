@@ -9,7 +9,7 @@
 // el motor no la calcula. El texto libre de la pregunta nunca va en el
 // registro (T2): solo el servicio, el objetivo y el minuto.
 import type { CaseDefinition, CaseRun, TeamMemberId, TeamRecord, TeamServiceId } from '@meridiano/case-schema';
-import { isTeamMemberId, isTeamServiceId } from '@meridiano/case-schema';
+import { isTeamMemberId, isTeamServiceId, resolveMessage, type Language } from '@meridiano/case-schema';
 import type { ActionResult } from './types.js';
 
 export type TeamParams = {
@@ -92,8 +92,8 @@ function teamRequestRecord(run: CaseRun, params: TeamParams): string {
     `${params.targetId !== undefined ? ':' + params.targetId : ''}@${run.minute}`;
 }
 
-export function submitTeam(_def: CaseDefinition, run: CaseRun, params: Record<string, unknown>): ActionResult {
-  const refuse = (): ActionResult => ({ status: 'impossible', run, events: [], reason: 'Petición al equipo no disponible.' });
+export function submitTeam(_def: CaseDefinition, run: CaseRun, params: Record<string, unknown>, language: Language = 'es'): ActionResult {
+  const refuse = (): ActionResult => ({ status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.teamUnavailable') });
   if (!isTeamParams(params)) return refuse();
   // Richter solo explica análisis ya completados: no se puede pedir que
   // explique un resultado que aún no existe.

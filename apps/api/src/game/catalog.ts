@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { validateCaseDefinition } from '@meridiano/case-schema';
-import { deadlineMinutesForDifficulty, type Difficulty } from '@meridiano/case-schema';
+import { caseText, deadlineMinutesForDifficulty, type Difficulty, type Language } from '@meridiano/case-schema';
 import type { CaseDefinition } from '@meridiano/case-schema';
 import type { CaseSummary } from '@meridiano/contracts';
 import type { ContentRating, CrimeType, ExplorationMode } from '@meridiano/contracts';
@@ -93,29 +93,36 @@ export async function definitionForRun(db: Orm, definitionId: string, difficulty
  * astrolabio desapareció durante el traslado. Los expedientes generados
  * traen su propia intro en la definición (`briefing`).
  */
-export function briefingForDefinition(definition: CaseDefinition): { speaker: string; title: string; paragraphs: string[] } | null {
-  if (definition.briefing) return { ...definition.briefing, paragraphs: [...definition.briefing.paragraphs] };
+export function briefingForDefinition(definition: CaseDefinition, language: Language = 'es'): { speaker: string; title: string; paragraphs: string[] } | null {
+  if (definition.briefing) {
+    return {
+      ...definition.briefing,
+      title: caseText(definition.id, 'briefing.title', language) ?? definition.briefing.title,
+      paragraphs: definition.briefing.paragraphs.map((paragraph, index) =>
+        caseText(definition.id, 'briefing.p' + index, language) ?? paragraph),
+    };
+  }
   if (definition.id !== astrolabioDefinition.id) return null;
   return {
     speaker: 'Margaret Sullivan',
-    title: 'El astrolabio de las tres ciudades',
+    title: caseText(definition.id, 'briefing.title', language) ?? 'El astrolabio de las tres ciudades',
     paragraphs: [
-      'Un astrolabio de la exposición del Instituto Horizonte, en Madrid, ha desaparecido durante su traslado. La pieza estaba en la sala de embalaje y ya no está. Eres detective de la agencia internacional A.C.M.E. y el caso es tuyo.',
-      'Empiezas en la sala de embalaje de Madrid, donde se preparó el envío. Habla con quien estaba allí, inspecciona la sala y sigue el rastro: el caso puede llevarte a París y a Lisboa si las pruebas te llevan hasta allí.',
-      'Tu trabajo es averiguar quién se llevó el astrolabio, reunir pruebas que lo demuestren y recuperar la pieza original. Para detener a alguien necesitarás una orden válida. El reloj del caso marca tu plazo: cuando se agote, la investigación se cierra.',
+      caseText(definition.id, 'briefing.p0', language) ?? 'Un astrolabio de la exposición del Instituto Horizonte, en Madrid, ha desaparecido durante su traslado. La pieza estaba en la sala de embalaje y ya no está. Eres detective de la agencia internacional A.C.M.E. y el caso es tuyo.',
+      caseText(definition.id, 'briefing.p1', language) ?? 'Empiezas en la sala de embalaje de Madrid, donde se preparó el envío. Habla con quien estaba allí, inspecciona la sala y sigue el rastro: el caso puede llevarte a París y a Lisboa si las pruebas te llevan hasta allí.',
+      caseText(definition.id, 'briefing.p2', language) ?? 'Tu trabajo es averiguar quién se llevó el astrolabio, reunir pruebas que lo demuestren y recuperar la pieza original. Para detener a alguien necesitarás una orden válida. El reloj del caso marca tu plazo: cuando se agote, la investigación se cierra.',
     ],
   };
 }
 
-export async function caseBriefing(db: Orm, caseId: string): Promise<{ speaker: string; title: string; paragraphs: string[] } | null> {
-  return briefingForDefinition(await findCase(db, caseId));
+export async function caseBriefing(db: Orm, caseId: string, language: Language = 'es'): Promise<{ speaker: string; title: string; paragraphs: string[] } | null> {
+  return briefingForDefinition(await findCase(db, caseId), language);
 }
 
-export function caseSummaryFor(definition: CaseDefinition, ownedByMe = false): CaseSummary {
+export function caseSummaryFor(definition: CaseDefinition, ownedByMe = false, language: Language = 'es'): CaseSummary {
   const meta = metaForDefinition(definition);
   return {
     caseId: definition.id,
-    title: definition.briefing?.title ?? 'El astrolabio de las tres ciudades',
+    title: caseText(definition.id, 'briefing.title', language) ?? definition.briefing?.title ?? 'El astrolabio de las tres ciudades',
     contentMode: definition.contentMode,
     crimeType: meta.crimeType,
     contentRating: meta.contentRating,
@@ -128,22 +135,22 @@ export function caseSummaryFor(definition: CaseDefinition, ownedByMe = false): C
   };
 }
 
-export async function caseSummary(db: Orm, caseId: string, ownerId?: string): Promise<CaseSummary> {
+export async function caseSummary(db: Orm, caseId: string, ownerId?: string, language: Language = 'es'): Promise<CaseSummary> {
   const definition = await findCase(db, caseId);
-  if (caseId === astrolabioDefinition.id || ownerId === undefined) return caseSummaryFor(definition, false);
+  if (caseId === astrolabioDefinition.id || ownerId === undefined) return caseSummaryFor(definition, false, language);
   const rows = await db.select({ createdBy: generatedCases.createdBy }).from(generatedCases)
     .where(eq(generatedCases.caseId, caseId)).limit(1);
-  return caseSummaryFor(definition, rows[0]?.createdBy === ownerId);
+  return caseSummaryFor(definition, rows[0]?.createdBy === ownerId, language);
 }
 
-export async function listCases(db: Orm, ownerId?: string): Promise<CaseSummary[]> {
-  const items = [caseSummaryFor(structuredClone(astrolabioDefinition))];
+export async function listCases(db: Orm, ownerId?: string, language: Language = 'es'): Promise<CaseSummary[]> {
+  const items = [caseSummaryFor(structuredClone(astrolabioDefinition), false, language)];
   const rows = await db.select().from(generatedCases).orderBy(generatedCases.createdAt);
   for (const row of rows) {
     if (typeof row.definition !== 'object' || row.definition === null) continue;
     const definition = row.definition as unknown as CaseDefinition;
     if (definition.id !== row.caseId || validateCaseDefinition(definition).valid === false) continue;
-    items.push(caseSummaryFor(structuredClone(definition), ownerId !== undefined && row.createdBy === ownerId));
+    items.push(caseSummaryFor(structuredClone(definition), ownerId !== undefined && row.createdBy === ownerId, language));
   }
   return items;
 }

@@ -1,9 +1,9 @@
 // Proyección general de partida (Fase A): construye PlayerViewDto y eventos
 // públicos a partir de la definición del caso y el estado del motor.
 // No serializa nunca EngineEvent.payload ni CaseRun internos.
-import type { CaseDefinition, CaseRun, FinalReport } from '@meridiano/case-schema';
-import { evidenceText, REMOTE_CHANNEL_LABELS, teamMember, GEOGRAPHIC_CATALOG, getCity, touristInfoFor, visitCityId, visitLocationName } from '@meridiano/case-schema';
-import { isPublicBatchStep, type AtlasCityDto, type CommunicationRecordDto, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
+import type { CaseDefinition, CaseRun, FinalReport, Language } from '@meridiano/case-schema';
+import { caseText, evidenceText, isRemoteChannel, localizedCountryName, remoteChannelInSentence, teamMember, GEOGRAPHIC_CATALOG, getCity, touristInfoFor, visitCityId, visitLocationName } from '@meridiano/case-schema';
+import { isPublicBatchStep, resolveMessage, type AtlasCityDto, type CommunicationRecordDto, type PlayerViewDto, type PublicEvent } from '@meridiano/contracts';
 import { availableOffers, completeFinalReport, ENGINE_VERSION, liveObjectives, visibleCaseCityIds, type EngineEvent } from '@meridiano/engine';
 import { RunStoreError, type StoredRun } from './runs.ts';
 import { briefingForDefinition, metaForDefinition } from './catalog.ts';
@@ -11,8 +11,8 @@ import { npcChatForDefinition } from './npc-chat.ts';
 
 type FullRun = StoredRun & CaseRun;
 
-export function publicFinalReport(definition: CaseDefinition, run: CaseRun, timeline: PublicEvent[] = []): FinalReport | null {
-  const report = completeFinalReport(definition, run);
+export function publicFinalReport(definition: CaseDefinition, run: CaseRun, timeline: PublicEvent[] = [], language: Language = 'es'): FinalReport | null {
+  const report = completeFinalReport(definition, run, language);
   if (!report) return null;
   // La cronología no vive en el estado del motor: la API la reconstruye
   // desde los registros de operaciones al proyectar una partida cerrada.
@@ -82,7 +82,7 @@ function visibleCitiesFor(definition: CaseDefinition, run: FullRun): CaseDefinit
  * turístico/cultural— y si el jugador ya las conoce. Los destinos
  * turísticos son información pública del atlas y siempre se listan; una
  * ciudad del expediente no descubierta en modo libre no se lista. */
-export function atlasFor(definition: CaseDefinition, run: CaseRun): AtlasCityDto[] {
+export function atlasFor(definition: CaseDefinition, run: CaseRun, language: Language = 'es'): AtlasCityDto[] {
   const visible = new Set(visibleCaseCityIds(definition, run));
   const caseIds = new Set(definition.cities.map(city => city.id));
   return GEOGRAPHIC_CATALOG.map(city => {
@@ -93,8 +93,9 @@ export function atlasFor(definition: CaseDefinition, run: CaseRun): AtlasCityDto
       name: defCity?.name ?? city.name,
       // El atlas enseña el nombre completo del país en todas sus ciudades:
       // el expediente usa códigos ISO ('FR') y mezclarlos con nombres
-      // ('España') en la misma lista se leía mal.
-      country: city.countryName,
+      // ('España') en la misma lista se leía mal. En el idioma del
+      // jugador: el nombre localizado del país, no el código.
+      country: localizedCountryName(city.country, language),
       kind: isCase ? 'case' as const : 'tourist' as const,
       discovered: isCase ? visible.has(city.id) : true,
     };
@@ -102,34 +103,43 @@ export function atlasFor(definition: CaseDefinition, run: CaseRun): AtlasCityDto
 }
 
 /** Ciudad pública de la posición: del expediente si es del caso, del
- * catálogo si es una admitida fuera de él. El país es el del expediente
- * para una ciudad del caso y el nombre completo del catálogo para una
- * turística (el código 'ES' no coincide con el atlas y el validador
- * rechazaría la vista). */
-function positionCity(definition: CaseDefinition, run: FullRun): PlayerViewDto['position']['city'] {
+ * catálogo si es una admitida fuera de él. El país es el nombre
+ * localizado (no el código 'ES' del expediente): la lista de ciudades y
+ * el atlas enseñan el mismo nombre, y el validador exige que la posición
+ * coincida con una de las dos. */
+function positionCity(definition: CaseDefinition, run: FullRun, language: Language = 'es'): PlayerViewDto['position']['city'] {
   const caseCity = definition.cities.find(item => item.id === run.position.cityId);
   const geoCity = caseCity ?? getCity(run.position.cityId);
   if (!geoCity) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-  const geo = getCity(geoCity.id);
-  return { id: geoCity.id, name: geoCity.name, country: caseCity?.country ?? geo?.countryName ?? geoCity.country };
+  return { id: geoCity.id, name: geoCity.name, country: localizedCountryName(geoCity.country, language) };
+}
+
+/** Nombre y descripción públicos de un lugar, en el idioma del jugador (la
+ * traducción tiene prioridad; la definición española es el fallback). */
+export function localizedLocation(definition: CaseDefinition, location: { id: string; name: string; description: string }, language: Language = 'es'): { id: string; name: string; description: string } {
+  return { id: location.id, name: caseText(definition.id, 'location.' + location.id + '.name', language) ?? location.name, description: caseText(definition.id, 'location.' + location.id + '.description', language) ?? location.description };
 }
 
 /** Posición pública de la partida: ciudad y lugar. En una ciudad admitida
  * fuera del expediente el lugar es sintético (`visit:<ciudad>`) y se
  * proyecta con la información turística del catálogo; no es un escenario
  * investigable, así que no se busca en la definición. */
-function publicPosition(definition: CaseDefinition, run: FullRun): PlayerViewDto['position'] {
-  const city = positionCity(definition, run);
+function publicPosition(definition: CaseDefinition, run: FullRun, language: Language = 'es'): PlayerViewDto['position'] {
+  const city = positionCity(definition, run, language);
   const visitCity = visitCityId(run.position.locationId);
-  if (visitCity) {
-    const geo = getCity(visitCity);
-    if (!geo || geo.id !== city.id) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-    const info = touristInfoFor(geo.id);
-    return { city, location: { id: run.position.locationId, name: visitLocationName(geo), description: info?.summary ?? '' } };
-  }
+  if (visitCity) return visitPosition(run, city, visitCity, language);
   const location = definition.locations.find(item => item.id === run.position.locationId);
   if (!location || location.cityId !== city.id) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-  return { city, location: { id: location.id, name: location.name, description: location.description } };
+  return { city, location: localizedLocation(definition, location, language) };
+}
+
+/** Posición en una ciudad turística visitada: lugar sintético con el nombre
+ * de la visita y el resumen turístico, sin ofertas de investigación. */
+function visitPosition(run: FullRun, city: PlayerViewDto['position']['city'], visitCity: string, language: Language): PlayerViewDto['position'] {
+  const geo = getCity(visitCity);
+  if (!geo || geo.id !== city.id) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
+  const info = touristInfoFor(geo.id, language);
+  return { city, location: { id: run.position.locationId, name: visitLocationName(geo, language), description: info?.summary ?? '' } };
 }
 
 /** Evidencias reveladas por un análisis del laboratorio, en orden de
@@ -149,9 +159,9 @@ function analysisResultsOf(run: FullRun): string[] {
  * `officialResult` es el resultado oficial de este contenido para el
  * perfil (DEC-020): null si aún no hay cierre oficial; lo carga quien
  * llama desde `official_results`, porque la vista es síncrona. */
-export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number, timeline: PublicEvent[] = [], officialResult: PlayerViewDto['officialResult'] = null): PlayerViewDto {
+export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCount: number, timeline: PublicEvent[] = [], officialResult: PlayerViewDto['officialResult'] = null, language: Language = 'es'): PlayerViewDto {
   if (run.engineVersion !== ENGINE_VERSION) throw new RunStoreError('DEPENDENCY_UNAVAILABLE');
-  const position = publicPosition(definition, run);
+  const position = publicPosition(definition, run, language);
 
   const visibleCities = visibleCitiesFor(definition, run);
   // Objetivos en vivo (lote 2): la misma evaluación que el informe final,
@@ -161,7 +171,7 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
   const discoveredIds = new Set(run.discoveries);
   const locations = definition.locations
     .filter(item => item.id === position.location.id || discoveredIds.has(item.id))
-    .map(item => ({ id: item.id, name: item.name, description: item.description }));
+    .map(item => localizedLocation(definition, item, language));
   const objects = viewObjects(definition, run);
 
   return {
@@ -183,8 +193,8 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     // que `createInitialRun` usa al crear la partida): el resumen al
     // retomar la siembra como visitada.
     initialCityId: definition.cities[0]?.id ?? '',
-    cities: visibleCities.map(item => ({ id: item.id, name: item.name, country: item.country })),
-    atlas: atlasFor(definition, run),
+    cities: visibleCities.map(item => ({ id: item.id, name: item.name, country: localizedCountryName(item.country, language) })),
+    atlas: atlasFor(definition, run, language),
     locations,
     objects,
     dossier: [...run.discoveries],
@@ -201,12 +211,12 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     // Datos de charla libre de cada personaje del expediente: sin ellos la
     // web solo conocía el catálogo fijo y un NPC generado llegaba al
     // director sin hechos ni persona.
-    npcChat: npcChatForDefinition(definition, run),
+    npcChat: npcChatForDefinition(definition, run, language),
     // Textos legibles de las evidencias del expediente, por id: sin ellos
     // la web traducía los hallazgos con el catálogo fijo y el dossier de
     // un expediente generado enseñaba los textos del astrolabio.
     evidenceTexts: Object.fromEntries(definition.evidence.flatMap(evidence => {
-      const text = evidenceText(evidence.id, definition.texts);
+      const text = evidenceText(evidence.id, definition.texts, definition.id, language);
       return text ? [[evidence.id, text]] : [];
     })),
     analysisResults: analysisResultsOf(run),
@@ -222,15 +232,15 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
     warrants: [...run.warrants],
     detentions: [...run.detentions],
     batch: batchSteps(run.pendingBatch),
-    finalReport: publicFinalReport(definition, run, timeline),
+    finalReport: publicFinalReport(definition, run, timeline, language),
     officialResult,
     objectives: definition.objectives.map(objective => ({
       id: objective.id,
-      description: objective.description,
+      description: caseText(definition.id, 'objective.' + objective.id, language) ?? objective.description,
       achieved: achievedObjectives.has(objective.id),
     })),
-    offers: availableOffers(definition, run),
-    briefing: briefingForDefinition(definition),
+    offers: availableOffers(definition, run, language),
+    briefing: briefingForDefinition(definition, language),
     caseMeta: metaForDefinition(definition),
     saveCapabilities: {
       manualLimit: 10,
@@ -247,130 +257,126 @@ export function playerViewDto(definition: CaseDefinition, run: FullRun, manualCo
 // lugares, NPC y evidencias descubiertas) y magnitudes. El payload del motor no
 // se serializa: contiene factIds, reglas internas y resultados no autorizados.
 /** Verbo del acto irregular en la cronología, según su tipo. */
-function irregularKindLabel(kind: string): string {
-  if (kind === 'force_entry') return 'Forzaste el acceso a';
-  if (kind === 'bribe') return 'Sobornaste a';
-  if (kind === 'impersonate') return 'Suplantaste a alguien hablando con';
-  return 'Acción irregular contra';
+function irregularKindLabel(kind: string, language: Language): string {
+  if (kind === 'force_entry') return resolveMessage(language, 'engine.event.irregularForce');
+  if (kind === 'bribe') return resolveMessage(language, 'engine.event.irregularBribe');
+  if (kind === 'impersonate') return resolveMessage(language, 'engine.event.irregularImpersonate');
+  return resolveMessage(language, 'engine.event.irregularUnknown');
 }
 
 /** Objetivo del acto por su nombre conocido (personaje o lugar), sin IDs. */
-function irregularTarget(definition: CaseDefinition, targetId: string): string {
+function irregularTarget(definition: CaseDefinition, targetId: string, language: Language): string {
   return definition.npcs.find(item => item.id === targetId)?.name
+    ?? caseText(definition.id, 'location.' + targetId + '.name', language)
     ?? definition.locations.find(item => item.id === targetId)?.name ?? targetId;
 }
 
 type EventPayload = Record<string, unknown>;
-type EventNamer = (definition: CaseDefinition, payload: EventPayload) => string;
+type EventNamer = (definition: CaseDefinition, payload: EventPayload, language: Language) => string;
 const eventSummaries: Record<string, EventNamer> = {
-  inspect: (definition, payload) => {
+  inspect: (definition, payload, language) => {
     const target = payload.targetId;
     const location = definition.locations.find(item => item.id === target)?.name ?? String(target ?? '');
-    return typeof payload.elementId === 'string'
-      ? 'Inspección de ' + payload.elementId + ' en ' + location + '.'
-      : 'Inspección en ' + location + '.';
+    if (typeof payload.elementId === 'string') {
+      const element = caseText(definition.id, 'inspect.' + String(target ?? '') + '.' + payload.elementId, language) ?? payload.elementId;
+      return resolveMessage(language, 'engine.event.inspectElement', { element, location });
+    }
+    return resolveMessage(language, 'engine.event.inspect', { location });
   },
-  collect: (definition, payload) => {
+  collect: (definition, payload, language) => {
     // El hallazgo se narra con su texto, nunca con el ID crudo (antes:
     // «Objeto EV-01 recogido.»). Sin texto, se mantiene el resumen anterior.
     // Con los textos del expediente, un generado también narra su texto.
     const id = String(payload.evidenceId ?? '');
-    const text = evidenceText(id, definition.texts);
-    return text ? 'Recogido: ' + text : 'Objeto ' + id + ' recogido.';
+    const text = evidenceText(id, definition.texts, definition.id, language);
+    return text ? resolveMessage(language, 'engine.event.collect', { text }) : resolveMessage(language, 'engine.event.collectFallback', { id });
   },
-  talk: (definition, payload) => {
+  talk: (definition, payload, language) => {
     const npc = definition.npcs.find(item => item.id === payload.npcId)?.name ?? String(payload.npcId ?? '');
-    return 'Conversación con ' + npc + '.';
+    return resolveMessage(language, 'engine.event.talk', { name: npc });
   },
-  communicate: (definition, payload) => {
+  communicate: (definition, payload, language) => {
     // El envío queda en la cronología con su destinatario y su canal; el
     // texto libre no se narra (T2) y el documento se nombra por su texto,
     // nunca por el ID crudo.
     const npc = definition.npcs.find(item => item.id === payload.recipientId)?.name ?? String(payload.recipientId ?? '');
-    const channel = typeof payload.channel === 'string'
-      ? (REMOTE_CHANNEL_LABELS as Record<string, string>)[payload.channel] ?? payload.channel
-      : '';
-    const what = typeof payload.documentId === 'string'
-      ? 'Documento enviado a ' + npc
-      : 'Mensaje enviado a ' + npc;
-    return channel ? what + ' por ' + channel + '.' : what + '.';
+    const channel = typeof payload.channel === 'string' && isRemoteChannel(payload.channel)
+      ? remoteChannelInSentence(payload.channel, language) : '';
+    const key = typeof payload.documentId === 'string'
+      ? (channel ? 'engine.event.communicateDocumentChannel' : 'engine.event.communicateDocument')
+      : (channel ? 'engine.event.communicateMessageChannel' : 'engine.event.communicateMessage');
+    return resolveMessage(language, key, { name: npc, channel });
   },
-  request_warrant: (definition, payload) => {
+  request_warrant: (definition, payload, language) => {
     // Antes no tenía resumen propio y caía en el genérico «La investigación
     // avanza.»: el jugador no sabía ni qué había pedido.
     const npc = definition.npcs.find(item => item.id === payload.suspectId)?.name ?? String(payload.suspectId ?? '');
-    return 'Solicitud de orden contra ' + npc + '.';
+    return resolveMessage(language, 'engine.event.warrantRequested', { name: npc });
   },
-  request_matured: (_definition, payload) => payload.type === 'warrant'
-    ? 'Orden concedida.'
-    : 'Una solicitud ha dado resultado.',
-  travel: (definition, payload) => {
+  request_matured: (_definition, payload, language) => payload.type === 'warrant'
+    ? resolveMessage(language, 'engine.event.warrantGranted')
+    : resolveMessage(language, 'engine.event.requestMatured'),
+  travel: (definition, payload, language) => {
     const city = definition.cities.find(item => item.id === payload.toCityId)?.name
       ?? getCity(String(payload.toCityId ?? ''))?.name ?? String(payload.toCityId ?? '');
-    return 'Viaje a ' + city + '.';
+    return resolveMessage(language, 'engine.event.travel', { city });
   },
-  travel_interrupted: (definition, payload) => {
+  travel_interrupted: (definition, payload, language) => {
     const city = definition.cities.find(item => item.id === payload.toCityId)?.name
       ?? getCity(String(payload.toCityId ?? ''))?.name ?? String(payload.toCityId ?? '');
-    return 'Viaje a ' + city + ' interrumpido.';
+    return resolveMessage(language, 'engine.event.travelInterrupted', { city });
   },
-  wait: (_definition, payload) => 'Espera de ' + String(payload.minutes ?? '') + ' minutos.',
-  action_interrupted: () => 'Acción interrumpida por el plazo.',
-  request_submitted: () => 'Solicitud enviada; el resultado llegará a su hora.',
-  warrant_denied: () => 'Una orden solicitada ha sido denegada.',
-  detain: (definition, payload) => {
+  wait: (_definition, payload, language) => resolveMessage(language, 'engine.event.wait', { minutes: String(payload.minutes ?? '') }),
+  action_interrupted: (_definition, _payload, language) => resolveMessage(language, 'engine.event.actionInterrupted'),
+  request_submitted: (_definition, _payload, language) => resolveMessage(language, 'engine.event.requestSubmitted'),
+  warrant_denied: (_definition, _payload, language) => resolveMessage(language, 'engine.event.warrantDenied'),
+  detain: (definition, payload, language) => {
     const npc = definition.npcs.find(item => item.id === payload.suspectId)?.name ?? String(payload.suspectId ?? '');
     // La automática la ejecutan las autoridades (GDD §12): el resumen lo
     // dice, para que el jugador entienda quién detuvo y por qué no viajó.
     return payload.mode === 'automatic'
-      ? `Las autoridades han detenido a ${npc} por orden de A.C.M.E.`
-      : 'Detención de ' + npc + '.';
+      ? resolveMessage(language, 'engine.event.detainAutomatic', { name: npc })
+      : resolveMessage(language, 'engine.event.detain', { name: npc });
   },
-  irregular: (definition, payload) => {
+  irregular: (definition, payload, language) => {
     // El acto queda en la cronología con su tipo y su objetivo; si te
     // vieron, se dice (la advertencia está en el dossier). Sin spoilers:
     // solo nombres que el jugador ya conoce.
-    const kindLabel = irregularKindLabel(String(payload.kind ?? ''));
-    const target = irregularTarget(definition, String(payload.targetId ?? ''));
+    const kindLabel = irregularKindLabel(String(payload.kind ?? ''), language);
+    const target = irregularTarget(definition, String(payload.targetId ?? ''), language);
     const seen = Array.isArray(payload.seenBy) && payload.seenBy.length > 0;
-    return `${kindLabel} ${target}.` + (seen ? ' Te han visto.' : ' Nadie te ha visto.');
+    return resolveMessage(language, seen ? 'engine.event.irregularSeen' : 'engine.event.irregularUnseen', { label: kindLabel, target });
   },
-  case_withdrawn: () => 'A.C.M.E. ha retirado el caso por tu conducta.',
-  team: (_definition, payload) => {
+  case_withdrawn: (_definition, _payload, language) => resolveMessage(language, 'engine.event.withdrawn'),
+  team: (_definition, payload, language) => {
     // Petición al equipo (GDD §8): quién y qué servicio, sin el texto
     // libre de la pregunta (T2). Solo nombres que el jugador ya conoce.
     const member = teamMember(String(payload.memberId ?? ''));
     const name = member?.name ?? String(payload.memberId ?? '');
     const service = String(payload.serviceId ?? '');
-    const what: Record<string, string> = {
-      briefing: 'sobre el encargo',
-      evaluate: 'que evaluara tu carrera',
-      explain: 'que te explicara un análisis',
-      lookup: 'en inteligencia',
-      routes: 'por las rutas de viaje',
-      organize: 'que organizara el expediente',
-    };
-    return `Pediste ayuda a ${name}${what[service] ? ' ' + what[service] : ''}.`;
+    const serviceLabel = resolveMessage(language, 'engine.event.team.' + service);
+    if (serviceLabel === 'engine.event.team.' + service) return resolveMessage(language, 'engine.event.teamBaseNoService', { name });
+    return resolveMessage(language, 'engine.event.teamBase', { name, service: serviceLabel });
   },
-  recover: () => 'Objeto original recuperado.',
-  finish: () => 'La investigación ha concluido.',
-  batch_paused: () => 'Lote en pausa: un paso no se pudo aplicar.',
-  batch_step_skipped: () => 'Paso de lote omitido por dependencia no aplicada.',
-  batch_completed: () => 'Lote completado.',
-  batch_cancelled: () => 'Lote cancelado.',
+  recover: (_definition, _payload, language) => resolveMessage(language, 'engine.event.recover'),
+  finish: (_definition, _payload, language) => resolveMessage(language, 'engine.event.finish'),
+  batch_paused: (_definition, _payload, language) => resolveMessage(language, 'engine.event.batchPaused'),
+  batch_step_skipped: (_definition, _payload, language) => resolveMessage(language, 'engine.event.batchSkipped'),
+  batch_completed: (_definition, _payload, language) => resolveMessage(language, 'engine.event.batchCompleted'),
+  batch_cancelled: (_definition, _payload, language) => resolveMessage(language, 'engine.event.batchCancelled'),
 };
 
-function eventSummary(definition: CaseDefinition, event: EngineEvent): string {
+function eventSummary(definition: CaseDefinition, event: EngineEvent, language: Language = 'es'): string {
   const summarizer = eventSummaries[event.type];
-  return summarizer ? summarizer(definition, event.payload as EventPayload) : 'La investigación avanza.';
+  return summarizer ? summarizer(definition, event.payload as EventPayload, language) : resolveMessage(language, 'engine.event.fallback');
 }
 
-export function projectEvents(definition: CaseDefinition, events: EngineEvent[]): PublicEvent[] {
+export function projectEvents(definition: CaseDefinition, events: EngineEvent[], language: Language = 'es'): PublicEvent[] {
   return events.map(event => ({
     id: 'evt-' + event.ordinal,
     sequence: event.ordinal,
     minute: event.minute,
     type: event.type,
-    summary: eventSummary(definition, event),
+    summary: eventSummary(definition, event, language),
   }));
 }

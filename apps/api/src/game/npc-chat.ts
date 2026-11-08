@@ -4,8 +4,8 @@
 // al director sin hechos ni persona y cada pregunta salía como
 // «He registrado tu consulta.». La vista del jugador lleva ahora estos
 // datos, construidos aquí desde la definición del caso en curso.
-import type { CaseDefinition, CaseRun, NPC } from '@meridiano/case-schema';
-import { channelsForNpc, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal } from '@meridiano/case-schema';
+import type { CaseDefinition, CaseRun, Language, NPC } from '@meridiano/case-schema';
+import { caseText, channelsForNpc, getNPC, npcGreeting, npcKnowledgeFacts, npcRefusal, resolveMessage } from '@meridiano/case-schema';
 import type { NpcChatEntry } from '@meridiano/contracts';
 import { misconductFactsForNpc, arrestFactsForNpc } from '@meridiano/engine';
 
@@ -18,23 +18,23 @@ import { misconductFactsForNpc, arrestFactsForNpc } from '@meridiano/engine';
  * trae un hecho `identity`, no se duplica. En el caso fijo no se añade:
  * la identidad de Inés ya la cubre su hecho `truth` y su respuesta debe
  * seguir siendo esa, no una frase sintética. */
-function identityFact(npc: NPC): { id: string; text: string } {
-  return { id: 'identity', text: npc.role ? `Soy ${npc.name}, ${npc.role}.` : `Soy ${npc.name}.` };
+function identityFact(definition: CaseDefinition, npc: NPC, language: Language): { id: string; text: string } {
+  const role = caseText(definition.id, 'npc.' + npc.id + '.role', language) ?? npc.role;
+  return { id: 'identity', text: role ? resolveMessage(language, 'engine.npc.identity', { name: npc.name, role }) : resolveMessage(language, 'engine.npc.identityNoRole', { name: npc.name }) };
 }
 
-function generatedEntry(definition: CaseDefinition, npc: NPC, texts: NonNullable<CaseDefinition['texts']>): NpcChatEntry {
-  const knowledge = npc.knowledge.flatMap(id => {
-    const text = texts.knowledge[id];
-    return text ? [{ id, text }] : [];
-  });
-  const greeting = texts.greetings[npc.id];
-  const refusal = texts.refusals?.[npc.id];
+function generatedEntry(definition: CaseDefinition, npc: NPC, texts: NonNullable<CaseDefinition['texts']>, language: Language): NpcChatEntry {
+  const knowledge = npcKnowledgeFacts(npc.id, texts, npc.knowledge, definition.id, language);
+  const greeting = npcGreeting(npc.id, texts, definition.id, language);
+  const refusal = npcRefusal(npc.id, texts, definition.id, language);
+  const role = caseText(definition.id, 'npc.' + npc.id + '.role', language) ?? npc.role;
+  const persona = caseText(definition.id, 'npc.' + npc.id + '.persona', language) ?? npc.persona ?? '';
   return {
     id: npc.id,
     name: npc.name,
-    ...(npc.role ? { role: npc.role } : {}),
-    persona: npc.persona ?? '',
-    knowledge: npc.knowledge.includes('identity') ? knowledge : [identityFact(npc), ...knowledge],
+    ...(role ? { role } : {}),
+    persona,
+    knowledge: npc.knowledge.includes('identity') ? knowledge : [identityFact(definition, npc, language), ...knowledge],
     ...(greeting ? { greeting } : {}),
     ...(refusal ? { refusal } : {}),
     // Canales remotos de la central (GDD §10): los de la definición del
@@ -43,22 +43,32 @@ function generatedEntry(definition: CaseDefinition, npc: NPC, texts: NonNullable
   };
 }
 
-function fixedEntry(definition: CaseDefinition, npc: NPC): NpcChatEntry {
+function fixedEntry(definition: CaseDefinition, npc: NPC, language: Language): NpcChatEntry {
   const profile = getNPC(npc.id);
-  const greeting = npcGreeting(npc.id);
-  const refusal = npcRefusal(npc.id);
+  const greeting = npcGreeting(npc.id, undefined, definition.id, language);
+  const refusal = npcRefusal(npc.id, undefined, definition.id, language);
+  const { role, persona } = npcRolePersona(definition, npc, language);
   return {
     id: npc.id,
     name: profile?.name ?? npc.name,
-    ...(profile ? { role: profile.role } : {}),
-    persona: profile?.persona ?? '',
-    knowledge: npcKnowledgeFacts(npc.id),
+    ...(role ? { role } : {}),
+    persona,
+    knowledge: npcKnowledgeFacts(npc.id, undefined, undefined, definition.id, language),
     ...(greeting ? { greeting } : {}),
     ...(refusal ? { refusal } : {}),
     // Canales remotos de la central (GDD §10): los de la definición del
     // personaje o, si no los trae, los del catálogo fijo.
     channels: channelsForNpc(definition, npc),
   };
+}
+
+/** Rol y persona de un personaje del caso fijo, en el idioma del jugador
+ * (la traducción tiene prioridad; el catálogo fijo es el fallback). */
+function npcRolePersona(definition: CaseDefinition, npc: NPC, language: Language): { role?: string; persona: string } {
+  const profile = getNPC(npc.id);
+  const role = caseText(definition.id, 'npc.' + npc.id + '.role', language) ?? profile?.role;
+  const persona = caseText(definition.id, 'npc.' + npc.id + '.persona', language) ?? profile?.persona ?? '';
+  return { ...(role ? { role } : {}), persona };
 }
 
 /** Datos de conversación de cada personaje del expediente, en el orden de
@@ -69,15 +79,15 @@ function fixedEntry(definition: CaseDefinition, npc: NPC): NpcChatEntry {
  * (lo que vio detener o su propia detención, GDD §12): el director los
  * usa si el jugador pregunta por ello, sin inventar nada. Sin partida no
  * hay hechos de conducta (la vista inicial no tiene actos que contar). */
-export function npcChatForDefinition(definition: CaseDefinition, run?: CaseRun): NpcChatEntry[] {
+export function npcChatForDefinition(definition: CaseDefinition, run?: CaseRun, language: Language = 'es'): NpcChatEntry[] {
   return definition.npcs.map(npc => {
-    const entry = definition.texts ? generatedEntry(definition, npc, definition.texts) : fixedEntry(definition, npc);
+    const entry = definition.texts ? generatedEntry(definition, npc, definition.texts, language) : fixedEntry(definition, npc, language);
     if (!run) return entry;
     // El validador de la vista admite 16 hechos por personaje: los de
     // conducta y detención se añaden solo si caben, sin desplazar el
     // conocimiento. La detención va primero: es un hecho del caso, no un
     // acto del jugador.
-    const extra = [...arrestFactsForNpc(definition, run, npc.id), ...misconductFactsForNpc(definition, run, npc.id)]
+    const extra = [...arrestFactsForNpc(definition, run, npc.id, language), ...misconductFactsForNpc(definition, run, npc.id, language)]
       .filter(fact => !entry.knowledge.some(item => item.id === fact.id));
     const room = Math.max(0, 16 - entry.knowledge.length);
     return { ...entry, knowledge: [...entry.knowledge, ...extra.slice(0, room)] };

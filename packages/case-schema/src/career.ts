@@ -1,6 +1,8 @@
 // Sistema de carrera, reputación e irregularidades (T5-04)
 // SPEC-008: equilibrio, recompensas idempotentes y sanciones recuperables
 import type { FinalReport } from '@meridiano/contracts';
+import { resolveMessage } from '@meridiano/contracts';
+import type { Language } from '@meridiano/contracts';
 
 export type CaseResult = 'complete' | 'partial' | 'unresolved' | 'incorrect';
 
@@ -166,32 +168,32 @@ export function getActiveSanctions(career: CareerRecord, currentMinute: number):
   return career.sanctions.filter(s => s.resolvedAt === undefined || s.resolvedAt > currentMinute);
 }
 
-export function getRank(career: CareerRecord): string {
-  return rankForTotals(career.prestige, career.integrity, career.trust);
+export function getRank(career: CareerRecord, language: Language = 'es'): string {
+  return rankForTotals(career.prestige, career.integrity, career.trust, language);
 }
 
 /** Rango por la suma de las tres dimensiones (SPEC-008, valores
  * iniciales para playtest): ≥100 Inspector, ≥50 Sargento, ≥20 Detective,
  * si no Aspirante. El rango es honorífico: ninguna herramienta se bloquea
  * por rango. */
-export function rankForTotals(prestige: number, integrity: number, trust: number): string {
+export function rankForTotals(prestige: number, integrity: number, trust: number, language: Language = 'es'): string {
   const total = prestige + integrity + trust;
-  if (total >= 100) return 'Inspector';
-  if (total >= 50) return 'Sargento';
-  if (total >= 20) return 'Detective';
-  return 'Aspirante';
+  if (total >= 100) return resolveMessage(language, 'career.rank.inspector');
+  if (total >= 50) return resolveMessage(language, 'career.rank.sargento');
+  if (total >= 20) return resolveMessage(language, 'career.rank.detective');
+  return resolveMessage(language, 'career.rank.aspirante');
 }
 
 /** Etiqueta cualitativa de una dimensión de reputación (SPEC-008: las
  * dimensiones se presentan con etiquetas, no con barras secretas).
  * Umbrales de presentación iniciales para playtest, no equilibrio: ≥15
  * Ejemplar, ≥8 Sólida, ≥0 Discreta, ≥−5 Dudosa, si no Dañada. */
-export function reputationLabel(value: number): string {
-  if (value >= 15) return 'Ejemplar';
-  if (value >= 8) return 'Sólida';
-  if (value >= 0) return 'Discreta';
-  if (value >= -5) return 'Dudosa';
-  return 'Dañada';
+export function reputationLabel(value: number, language: Language = 'es'): string {
+  if (value >= 15) return resolveMessage(language, 'career.reputation.ejemplar');
+  if (value >= 8) return resolveMessage(language, 'career.reputation.solida');
+  if (value >= 0) return resolveMessage(language, 'career.reputation.discreta');
+  if (value >= -5) return resolveMessage(language, 'career.reputation.dudosa');
+  return resolveMessage(language, 'career.reputation.danada');
 }
 
 /** Recompensa de carrera de un cierre, derivada solo del informe final
@@ -256,7 +258,7 @@ export interface DerivedCareerProfile {
  * limpio posterior (sin actos irregulares) y no destruye guardados ni
  * bloquea herramientas. `imposedAt`/`resolvedAt` son minutos de cierre
  * de su expediente, no un reloj global. */
-export function deriveCareerProfile(entries: CareerResultEntry[]): DerivedCareerProfile {
+export function deriveCareerProfile(entries: CareerResultEntry[], language: Language = 'es'): DerivedCareerProfile {
   const medals: string[] = [];
   const countries: string[] = [];
   const places: string[] = [];
@@ -282,14 +284,14 @@ export function deriveCareerProfile(entries: CareerResultEntry[]): DerivedCareer
     sanctions.push({
       id: 'suspension-' + entry.contentHash.slice(0, 12),
       caseId: entry.caseId,
-      reason: 'A.C.M.E. retiró el caso por conducta irregular',
+      reason: resolveMessage(language, 'career.sanction.withdrawn'),
       severity: 'suspension',
       imposedAt: entry.minute,
       ...(resolved ? { resolvedAt: resolved.minute } : {}),
     });
   });
   return {
-    rank: rankForTotals(prestige, integrity, trust),
+    rank: rankForTotals(prestige, integrity, trust, language),
     points, prestige, integrity, trust,
     totalCases: entries.length,
     completedCases,

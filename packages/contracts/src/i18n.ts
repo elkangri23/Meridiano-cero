@@ -10,10 +10,11 @@
 // La interpolación es `{variable}` (p. ej. `{minutes}`, `{name}`).
 //
 // El idioma es una preferencia del jugador (`preferences.language`) que
-// vive en localStorage; la API no lo conoce y no lo necesita: todo lo
-// que resuelve el servidor (textos del motor y del expediente) sigue en
-// español hasta la fase de traducción, con los espacios `engine.*` y
-// `cases.*` reservados en `es.ts`.
+// vive en localStorage; la web lo manda en cada petición de juego en la
+// cabecera `x-meridiano-language` y la API lo valida con `parseLanguage`.
+// Los textos del motor y del expediente se resuelven en ese idioma
+// (`engine.*` y `cases.*` en `es.ts`); sin cabecera o con valor inválido,
+// todo sigue en español.
 import { ES_MESSAGES, type LocaleKey } from './locales/es.js';
 import { EN_MESSAGES } from './locales/en.js';
 import { FR_MESSAGES } from './locales/fr.js';
@@ -36,12 +37,18 @@ export interface Translator {
 
 /** Idiomas que se ofrecen en el selector de Ajustes, con su nombre
  * nativo: el nombre de cada idioma se escribe en ese idioma, nunca
- * traducido. El francés existe como preferencia válida pero no se ofrece
- * todavía (sin traductor). */
+ * traducido. */
 export const SUPPORTED_LANGUAGES: readonly { id: Language; label: string }[] = [
   { id: 'es', label: 'Español' },
   { id: 'en', label: 'English' },
+  { id: 'fr', label: 'Français' },
 ];
+
+/** Idioma de una petición (cabecera `x-meridiano-language`): solo
+ * `es`/`en`/`fr` valen; cualquier otro valor (o su ausencia) es español. */
+export function parseLanguage(value: unknown): Language {
+  return value === 'en' || value === 'fr' ? value : 'es';
+}
 
 const MESSAGES: Record<Language, Partial<Record<LocaleKey, string>>> = {
   es: ES_MESSAGES,

@@ -18,8 +18,8 @@ import { portraitSeed, teamPortraitSeed } from './portraits';
 import { createMusicEngine, type EffectKind } from './music';
 import { groupOffers, groupTalkOffers } from './scene-offers';
 import type { TalkGroup } from './scene-offers';
-import { buildIntelFacts, INTEL_GREETING, INTEL_ID, INTEL_NAME, INTEL_NO_RECORD, INTEL_PERSONA, INTEL_REFUSAL, selectIntelFacts } from './intel-terminal';
-import { ELENA_ID, ELENA_NAME, ELENA_PERSONA, ELENA_REFUSAL, TEAM_GREETING, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
+import { buildIntelFacts, INTEL_ID, INTEL_NAME, intelGreeting, intelNoRecord, intelPersona, intelRefusal, selectIntelFacts } from './intel-terminal';
+import { ELENA_ID, ELENA_NAME, elenaPersona, elenaRefusal, teamGreeting, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { GameWindow, MinimizedBar, WINDOW_KEYS, useWindows } from './windows';
@@ -203,12 +203,12 @@ function textsFromView(view: PlayerViewDto): CaseTexts {
  * `warrant:access` es la orden de acceso. Sin esto la escena enseñaba los
  * IDs crudos (`warrant:ines`). El nombre sale de la vista (casos
  * generados) con el catálogo fijo como respaldo. */
-function warrantText(id: string, npcName?: (id: string) => string | undefined): string {
-  if (id === 'warrant:access') return 'Orden de acceso';
+function warrantText(id: string, npcName: ((id: string) => string | undefined) | undefined, t: TranslateFn): string {
+  if (id === 'warrant:access') return t('game.warrantAccess');
   if (id.startsWith('warrant:')) {
     const suspectId = id.slice('warrant:'.length);
     const name = npcName?.(suspectId) ?? getNPC(suspectId)?.name ?? suspectId;
-    return `Orden contra ${name}`;
+    return t('game.warrantAgainst', { name });
   }
   return id;
 }
@@ -221,17 +221,17 @@ function talkTarget(offer: PublicActionOffer | undefined, lookup: DiscoveryLooku
 }
 
 /** Frase del viaje de una acción confirmada, si cambió de ciudad. */
-function travelDetail(offer: PublicActionOffer | undefined, previous: PlayerViewDto | null, response: ActionResponseDto): string {
+function travelDetail(offer: PublicActionOffer | undefined, previous: PlayerViewDto | null, response: ActionResponseDto, language: Language): string {
   if (offer?.action.type !== 'travel' || !previous || previous.position.city.id === response.position.city.id) return '';
-  return travelText(previous.position.city.name, response.position.city.name);
+  return travelText(previous.position.city.name, response.position.city.name, language);
 }
 
 /** Hallazgos nuevos del dossier, en frases legibles. */
-function discoveryDetail(response: ActionResponseDto, previous: PlayerViewDto | null, lookup: DiscoveryLookup): string {
+function discoveryDetail(response: ActionResponseDto, previous: PlayerViewDto | null, lookup: DiscoveryLookup, language: Language): string {
   const entries = (previous ? response.dossier.filter(entry => !previous.dossier.includes(entry)) : [...response.dossier])
     .filter(entry => !entry.startsWith('travel:'));
   const texts = textsFromView(previous ?? response);
-  return entries.map(entry => discoveryText(entry, lookup, texts)).join(' ');
+  return entries.map(entry => discoveryText(entry, lookup, texts, response.caseId, language)).join(' ');
 }
 
 /** Solicitudes enviadas por la acción: qué se pidió y cuándo llega el
@@ -257,7 +257,7 @@ function warrantDetail(response: ActionResponseDto, previous: PlayerViewDto | nu
   const added = previous
     ? response.warrants.filter(item => !previous.warrants.includes(item))
     : [...response.warrants];
-  return added.map(item => t('game.detail.warrantGranted', { warrant: warrantText(item, lookup.npcName) })).join(' ');
+  return added.map(item => t('game.detail.warrantGranted', { warrant: warrantText(item, lookup.npcName, t) })).join(' ');
 }
 
 /** Detenciones nuevas: quedan registradas y el caso sigue abierto (la
@@ -315,13 +315,13 @@ function emptyDetail(offer: PublicActionOffer | undefined, told: boolean, t: Tra
  * una consulta o una orden, esperar a que madurase una orden, detener y
  * cerrar solo dejaban el resumen de una línea (y recoger, además, el ID
  * crudo). */
-function actionResultDetail(response: ActionResponseDto, previous: PlayerViewDto | null, t: TranslateFn, offer?: PublicActionOffer): string {
+function actionResultDetail(response: ActionResponseDto, previous: PlayerViewDto | null, t: TranslateFn, language: Language, offer?: PublicActionOffer): string {
   // Los nombres de los personajes salen de la vista anterior: la oferta de
   // hablar puede no estar ya en la vista nueva.
   const lookup = lookupFromView(previous ?? response);
   const parts = [
-    travelDetail(offer, previous, response),
-    discoveryDetail(response, previous, lookup),
+    travelDetail(offer, previous, response, language),
+    discoveryDetail(response, previous, lookup, language),
     talkDetail(offer, lookup, t),
     submittedDetail(response, previous, offer, lookup, t),
     warrantDetail(response, previous, lookup, t),
@@ -459,7 +459,7 @@ function SceneMeta({ view }: { view: PlayerViewDto }) {
   return <div className="game-scene-meta">
     {view.objects.length > 0 && <p>{t('game.inPossession', { items: view.objects.map(item => `${view.evidenceTexts[item.id] ?? item.id} (${evidenceTypeLabel(item.type, t)})`).join(', ') })}</p>}
     {view.pendingRequests.length > 0 && <p>{t('game.pendingRequests', { items: view.pendingRequests.map(item => `${requestTypeLabel(item.type, t)} (min ${item.dueMinute})`).join(', ') })}</p>}
-    {view.warrants.length > 0 && <p>{t('game.warrants', { items: view.warrants.map(item => warrantText(item, lookup.npcName)).join(', ') })}</p>}
+    {view.warrants.length > 0 && <p>{t('game.warrants', { items: view.warrants.map(item => warrantText(item, lookup.npcName, t)).join(', ') })}</p>}
     {view.detentions.length > 0 && <p>{t('game.detentions', { items: view.detentions.map(id => lookup.npcName(id) ?? id).join(', ') })}</p>}
   </div>;
 }
@@ -1085,8 +1085,9 @@ function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void
  * salen de `resumeSummary` (vista del jugador + estado del motor). */
 function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boolean; onDismiss: () => void }) {
   const t = useTranslation();
+  const { preferences } = usePreferences();
   if (!open) return null;
-  const summary = resumeSummary(view, lookupFromView(view), (id, lookup) => discoveryText(id, lookup, textsFromView(view)));
+  const summary = resumeSummary(view, lookupFromView(view), (id, lookup) => discoveryText(id, lookup, textsFromView(view), view.caseId, preferences.language));
   return <section className="game-briefing" data-testid="resume-panel" aria-label={t('game.resumeTitle')}>
     <p className="game-overline">{t('game.resumeTitle')}</p>
     <h2>{t('game.resumeHeading')}</h2>
@@ -1111,6 +1112,7 @@ function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boo
 
 function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewDto; onRead?: (text: string) => void; canRead?: boolean; noVoices?: boolean }) {
   const t = useTranslation();
+  const { preferences } = usePreferences();
   const lookup = lookupFromView(view);
   const npcName = (id: string) => lookup.npcName(id);
   return <div>
@@ -1125,7 +1127,7 @@ function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewD
     {view.dossier.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noFindings')}</p></div>
       : view.dossier.map((entry, index) => {
-        const text = discoveryText(entry, lookup, textsFromView(view));
+        const text = discoveryText(entry, lookup, textsFromView(view), view.caseId, preferences.language);
         return <article key={index} className="game-evidence-card"><span className="game-evidence-kind">{t('game.finding')}</span><p>{text}</p>
           {canRead && onRead && <p><button type="button" data-testid={`dossier-read-${index}`} onClick={() => onRead(text)}>{t('game.read')}</button></p>}
         </article>;
@@ -1135,7 +1137,7 @@ function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewD
     <h4>{t('game.recordedConversation')}</h4>
     {view.conversation.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noConversations')}</p></div>
-      : <ul className="game-destination-list">{view.conversation.map((entry, index) => <li key={index}><span>{conversationRecordText(entry, npcName, undefined, id => lookup.locationName(id))}</span></li>)}</ul>}
+      : <ul className="game-destination-list">{view.conversation.map((entry, index) => <li key={index}><span>{conversationRecordText(entry, npcName, undefined, id => lookup.locationName(id), preferences.language)}</span></li>)}</ul>}
   </div>;
 }
 
@@ -1880,10 +1882,11 @@ function CareerConsequences({ officialResult }: { officialResult: PlayerViewDto[
 
 function ReportContent({ view }: { view: PlayerViewDto }) {
   const t = useTranslation();
+  const { preferences } = usePreferences();
   if (!view.finalReport) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.reportNotAvailable')}</p></div>;
   const report = view.finalReport;
   const objectiveDescription = (id: string) =>
-    view.objectives.find(objective => objective.id === id)?.description ?? objectiveText(id);
+    view.objectives.find(objective => objective.id === id)?.description ?? objectiveText(id, view.caseId, preferences.language);
   return <div>
     <p className="game-report-result">{t('game.reportResult')}: <strong>{reportResultText(report.result, t)}</strong> · {t('game.reportReason')}: {reportReasonText(report.reason, t)} · {t('game.reportMinute')}: {report.minute}</p>
     <h4>{t('game.reportTruth')}</h4>
@@ -2069,6 +2072,25 @@ export function GameScreen() {
     setResumeOpen(false);
   }
 
+  // Cambiar el idioma en Ajustes vuelve a pedir la vista (y el título del
+  // expediente) en el idioma nuevo: el servidor traduce el contenido por
+  // petición y la vista anterior quedaría en el idioma viejo. Silencioso:
+  // si la recarga falla, se conserva la vista anterior.
+  const viewLanguageRef = useRef(preferences.language);
+  useEffect(() => {
+    if (!view || !runId || viewLanguageRef.current === preferences.language) return;
+    viewLanguageRef.current = preferences.language;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const [fresh, catalog] = await Promise.all([gameApi.view(runId, controller.signal), gameApi.catalog(controller.signal)]);
+        setView(fresh);
+        setCaseTitle(catalog.find(item => item.caseId === fresh.caseId)?.title ?? fresh.caseId);
+      } catch { /* conserva la vista anterior */ }
+    })();
+    return () => controller.abort();
+  }, [preferences.language, view, runId]);
+
   const contacts = useMemo(() => (view ? contactsFromView(view) : []), [view]);
 
   const handleLoadError = useCallback((error: unknown) => {
@@ -2180,7 +2202,7 @@ export function GameScreen() {
   function applyResponse(response: ActionResponseDto, offerLabel: string, offer?: PublicActionOffer) {
     const previous = view;
     setView(response);
-    const detail = actionResultDetail(response, previous, t, offer);
+    const detail = actionResultDetail(response, previous, t, preferences.language, offer);
     const entries: LogEntry[] = response.events.map(event => ({ minute: event.minute, summary: event.summary }));
     const last = entries[entries.length - 1];
     if (detail && last) entries[entries.length - 1] = { ...last, detail };
@@ -2226,14 +2248,14 @@ export function GameScreen() {
    * ventana aparte): recupera sus turnos y su memoria de esta pestaña o
    * la inicia con su saludo. El foco lo mueve el panel al montarse. */
   function openChat(npcId: string, npcName: string, opener: HTMLElement | null = null) {
-    if (!runId) return;
+    if (!runId || !view) return;
     const key = `meridiano:chat:${runId}:${npcId}`;
     const stored = loadStoredChat(key);
     if (stored) {
       setChatTurns(stored.turns);
       setChatMemory(stored.memory ?? null);
     } else {
-      const greeting = chatGreeting(findChatEntry(view, npcId), npcGreeting(npcId), npcName, t);
+      const greeting = chatGreeting(findChatEntry(view, npcId), npcGreeting(npcId, undefined, view.caseId, preferences.language), npcName, t);
       const turns: ChatTurn[] = [{ from: 'npc', text: greeting }];
       const memory = { schemaVersion: 1, runId, npcId, treatment: 'neutral', turns: [] };
       setChatTurns(turns);
@@ -2251,7 +2273,7 @@ export function GameScreen() {
   /** Pregunta lista para enviar al personaje, o null si falta algo. */
   function chatQuestion(): { runId: string; csrfToken: string; npcId: string; name: string; text: string; facts: Array<{ id: string; text: string }>; memory: unknown } | null {
     const text = chatDraft.trim();
-    if (!text || !runId || !identity || !chatNpc || chatBusy) return null;
+    if (!text || !runId || !identity || !chatNpc || chatBusy || !view) return null;
     const npcId = chatNpc.id;
     // Hechos extra de la central: si la pregunta viene de preguntar por
     // un documento enviado, su texto entra como hecho autorizado de esa
@@ -2259,14 +2281,14 @@ export function GameScreen() {
     // pregunta por el documento saldría como «He registrado tu consulta.».
     const extra = chatExtraFacts && chatExtraFacts.npcId === npcId ? chatExtraFacts.facts : [];
     return { runId, csrfToken: identity.csrfToken, npcId, name: chatNpc.name, text,
-      facts: [...chatFacts(findChatEntry(view, npcId), npcKnowledgeFacts(npcId)), ...extra],
+      facts: [...chatFacts(findChatEntry(view, npcId), npcKnowledgeFacts(npcId, undefined, undefined, view.caseId, preferences.language)), ...extra],
       memory: chatMemory ?? { schemaVersion: 1, runId, npcId, treatment: 'neutral', turns: [] } };
   }
 
   async function sendChatMessage(event: FormEvent) {
     event.preventDefault();
     const question = chatQuestion();
-    if (!question) return;
+    if (!question || !view) return;
     // Los hechos extra solo valen para esta pregunta.
     setChatExtraFacts(null);
     const factIds = question.facts.map(fact => fact.id);
@@ -2277,7 +2299,7 @@ export function GameScreen() {
     setChatError('');
     const controller = new AbortController();
     try {
-      const refusal = chatRefusal(findChatEntry(view, question.npcId), npcRefusal(question.npcId));
+      const refusal = chatRefusal(findChatEntry(view, question.npcId), npcRefusal(question.npcId, undefined, view.caseId, preferences.language));
       const result = await aiApi.converse({ runId: question.runId, text: question.text,
         npc: { id: question.npcId, name: question.name, persona: chatPersona(findChatEntry(view, question.npcId), getNPC(question.npcId)?.persona ?? ''), knownFactIds: factIds, revealableFactIds: factIds, ...(refusal ? { refusal } : {}) },
         facts: question.facts, memory: question.memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
@@ -2331,7 +2353,7 @@ export function GameScreen() {
       setIntelTurns(stored.turns);
       setIntelMemory(stored.memory ?? null);
     } else {
-      const turns: ChatTurn[] = [{ from: 'npc', text: INTEL_GREETING }];
+      const turns: ChatTurn[] = [{ from: 'npc', text: intelGreeting(t) }];
       const memory = { schemaVersion: 1, runId, npcId: INTEL_ID, treatment: 'neutral', turns: [] };
       setIntelTurns(turns);
       setIntelMemory(memory);
@@ -2361,11 +2383,12 @@ export function GameScreen() {
       objectives: view.objectives,
       briefing: view.briefing,
       heard: heardIntelFacts(),
-      textForDiscovery: id => discoveryText(id, lookupFromView(view), textsFromView(view)),
+      textForDiscovery: id => discoveryText(id, lookupFromView(view), textsFromView(view), view.caseId, preferences.language),
+      t,
     });
     const selected = selectIntelFacts(text, facts);
     if (selected.length === 0) {
-      const next: ChatTurn[] = [...turns, { from: 'npc', text: INTEL_NO_RECORD }];
+      const next: ChatTurn[] = [...turns, { from: 'npc', text: intelNoRecord(t) }];
       setIntelTurns(next);
       setIntelMemory(memory);
       saveChat(key, next, memory);
@@ -2376,7 +2399,7 @@ export function GameScreen() {
     try {
       const factIds = selected.map(fact => fact.id);
       const result = await aiApi.converse({ runId, text,
-        npc: { id: INTEL_ID, name: INTEL_NAME, persona: INTEL_PERSONA, knownFactIds: factIds, revealableFactIds: factIds, refusal: INTEL_REFUSAL },
+        npc: { id: INTEL_ID, name: INTEL_NAME, persona: intelPersona(t), knownFactIds: factIds, revealableFactIds: factIds, refusal: intelRefusal(t) },
         facts: selected, memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
       controller.signal, { csrfToken: identity.csrfToken });
       const next: ChatTurn[] = [...turns, { from: 'npc', text: result.narrative.text }];
@@ -2413,7 +2436,7 @@ export function GameScreen() {
       setTeamTurns(stored.turns);
       setTeamElenaMemory(stored.memory ?? null);
     } else {
-      const turns: TeamTurn[] = [{ memberId: 'margaret', from: 'team', text: TEAM_GREETING }];
+      const turns: TeamTurn[] = [{ memberId: 'margaret', from: 'team', text: teamGreeting(t) }];
       const memory = { schemaVersion: 1, runId, npcId: ELENA_ID, treatment: 'neutral', turns: [] };
       setTeamTurns(turns);
       setTeamElenaMemory(memory);
@@ -2493,11 +2516,12 @@ export function GameScreen() {
       objectives: view.objectives,
       briefing: view.briefing,
       heard: heardIntelFacts(),
-      textForDiscovery: id => discoveryText(id, lookupFromView(view), textsFromView(view)),
+      textForDiscovery: id => discoveryText(id, lookupFromView(view), textsFromView(view), view.caseId, preferences.language),
+      t,
     });
     const selected = selectIntelFacts(text, facts);
     if (selected.length === 0) {
-      const next: TeamTurn[] = [...turns, { memberId: 'elena', from: 'team', text: ELENA_REFUSAL }];
+      const next: TeamTurn[] = [...turns, { memberId: 'elena', from: 'team', text: elenaRefusal(t) }];
       setTeamTurns(next);
       setTeamElenaMemory(memory);
       saveTeam(key, next, memory);
@@ -2508,7 +2532,7 @@ export function GameScreen() {
     try {
       const factIds = selected.map(fact => fact.id);
       const result = await aiApi.converse({ runId, text,
-        npc: { id: ELENA_ID, name: ELENA_NAME, persona: ELENA_PERSONA, knownFactIds: factIds, revealableFactIds: factIds, refusal: ELENA_REFUSAL },
+        npc: { id: ELENA_ID, name: ELENA_NAME, persona: elenaPersona(t), knownFactIds: factIds, revealableFactIds: factIds, refusal: elenaRefusal(t) },
         facts: selected, memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
       controller.signal, { csrfToken: identity.csrfToken });
       const next: TeamTurn[] = [...turns, { memberId: 'elena', from: 'team', text: result.narrative.text }];
@@ -2655,7 +2679,7 @@ export function GameScreen() {
       const summary = await gameApi.createSave(runId, saveName.trim(), view.version, crypto.randomUUID(),
         replaceTarget ? replaceTarget.saveId : null, identity, new AbortController().signal);
       setSavePhase('saved');
-      setNotice(summary.replayed ? 'Guardado ya existente (reintento).' : `Guardado «${summary.name}» confirmado.`);
+      setNotice(summary.replayed ? t('game.notice.saveExists') : t('game.notice.saveConfirmed', { name: summary.name }));
       setSaveName('');
       setReplaceTarget(null);
       await reloadSaves();
@@ -2674,8 +2698,8 @@ export function GameScreen() {
     try {
       const response = await gameApi.loadSave(runId, target.saveId, view.version, crypto.randomUUID(), identity, controller.signal);
       setView(response);
-      setLog(current => [...current, { minute: response.clock.minute, summary: `Cargado el guardado «${target.name}».` }]);
-      setNotice(`Cargado «${target.name}»: vuelves al minuto ${response.clock.minute}. El progreso posterior queda en la rama anterior.`);
+      setLog(current => [...current, { minute: response.clock.minute, summary: t('game.notice.saveLoadedLog', { name: target.name }) }]);
+      setNotice(t('game.notice.saveLoaded', { name: target.name, minute: response.clock.minute }));
       await reloadSaves();
     } catch (error) {
       handleActionError(error);
@@ -2686,7 +2710,7 @@ export function GameScreen() {
     if (!runId || !identity) return;
     try {
       await gameApi.deleteSave(runId, save.saveId, save.metadataVersion, crypto.randomUUID(), identity, new AbortController().signal);
-      setNotice(`Guardado «${save.name}» borrado.`);
+      setNotice(t('game.notice.saveDeleted', { name: save.name }));
       await reloadSaves();
       await reloadView();
     } catch (error) {

@@ -1320,7 +1320,8 @@ export {
 // NPCs recurrentes, canales y consultas (`npc-catalog.ts`).
 export {
   RECURRENT_NPCS, COMMUNICATION_CHANNELS, REMOTE_CHANNELS,
-  REMOTE_CHANNEL_LABELS, QUERY_TYPES, getNPC, getNPCsByCity, getQueryType,
+  REMOTE_CHANNEL_LABELS, REMOTE_CHANNEL_KEYS, remoteChannelLabel,
+  remoteChannelInSentence, QUERY_TYPES, getNPC, getNPCsByCity, getQueryType,
   getChannelCost, searchNPCs,
   type NPCProfile, type CommunicationChannel, type QueryType,
 } from './npc-catalog.js';
@@ -1328,12 +1329,13 @@ export {
 // Sistema de locales (`i18n.ts` + `locales/`): el español es el idioma
 // de referencia y cualquier otro cae a él cuando no traduce una clave.
 export {
-  createTranslator, formatMessage, resolveMessage, SUPPORTED_LANGUAGES,
+  createTranslator, formatMessage, resolveMessage, parseLanguage, SUPPORTED_LANGUAGES,
   type LocaleKey, type TranslateVars, type TranslateFn, type Translator,
 } from './i18n.js';
 export { ES_MESSAGES } from './locales/es.js';
 export { EN_MESSAGES } from './locales/en.js';
 export { FR_MESSAGES } from './locales/fr.js';
+export { caseText, caseTextOr } from './locales/cases.js';
 
 // Preferencias de presentación persistentes (`preferences.ts`).
 export {
@@ -1378,7 +1380,7 @@ export {
 // expediente, la API para el atlas y la web para el mapa.
 export {
   GEOGRAPHIC_CATALOG, DEFAULT_TRAVEL_ROUTES, getCity, getRoute,
-  getReachableCities, searchCities,
+  getReachableCities, searchCities, localizedCountryName,
   type GeographicCity, type TravelRoute,
 } from './geography-catalog.js';
 

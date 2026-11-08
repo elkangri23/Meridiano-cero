@@ -2,11 +2,14 @@
 // (GDD §5, REQ-G05-03/04): destinos separados de los escenarios
 // investigables, sin pruebas nuevas. Los textos son datos de contenido del
 // catálogo —como los textos de hechos de `fact-texts.ts`—, no cadenas de
-// interfaz: la traducción a otros idiomas es trabajo de la fase de
-// traducción de i18n (ver `docs/TRADUCCIONES.md`). Solo hechos generales y
-// lugares conocidos; nada inventado ni rutas reales fuera del catálogo.
+// interfaz: el resumen en español vive en `TOURIST_INFO` y su traducción
+// en las claves `engine.tourist.<ciudad>` de `locales/es.ts` (con sus pares
+// en `en.ts`/`fr.ts`). Solo hechos generales y lugares conocidos; nada
+// inventado ni rutas reales fuera del catálogo.
 
 import type { GeographicCity } from './geography-catalog.js';
+import { resolveMessage } from './i18n.js';
+import type { Language } from './preferences.js';
 
 export interface TouristInfo {
   /** Resumen histórico y geográfico en una o dos frases. */
@@ -55,15 +58,19 @@ export const TOURIST_INFO: Record<string, TouristInfo> = {
 };
 
 /** Información turística de una ciudad admitida, o undefined si no está en
- * el catálogo: la web y la API nunca inventan una ciudad fuera de él. */
-export function touristInfoFor(cityId: string): TouristInfo | undefined {
-  return TOURIST_INFO[cityId];
+ * el catálogo: la web y la API nunca inventan una ciudad fuera de él. El
+ * resumen se resuelve en el idioma pedido (`engine.tourist.<ciudad>`); los
+ * lugares son nombres propios y no se traducen. */
+export function touristInfoFor(cityId: string, language: Language = 'es'): TouristInfo | undefined {
+  const info = TOURIST_INFO[cityId];
+  if (!info) return undefined;
+  return { summary: resolveMessage(language, 'engine.tourist.' + cityId), landmarks: [...info.landmarks] };
 }
 
 /** Nombre del lugar sintético donde se está al visitar una ciudad que no es
  * del expediente: no es un escenario investigable, solo el punto de llegada. */
-export function visitLocationName(city: GeographicCity): string {
-  return 'Centro de ' + city.name;
+export function visitLocationName(city: GeographicCity, language: Language = 'es'): string {
+  return resolveMessage(language, 'engine.tourist.visit', { city: city.name });
 }
 
 /** Id sintético del lugar de visita de una ciudad fuera del expediente. El

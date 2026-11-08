@@ -6,7 +6,7 @@ import { startBatch, decideBatch } from './batch.js';
 import { materialMinutes, confirmation } from './timed-action.js';
 import { appendRequest, pendingEvidence } from './requests.js';
 import { visibleCaseCityIds } from './discovery.js';
-import { getCity, getRoute, visitLocationId } from '@meridiano/case-schema';
+import { getCity, getRoute, visitLocationId, resolveMessage, type Language } from '@meridiano/case-schema';
 import { isFixedCase, ORIGINAL_OBJECT } from './fixed-case.js';
 import { revealInspection, canCollect, revealTalk, queryRule, matureEvidence, revealEvidence, FIXED_ANALYSIS_RULE } from './fixed-evidence.js';
 import { generatedAnalysis, generatedQueryRule, matureGeneratedEvidence, revealGeneratedInspection, revealGeneratedTalk } from './generated-mechanics.js';
@@ -91,11 +91,11 @@ function requireTransitionVersion(before: CaseRun, after: CaseRun): void {
   if (!Number.isSafeInteger(after.tripCount) || after.tripCount < before.tripCount) throw new EngineStateError('TRAVEL_SEQUENCE_INVALID');
 }
 
-function completeTransition(run: CaseRun, action: Action, work: () => ActionResult): ActionResult {
+function completeTransition(run: CaseRun, action: Action, work: () => ActionResult, language: Language = 'es'): ActionResult {
   const refuse = (reason: string): ActionResult => ({ status: 'impossible', run, events: [], reason });
   if (run.engineVersion !== ENGINE_VERSION) throw new EngineStateError('ENGINE_VERSION_UNSUPPORTED');
-  if (run.status === 'closed') return refuse('La partida ya está cerrada.');
-  if (run.pendingBatch !== null && action.type !== 'batch_decision') return refuse('Hay un lote pendiente de decisión.');
+  if (run.status === 'closed') return refuse(resolveMessage(language, 'engine.reason.runClosed'));
+  if (run.pendingBatch !== null && action.type !== 'batch_decision') return refuse(resolveMessage(language, 'engine.reason.batchPending'));
   requireRunCounters(run);
   const result = work();
   requireTransitionVersion(run, result.run);
@@ -107,86 +107,86 @@ function completeTransition(run: CaseRun, action: Action, work: () => ActionResu
   return { ...result, run: { ...result.run, eventOrdinal: end }, events };
 }
 
-export function resolveAction(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  return completeTransition(run, action, () => previewAction(def, run, action));
+export function resolveAction(def: CaseDefinition, run: CaseRun, action: Action, language: Language = 'es'): ActionResult {
+  return completeTransition(run, action, () => previewAction(def, run, action, language), language);
 }
 
-export function confirmAction(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  return completeTransition(run, action, () => confirmActionInternal(def, run, action));
+export function confirmAction(def: CaseDefinition, run: CaseRun, action: Action, language: Language = 'es'): ActionResult {
+  return completeTransition(run, action, () => confirmActionInternal(def, run, action, language), language);
 }
 
 /** Preview propia de la detención: siempre pide confirmación
  * (irreversible) y su descripción dice de qué modo es — en persona o
  * coordinada con las autoridades (GDD §12). Sin plan válido, es
  * imposible, con el mismo motivo que al confirmar. */
-function previewDetention(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function previewDetention(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const suspectId = typeof action.params.suspectId === 'string' ? action.params.suspectId : undefined;
   const plan = suspectId === undefined ? undefined : detentionPlan(def, run, suspectId, action.params.mode, action.params);
-  if (!plan?.ok) return { status: 'impossible', run, events: [], reason: 'Intervención no disponible.' };
+  if (!plan?.ok) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.detentionUnavailable') };
   const name = def.npcs.find(npc => npc.id === plan.suspect.id)?.name ?? plan.suspect.id;
   const minutes = plan.minutes;
   return { status: 'confirmation_required', run, events: [], preview: {
     actionType: 'detain', estimatedMinutes: minutes, estimatedEndTime: run.minute + minutes,
     description: action.params.mode === 'automatic'
-      ? `Coordinar la detención de ${name} con las autoridades (orden válida, ubicación conocida): ${minutes} minutos estimados. Las autoridades actúan; una detención errónea deja el resultado en «incorrecto».`
-      : `Detener a ${name} en persona (orden válida, ubicación conocida): ${minutes} minutos estimados. Una detención errónea deja el resultado en «incorrecto».`,
+      ? resolveMessage(language, 'engine.preview.detainAutomatic', { name, minutes })
+      : resolveMessage(language, 'engine.preview.detainInteractive', { name, minutes }),
   } };
 }
 
-function previewAction(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function previewAction(def: CaseDefinition, run: CaseRun, action: Action, language: Language = 'es'): ActionResult {
   // La acción irregular siempre pide confirmación con los riesgos
   // conocidos (testigos, advertencia, retirada): su descripción no es la
   // genérica de `confirmation`, nombra quién puede verte y qué está en juego.
   if (action.type === 'irregular') {
-    const preview = irregularPreview(def, run, action);
-    if (!preview) return { status: 'impossible', run, events: [], reason: 'Acción irregular no disponible.' };
+    const preview = irregularPreview(def, run, action, language);
+    if (!preview) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.irregularUnavailable') };
     return { status: 'confirmation_required', run, events: [], preview };
   }
   // La detención siempre pide confirmación (irreversible) y su
   // descripción dice de qué modo es: en persona o coordinada con las
   // autoridades (GDD §12). Sin plan válido, es imposible, con el mismo
   // motivo que al confirmar.
-  if (action.type === 'detain') return previewDetention(def, run, action);
-  const result = resolvePreview(def, run, action);
+  if (action.type === 'detain') return previewDetention(def, run, action, language);
+  const result = resolvePreview(def, run, action, language);
   requireTransitionVersion(run, result.run);
   if (result.status === 'impossible') return result;
   const minutes = materialMinutes(def, run, action);
-  if (minutes > 0) return confirmation(run, action, minutes);
-  if (action.type === 'wait') return confirmation(run, action, Number(action.params.minutes));
-  return previewBatchResult(run, action, result);
+  if (minutes > 0) return confirmation(run, action, minutes, language);
+  if (action.type === 'wait') return confirmation(run, action, Number(action.params.minutes), language);
+  return previewBatchResult(run, action, result, language);
 }
 
-function resolvePreview(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  if (action.type === 'batch') return resolveBatch(def, run, action, true);
-  if (action.type === 'batch_decision') return resolveBatchDecision(def, run, action, true);
-  return resolveActionInternal(def, run, action);
+function resolvePreview(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
+  if (action.type === 'batch') return resolveBatch(def, run, action, true, language);
+  if (action.type === 'batch_decision') return resolveBatchDecision(def, run, action, true, language);
+  return resolveActionInternal(def, run, action, language);
 }
 
-function previewBatchResult(run: CaseRun, action: Action, result: ActionResult): ActionResult {
+function previewBatchResult(run: CaseRun, action: Action, result: ActionResult, language: Language): ActionResult {
   const elapsed = result.run.minute - run.minute;
   const closesCase = result.events.some(event => event.type === 'finish');
-  if (action.type === 'batch_decision' && action.params.decision === 'continue_independent') return batchConfirmation(run, action, elapsed, closesCase);
-  if (action.type === 'batch' && (elapsed > 0 || closesCase || result.events.some(event => event.type === 'travel'))) return batchConfirmation(run, action, elapsed, closesCase);
+  if (action.type === 'batch_decision' && action.params.decision === 'continue_independent') return batchConfirmation(run, action, elapsed, closesCase, language);
+  if (action.type === 'batch' && (elapsed > 0 || closesCase || result.events.some(event => event.type === 'travel'))) return batchConfirmation(run, action, elapsed, closesCase, language);
   return result;
 }
 
-function batchConfirmation(run: CaseRun, action: Action, elapsed: number, closesCase: boolean): ActionResult {
-  const result = confirmation(run, action, elapsed);
+function batchConfirmation(run: CaseRun, action: Action, elapsed: number, closesCase: boolean, language: Language): ActionResult {
+  const result = confirmation(run, action, elapsed, language);
   if (result.status !== 'confirmation_required') return result;
   return { ...result, preview: { ...result.preview,
-    description: 'Confirmar secuencia: ' + elapsed + ' minutos estimados; los viajes pueden retrasarse y cambiar la viabilidad de pasos posteriores.' +
-      (closesCase ? ' Incluye cierre del caso; no se ejecutarán pasos posteriores.' : '') } };
+    description: resolveMessage(language, 'engine.preview.batch', { elapsed }) +
+      (closesCase ? resolveMessage(language, 'engine.preview.batchCloses') : '') } };
 }
 
-function applyMaterial(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  const validation = resolveActionInternal(def, run, action);
+function applyMaterial(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
+  const validation = resolveActionInternal(def, run, action, language);
   if (validation.status !== 'applied') return validation;
   const minutes = materialMinutes(def, run, action);
   if (minutes === 0) return validation;
-  const elapsed = resolveWait(def, run, { type: 'wait', params: { minutes } });
+  const elapsed = resolveWait(def, run, { type: 'wait', params: { minutes } }, language);
   if (elapsed.status === 'case_closed') return { ...elapsed, run: { ...elapsed.run, pendingBatch: null },
     events: elapsed.events.map(event => event.type === 'wait' ? makeEvent(elapsed.run.minute, 'action_interrupted', { actionType: action.type, elapsedMinutes: elapsed.run.minute - run.minute }) : event) };
-  const result = resolveActionInternal(def, elapsed.run, action);
+  const result = resolveActionInternal(def, elapsed.run, action, language);
   return { ...result, run: { ...result.run, version: run.version + 1 },
     events: [...elapsed.events.filter(event => event.type !== 'wait'), ...result.events] };
 }
@@ -198,10 +198,10 @@ function revealInspect(def: CaseDefinition, run: CaseRun, target: string, elemen
   return isFixedCase(def) ? revealInspection(def, run, target, element) : revealGeneratedInspection(def, run, target, element);
 }
 
-function doInspect(def: CaseDefinition, run: CaseRun, targetId: string): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
+function doInspect(def: CaseDefinition, run: CaseRun, targetId: string, language: Language): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
   const location = def.locations.find((l) => l.id === targetId);
   if (!location || !location.accessible || location.cityId !== run.position.cityId) {
-    return { impossible: 'Objetivo no accesible.' };
+    return { impossible: resolveMessage(language, 'engine.reason.targetUnavailable') };
   }
   const newDiscoveries = run.discoveries.includes(targetId)
     ? run.discoveries
@@ -215,10 +215,10 @@ function doInspect(def: CaseDefinition, run: CaseRun, targetId: string): { run: 
   return { run: revealInspect(def, newRun, targetId), events };
 }
 
-function doInspectSpecific(def: CaseDefinition, run: CaseRun, targetId: string, elementId: string): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
+function doInspectSpecific(def: CaseDefinition, run: CaseRun, targetId: string, elementId: string, language: Language): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
   const location = def.locations.find((l) => l.id === targetId);
   if (!location || !location.accessible || location.cityId !== run.position.cityId) {
-    return { impossible: 'Objetivo no accesible.' };
+    return { impossible: resolveMessage(language, 'engine.reason.targetUnavailable') };
   }
   const newDiscoveries = run.discoveries.includes(targetId)
     ? run.discoveries
@@ -234,13 +234,13 @@ function doInspectSpecific(def: CaseDefinition, run: CaseRun, targetId: string, 
 
 // ── Collect ───────────────────────────────────────────────────────────────────
 
-function doCollect(def: CaseDefinition, run: CaseRun, evidenceId: string): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
+function doCollect(def: CaseDefinition, run: CaseRun, evidenceId: string, language: Language): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
   const ev = def.evidence.find((e) => e.id === evidenceId);
   if (!ev || !canCollect(def, run, evidenceId)) {
-    return { impossible: 'Evidencia no disponible.' };
+    return { impossible: resolveMessage(language, 'engine.reason.evidenceUnavailable') };
   }
   if (run.inventory.includes(evidenceId)) {
-    return { impossible: 'Ya recogida.' };
+    return { impossible: resolveMessage(language, 'engine.reason.alreadyCollected') };
   }
   const newAdmissibility = { ...run.admissibility, [evidenceId]: ev.admissible };
   const record = run.evidenceRecords?.[evidenceId];
@@ -257,10 +257,10 @@ function doCollect(def: CaseDefinition, run: CaseRun, evidenceId: string): { run
 
 // ── Talk ──────────────────────────────────────────────────────────────────────
 
-function doTalk(def: CaseDefinition, run: CaseRun, npcId: string, topicId?: unknown): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
+function doTalk(def: CaseDefinition, run: CaseRun, npcId: string, topicId?: unknown, language: Language = 'es'): { run: CaseRun; events: EngineEvent[] } | { impossible: string } {
   const npc = def.npcs.find((n) => n.id === npcId);
   if (!npc || npc.cityId !== run.position.cityId) {
-    return { impossible: 'NPC no accesible.' };
+    return { impossible: resolveMessage(language, 'engine.reason.npcNotAccessible') };
   }
   const newRecords = [...run.conversationRecords, `talk:${npcId}@${run.minute}`];
   const newRelations = { ...run.npcRelations };
@@ -279,13 +279,13 @@ function doTalk(def: CaseDefinition, run: CaseRun, npcId: string, topicId?: unkn
   return { run: revealed, events };
 }
 
-function inspectAction(def: CaseDefinition, run: CaseRun, action: Action) {
+function inspectAction(def: CaseDefinition, run: CaseRun, action: Action, language: Language) {
   const target = action.params.targetId;
-  if (typeof target !== 'string') return { impossible: 'Objetivo no accesible.' };
-  if (action.params.elementId !== undefined && typeof action.params.elementId !== 'string') return { impossible: 'Objetivo no accesible.' };
-  if (isFixedCase(def) && target === 'MAD-SALA' && action.params.elementId !== undefined && !['cerradura', 'caja'].includes(String(action.params.elementId))) return { impossible: 'Objetivo no accesible.' };
+  if (typeof target !== 'string') return { impossible: resolveMessage(language, 'engine.reason.targetUnavailable') };
+  if (action.params.elementId !== undefined && typeof action.params.elementId !== 'string') return { impossible: resolveMessage(language, 'engine.reason.targetUnavailable') };
+  if (isFixedCase(def) && target === 'MAD-SALA' && action.params.elementId !== undefined && !['cerradura', 'caja'].includes(String(action.params.elementId))) return { impossible: resolveMessage(language, 'engine.reason.targetUnavailable') };
   return typeof action.params.elementId === 'string'
-    ? doInspectSpecific(def, run, target, action.params.elementId) : doInspect(def, run, target);
+    ? doInspectSpecific(def, run, target, action.params.elementId, language) : doInspect(def, run, target, language);
 }
 
 // ── Batch / Sequence ──────────────────────────────────────────────────────────
@@ -310,8 +310,8 @@ function maturedEvents(requests: ScheduledResult[], run: CaseRun): EngineEvent[]
     { requestId: request.id, type: request.type }));
 }
 
-function queueEvidence(run: CaseRun, evidenceId: string, delay: number, method: 'analyze' | 'query'): ActionResult {
-  if (pendingEvidence(run, evidenceId)) return { status: 'impossible', run, events: [], reason: 'Solicitud ya en curso.' };
+function queueEvidence(run: CaseRun, evidenceId: string, delay: number, method: 'analyze' | 'query', language: Language): ActionResult {
+  if (pendingEvidence(run, evidenceId)) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.requestInProgress') };
   const id = `req-${run.version + 1}`;
   const dueMinute = run.minute + delay;
   if (!Number.isSafeInteger(dueMinute)) throw new EngineStateError('REQUEST_STATE_INVALID');
@@ -320,22 +320,22 @@ function queueEvidence(run: CaseRun, evidenceId: string, delay: number, method: 
     events: [makeEvent(run.minute, 'request_submitted', { requestId: id })] };
 }
 
-function requestAnalysis(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function requestAnalysis(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const generic = generatedAnalysis(def, run, action.params.evidenceId);
-  if (generic) return queueEvidence(run, generic.resultEvidenceId, generic.delayMinutes, 'analyze');
+  if (generic) return queueEvidence(run, generic.resultEvidenceId, generic.delayMinutes, 'analyze', language);
   if (!isFixedCase(def) || action.params.evidenceId !== FIXED_ANALYSIS_RULE.inputEvidenceId
     || !run.inventory.includes(FIXED_ANALYSIS_RULE.inputEvidenceId)) {
-    return { status: 'impossible', run, events: [], reason: 'Análisis no disponible.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.analysisUnavailable') };
   }
-  if (run.discoveries.includes(FIXED_ANALYSIS_RULE.resultEvidenceId)) return { status: 'impossible', run, events: [], reason: 'Análisis ya disponible.' };
-  return queueEvidence(run, FIXED_ANALYSIS_RULE.resultEvidenceId, FIXED_ANALYSIS_RULE.delayMinutes, 'analyze');
+  if (run.discoveries.includes(FIXED_ANALYSIS_RULE.resultEvidenceId)) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.analysisAvailable') };
+  return queueEvidence(run, FIXED_ANALYSIS_RULE.resultEvidenceId, FIXED_ANALYSIS_RULE.delayMinutes, 'analyze', language);
 }
 
-function requestQuery(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function requestQuery(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const rule = queryRule(def, run, action.params.topicId) ?? generatedQueryRule(def, run, action.params.topicId);
-  if (!rule) return { status: 'impossible', run, events: [], reason: 'Consulta no disponible.' };
-  if (run.discoveries.includes(rule.evidenceId)) return { status: 'impossible', run, events: [], reason: 'Consulta ya disponible.' };
-  return queueEvidence(run, rule.evidenceId, rule.delayMinutes, 'query');
+  if (!rule) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.queryUnavailable') };
+  if (run.discoveries.includes(rule.evidenceId)) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.queryAvailable') };
+  return queueEvidence(run, rule.evidenceId, rule.delayMinutes, 'query', language);
 }
 
 function processMaturedRequests(def: CaseDefinition, run: CaseRun, newMinute: number, expired: boolean): { run: CaseRun; matured: ScheduledResult[] } {
@@ -360,35 +360,35 @@ function processMaturedRequests(def: CaseDefinition, run: CaseRun, newMinute: nu
 
 // ── resolveAction ─────────────────────────────────────────────────────────────
 
-function resolveActionInternal(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  if (!Object.hasOwn(handlers, action.type)) return { status: 'impossible', run, events: [], reason: 'Acción no disponible.' };
-  return handlers[action.type](def, run, action);
+function resolveActionInternal(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
+  if (!Object.hasOwn(handlers, action.type)) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.actionUnavailable') };
+  return handlers[action.type](def, run, action, language);
 }
 
-function resolveInspection(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  const res = inspectAction(def, run, action);
+function resolveInspection(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
+  const res = inspectAction(def, run, action, language);
   if ('impossible' in res) return { status: 'impossible', run, events: [], reason: res.impossible };
   return { status: 'applied', run: res.run, events: res.events };
 }
 
-function resolveCollection(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function resolveCollection(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const evidenceId = action.params.evidenceId;
   if (typeof evidenceId !== 'string') {
-    return { status: 'impossible', run, events: [], reason: 'evidenceId inválido.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.invalidEvidence') };
   }
-  const res = doCollect(def, run, evidenceId);
+  const res = doCollect(def, run, evidenceId, language);
   if ('impossible' in res) {
     return { status: 'impossible', run, events: [], reason: res.impossible };
   }
   return { status: 'applied', run: res.run, events: res.events };
 }
 
-function resolveTalk(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function resolveTalk(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const npcId = action.params.npcId;
   if (typeof npcId !== 'string') {
-    return { status: 'impossible', run, events: [], reason: 'npcId inválido.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.invalidNpc') };
   }
-  const res = doTalk(def, run, npcId, action.params.topicId);
+  const res = doTalk(def, run, npcId, action.params.topicId, language);
   if ('impossible' in res) {
     return { status: 'impossible', run, events: [], reason: res.impossible };
   }
@@ -419,14 +419,14 @@ function travelDuration(def: CaseDefinition, fromCityId: string, toCityId: strin
   return getRoute(fromCityId, toCityId)?.minutes;
 }
 
-function previewTravel(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function previewTravel(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const toCityId = action.params.toCityId;
   if (typeof toCityId !== 'string') {
-    return { status: 'impossible', run, events: [], reason: 'toCityId inválido.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.invalidCity') };
   }
   const minutes = travelDuration(def, run.position.cityId, toCityId);
   if (minutes === undefined) {
-    return { status: 'impossible', run, events: [], reason: 'No hay ruta disponible.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.noRoute') };
   }
   nextTripCount(run);
   const baseCost = minutes;
@@ -435,29 +435,29 @@ function previewTravel(def: CaseDefinition, run: CaseRun, action: Action): Actio
     actionType: 'travel',
     estimatedMinutes: baseCost,
     estimatedEndTime: run.minute + baseCost,
-    description: `Viaje a ${destination?.name ?? toCityId}: ${baseCost} minutos estimados; puede haber retrasos.`,
+    description: resolveMessage(language, 'engine.preview.travel', { city: destination?.name ?? toCityId, minutes: baseCost }),
   };
   return { status: 'confirmation_required', run, events: [], preview };
 }
 
-function executeBatchStep(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly: boolean): ActionResult {
-  if (action.type === 'travel') return confirmTravel(def, run, action, estimateOnly);
-  if (action.type === 'finish') return finishCase(def, run);
-  return applyMaterial(def, run, action);
+function executeBatchStep(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly: boolean, language: Language): ActionResult {
+  if (action.type === 'travel') return confirmTravel(def, run, action, estimateOnly, language);
+  if (action.type === 'finish') return finishCase(def, run, language);
+  return applyMaterial(def, run, action, language);
 }
 
-function resolveBatch(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false): ActionResult {
-  return startBatch(run, action.params, (current, step) => executeBatchStep(def, current, step, estimateOnly));
+function resolveBatch(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false, language: Language = 'es'): ActionResult {
+  return startBatch(run, action.params, (current, step) => executeBatchStep(def, current, step, estimateOnly, language), language);
 }
 
-function resolveBatchDecision(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false): ActionResult {
-  return decideBatch(run, action.params, (current, step) => executeBatchStep(def, current, step, estimateOnly));
+function resolveBatchDecision(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false, language: Language = 'es'): ActionResult {
+  return decideBatch(run, action.params, (current, step) => executeBatchStep(def, current, step, estimateOnly, language), language);
 }
 
-function resolveWait(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function resolveWait(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const minutes = action.params.minutes;
   if (typeof minutes !== 'number' || !Number.isSafeInteger(minutes) || minutes < 1 || !Number.isSafeInteger(run.minute + minutes)) {
-    return { status: 'impossible', run, events: [], reason: 'minutes inválido.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.invalidMinutes') };
   }
   const newMinute = advanceMinute(run.minute, minutes, def.deadlineMinutes);
   const expired = hasExpired(newMinute, def.deadlineMinutes);
@@ -472,7 +472,7 @@ function resolveWait(def: CaseDefinition, run: CaseRun, action: Action): ActionR
   const events = [...maturedEvents(matured, newRun), makeEvent(newMinute, 'wait', { minutes, matured: matured.length })];
 
   if (expired) {
-    const report = buildFinalReport(def, newRun, 'deadline');
+    const report = buildFinalReport(def, newRun, 'deadline', language);
     const closedRun: CaseRun = { ...newRun, status: 'closed', finalReport: report };
     return { status: 'case_closed', run: closedRun, events, report };
   }
@@ -480,15 +480,15 @@ function resolveWait(def: CaseDefinition, run: CaseRun, action: Action): ActionR
   return { status: 'applied', run: newRun, events };
 }
 
-function resolveTeam(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  return submitTeam(def, run, action.params);
+function resolveTeam(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
+  return submitTeam(def, run, action.params, language);
 }
-function resolveCommunication(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  return submitCommunication(def, run, action.params);
+function resolveCommunication(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
+  return submitCommunication(def, run, action.params, language);
 }
 
-function resolveIrregular(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  return submitIrregular(def, run, action.params);
+function resolveIrregular(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
+  return submitIrregular(def, run, action.params, language);
 }
 
 function applyDetention(run: CaseRun, suspectId: string, mode: unknown): ActionResult {
@@ -496,13 +496,13 @@ function applyDetention(run: CaseRun, suspectId: string, mode: unknown): ActionR
     events: [makeEvent(run.minute, 'detain', { suspectId, mode: mode === 'automatic' ? 'automatic' : 'interactive' })] };
 }
 
-function resolveDetention(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function resolveDetention(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const refuse = (reason: string): ActionResult => ({ status: 'impossible', run, events: [], reason });
   const suspectId = typeof action.params.suspectId === 'string' ? action.params.suspectId : undefined;
-  if (suspectId === undefined) return refuse('Intervención no disponible.');
-  if (run.detentions.includes(suspectId)) return refuse('Detención ya realizada.');
+  if (suspectId === undefined) return refuse(resolveMessage(language, 'engine.reason.detentionUnavailable'));
+  if (run.detentions.includes(suspectId)) return refuse(resolveMessage(language, 'engine.reason.detentionDone'));
   const plan = detentionPlan(def, run, suspectId, action.params.mode, action.params);
-  if (!plan.ok) return refuse('Intervención no disponible.');
+  if (!plan.ok) return refuse(resolveMessage(language, 'engine.reason.detentionUnavailable'));
   return applyDetention(run, plan.suspect.id, action.params.mode);
 }
 
@@ -515,16 +515,16 @@ function recoveryTarget(def: CaseDefinition): RecoveryTarget | undefined {
   return { objectId: recovery.objectId, cityId: recovery.cityId, locationId: recovery.locationId, evidenceId: recovery.evidenceId, requiresAccessWarrant: recovery.requiresAccessWarrant };
 }
 
-function resolveRecovery(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function resolveRecovery(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   const refuse = (reason: string): ActionResult => ({ status: 'impossible', run, events: [], reason });
   const irregular = run.discoveries.includes('forced-entry');
   const access = run.warrants.includes('warrant:access') || irregular;
   const target = recoveryTarget(def);
   if (!target || action.params.objectId !== target.objectId || run.position.cityId !== target.cityId ||
       run.position.locationId !== target.locationId || (target.requiresAccessWarrant && !access)) {
-    return refuse('Recuperación no disponible.');
+    return refuse(resolveMessage(language, 'engine.reason.recoveryUnavailable'));
   }
-  if (run.recoveredObjects.includes(target.objectId)) return refuse('Objeto ya recuperado.');
+  if (run.recoveredObjects.includes(target.objectId)) return refuse(resolveMessage(language, 'engine.reason.objectRecovered'));
   const revealed = revealEvidence(def, run, target.evidenceId, run.minute, 'recover');
   return { status: 'applied', run: { ...revealed, version: run.version + 1, recoveredObjects: [...run.recoveredObjects, target.objectId],
     inventory: [...run.inventory, target.evidenceId], admissibility: { ...revealed.admissibility, [target.evidenceId]: !irregular } },
@@ -534,14 +534,14 @@ function resolveRecovery(def: CaseDefinition, run: CaseRun, action: Action): Act
 function finishParams(action: Action): boolean {
   return typeof action.params === 'object' && action.params !== null && !Array.isArray(action.params) && Object.keys(action.params).length === 0;
 }
-function resolveFinish(_def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
-  if (!finishParams(action)) return { status: 'impossible', run, events: [], reason: 'Parámetros de cierre inválidos.' };
+function resolveFinish(_def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
+  if (!finishParams(action)) return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.closeParamsInvalid') };
   return { status: 'confirmation_required', run, events: [], preview: {
-    actionType: 'finish', estimatedMinutes: 0, estimatedEndTime: run.minute, description: 'Confirmar cierre del caso.',
+    actionType: 'finish', estimatedMinutes: 0, estimatedEndTime: run.minute, description: resolveMessage(language, 'engine.preview.finish'),
   }};
 }
-function finishCase(def: CaseDefinition, run: CaseRun): ActionResult {
-  const report = buildFinalReport(def, run, 'finished');
+function finishCase(def: CaseDefinition, run: CaseRun, language: Language = 'es'): ActionResult {
+  const report = buildFinalReport(def, run, 'finished', language);
   const newRun: CaseRun = {
     ...run,
     version: run.version + 1,
@@ -552,39 +552,41 @@ function finishCase(def: CaseDefinition, run: CaseRun): ActionResult {
   return { status: 'case_closed', run: newRun, events, report };
 }
 
-type Handler = (def: CaseDefinition, run: CaseRun, action: Action) => ActionResult;
+type Handler = (def: CaseDefinition, run: CaseRun, action: Action, language: Language) => ActionResult;
 const handlers: Readonly<Record<Action['type'], Handler>> = Object.freeze({
   inspect: resolveInspection, collect: resolveCollection, talk: resolveTalk, travel: previewTravel,
   analyze: requestAnalysis, query: requestQuery,
-  request_warrant: (def, run, action) => requestWarrant(def, run, action.params),
-  batch: resolveBatch, batch_decision: resolveBatchDecision, wait: resolveWait,
+  request_warrant: (def, run, action, language) => requestWarrant(def, run, action.params, language),
+  batch: (def, run, action, language) => resolveBatch(def, run, action, false, language),
+  batch_decision: (def, run, action, language) => resolveBatchDecision(def, run, action, false, language),
+  wait: resolveWait,
   communicate: resolveCommunication, detain: resolveDetention, recover: resolveRecovery, finish: resolveFinish,
   irregular: resolveIrregular, team: resolveTeam,
 });
 
 // ── Confirmación de acciones con coste ─────────────────────────────────────────
 
-function confirmActionInternal(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function confirmActionInternal(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   switch (action.type) {
-    case 'finish': return finishParams(action) ? finishCase(def, run) : resolveFinish(def, run, action);
-    case 'travel': return confirmTravel(def, run, action);
-    case 'analyze': return requestAnalysis(def, run, action);
+    case 'finish': return finishParams(action) ? finishCase(def, run, language) : resolveFinish(def, run, action, language);
+    case 'travel': return confirmTravel(def, run, action, false, language);
+    case 'analyze': return requestAnalysis(def, run, action, language);
     case 'inspect':
     case 'detain':
     case 'recover':
-    case 'irregular': return applyMaterial(def, run, action);
+    case 'irregular': return applyMaterial(def, run, action, language);
     // Enviar un documento avanza el reloj (trámite) antes de enviarlo;
     // escribir un mensaje no cuesta tiempo y va directo.
-    case 'communicate': return applyCommunication(def, run, action);
-    default: return resolveActionInternal(def, run, action);
+    case 'communicate': return applyCommunication(def, run, action, language);
+    default: return resolveActionInternal(def, run, action, language);
   }
 }
 
 /** Confirmar un envío de la central: el documento es un trámite con
  * coste de tiempo; el mensaje va directo, sin avanzar el reloj. */
-function applyCommunication(def: CaseDefinition, run: CaseRun, action: Action): ActionResult {
+function applyCommunication(def: CaseDefinition, run: CaseRun, action: Action, language: Language): ActionResult {
   return typeof action.params.documentId === 'string'
-    ? applyMaterial(def, run, action) : resolveActionInternal(def, run, action);
+    ? applyMaterial(def, run, action, language) : resolveActionInternal(def, run, action, language);
 }
 
 function travelPosition(def: CaseDefinition, run: CaseRun, toCityId: string, expired: boolean): CaseRun['position'] {
@@ -598,14 +600,14 @@ function travelPosition(def: CaseDefinition, run: CaseRun, toCityId: string, exp
   return { cityId: toCityId, locationId: visitLocationId(toCityId) };
 }
 
-function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false): ActionResult {
+function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action, estimateOnly = false, language: Language = 'es'): ActionResult {
   const toCityId = action.params.toCityId;
   if (typeof toCityId !== 'string') {
-    return { status: 'impossible', run, events: [], reason: 'toCityId inválido.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.invalidCity') };
   }
   const minutes = travelDuration(def, run.position.cityId, toCityId);
   if (minutes === undefined) {
-    return { status: 'impossible', run, events: [], reason: 'No hay ruta disponible.' };
+    return { status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.noRoute') };
   }
   const confirmedTrips = nextTripCount(run);
   const baseCost = minutes;
@@ -630,7 +632,7 @@ function confirmTravel(def: CaseDefinition, run: CaseRun, action: Action, estima
   const events = [...maturedEvents(matured, processedRun), makeEvent(newMinute, expired ? 'travel_interrupted' : 'travel', { toCityId, baseCost, delay, totalCost })];
 
   if (expired) {
-    const report = buildFinalReport(def, processedRun, 'deadline');
+    const report = buildFinalReport(def, processedRun, 'deadline', language);
     const closedRun: CaseRun = {
       ...processedRun,
       status: 'closed',

@@ -1,5 +1,5 @@
 import type { CaseDefinition, CaseRun, CommunicationRecord, RemoteChannel, ScheduledResult } from '@meridiano/case-schema';
-import { channelsForNpc, DOCUMENT_SEND_MINUTES } from '@meridiano/case-schema';
+import { channelsForNpc, DOCUMENT_SEND_MINUTES, resolveMessage, type Language } from '@meridiano/case-schema';
 import type { ActionResult } from './types.js';
 import { appendRequest } from './requests.js';
 import { EngineStateError } from './state-error.js';
@@ -79,8 +79,8 @@ function communicationSentRecord(requestId: string, run: CaseRun, params: Commun
     `${params.documentId !== undefined ? ':' + params.documentId : ''}@${run.minute}`;
 }
 
-export function submitCommunication(def: CaseDefinition, run: CaseRun, params: Record<string, unknown>): ActionResult {
-  const refuse = (): ActionResult => ({ status: 'impossible', run, events: [], reason: 'Comunicación no disponible.' });
+export function submitCommunication(def: CaseDefinition, run: CaseRun, params: Record<string, unknown>, language: Language = 'es'): ActionResult {
+  const refuse = (): ActionResult => ({ status: 'impossible', run, events: [], reason: resolveMessage(language, 'engine.reason.communicationUnavailable') });
   if (!isCommunicationParams(params) || communicationRefusal(def, run, params)) return refuse();
   const requestId = nextCommunicationId(run);
   const record = communicationRecord(requestId, run, params);

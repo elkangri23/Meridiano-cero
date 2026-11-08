@@ -1,5 +1,6 @@
 import type { CaseDefinition, CaseRun } from '@meridiano/case-schema';
-import { ARREST_COORDINATION_MINUTES, DOCUMENT_SEND_MINUTES, IRREGULAR_MINUTES } from '@meridiano/case-schema';
+import { ARREST_COORDINATION_MINUTES, DOCUMENT_SEND_MINUTES, IRREGULAR_MINUTES, resolveMessage } from '@meridiano/case-schema';
+import type { Language } from '@meridiano/case-schema';
 import type { Action, ActionResult } from './types.js';
 import { isFixedCase } from './fixed-case.js';
 import { DETENTION_INTERACTIVE_MINUTES } from './arrest.js';
@@ -35,9 +36,9 @@ export function materialMinutes(def: CaseDefinition, run: CaseRun, action: Actio
   return inspectMinutes(run, action, (targetId, element) => inspectedEvidence(targetId, element));
 }
 
-export function confirmation(run: CaseRun, action: Action, minutes: number): ActionResult {
+export function confirmation(run: CaseRun, action: Action, minutes: number, language: Language = 'es'): ActionResult {
   return { status: 'confirmation_required', run, events: [], preview: {
     actionType: action.type, estimatedMinutes: minutes, estimatedEndTime: run.minute + minutes,
-    description: `Confirmar acción: ${minutes} minutos estimados.`,
+    description: resolveMessage(language, 'engine.preview.action', { minutes }),
   } };
 }

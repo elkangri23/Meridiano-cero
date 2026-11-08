@@ -1,6 +1,10 @@
 import type { Tool } from './sample';
 import { destinations } from './sample';
 import { useTranslation } from '../i18n';
+import type { LocaleKey } from '@meridiano/contracts';
+
+/** Nombre del país de un destino de muestra, en el idioma del jugador. */
+const countryKeys: Record<string, LocaleKey> = { es: 'engine.country.es', fr: 'engine.country.fr', pt: 'engine.country.pt' };
 
 interface Props {
   readableFont: boolean; setReadableFont: (enabled: boolean) => void;
@@ -15,8 +19,8 @@ export function ToolPanel({ tool, draft, contrast, setContrast, scale, setScale,
     <div className="atlas" aria-hidden="true"><div className="atlas-land" />{destinations.map(city =>
       <span key={city.id} className="atlas-city" style={{ left: city.x + '%', top: city.y + '%' }}>{city.name}</span>)}</div>
     <ul className="destination-list">{destinations.map(city => <li key={city.id}>
-      <span><strong>{city.name}</strong><small>{city.country}</small></span>
-      <button type="button" onClick={() => { draft('Viajar a ' + city.name); }}>{t('prototype.map.prepare')}<span className="sr-only">{t('prototype.map.prepareTo', { city: city.name })}</span></button>
+      <span><strong>{city.name}</strong><small>{t(countryKeys[city.code] ?? 'engine.country.es')}</small></span>
+      <button type="button" onClick={() => { draft(t('prototype.map.travelDraft', { city: city.name })); }}>{t('prototype.map.prepare')}<span className="sr-only">{t('prototype.map.prepareTo', { city: city.name })}</span></button>
     </li>)}</ul>
   </section>;
   if (tool === 'laboratorio') return <section aria-labelledby="tool-title">
@@ -28,7 +32,7 @@ export function ToolPanel({ tool, draft, contrast, setContrast, scale, setScale,
     <p className="overline">{t('prototype.comms.overline')}</p><h2 id="tool-title">{t('prototype.comms.title')}</h2>
     <article className="contact-card"><span className="avatar" aria-hidden="true">MS</span><div><h3>Margaret Sullivan</h3><p>{t('prototype.comms.role')}</p></div></article>
     <blockquote>{t('prototype.comms.quote')}</blockquote>
-    <button type="button" className="secondary-button" onClick={() => { draft('Consultar el encargo con Margaret'); }}>{t('prototype.comms.prepare')}</button>
+    <button type="button" className="secondary-button" onClick={() => { draft(t('prototype.comms.draft')); }}>{t('prototype.comms.prepare')}</button>
     <p className="panel-note">{t('prototype.comms.note')}</p>
   </section>;
   if (tool === 'ajustes') return <section aria-labelledby="tool-title">

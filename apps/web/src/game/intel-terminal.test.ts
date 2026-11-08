@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildIntelFacts, INTEL_MAX_FACTS, INTEL_NO_RECORD, selectIntelFacts } from './intel-terminal';
+import { buildIntelFacts, INTEL_MAX_FACTS, intelNoRecord, selectIntelFacts } from './intel-terminal';
+import { createTranslator } from '@meridiano/contracts';
+
+const t = createTranslator('es').t;
+const tFr = createTranslator('fr').t;
 
 const TEXTS: Record<string, string> = {
   'EV-02': 'La cerradura de la vitrina tiene residuo de herramienta.',
@@ -14,6 +18,18 @@ function facts() {
     briefing: { speaker: 'El director de A.C.M.E.', title: 'El astrolabio robado', paragraphs: ['Han robado el astrolabio original en Madrid.'] },
     heard: [{ id: 'npc:tomas:identidad', text: 'Tomás Ríos: Soy Tomás Ríos, jefe de seguridad del museo.' }],
     textForDiscovery: id => TEXTS[id] ?? id,
+    t,
+  });
+}
+
+function factsFr() {
+  return buildIntelFacts({
+    dossier: ['EV-02'],
+    objectives: [{ id: 'obj-detener', description: 'Arrêter Inés avec un mandat valide', achieved: false }],
+    briefing: { speaker: 'Margaret Sullivan', title: 'L\'astrolabe des trois villes', paragraphs: ['Un astrolabe a disparu à Madrid.'] },
+    heard: [],
+    textForDiscovery: id => TEXTS[id] ?? id,
+    t: tFr,
   });
 }
 
@@ -43,7 +59,18 @@ describe('terminal de inteligencia: solo hechos autorizados', () => {
 
   it('sin solapamiento no selecciona nada: la terminal dirá que no hay registro', () => {
     expect(selectIntelFacts('¿Qué se sabe del submarino amarillo?', facts())).toEqual([]);
-    expect(INTEL_NO_RECORD).toContain('no demuestra inocencia');
+    expect(intelNoRecord(t)).toContain('no demuestra inocencia');
+    expect(intelNoRecord(tFr)).toContain('ne prouve pas l\'innocence');
+  });
+
+  it('en francés, el hecho de objetivo sale en francés y las palabras vacías no puntúan', () => {
+    const built = factsFr();
+    expect(built.find(fact => fact.id === 'objetivo:obj-detener')?.text)
+      .toBe('Objectif : Arrêter Inés avec un mandat valide. État : en attente.');
+    // «Que dit le dossier ?» son solo palabras vacías en francés: no
+    // selecciona nada (antes, «le» puntuaría como contenido).
+    expect(selectIntelFacts('Que dit le dossier ?', built)).toEqual([]);
+    expect(selectIntelFacts('What does the file say?', built)).toEqual([]);
   });
 
   it('nunca entrega más de 16 hechos al modelo', () => {

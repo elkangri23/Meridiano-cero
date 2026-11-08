@@ -46,13 +46,16 @@ export const TEAM_SERVICE_KEYS: Record<TeamServiceId, LocaleKey> = {
 
 /** Elena Vázquez como interlocutora: la misma consulta determinista que la
  * terminal de inteligencia, con su persona. Sin hecho que respalde la
- * respuesta, lo dice y no llama al modelo (la misma regla que la terminal). */
+ * respuesta, lo dice y no llama al modelo (la misma regla que la terminal).
+ * Las frases salen de `t()` en el idioma del jugador, no de constantes en
+ * español: la persona alimenta al modelo y el saludo y la negativa se
+ * enseñan. */
 export const ELENA_ID = 'elena';
 export const ELENA_NAME = 'Elena Vázquez';
-export const ELENA_PERSONA = 'Eres Elena Vázquez, de inteligencia de A.C.M.E. Respondes con frases cortas y formales, en primera persona, solo con lo que dicen los registros citados. Nunca inventas hechos del caso, nunca revelas culpabilidad y nunca dices quién es el culpable salvo que un registro citado lo afirme. Si un dato no está en los registros citados, di que no consta.';
-export const ELENA_REFUSAL = 'Sin registro en los archivos consultados. La ausencia de registro no demuestra inocencia.';
-export const ELENA_GREETING = 'Soy Elena Vázquez, inteligencia de A.C.M.E. Pregunta por lo investigado: sospechosos, pruebas, lugares. Solo respondo con lo que consta en los registros.';
-export const TEAM_GREETING = 'Soy Margaret Sullivan, directora de A.C.M.E. Pregunta al equipo: yo te recuerdo el encargo y evalúo tu carrera, Richter explica los análisis, Elena consulta los registros, David coordina detenciones y Clara organiza el expediente.';
+export function elenaPersona(t: TranslateFn): string { return t('engine.team.elenaPersona'); }
+export function elenaRefusal(t: TranslateFn): string { return t('engine.team.elenaRefusal'); }
+export function elenaGreeting(t: TranslateFn): string { return t('engine.team.elenaGreeting'); }
+export function teamGreeting(t: TranslateFn): string { return t('engine.team.greeting'); }
 
 /** Respuesta de un servicio determinista desde la vista, o null si el
  * servicio no tiene respuesta calculable (la consulta de Elena y la
@@ -62,10 +65,10 @@ export const TEAM_GREETING = 'Soy Margaret Sullivan, directora de A.C.M.E. Pregu
  * carrera empieza con el primer cierre. */
 export function teamServiceAnswer(serviceId: TeamServiceId, view: PlayerViewDto, targetId: string | undefined, career: CareerProfileDto | null | undefined, t: TranslateFn): string | null {
   switch (serviceId) {
-    case 'briefing': return briefingAnswer(view);
-    case 'explain': return targetId ? explainAnswer(view, targetId) : null;
-    case 'routes': return routesAnswer(view);
-    case 'organize': return organizeAnswer(view);
+    case 'briefing': return briefingAnswer(view, t);
+    case 'explain': return targetId ? explainAnswer(view, targetId, t) : null;
+    case 'routes': return routesAnswer(view, t);
+    case 'organize': return organizeAnswer(view, t);
     case 'evaluate': return career ? evaluateAnswer(career, t) : null;
     default: return null;
   }
@@ -97,19 +100,28 @@ export function medalLabel(medal: string | null, t: TranslateFn): string {
  * en curso ni dice si se va bien: la carrera solo cuenta cierres. */
 export function evaluateAnswer(career: CareerProfileDto, t: TranslateFn): string {
   if (career.totalCases === 0) {
-    return 'Aún no tienes casos cerrados. Tu carrera empieza con el primer informe oficial: cierra un caso y te diré tu rango, tus puntos y tu reputación.';
+    return t('engine.team.evaluateEmpty');
   }
   const parts: string[] = [];
-  parts.push(`Tu carrera: rango ${career.rank}, ${career.points} puntos en ${career.totalCases} ${career.totalCases === 1 ? 'caso' : 'casos'} (${career.completedCases} ${career.completedCases === 1 ? 'resuelto' : 'resueltos'}).`);
-  parts.push(`Prestigio ${career.prestigeLabel.toLowerCase()}, integridad ${career.integrityLabel.toLowerCase()}, confianza ${career.trustLabel.toLowerCase()}.`);
+  parts.push(t('engine.team.evaluateLine', {
+    rank: career.rank, points: career.points, total: career.totalCases,
+    caseWord: t(career.totalCases === 1 ? 'engine.team.caseOne' : 'engine.team.caseMany'),
+    completed: career.completedCases,
+    resolvedWord: t(career.completedCases === 1 ? 'engine.team.resolvedOne' : 'engine.team.resolvedMany'),
+  }));
+  parts.push(t('engine.team.evaluateReputation', {
+    prestige: career.prestigeLabel.toLowerCase(), integrity: career.integrityLabel.toLowerCase(), trust: career.trustLabel.toLowerCase(),
+  }));
   if (career.medals.length > 0) {
-    parts.push('Medallas: ' + career.medals.map(medal => medalLabel(medal, t)).join(', ') + '.');
+    parts.push(t('engine.team.evaluateMedals', { list: career.medals.map(medal => medalLabel(medal, t)).join(', ') }));
   }
   const active = career.sanctions.filter(sanction => sanction.active);
   if (active.length > 0) {
-    parts.push(`Tienes ${active.length} ${active.length === 1 ? 'suspensión activa' : 'suspensiones activas'}: ${active.map(sanction => sanction.reason).join('; ')}. Un caso limpio la resuelve.`);
+    parts.push(t(active.length === 1 ? 'engine.team.evaluateSanctionOne' : 'engine.team.evaluateSanctionsMany', {
+      count: active.length, reasons: active.map(sanction => sanction.reason).join('; '),
+    }));
   } else if (career.sanctions.length > 0) {
-    parts.push('Tuviste una suspensión y ya la resolviste con casos limpios.');
+    parts.push(t('engine.team.evaluateSanctionResolved'));
   }
   return parts.join(' ');
 }
@@ -117,56 +129,64 @@ export function evaluateAnswer(career: CareerProfileDto, t: TranslateFn): string
 /** Margaret sobre el encargo: la introducción del caso tal como la
  * presentó ella, más los objetivos con su estado. Nunca valora si se va
  * bien: solo recuerda qué se encargó y qué falta. */
-export function briefingAnswer(view: PlayerViewDto): string {
+export function briefingAnswer(view: PlayerViewDto, t: TranslateFn): string {
   const lines: string[] = [];
   if (view.briefing) {
     lines.push(`${view.briefing.speaker}: ${view.briefing.paragraphs.join(' ')}`);
   } else {
-    lines.push('El encargo es el caso que tienes abierto.');
+    lines.push(t('engine.team.briefingFallback'));
   }
-  lines.push('Objetivos: ' + view.objectives.map(objective =>
-    `${objective.description} (${objective.achieved ? 'logrado' : 'pendiente'})`).join('; ') + '.');
+  lines.push(t('engine.team.briefingObjectives', { list: view.objectives.map(objective =>
+    `${objective.description} (${objective.achieved ? t('engine.team.objectiveAchieved') : t('engine.team.objectivePending')})`).join('; ') }));
   return lines.join(' ');
 }
 
 /** Richter explica un análisis completado: el texto del resultado y el
  * recordatorio de procedimiento del laboratorio. Sin análisis completado
  * no hay nada que explicar (el motor lo rechaza). */
-export function explainAnswer(view: PlayerViewDto, analysisId: string): string {
+export function explainAnswer(view: PlayerViewDto, analysisId: string, t: TranslateFn): string {
   const text = view.evidenceTexts[analysisId] ?? analysisId;
   const object = view.objects.find(item => item.id === analysisId);
-  const admissibility = object ? (object.admissible ? 'admisible' : 'no admisible') : '';
-  return `Resultado: ${text}` +
-    (admissibility ? ` Prueba ${admissibility}.` : '') +
-    ' Un análisis solo dice lo que la prueba permite decir.';
+  const admissibility = object ? t(object.admissible ? 'engine.team.explainAdmissible' : 'engine.team.explainInadmissible') : '';
+  return t('engine.team.explainResult', { text }) +
+    (admissibility ? ` ${t('engine.team.explainAdmissibility', { admissibility })}` : '') +
+    ` ${t('engine.team.explainNote')}`;
+}
+
+/** Etiqueta de un tipo de solicitud pendiente; un tipo desconocido se
+ * enseña tal cual (el motor no debería enviarlo). */
+const requestTypeKeys: Record<string, LocaleKey> = { analysis: 'labels.request.analysis', query: 'labels.request.query', request: 'labels.request.request' };
+function requestTypeLabel(type: string, t: TranslateFn): string {
+  const key = requestTypeKeys[type];
+  return key ? t(key) : type;
 }
 
 /** Clara organiza el expediente: lo recogido (con admisibilidad), lo
  * pendiente, las órdenes y detenciones y los objetivos. Todo sale de la
  * vista; nada nuevo, solo ordenado. */
-export function organizeAnswer(view: PlayerViewDto): string {
+export function organizeAnswer(view: PlayerViewDto, t: TranslateFn): string {
   const parts: string[] = [];
   parts.push(view.objects.length === 0
-    ? 'Pruebas en tu poder: ninguna todavía.'
-    : 'Pruebas en tu poder: ' + view.objects.map(item =>
-      `${view.evidenceTexts[item.id] ?? item.id} (${item.admissible ? 'admisible' : 'no admisible'})`).join('; ') + '.');
+    ? t('engine.team.organizeEmpty')
+    : t('engine.team.organizeObjects', { list: view.objects.map(item =>
+      `${view.evidenceTexts[item.id] ?? item.id} (${item.admissible ? t('engine.team.explainAdmissible') : t('engine.team.explainInadmissible')})`).join('; ') }));
   parts.push(view.pendingRequests.length === 0
-    ? 'Solicitudes pendientes: ninguna.'
-    : 'Solicitudes pendientes: ' + view.pendingRequests.map(item =>
-      `${item.type} (responde en el minuto ${item.dueMinute})`).join('; ') + '.');
-  parts.push(view.warrants.length === 0 ? 'Órdenes: ninguna.' : `Órdenes: ${view.warrants.length}.`);
-  parts.push(view.detentions.length === 0 ? 'Detenciones: ninguna.' : `Detenciones: ${view.detentions.length}.`);
-  parts.push('Objetivos: ' + view.objectives.map(objective =>
-    `${objective.description} (${objective.achieved ? 'logrado' : 'pendiente'})`).join('; ') + '.');
+    ? t('engine.team.organizePendingEmpty')
+    : t('engine.team.organizePending', { list: view.pendingRequests.map(item =>
+      t('engine.team.pendingItem', { type: requestTypeLabel(item.type, t), due: item.dueMinute })).join('; ') }));
+  parts.push(view.warrants.length === 0 ? t('engine.team.organizeWarrantsEmpty') : t('engine.team.organizeWarrants', { count: view.warrants.length }));
+  parts.push(view.detentions.length === 0 ? t('engine.team.organizeDetentionsEmpty') : t('engine.team.organizeDetentions', { count: view.detentions.length }));
+  parts.push(t('engine.team.organizeObjectives', { list: view.objectives.map(objective =>
+    `${objective.description} (${objective.achieved ? t('engine.team.objectiveAchieved') : t('engine.team.objectivePending')})`).join('; ') }));
   return parts.join(' ');
 }
 
 /** David consulta las rutas: los viajes que la vista ofrece desde la
  * ciudad actual, con su duración. Las rutas son las del expediente; el
  * viaje en sí se hace desde la escena o el mapa, como siempre. */
-export function routesAnswer(view: PlayerViewDto): string {
+export function routesAnswer(view: PlayerViewDto, t: TranslateFn): string {
   const routes = view.offers.filter(offer => offer.action.type === 'travel');
-  if (routes.length === 0) return `Desde ${view.position.city.name} no hay rutas de viaje disponibles.`;
-  return `Desde ${view.position.city.name}: ` + routes.map(offer =>
-    `${offer.label}${offer.detail ? ` (${offer.detail})` : ''}`).join('; ') + '.';
+  if (routes.length === 0) return t('engine.team.routesEmpty', { city: view.position.city.name });
+  return t('engine.team.routes', { city: view.position.city.name, list: routes.map(offer =>
+    `${offer.label}${offer.detail ? ` (${offer.detail})` : ''}`).join('; ') });
 }

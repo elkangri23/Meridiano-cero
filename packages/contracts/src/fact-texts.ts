@@ -10,9 +10,12 @@
 // `CaseDefinition.texts`: las funciones de este módulo aceptan un `texts`
 // opcional y, cuando está presente, lo usan en vez del catálogo fijo. Sin
 // él, el comportamiento es el de siempre (caso fijo).
-import { RECURRENT_NPCS, REMOTE_CHANNEL_LABELS } from './npc-catalog.js';
+import { RECURRENT_NPCS, remoteChannelInSentence } from './npc-catalog.js';
 import { teamMember } from './team.js';
 import type { LocaleKey } from './locales/es.js';
+import type { Language } from './preferences.js';
+import { resolveMessage } from './i18n.js';
+import { caseText } from './locales/cases.js';
 
 /**
  * Textos narrativos de un expediente generado (T4-08). El caso fijo los
@@ -78,8 +81,14 @@ export interface DiscoveryLookup {
 }
 
 /** Texto de una evidencia, si existe. Con `texts` (expediente generado), el
- * texto viene del expediente; sin él, del catálogo fijo. */
-export function evidenceText(evidenceId: string, texts?: CaseTexts): string | undefined {
+ * texto viene del expediente; sin él, del catálogo fijo. Con `caseId` e
+ * idioma distinto de español, la traducción del caso manda y el español de
+ * la definición es el fallback. */
+export function evidenceText(evidenceId: string, texts?: CaseTexts, caseId?: string, language: Language = 'es'): string | undefined {
+  if (caseId) {
+    const translated = caseText(caseId, 'texts.evidence.' + evidenceId, language);
+    if (translated) return translated;
+  }
   return texts ? texts.evidence[evidenceId] : EVIDENCE_TEXTS[evidenceId];
 }
 
@@ -220,19 +229,26 @@ export function hasKnowledgeContent(text: string, anchors: KnowledgeContentAncho
   return false;
 }
 
-/** Frase de un objetivo logrado del informe final. */
-export function objectiveText(objectiveId: string): string {
+/** Frase de un objetivo logrado del informe final. Con `caseId` e idioma
+ * distinto de español, la traducción del caso manda y la frase española de
+ * la definición es el fallback. */
+export function objectiveText(objectiveId: string, caseId?: string, language: Language = 'es'): string {
+  if (caseId) {
+    const translated = caseText(caseId, 'objective.' + objectiveId, language);
+    if (translated) return translated;
+  }
   return OBJECTIVE_TEXT[objectiveId] ?? objectiveId;
 }
 
 /** Hechos que un personaje puede declarar, con su texto, según su
  * conocimiento (RECURRENT_NPCS). Con `texts` y `knowledgeIds` (expediente
- * generado), el conocimiento y los textos vienen del expediente. */
-export function npcKnowledgeFacts(npcId: string, texts?: CaseTexts, knowledgeIds?: string[]): Array<{ id: string; text: string }> {
+ * generado), el conocimiento y los textos vienen del expediente. Con
+ * `caseId` e idioma distinto de español, la traducción del caso manda. */
+export function npcKnowledgeFacts(npcId: string, texts?: CaseTexts, knowledgeIds?: string[], caseId?: string, language: Language = 'es'): Array<{ id: string; text: string }> {
   const knowledge = texts ? (knowledgeIds ?? []) : (RECURRENT_NPCS.find(item => item.id === npcId)?.knowledge ?? []);
   const source = texts ? texts.knowledge : KNOWLEDGE_TEXTS;
   return knowledge.flatMap(id => {
-    const text = source[id];
+    const text = (caseId ? caseText(caseId, 'texts.knowledge.' + id, language) : undefined) ?? source[id];
     return text ? [{ id, text }] : [];
   });
 }
@@ -246,61 +262,79 @@ export const NPC_REFUSALS: Record<string, string> = {
 };
 
 /** Negativa en personaje de un NPC al declarar sobre el robo, si la tiene. */
-export function npcRefusal(npcId: string, texts?: CaseTexts): string | undefined {
+export function npcRefusal(npcId: string, texts?: CaseTexts, caseId?: string, language: Language = 'es'): string | undefined {
+  if (caseId) {
+    const translated = caseText(caseId, 'texts.refusals.' + npcId, language);
+    if (translated) return translated;
+  }
   return texts ? texts.refusals?.[npcId] : NPC_REFUSALS[npcId];
 }
 
 /** Saludo de un personaje al empezar a hablar con él. */
-export function npcGreeting(npcId: string, texts?: CaseTexts): string | undefined {
+export function npcGreeting(npcId: string, texts?: CaseTexts, caseId?: string, language: Language = 'es'): string | undefined {
+  if (caseId) {
+    const translated = caseText(caseId, 'texts.greetings.' + npcId, language);
+    if (translated) return translated;
+  }
   return texts ? texts.greetings[npcId] : NPC_GREETINGS[npcId];
 }
 
 /** Frase del primer viaje a una ciudad (`travel:<ciudad>`): el motor lo
  * registra como descubrimiento. Nunca se muestra la clave cruda. */
-function travelDiscovery(id: string, lookup: DiscoveryLookup): string | undefined {
+function travelDiscovery(id: string, lookup: DiscoveryLookup, language: Language): string | undefined {
   if (!id.startsWith('travel:')) return undefined;
   const city = lookup.cityName(id.slice('travel:'.length));
-  return city ? `Viajas a ${city}.` : 'Viaje realizado.';
+  return city ? resolveMessage(language, 'engine.discovery.travel', { city }) : resolveMessage(language, 'engine.discovery.travelFallback');
 }
 
 /** Frase para un marcador del motor (análisis, identidad, ubicación,
  * respuesta recibida u orden denegada); undefined si no es un marcador. */
 /** Marcadores de conducta irregular en el dossier: el acceso forzado y
  * la advertencia de A.C.M.E. se leen como frases, nunca como claves. */
-function irregularMarker(id: string): string | undefined {
-  if (id === 'forced-entry') return 'Acceso forzado: entraste sin permiso ni orden de acceso.';
+function irregularMarker(id: string, language: Language): string | undefined {
+  if (id === 'forced-entry') return resolveMessage(language, 'engine.discovery.forcedEntry');
   // La regla es retirar el caso a la 3.ª vez visto (motor `misconduct.ts`,
   // `WITNESSED_WITHDRAWAL_COUNT`): el texto anterior decía «si te ven otra
   // vez», que es la 2.ª, y mentía sobre la regla.
-  if (id === 'warning') return 'Advertencia de A.C.M.E.: te han visto en una acción irregular. A la 3.ª vez que te vean, A.C.M.E. retirará el caso.';
+  if (id === 'warning') return resolveMessage(language, 'engine.discovery.warning', { count: 3 });
   return undefined;
 }
 
-function markerDiscovery(id: string, lookup: DiscoveryLookup, texts?: CaseTexts): string | undefined {
-  const travel = travelDiscovery(id, lookup);
+function markerDiscovery(id: string, lookup: DiscoveryLookup, texts?: CaseTexts, caseId?: string, language: Language = 'es'): string | undefined {
+  const travel = travelDiscovery(id, lookup, language);
   if (travel) return travel;
+  const prefixed = prefixedMarker(id, lookup, texts, caseId, language);
+  if (prefixed) return prefixed;
+  if (id.startsWith('communication_received:')) return resolveMessage(language, 'engine.discovery.communicationReceived');
+  if (id.startsWith('warrant-denied:')) return resolveMessage(language, 'engine.discovery.warrantDenied');
+  return irregularMarker(id, language);
+}
+
+/** Hallazgos con prefijo (`analysis:`, `identity:`, `location:`): el texto
+ * del hecho o del personaje, o el identificador tal cual si no se conoce. */
+function prefixedMarker(id: string, lookup: DiscoveryLookup, texts?: CaseTexts, caseId?: string, language: Language = 'es'): string | undefined {
   if (id.startsWith('analysis:')) {
-    const inner = evidenceText(id.slice('analysis:'.length), texts);
-    return inner ? `Análisis completado: ${inner}` : id;
+    const inner = evidenceText(id.slice('analysis:'.length), texts, caseId, language);
+    return inner ? resolveMessage(language, 'engine.discovery.analysis', { text: inner }) : id;
   }
   if (id.startsWith('identity:')) {
     const name = lookup.npcName(id.slice('identity:'.length));
-    return name ? `Confirmaste la identidad de ${name}.` : id;
+    return name ? resolveMessage(language, 'engine.discovery.identity', { name }) : id;
   }
   if (id.startsWith('location:')) {
     const name = lookup.npcName(id.slice('location:'.length));
-    return name ? `Sabes dónde encontrar a ${name}.` : id;
+    return name ? resolveMessage(language, 'engine.discovery.location', { name }) : id;
   }
-  if (id.startsWith('communication_received:')) return 'Llegó la respuesta a tu solicitud.';
-  if (id.startsWith('warrant-denied:')) return 'Una orden solicitada ha sido denegada.';
-  return irregularMarker(id);
+  return undefined;
 }
 
 /** Frase narrativa de un viaje confirmado: de la ciudad de origen a la de
  * destino. Solo usa nombres que el jugador ya conoce; no inventa hechos
  * del caso (es narración genérica de desplazamiento). */
-export function travelText(fromCity: string | undefined, toCity: string): string {
-  return fromCity && fromCity !== toCity ? `Sales de ${fromCity} y llegas a ${toCity}.` : `Llegas a ${toCity}.`;
+export function travelText(fromCity: string | undefined, toCity: string, language: Language = 'es'): string {
+  return fromCity && fromCity !== toCity
+    ? resolveMessage(language, 'engine.travel.fromTo', { from: fromCity, to: toCity })
+    : resolveMessage(language, 'engine.travel.arrive', { to: toCity });
 }
 
 /** Frase legible para un hallazgo del dossier. Los identificadores que el
@@ -310,15 +344,15 @@ export function travelText(fromCity: string | undefined, toCity: string): string
  * (`analysis:EV-xx`), respuestas recibidas y órdenes denegadas. Un
  * identificador desconocido se devuelve tal cual: nunca se oculta un
  * hallazgo por no tener texto. */
-export function discoveryText(id: string, lookup: DiscoveryLookup, texts?: CaseTexts): string {
-  const evidence = texts ? texts.evidence[id] : EVIDENCE_TEXTS[id];
+export function discoveryText(id: string, lookup: DiscoveryLookup, texts?: CaseTexts, caseId?: string, language: Language = 'es'): string {
+  const evidence = evidenceText(id, texts, caseId, language);
   if (evidence) return evidence;
-  const marker = markerDiscovery(id, lookup, texts);
+  const marker = markerDiscovery(id, lookup, texts, caseId, language);
   if (marker) return marker;
   const location = lookup.locationName(id);
-  if (location) return `Lugar conocido: ${location}.`;
+  if (location) return resolveMessage(language, 'engine.discovery.knownLocation', { name: location });
   const city = lookup.cityName(id);
-  if (city) return `Ciudad conocida: ${city}.`;
+  if (city) return resolveMessage(language, 'engine.discovery.knownCity', { name: city });
   return id;
 }
 
@@ -327,23 +361,30 @@ export function discoveryText(id: string, lookup: DiscoveryLookup, texts?: CaseT
  * `communication_received:<id>@<minuto>`). Un registro desconocido se
  * devuelve tal cual. El documento se nombra por su texto cuando
  * `documentText` lo resuelve; sin él, por su código. */
-function talkRecordText(record: string, npcName: (id: string) => string | undefined): string | null {
+function talkRecordText(record: string, npcName: (id: string) => string | undefined, language: Language): string | null {
   const talk = /^talk:([A-Za-z0-9._:-]+)@(\d+)$/.exec(record);
   if (!talk) return null;
   const name = npcName(talk[1] ?? '');
-  return name ? `Hablaste con ${name} (min ${talk[2]}).` : record;
+  return name ? resolveMessage(language, 'engine.record.talk', { name, minute: talk[2] ?? '' }) : record;
 }
 
-function sentRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined): string | null {
+function sentRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined, language: Language = 'es'): string | null {
   const sent = /^communication_sent:(?:[^:@]+):(call|whatsapp|sms|email|fax):([^:@]+)(?::([^:@]+))?@(\d+)$/.exec(record);
   if (!sent) return null;
   const name = npcName(sent[2] ?? '');
   if (!name) return record;
-  const channel = REMOTE_CHANNEL_LABELS[sent[1] as keyof typeof REMOTE_CHANNEL_LABELS] ?? sent[1];
-  const document = sent[3] ? (documentText?.(sent[3]) ?? sent[3]) : '';
+  const channel = remoteChannelInSentence(sent[1] as 'call' | 'whatsapp' | 'sms' | 'email' | 'fax', language);
+  const document = sentDocumentText(sent, documentText);
+  const minute = sent[4] ?? '';
   return document
-    ? `Enviaste a ${name} por ${channel} el documento «${document}» (min ${sent[4]}).`
-    : `Enviaste un mensaje a ${name} por ${channel} (min ${sent[4]}).`;
+    ? resolveMessage(language, 'engine.record.sentDocument', { name, channel, document, minute })
+    : resolveMessage(language, 'engine.record.sentMessage', { name, channel, minute });
+}
+
+/** Nombre del documento de un envío: por su texto cuando se resuelve, por
+ * su código si no, o vacío cuando el envío no llevaba documento. */
+function sentDocumentText(sent: RegExpExecArray, documentText?: (id: string) => string | undefined): string {
+  return sent[3] ? (documentText?.(sent[3]) ?? sent[3]) : '';
 }
 
 /** Frase legible para un registro de conducta irregular
@@ -354,6 +395,7 @@ function irregularRecordText(
   record: string,
   npcName: (id: string) => string | undefined,
   locationName?: (id: string) => string | undefined,
+  language: Language = 'es',
 ): string | null {
   const match = /^irregular:(force_entry|bribe|impersonate):([A-Za-z0-9._:-]+)@(\d+)$/.exec(record);
   if (!match) return null;
@@ -362,51 +404,53 @@ function irregularRecordText(
   const minute = match[3] ?? '';
   if (kind === 'force_entry') {
     const place = locationName?.(target) ?? target;
-    return `Forzaste el acceso a ${place} (min ${minute}).`;
+    return resolveMessage(language, 'engine.record.irregularForce', { place, minute });
   }
   const name = npcName(target);
   if (!name) return record;
   return kind === 'bribe'
-    ? `Sobornaste a ${name} (min ${minute}).`
-    : `Suplantaste a alguien hablando con ${name} (min ${minute}).`;
+    ? resolveMessage(language, 'engine.record.irregularBribe', { name, minute })
+    : resolveMessage(language, 'engine.record.irregularImpersonate', { name, minute });
 }
 
 /** Frase legible para un registro de petición al equipo A.C.M.E.
  * (`team:<miembro>:<servicio>[:<objetivo>]@<minuto>`, GDD §8). Sin
  * nombre conocido se devuelve el registro tal cual: nunca se oculta. */
-function teamRecordText(record: string): string | null {
+function teamRecordText(record: string, language: Language): string | null {
   const match = /^team:([a-z]+):([a-z]+)(?::([A-Za-z0-9._:-]+))?@(\d+)$/.exec(record);
   if (!match) return null;
   const [, memberId = '', serviceId = '', targetId = '', minute = ''] = match;
   const member = teamMember(memberId);
   if (!member) return record;
-  const phrases: Record<string, { verb: string; object: string }> = {
-    briefing: { verb: 'Preguntaste a', object: 'sobre el encargo' },
-    explain: { verb: 'Pediste a', object: targetId ? `que te explicara el análisis ${targetId}` : 'que te explicara un análisis' },
-    lookup: { verb: 'Consultaste a', object: 'en inteligencia' },
-    routes: { verb: 'Preguntaste a', object: 'por las rutas de viaje' },
-    organize: { verb: 'Pediste a', object: 'que organizara el expediente' },
+  const phrases: Record<string, { key: string; vars: Record<string, string> }> = {
+    briefing: { key: 'engine.record.team.briefing', vars: {} },
+    explain: targetId
+      ? { key: 'engine.record.team.explain', vars: { target: targetId } }
+      : { key: 'engine.record.team.explainNoTarget', vars: {} },
+    lookup: { key: 'engine.record.team.lookup', vars: {} },
+    routes: { key: 'engine.record.team.routes', vars: {} },
+    organize: { key: 'engine.record.team.organize', vars: {} },
     // La evaluación de carrera de Margaret faltaba y el dossier enseñaba
     // el registro crudo `team:margaret:evaluate@10`.
-    evaluate: { verb: 'Pediste a', object: 'que evaluara tu carrera' },
+    evaluate: { key: 'engine.record.team.evaluate', vars: {} },
   };
   const phrase = phrases[serviceId];
   if (!phrase) return record;
-  return `${phrase.verb} ${member.name} ${phrase.object} (min ${minute}).`;
+  return resolveMessage(language, phrase.key, { name: member.name, minute, ...phrase.vars });
 }
 
-export function conversationRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined, locationName?: (id: string) => string | undefined): string {
-  const talk = talkRecordText(record, npcName);
+export function conversationRecordText(record: string, npcName: (id: string) => string | undefined, documentText?: (id: string) => string | undefined, locationName?: (id: string) => string | undefined, language: Language = 'es'): string {
+  const talk = talkRecordText(record, npcName, language);
   if (talk !== null) return talk;
-  const sent = sentRecordText(record, npcName, documentText);
+  const sent = sentRecordText(record, npcName, documentText, language);
   if (sent !== null) return sent;
   const received = /^communication_received:[A-Za-z0-9._:-]+@(\d+)$/.exec(record);
-  if (received) return `Respuesta recibida (min ${received[1]}).`;
-  const irregular = irregularRecordText(record, npcName, locationName);
+  if (received) return resolveMessage(language, 'engine.record.received', { minute: received[1] ?? '' });
+  const irregular = irregularRecordText(record, npcName, locationName, language);
   if (irregular !== null) return irregular;
-  const team = teamRecordText(record);
+  const team = teamRecordText(record, language);
   if (team !== null) return team;
   const warning = /^warning:([A-Za-z0-9._:-]+)@(\d+)$/.exec(record);
-  if (warning) return `Advertencia de A.C.M.E. (min ${warning[2]}): te han visto en una acción irregular.`;
+  if (warning) return resolveMessage(language, 'engine.record.warning', { minute: warning[2] ?? '' });
   return record;
 }

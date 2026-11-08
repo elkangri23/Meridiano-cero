@@ -11,9 +11,9 @@ export const sampleView: PlayerView = {
   pendingRequests: [], warrants: [], detentions: [], finalReport: null,
 };
 export const destinations = [
-  { id: 'madrid', name: 'Madrid', country: 'España', x: 43, y: 67 },
-  { id: 'paris', name: 'París', country: 'Francia', x: 59, y: 29 },
-  { id: 'lisboa', name: 'Lisboa', country: 'Portugal', x: 23, y: 75 },
+  { id: 'madrid', name: 'Madrid', code: 'es' as const, x: 43, y: 67 },
+  { id: 'paris', name: 'París', code: 'fr' as const, x: 59, y: 29 },
+  { id: 'lisboa', name: 'Lisboa', code: 'pt' as const, x: 23, y: 75 },
 ] as const;
 export type Tool = 'dossier' | 'mapa' | 'laboratorio' | 'comunicaciones' | 'ajustes';
 /** Etiquetas de las herramientas (i18n): el texto vive en `locales/es.ts`. */

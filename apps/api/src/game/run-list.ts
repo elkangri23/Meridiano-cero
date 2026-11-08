@@ -1,5 +1,6 @@
 import { listCases } from './catalog.ts';
 import type { RunListDto, RunSummaryDto } from '@meridiano/contracts';
+import type { Language } from '@meridiano/case-schema';
 import type { Database } from '../database/connection.ts';
 import { inSession, RunStoreError } from './runs.ts';
 
@@ -53,9 +54,9 @@ function summary(row: Row, titles: Map<string, string>): RunSummaryDto {
   return { runId: row.runId, caseId: row.caseId, caseTitle: titles.get(row.caseId) ?? null, status: row.status, difficulty: row.difficulty, version: row.version, minute: row.minute, createdAt: row.createdAt.toISOString() };
 }
 
-export async function listStoredRuns(database: Database, digest: string, query: Record<string, unknown>): Promise<RunListDto> {
+export async function listStoredRuns(database: Database, digest: string, query: Record<string, unknown>, language: Language = 'es'): Promise<RunListDto> {
   const options = runListOptions(query);
-  const titles = new Map((await listCases(database.orm)).map(item => [item.caseId, item.title]));
+  const titles = new Map((await listCases(database.orm, undefined, language)).map(item => [item.caseId, item.title]));
   return inSession(database, digest, async (client, ownerId) => {
     // Un snapshot para ancla/página; timestamps de DB conservan microsegundos.
     const result = await client.query<Row>(`

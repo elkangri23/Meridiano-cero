@@ -21,6 +21,12 @@ function respond(body: unknown, status = 200) {
 }
 afterEach(() => { vi.unstubAllGlobals(); });
 
+/** Cabeceras de la petición capturada, como objeto plano (el cliente las envía como Headers). */
+function headersOf(init: RequestInit | undefined): Record<string, string> {
+  const raw = init?.headers;
+  return raw instanceof Headers ? Object.fromEntries(raw.entries()) : { ...(raw as Record<string, string> | undefined) };
+}
+
 describe('T3: frontera HTTP de la pantalla de juego', () => {
   it('vista GET del ID elegido con las garantías del transporte', async () => {
     const fetcher = respond(initialView);
@@ -67,8 +73,8 @@ describe('T3: frontera HTTP de la pantalla de juego', () => {
     expect(await gameApi.preview(initialView.runId, action, session, signal())).toMatchObject({ outcome: 'confirmation_required' });
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/v1/runs/' + initialView.runId + '/action');
     expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'POST',
-      headers: { 'x-csrf-token': session.csrfToken, 'x-expected-profile-id': id },
       body: JSON.stringify({ action, confirm: false }) });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'content-type': 'application/json', 'x-csrf-token': session.csrfToken, 'x-expected-profile-id': id, 'x-meridiano-language': 'es' });
   });
   it('commit envía confirm:true con versión y clave, y traduce el conflicto de versión', async () => {
     const fetcher = respond(actionResponse);
@@ -120,8 +126,8 @@ describe('T3: frontera HTTP de la pantalla de juego', () => {
     await gameApi.deleteSave(initialView.runId, saveId, 1, key, session, signal());
     expect(fetcher.mock.calls[0]?.[0]).toBe(`/api/v1/runs/${initialView.runId}/saves/${saveId}`);
     expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: 'DELETE',
-      headers: { 'x-csrf-token': session.csrfToken },
       body: JSON.stringify({ expectedSaveVersion: 1, idempotencyKey: key }) });
+    expect(headersOf(fetcher.mock.calls[0]?.[1])).toEqual({ 'content-type': 'application/json', 'x-csrf-token': session.csrfToken, 'x-expected-profile-id': id, 'x-meridiano-language': 'es' });
     respond({ error: { code: 'RUN_CLOSED' } }, 409);
     await expect(gameApi.deleteSave(initialView.runId, saveId, 1, key, session, signal())).rejects.toEqual(new GameError('run_closed'));
   });
