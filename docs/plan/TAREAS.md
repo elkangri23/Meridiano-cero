@@ -94,6 +94,14 @@ Añadir workflow con permisos mínimos, lockfile congelado, tipos/lint/tests/imp
 
 Salida comprobable: Ejecutar comprobaciones reales y registrar resultados; inyectar fallo controlado en copia temporal para comprobar que el gate lo detecta.
 
+## T1-05
+
+Contratos: SPEC-011/012; ADR-010.
+
+Limpieza de lint a cero (ESLint) tras la carrera: complejidad >10, `any` explícitos, aserciones no nulas y variables sin usar, sin cambiar el comportamiento del juego. Refactorización por extracción de ayudantes y tipado; los únicos cambios de API son parámetros sin usar que se ignoraban (`runIncrementalBackup` pierde `since`, `JobQueue.recoverStale` pierde `leaseMs`) y el update de un guardado sin fila, que devuelve 404 en vez de romper.
+
+Salida comprobable: ESLint 0 errores y 0 warnings en `apps` y `packages`; typecheck limpio en los 8 paquetes; unitarios 1150/1150 (93 archivos); build de los 7 artefactos OK; despliegue en producción con backup y smoke 197/197. `check:imports` y `verify:guards` quedan en 10 violaciones preexistentes de base (ciclo generator y aislamiento web→case-schema); su arreglo es arquitectónico y queda para otro lote.
+
 ## T2-01
 
 Contratos: SPEC-001/002; ADR-003/005.
