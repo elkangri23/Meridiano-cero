@@ -24,39 +24,17 @@ import {
   selectGeography,
   validateStageOutput,
   validateStagePart,
-  type GeneratableCrime,
   type ResolvedChoice,
   type SelectedGeography,
 } from './stages.js';
 import { validateGenerationParams } from './validator.js';
 export { validateGenerationParams };
 import { analyzeWarrantRoutes, simulateCase, type GoldenPathAction, type SimulationResult } from './simulator.js';
-
-// ============================================================================
-// Parámetros de entrada
-// ============================================================================
-
-/** Delitos generables (lista canónica reconciliada en T4-08, sin
- * 'aleatorio', que es modo de selección). */
-export type CrimeType = GeneratableCrime;
-
-export type Region = 'europa' | 'america' | 'asia' | 'africa' | 'oceania' | 'global';
-
-export type SurpriseMode = 'familiar' | 'general' | 'sorprende';
-
-export interface GenerationParams {
-  crimeType?: CrimeType;
-  difficulty: Difficulty;
-  explorationMode: ExplorationMode;
-  duration: 'short' | 'medium' | 'long';
-  region?: Region;
-  surpriseMode: SurpriseMode;
-  seed?: number;
-  catalogVersion?: string;
-}
-
-type Difficulty = 'easy' | 'normal' | 'hard';
-type ExplorationMode = 'guided' | 'free';
+// Tipos compartidos del trabajo (parámetros, etapas, validación): viven
+// en `job-types.ts` para no cerrar un ciclo entre pipeline, etapas y
+// validador. La superficie pública no cambia: se re-exportan aquí.
+import type { GenerationParams, GenerationStage, ValidationResult } from './job-types.js';
+export type { CrimeType, Region, SurpriseMode, GenerationParams, GenerationStage, ValidationResult, ValidationError } from './job-types.js';
 
 export const DEFAULT_GENERATION_PARAMS: Required<GenerationParams> = {
   crimeType: 'robo',
@@ -140,17 +118,6 @@ export interface StageValidation {
 // ============================================================================
 // Etapas del pipeline
 // ============================================================================
-
-export type GenerationStage =
-  | 1  // Fijar delito, objetivos, verdad y motivaciones (LLM)
-  | 2  // Seleccionar geografía desde catálogo verificable (determinista)
-  | 3  // Definir NPC, conocimiento, relaciones y cronología (LLM)
-  | 4  // Construir lugares investigables y grafo de pistas (LLM)
-  | 5  // Ensamblar la definición (determinista)
-  | 6  // Validar estructura/referencias/contenido (determinista, puerta)
-  | 7  // Revisión semántica independiente (LLM, puerta)
-  | 8  // Simular la ruta dorada por el motor real (determinista, puerta)
-  | 9; // Publicar versión/hash/reporte y metadatos jugables
 
 export const STAGE_NAMES: Record<GenerationStage, string> = {
   1: 'fijar_delito_objetivos_verdad_motivaciones',
@@ -788,20 +755,4 @@ export function createGeneratorService(config: PipelineConfig): GeneratorService
       return runPipeline(draft, config);
     },
   };
-}
-
-// ============================================================================
-// Validación
-// ============================================================================
-
-export interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
-}
-
-export interface ValidationError {
-  code: string;
-  message: string;
-  path?: string;
 }

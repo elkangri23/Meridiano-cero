@@ -5,9 +5,9 @@
 
 import { validateCaseDefinition, validateGeneratedContent } from '@meridiano/case-schema';
 import type { ContentRating } from '@meridiano/case-schema';
-import type { GenerationParams, ValidationResult, ValidationError } from './pipeline.js';
+import type { GenerationParams, ValidationResult, ValidationError } from './job-types.js';
 import type { CaseDefinition, Difficulty, ContentMode, ExplorationMode } from '@meridiano/case-schema';
-import { GENERATABLE_CRIMES } from './stages.js';
+import { GENERATABLE_CRIMES } from './job-types.js';
 import { simulateCase, type GoldenPathAction } from './simulator.js';
 
 import { validateStageOutput } from './stages.js';

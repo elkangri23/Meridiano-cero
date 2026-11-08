@@ -5,10 +5,13 @@ import { describe, expect, it } from 'vitest';
 import { RECURRENT_NPCS } from './npc-catalog.js';
 import {
   EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, OBJECTIVE_TEXT,
-  REPORT_REASON_TEXT, REPORT_RESULT_TEXT, conversationRecordText,
+  conversationRecordText,
   discoveryText, evidenceText, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, npcGreeting, npcKnowledgeFacts, npcRefusal,
-  objectiveText, reportReasonText, reportResultText, travelText,
+  objectiveText, travelText,
 } from './fact-texts.js';
+import {
+  REPORT_REASON_TEXT, REPORT_RESULT_TEXT, reportReasonText, reportResultText,
+} from './index.js';
 
 const lookup = {
   locationName: (id: string) => ({ 'MAD-SALA': 'Sala de embalaje', 'PAR-ARCH': 'Archivo de conservación', 'LIS-ALM': 'Almacén de depósito' }[id]),

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createPreferenceStore, normalizePreferences } from '@meridiano/case-schema';
-import type { PaletteMode, PresentationPreferences } from '@meridiano/case-schema';
+import { createPreferenceStore, normalizePreferences } from '@meridiano/contracts';
+import type { PaletteMode, PresentationPreferences } from '@meridiano/contracts';
 
 /** Preferencias persistentes (§15): la librería de case-schema guarda en
  * localStorage ('meridiano-cero-preferences-v1') y normaliza; aquí solo se

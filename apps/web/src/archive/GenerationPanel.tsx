@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { CRIME_TYPE_LABELS, GDD_CRIME_TYPES } from '@meridiano/case-schema';
+import { CRIME_TYPE_LABELS, GDD_CRIME_TYPES } from '@meridiano/contracts';
 import type { ContentRating, CrimeType, GenerationJobDto } from '@meridiano/contracts';
 import type { ArchiveState } from './model';
 import type { createArchiveModel } from './model';

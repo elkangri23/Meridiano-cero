@@ -1,12 +1,8 @@
-import type { ContentRating, CrimeType, FinalReport } from '@meridiano/contracts';
-import type { RemoteChannel } from './npc-catalog.js';
-export type { FinalReport, PlayerView } from '@meridiano/contracts';
+import type { ContentRating, CrimeType, FinalReport, RemoteChannel, CaseTexts, TeamRecord, Difficulty, ExplorationMode, ContentMode } from '@meridiano/contracts';
+export type { FinalReport, PlayerView, RemoteChannel, CaseTexts, TeamMember, TeamMemberId, TeamRecord, TeamServiceId, Difficulty, ExplorationMode, ContentMode } from '@meridiano/contracts';
 
 // Tipos puros del expediente. Sin secretos de solución en PlayerView.
 
-export type Difficulty = 'easy' | 'normal' | 'hard';
-export type ExplorationMode = 'guided' | 'free';
-export type ContentMode = 'fixed' | 'generated';
 export type CaseStatus = 'active' | 'closed';
 
 export interface City {
@@ -101,33 +97,9 @@ export interface MisconductRecord {
   seenBy: string[];
 }
 
-/** Miembros del equipo recurrente A.C.M.E. (GDD §8). Nombres provisionales
- * del GDD; las funciones son las del expediente, no un catálogo por caso. */
-export type TeamMemberId = 'margaret' | 'richter' | 'elena' | 'david' | 'clara';
-
-export interface TeamMember {
-  id: TeamMemberId;
-  name: string;
-  role: string;
-}
-
-/** Servicios que el motor registra como petición al equipo (GDD §8).
- * `coordinate` no es un servicio del motor: coordinar una detención es la
- * acción `detain` que ya existe y la ventana del equipo solo la enseña a
- * través de David. */
-export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'routes' | 'organize' | 'evaluate';
-
-/** Una petición al equipo A.C.M.E. (GDD §8): quién, qué servicio, sobre
- * qué (solo `explain`, con el id del análisis completado) y cuándo. El
- * registro nunca se borra; el dossier lo enseña y la ventana del equipo
- * muestra el historial. El texto libre de la pregunta nunca vive aquí. */
-export interface TeamRecord {
-  id: string;
-  memberId: TeamMemberId;
-  serviceId: TeamServiceId;
-  targetId?: string;
-  minute: number;
-}
+// Los tipos del equipo A.C.M.E. (TeamMember, TeamMemberId, TeamServiceId,
+// TeamRecord) viven en `@meridiano/contracts` (`team.ts`); se importan y
+// re-exportan arriba.
 
 /**
  * Mecánica declarativa de un expediente generado (T4-08). El motor del caso
@@ -214,20 +186,9 @@ export interface CaseMechanics {
  * en persona. El tipo se fija al generar el caso. */
 export type ArrestType = 'automatic' | 'interactive';
 
-/**
- * Textos narrativos de un expediente generado (T4-08). El caso fijo los
- * tiene hardcodeados en `fact-texts.ts`; los generados los traen aquí.
- * `evidence` es el hecho revelado por cada evidencia; `knowledge`, lo que
- * cada personaje puede contar sobre lo que sabe (en primera persona);
- * `greetings`, el saludo al hablar con cada NPC; `refusals`, la negativa en
- * personaje (normalmente solo la del sospechoso sobre el delito).
- */
-export interface CaseTexts {
-  evidence: Record<string, string>;
-  knowledge: Record<string, string>;
-  greetings: Record<string, string>;
-  refusals?: Record<string, string>;
-}
+// Los textos narrativos de un expediente generado (`CaseTexts`) viven en
+// `@meridiano/contracts` (`fact-texts.ts`); se importan y re-exportan
+// arriba.
 
 export interface CaseDefinition {
   id: string;

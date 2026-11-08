@@ -16,12 +16,11 @@
 // persistencia) son deterministas.
 
 import { FORENSIC_TYPES, GEOGRAPHIC_CATALOG, arrestTypeForCaseId, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type ArrestType, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type ForensicType, type KnowledgeContentAnchors, type RemoteChannel } from '@meridiano/case-schema';
-import type { GenerationParams, GenerationStage } from './pipeline.js';
-
-/** Delitos generables (lista canónica sin 'aleatorio', que es modo de
- * selección). Homicidio y secuestro solo en General (GDD §14). */
-export const GENERATABLE_CRIMES = ['robo', 'desaparicion', 'fraude', 'espionaje', 'sabotaje', 'misterio-historico', 'extorsion', 'contrabando', 'corrupcion', 'falsificacion', 'homicidio', 'secuestro'] as const;
-export type GeneratableCrime = (typeof GENERATABLE_CRIMES)[number];
+// Tipos compartidos del trabajo y delitos generables: viven en
+// `job-types.ts` para no cerrar un ciclo entre etapas, pipeline y
+// validador. La superficie pública no cambia: se re-exportan aquí.
+import { GENERATABLE_CRIMES, type GeneratableCrime, type GenerationParams, type GenerationStage } from './job-types.js';
+export { GENERATABLE_CRIMES, type GeneratableCrime } from './job-types.js';
 
 /** Plazo base del expediente según la duración pedida (minutos). La
  * dificultad de la PARTIDA lo multiplica después (fácil ×2, normal ×1,

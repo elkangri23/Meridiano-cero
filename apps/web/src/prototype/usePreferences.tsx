@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { createPreferenceStore, type PresentationPreferences } from '@meridiano/case-schema';
+import { createPreferenceStore, type PresentationPreferences } from '@meridiano/contracts';
 
 const store = createPreferenceStore();
 

@@ -1,28 +1,12 @@
-// Tipos forenses del laboratorio (GDD §11): huellas, documentos,
-// fotografías, audio, muestras y materiales. Un análisis de laboratorio ya
-// no es genérico: cada regla de análisis del expediente declara su tipo y
-// el laboratorio solo ofrece el tipo que tiene sentido para esa prueba.
-// El tipo es una categoría del método, no una conclusión: el resultado
-// sigue siendo la evidencia que declara la mecánica, con su propio coste
-// (delayMinutes) y sin interpretar culpabilidad.
+// Tipos forenses del laboratorio (GDD §11): derivación del tipo que
+// corresponde a una evidencia o a una regla de análisis. El vocabulario
+// (tipos canónicos, etiquetas y `isForensicType`) vive en
+// `@meridiano/contracts` (`forensics.ts`) porque la web lo necesita para
+// las etiquetas; este módulo lo re-exporta para el resto del paquete.
 import type { CaseDefinition, Evidence, MechanicsAnalysis } from './types.js';
+import { isForensicType, type ForensicType } from '@meridiano/contracts';
 
-/** Tipos forenses canónicos (GDD §11, en ese orden). */
-export const FORENSIC_TYPES = ['huellas', 'documentos', 'fotografias', 'audio', 'muestras', 'materiales'] as const;
-export type ForensicType = (typeof FORENSIC_TYPES)[number];
-
-export const FORENSIC_TYPE_LABELS: Record<ForensicType, string> = {
-  huellas: 'Huellas y marcas',
-  documentos: 'Documentos',
-  fotografias: 'Fotografías',
-  audio: 'Audio',
-  muestras: 'Muestras',
-  materiales: 'Materiales',
-};
-
-export function isForensicType(value: unknown): value is ForensicType {
-  return typeof value === 'string' && (FORENSIC_TYPES as readonly string[]).includes(value);
-}
+export { FORENSIC_TYPES, FORENSIC_TYPE_LABELS, isForensicType, type ForensicType } from '@meridiano/contracts';
 
 /** Tipo forense que corresponde al tipo de evidencia que se examina.
 // Es la derivación para expedientes antiguos, cuya mecánica no declara el

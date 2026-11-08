@@ -2,7 +2,7 @@
 // La central solo ofrece a cada contacto los canales que tiene sentido
 // usar con él; el resto no se ofrece ni se acepta.
 import { LEGACY_ASTROLABIO_ID } from './legacy-astrolabio.js';
-import { getNPC, REMOTE_CHANNELS, type CommunicationChannel, type RemoteChannel } from './npc-catalog.js';
+import { getNPC, REMOTE_CHANNELS, type CommunicationChannel, type RemoteChannel } from '@meridiano/contracts';
 import type { CaseDefinition, CommunicationRecord, IrregularKind, MisconductRecord, NPC } from './types.js';
 
 export type { RemoteChannel };

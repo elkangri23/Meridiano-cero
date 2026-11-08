@@ -12,7 +12,21 @@
 // él, el comportamiento es el de siempre (caso fijo).
 import { RECURRENT_NPCS, REMOTE_CHANNEL_LABELS } from './npc-catalog.js';
 import { teamMember } from './team.js';
-import type { CaseTexts } from './types.js';
+
+/**
+ * Textos narrativos de un expediente generado (T4-08). El caso fijo los
+ * tiene hardcodeados en este módulo; los generados los traen aquí.
+ * `evidence` es el hecho revelado por cada evidencia; `knowledge`, lo que
+ * cada personaje puede contar sobre lo que sabe (en primera persona);
+ * `greetings`, el saludo al hablar con cada NPC; `refusals`, la negativa en
+ * personaje (normalmente solo la del sospechoso sobre el delito).
+ */
+export interface CaseTexts {
+  evidence: Record<string, string>;
+  knowledge: Record<string, string>;
+  greetings: Record<string, string>;
+  refusals?: Record<string, string>;
+}
 
 /** Hecho revelado por cada evidencia (SPEC-003, tabla de evidencias). */
 export const EVIDENCE_TEXTS: Record<string, string> = {
@@ -68,9 +82,10 @@ export function evidenceText(evidenceId: string, texts?: CaseTexts): string | un
   return texts ? texts.evidence[evidenceId] : EVIDENCE_TEXTS[evidenceId];
 }
 
-/** Informe final: resultado y motivo del cierre, en español. Definidos en
- * `@meridiano/contracts` y re-exportados aquí para el resto del paquete. */
-export { REPORT_RESULT_TEXT, REPORT_REASON_TEXT, reportResultText, reportReasonText } from '@meridiano/contracts';
+/** Informe final: resultado y motivo del cierre, en español. Viven en el
+ * índice de este paquete (`REPORT_RESULT_TEXT`, `REPORT_REASON_TEXT`,
+ * `reportResultText`, `reportReasonText`); este módulo no los re-exporta
+ * para no cerrar un ciclo con el índice. */
 
 /** Etiqueta legible de cada tipo de acción irregular (GDD §14). */
 export const IRREGULAR_KIND_TEXT: Record<string, string> = {

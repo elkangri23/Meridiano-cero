@@ -4,7 +4,7 @@ import { NewRun } from './NewRun';
 import { GenerationPanel } from './GenerationPanel';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChangeEvent, RefObject } from 'react';
-import { caseLabel } from '@meridiano/case-schema';
+import { caseLabel } from '@meridiano/contracts';
 import type { DetectiveProfileDto, SessionDto } from '@meridiano/contracts';
 import { archiveApi } from './client';
 import { profileApi } from '../auth/client';

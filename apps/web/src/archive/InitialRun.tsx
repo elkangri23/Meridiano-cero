@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { PlayerViewDto } from '@meridiano/contracts';
-import { caseLabel } from '@meridiano/case-schema';
+import { caseLabel } from '@meridiano/contracts';
 
 /** Ficha de lectura: no representa una escena interactiva ni calcula reglas. */
 export function InitialRun({ view, close }: { view: PlayerViewDto; close: () => void }) {

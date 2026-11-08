@@ -1,5 +1,5 @@
 import { check, identifier, integer, isRecord, text, type DataRecord } from './validation-fields.js';
-import { hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type KnowledgeContentAnchors } from './fact-texts.js';
+import { hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type KnowledgeContentAnchors } from '@meridiano/contracts';
 import { FORENSIC_TYPES, type ForensicType } from './forensics.js';
 import type { EntityGroups } from './validation-entities.js';
 

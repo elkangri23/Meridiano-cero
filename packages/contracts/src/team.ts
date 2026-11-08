@@ -6,7 +6,34 @@
 // sugerir la siguiente pista. La evaluación de carrera de Margaret está
 // conectada desde T5-04: responde solo con el perfil de carrera oficial
 // (rango, puntos, medallas, reputación), nunca con el estado del caso.
-import type { TeamMember, TeamMemberId, TeamRecord, TeamServiceId } from './types.js';
+
+/** Miembros del equipo recurrente A.C.M.E. (GDD §8). Nombres provisionales
+ * del GDD; las funciones son las del expediente, no un catálogo por caso. */
+export type TeamMemberId = 'margaret' | 'richter' | 'elena' | 'david' | 'clara';
+
+export interface TeamMember {
+  id: TeamMemberId;
+  name: string;
+  role: string;
+}
+
+/** Servicios que el motor registra como petición al equipo (GDD §8).
+ * `coordinate` no es un servicio del motor: coordinar una detención es la
+ * acción `detain` que ya existe y la ventana del equipo solo la enseña a
+ * través de David. */
+export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'routes' | 'organize' | 'evaluate';
+
+/** Una petición al equipo A.C.M.E. (GDD §8): quién, qué servicio, sobre
+ * qué (solo `explain`, con el id del análisis completado) y cuándo. El
+ * registro nunca se borra; el dossier lo enseña y la ventana del equipo
+ * muestra el historial. El texto libre de la pregunta nunca vive aquí. */
+export interface TeamRecord {
+  id: string;
+  memberId: TeamMemberId;
+  serviceId: TeamServiceId;
+  targetId?: string;
+  minute: number;
+}
 
 export const TEAM_MEMBERS: readonly TeamMember[] = [
   { id: 'margaret', name: 'Margaret Sullivan', role: 'Directora' },

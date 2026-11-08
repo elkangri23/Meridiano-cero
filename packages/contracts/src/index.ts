@@ -1215,3 +1215,72 @@ export function isSaveLoadResponseDto(value: unknown): value is SaveLoadResponse
   if (!Object.keys(record).every(key => allowed.has(key))) return false;
   return uuid(record.operationId) && uuid(record.newBranchId);
 }
+
+// ============================================================================
+// Superficie compartida con la web (frontera web-isolation)
+//
+// La web solo puede importar de este paquete: lo que la vista necesita del
+// dominio vive aquí, en módulos propios, y `@meridiano/case-schema` lo
+// re-exporta para el motor, la API y el generador. Nada de lo de aquí
+// importa de fuera del paquete (regla `public-contracts-only`): son datos
+// de referencia, etiquetas y funciones puras de presentación, sin estado
+// de partida ni acceso a la base de datos. No duplicar en dos sitios: la
+// única definición de cada nombre de esta sección es su módulo de origen.
+// ============================================================================
+
+// Catálogo de parámetros y etiquetas de expedientes (`catalog.ts`).
+export {
+  validateCatalogParams, getBudgetForParams, getSuggestedDuration,
+  deadlineMinutesForDifficulty, DIFFICULTY_DEADLINE_FACTOR, DIFFICULTY_BUDGET,
+  DIFFICULTY_DURATION, GDD_CRIME_TYPES, GENERAL_ONLY_CRIMES, ALLOWED_REGIONS,
+  ALLOWED_CRIME_TYPES, crimeAllowedForRating, CRIME_TYPE_LABELS,
+  CONTENT_RATING_LABELS, caseLabel,
+  type CatalogParams, type CatalogValidationResult, type Duration,
+  type Difficulty, type ExplorationMode, type ContentMode,
+} from './catalog.js';
+
+// NPCs recurrentes, canales y consultas (`npc-catalog.ts`).
+export {
+  RECURRENT_NPCS, COMMUNICATION_CHANNELS, REMOTE_CHANNELS,
+  REMOTE_CHANNEL_LABELS, QUERY_TYPES, getNPC, getNPCsByCity, getQueryType,
+  getChannelCost, searchNPCs,
+  type NPCProfile, type CommunicationChannel, type QueryType,
+} from './npc-catalog.js';
+
+// Preferencias de presentación persistentes (`preferences.ts`).
+export {
+  createDefaultPreferences, normalizePreferences, clampScale, clampVolume,
+  clampRate, createPreferenceStore,
+  type PresentationPreferences, type FontMode, type PaletteMode, type Language,
+  type AudioSettings, type TTSSettings, type AccessibilitySettings,
+  type PreferenceStore, type StorageLike,
+} from './preferences.js';
+
+// Narración TTS (`audio-tts.ts`).
+export {
+  createTTSController, createNoopTTSController,
+  type TTSController, type TTSVoice, type TTSStatus, type TTSOptions,
+} from './audio-tts.js';
+
+// Textos legibles del caso fijo y de los generados (`fact-texts.ts`).
+export {
+  EVIDENCE_TEXTS, KNOWLEDGE_TEXTS, NPC_GREETINGS, NPC_REFUSALS, OBJECTIVE_TEXT,
+  IRREGULAR_KIND_TEXT, evidenceText, npcKnowledgeFacts, npcGreeting, npcRefusal,
+  discoveryText, conversationRecordText, travelText, objectiveText,
+  isKnowledgeLabelText, knowledgeContentAnchors, hasKnowledgeContent,
+  type KnowledgeContentWorld, type KnowledgeContentAnchors, type DiscoveryLookup,
+  type CaseTexts,
+} from './fact-texts.js';
+
+// Vocabulario forense (`forensics.ts`): solo tipos y etiquetas. La
+// derivación por evidencia o regla vive en `@meridiano/case-schema`.
+export {
+  FORENSIC_TYPES, FORENSIC_TYPE_LABELS, isForensicType, type ForensicType,
+} from './forensics.js';
+
+// Equipo recurrente A.C.M.E. (`team.ts`).
+export {
+  TEAM_MEMBERS, TEAM_MEMBER_IDS, TEAM_SERVICES, teamMember, isTeamMemberId,
+  isTeamServiceId, isTeamRecord,
+  type TeamMember, type TeamMemberId, type TeamServiceId, type TeamRecord,
+} from './team.js';

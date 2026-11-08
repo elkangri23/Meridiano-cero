@@ -1,7 +1,7 @@
 // Límites de catálogo y carrera (T5-07)
 // Bordes funcionales: lo que el motor debe rechazar o limitar sin fijar equilibrio.
 
-import { validateCatalogParams, getBudgetForParams, type CatalogParams } from './catalog.js';
+import { validateCatalogParams, getBudgetForParams, type CatalogParams } from '@meridiano/contracts';
 import { calculateCaseOutcome, applyOutcome, createInitialCareer, getRank, type CaseResult } from './career.js';
 
 export interface CatalogBoundaryResult {
