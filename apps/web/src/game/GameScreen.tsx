@@ -1183,7 +1183,7 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
 function SceneChatPanel({ npc, view, turns, draft, busy, error, onDraft, onSend, onRead, canRead, noVoices, onClose }: {
   npc: { id: string; name: string }; view: PlayerViewDto; turns: ChatTurn[]; draft: string; busy: boolean; error: string;
   onDraft: (value: string) => void; onSend: (event: FormEvent) => void;
-  onRead: (text: string) => void; canRead: boolean; noVoices?: boolean; onClose: () => void;
+  onRead: (text: string) => void; canRead: boolean; noVoices: boolean; onClose: () => void;
 }) {
   const t = useTranslation();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -1946,6 +1946,17 @@ export function GameScreen() {
   // Quién abrió la charla en escena (botón «Hablar con» o «Preguntar por
   // la respuesta» de la central): al cerrarla, el foco vuelve a él.
   const chatOpenerRef = useRef<HTMLElement | null>(null);
+
+  /** Cierra la charla en escena y devuelve el foco a quien la abrió (o a
+   * la escena si ese botón ya no está). Los turnos y la memoria quedan
+   * guardados en esta pestaña, como antes. */
+  const closeChat = useCallback(() => {
+    setChatNpc(null);
+    const opener = chatOpenerRef.current;
+    chatOpenerRef.current = null;
+    if (opener && opener.isConnected) opener.focus();
+    else document.getElementById('game-scene')?.focus();
+  }, []);
   const orderInputRef = useRef<HTMLTextAreaElement>(null);
 
   const [identity, setIdentity] = useState<SessionDto | null>(null);
@@ -2206,17 +2217,6 @@ export function GameScreen() {
     setChatNpc({ id: npcId, name: npcName });
     setChatError('');
   }
-
-  /** Cierra la charla en escena y devuelve el foco a quien la abrió (o a
-   * la escena si ese botón ya no está). Los turnos y la memoria quedan
-   * guardados en esta pestaña, como antes. */
-  const closeChat = useCallback(() => {
-    setChatNpc(null);
-    const opener = chatOpenerRef.current;
-    chatOpenerRef.current = null;
-    if (opener && opener.isConnected) opener.focus();
-    else document.getElementById('game-scene')?.focus();
-  }, []);
 
   /** Pregunta lista para enviar al personaje, o null si falta algo. */
   function chatQuestion(): { runId: string; csrfToken: string; npcId: string; name: string; text: string; facts: Array<{ id: string; text: string }>; memory: unknown } | null {
@@ -2669,6 +2669,13 @@ export function GameScreen() {
     setCommChannel(contact?.channels[0] ?? '');
   }
 
+  /** Nombre de un contacto de la central: su contacto, su entrada de
+   * charla o su id si no hay nombre. */
+  function communicationContactName(record: PlayerViewDto['communications'][number]): string {
+    return contacts.find(contact => contact.id === record.recipientId)?.name
+      ?? view?.npcChat.find(entry => entry.id === record.recipientId)?.name ?? record.recipientId;
+  }
+
   /** Preguntar a un contacto por un envío ya recibido: abre su conversación
    * con la pregunta preparada (el jugador la envía cuando quiera) y, si
    * era un documento, su texto como hecho autorizado de esa pregunta. La
@@ -2676,8 +2683,7 @@ export function GameScreen() {
    * sin inventar; el turno queda en la memoria de chat del personaje. */
   function askAboutCommunication(record: PlayerViewDto['communications'][number], trigger: HTMLElement | null = null) {
     if (!view) return;
-    const name = contacts.find(contact => contact.id === record.recipientId)?.name
-      ?? view.npcChat.find(entry => entry.id === record.recipientId)?.name ?? record.recipientId;
+    const name = communicationContactName(record);
     const documentText = record.documentId ? view.evidenceTexts[record.documentId] : undefined;
     setChatExtraFacts({ npcId: record.recipientId,
       facts: record.documentId && documentText ? [{ id: record.documentId, text: documentText }] : [] });
