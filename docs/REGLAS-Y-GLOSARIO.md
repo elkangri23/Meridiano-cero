@@ -25,6 +25,7 @@ Fecha: 2026-10-31. Documento para jugadores y para el apartado "Glosario" de la 
 - **Archivo:** listado de partidas propias con filtros y paginación.
 - **Música retro:** banda sonora sintetizada en el navegador (melodía y bajo en bucle, sin archivos de audio); decorativa, nunca la única vía de información. Empieza tras el primer gesto del usuario, nunca sola al cargar.
 - **Lectura en voz alta (TTS):** lectura de narración, diálogos y documentos con la voz del sistema o navegador; con voz, velocidad, lectura manual/automática, repetir, pausar y detener. Si no hay voz compatible, la opción queda deshabilitada y el texto sigue disponible.
+- **Accesibilidad:** el juego se juega entero con el teclado (Tab, Enter, Escape), con foco visible que no se pierde al abrir o cerrar ventanas, y con lector de pantalla (la narración se anuncia al terminar de escribirse). Ajustes en la ventana Ajustes: reducir movimiento, foco marcado, enlace de salto a la escena, anunciar narración, fuente legible, escala de texto 100–200 %, alto contraste y paletas de daltonismo. Ningún estado depende solo del color.
 - **Localizador de creación:** mecanismo para recuperar una creación perdida por conexión sin duplicar partida.
 
 ## Reglas fundamentales

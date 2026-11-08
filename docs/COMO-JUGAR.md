@@ -104,6 +104,19 @@ El juego tiene **música retro sintetizada** (melodía y bajo en bucle, generado
 - **La música no suena sola:** por la política de autoplay del navegador, empieza tras tu primer clic o tecla en la página, nunca al cargar.
 - **Lectura en voz alta (TTS):** en Ajustes puedes activar la lectura con la voz de tu sistema o navegador. Elige voz (automática en español si la hay) y velocidad, y si quieres lectura automática de la narración y los diálogos. En la consola tienes **Leer**, **Repetir**, **Pausar** y **Detener**; en el chat y en los hallazgos del dossier, un botón **Leer** en cada texto. Si tu navegador no ofrece síntesis de voz, la opción queda deshabilitada y explicada, y todo el texto sigue disponible.
 
+## Accesibilidad
+
+El juego se puede jugar **entero con el teclado**, sin ratón, y con lector de pantalla. Los ajustes están en la ventana **Ajustes** de la pantalla de juego y se guardan en tu navegador.
+
+- **Teclado:** Tab y Shift+Tab para moverse, Enter para activar, Escape para cerrar ventanas y diálogos. Al abrir una ventana, el foco entra en su título; al cerrarla, vuelve al botón que la abrió. El diálogo de confirmación atrapa el foco mientras está abierto y lo devuelve al cancelar. Las ventanas se pueden mover también con el teclado (botón **Mover**: flechas, Enter termina, Escape cancela).
+- **Salto a la escena:** al entrar en la partida, el primer Tab llega al enlace **Saltar a la escena**, que lleva directo a la escena sin pasar por la barra de herramientas.
+- **Reducir movimiento:** apaga las animaciones del juego (reloj de arena, avión del viaje, cursor que parpadea) y muestra la narración entera de golpe, sin efecto máquina de escribir. Si tu sistema ya pide movimiento reducido, se aplica también sin tocar nada aquí.
+- **Foco visible:** un contorno dorado grueso marca siempre dónde estás. Si lo apagas, el foco sigue visible pero fino.
+- **Anunciar la narración:** el lector de pantalla lee la última entrada de la consola cuando termina de escribirse, sin repetir la narración entera en cada cambio.
+- **Fuente legible y tamaño de texto:** cambia la letra monoespaciada por una sans-serif, y la escala del texto del 100% al 200% sin que se rompa ninguna ventana.
+- **Contraste y daltonismo:** alto contraste y paletas de protanopia, deuteranopia y tritanopia; ningún estado depende solo del color (los objetivos dicen «Logrado» o «Pendiente» además de su marca, y el botón activo de la barra es además negrita).
+- **Descripciones:** cada fondo de escena y el mapa del atlas tienen descripción en texto; la descripción dice solo lo que se dibuja, nunca pruebas que aún no descubriste.
+
 ## Errores y conexión
 
 - Si pierdes la conexión, la UI muestra estado offline y permite reconectar manualmente.
