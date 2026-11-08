@@ -6,7 +6,9 @@ import type { Page } from '@playwright/test';
  * lectores de pantalla, descripciones de escenas y escala 200% sin roturas.
  * No se prueba con un lector de pantalla real ni con usuarios reales
  * (Antonio confirmó que no dispone de ellos): se prueba el comportamiento
- * observable en el navegador (atributos ARIA, foco, clases, anuncios). */
+ * observable en el navegador (atributos ARIA, foco, clases, anuncios).
+ * El archivo tiene 8 pruebas (8 entradas locales): la API de desarrollo
+ * limita la entrada local a 10 intentos por IP y minuto. */
 
 /** Crea una partida desde la UI del archivo; la creación confirmada navega sola a su pantalla de juego. */
 async function openGameScreen(page: Page) {
@@ -80,15 +82,32 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     await expect.poll(async () => (await activeElement(page))?.id, { timeout: 5000 }).toBe('game-scene');
   });
 
-  test('abrir el dossier con teclado mueve el foco a su título y cerrarlo lo devuelve', async ({ page }) => {
+  test('el dossier con teclado: foco dorado, título al abrir, botón activo oscuro y retorno al cerrar', async ({ page }) => {
     await openGameScreen(page);
     await dismissIntro(page);
+    // Un Tab pone al navegador en modalidad teclado: el foco por script
+    // después sí muestra :focus-visible.
+    await page.keyboard.press('Tab');
     await page.getByTestId('toolbar-dossier').focus();
+    const outline = await page.evaluate(() => {
+      const style = getComputedStyle(document.activeElement as HTMLElement);
+      return { width: style.outlineWidth, color: style.outlineColor };
+    });
+    expect(outline.width).toBe('3px');
+    expect(outline.color).toBe('rgb(255, 255, 85)');
     await page.keyboard.press('Enter');
     const dossier = page.getByRole('dialog', { name: 'Dossier' });
     await expect(dossier).toBeVisible();
     await expect.poll(async () => activeElement(page), { timeout: 5000 }).toEqual(
       expect.objectContaining({ tag: 'H3', text: 'Dossier' }));
+    const active = await page.evaluate(() => {
+      const button = document.querySelector('[data-testid="toolbar-dossier"]') as HTMLElement;
+      const style = getComputedStyle(button);
+      return { background: style.backgroundColor, weight: style.fontWeight, pressed: button.getAttribute('aria-pressed') };
+    });
+    expect(active.pressed).toBe('true');
+    expect(active.background).toBe('rgb(0, 85, 85)');
+    expect(active.weight).toBe('700');
     await page.keyboard.press('Escape');
     await expect(dossier).toBeHidden();
     await expectFocusTestId(page, 'toolbar-dossier');
@@ -133,52 +152,46 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     await expectFocusTestId(page, 'offer-travel:paris');
   });
 
-  test('el movimiento reducido apaga las animaciones', async ({ page }) => {
+  test('movimiento reducido y anuncios de narración', async ({ page }) => {
     await openGameScreen(page);
-    const settings = await openSettings(page);
-    await settings.getByTestId('a11y-reduced-motion').check();
-    await page.keyboard.press('Escape');
-    await expect.poll(async () => page.evaluate(() => document.documentElement.className)).toContain('game-reduced-motion');
-    await page.getByTestId('offer-inspect:MAD-SALA').click();
-    await expect(page.getByTestId('clock')).toContainText('10 min');
-    const hourglass = page.locator('.game-hourglass svg').first();
-    await expect(hourglass).toBeVisible();
-    const animationName = await hourglass.evaluate(el => getComputedStyle(el).animationName);
-    expect(animationName).toBe('none');
-  });
-
-  test('la consola no es aria-live y la narración se anuncia al terminar de escribirse', async ({ page }) => {
-    await openGameScreen(page);
+    // La consola no es aria-live (el tipeo anunciaría el texto a trozos).
     await expect(page.locator('.game-console ol')).not.toHaveAttribute('aria-live');
     await page.getByTestId('offer-inspect:MAD-SALA').click();
     await expect(page.getByTestId('clock')).toContainText('10 min');
+    // Con los anuncios activos, la narración se anuncia al terminar de escribirse.
     const announcer = page.getByTestId('narration-announcer');
     await expect.poll(async () => announcer.textContent(), { timeout: 5000 }).not.toBe('');
     const announced = (await announcer.textContent()) ?? '';
     expect(announced.length).toBeGreaterThan(10);
     const lastItem = await page.locator('.game-console ol > li').last().textContent();
     expect(lastItem).toContain(announced.slice(0, 20));
-  });
-
-  test('sin anunciar la narración, la región queda vacía', async ({ page }) => {
-    await openGameScreen(page);
+    // Con el movimiento reducido, las animaciones se apagan.
     const settings = await openSettings(page);
-    await settings.getByTestId('a11y-announce-narration').uncheck();
+    await settings.getByTestId('a11y-reduced-motion').check();
     await page.keyboard.press('Escape');
-    await page.getByTestId('offer-inspect:MAD-SALA').click();
-    await expect(page.getByTestId('clock')).toContainText('10 min');
+    await expect.poll(async () => page.evaluate(() => document.documentElement.className)).toContain('game-reduced-motion');
+    await page.getByTestId('offer-inspect:MAD-SALA:cerradura').click();
+    await expect(page.getByTestId('clock')).toContainText('20 min');
+    const hourglass = page.locator('.game-hourglass svg').first();
+    await expect(hourglass).toBeVisible();
+    const animationName = await hourglass.evaluate(el => getComputedStyle(el).animationName);
+    expect(animationName).toBe('none');
+    // Sin anuncios, la región queda vacía aunque haya narración nueva.
+    const settingsAgain = await openSettings(page);
+    await settingsAgain.getByTestId('a11y-announce-narration').uncheck();
+    await page.keyboard.press('Escape');
+    await page.getByTestId('offer-collect:EV-02').click();
+    await expect(page.getByTestId('clock')).toContainText('30 min');
     await page.waitForTimeout(2000);
     await expect(page.getByTestId('narration-announcer')).toBeEmpty();
   });
 
-  test('los objetivos dicen su estado con palabras, no solo con ✓/○', async ({ page }) => {
+  test('objetivos, arte de escena y atlas con equivalentes accesibles', async ({ page }) => {
     await openGameScreen(page);
+    // Los objetivos dicen su estado con palabras, no solo con ✓/○.
     const first = page.locator('[data-testid^="objective-"] .game-sr-only').first();
     await expect(first).toHaveText('Pendiente:');
-  });
-
-  test('el arte de escena y el atlas tienen descripción accesible', async ({ page }) => {
-    await openGameScreen(page);
+    // El arte de escena y el atlas tienen descripción (sin spoilers).
     const art = page.getByTestId('scene-art');
     await expect(art).toHaveAttribute('role', 'img');
     await expect(art).toHaveAttribute('aria-label', /sala de embalaje/);
@@ -210,30 +223,5 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     if (!box) return;
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(1280);
-  });
-
-  test('el foco visible es dorado de 3 px y el botón activo tiene fondo oscuro', async ({ page }) => {
-    await openGameScreen(page);
-    await dismissIntro(page);
-    // Un Tab pone al navegador en modalidad teclado: el foco por script
-    // después sí muestra :focus-visible.
-    await page.keyboard.press('Tab');
-    await page.getByTestId('toolbar-dossier').focus();
-    const outline = await page.evaluate(() => {
-      const style = getComputedStyle(document.activeElement as HTMLElement);
-      return { width: style.outlineWidth, color: style.outlineColor, offset: style.outlineOffset };
-    });
-    expect(outline.width).toBe('3px');
-    expect(outline.color).toBe('rgb(255, 255, 85)');
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('dialog', { name: 'Dossier' })).toBeVisible();
-    const active = await page.evaluate(() => {
-      const button = document.querySelector('[data-testid="toolbar-dossier"]') as HTMLElement;
-      const style = getComputedStyle(button);
-      return { background: style.backgroundColor, weight: style.fontWeight, pressed: button.getAttribute('aria-pressed') };
-    });
-    expect(active.pressed).toBe('true');
-    expect(active.background).toBe('rgb(0, 85, 85)');
-    expect(active.weight).toBe('700');
   });
 });
