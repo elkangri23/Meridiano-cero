@@ -49,6 +49,17 @@ const channelKeys: Record<string, LocaleKey> = { call: 'labels.channel.call', wh
 const requestTypeKeys: Record<string, LocaleKey> = { analysis: 'labels.request.analysis', query: 'labels.request.query', request: 'labels.request.request' };
 const evidenceTypeKeys: Record<string, LocaleKey> = { object: 'labels.evidence.object', observation: 'labels.evidence.observation', testimony: 'labels.evidence.testimony', analysis: 'labels.evidence.analysis', record: 'labels.evidence.record' };
 
+/** Etiqueta de un tipo de evidencia o de solicitud; un tipo desconocido
+ * se enseña tal cual (el motor no debería enviarlo). */
+function evidenceTypeLabel(type: string, t: TranslateFn): string {
+  const key = evidenceTypeKeys[type];
+  return key ? t(key) : type;
+}
+function requestTypeLabel(type: string, t: TranslateFn): string {
+  const key = requestTypeKeys[type];
+  return key ? t(key) : type;
+}
+
 /** Dificultad de la partida, tal como se enseña en la cabecera junto al
  * reloj («Normal · 48 horas»): la etiqueta que la verificación no encontró
  * porque la vista del jugador no traía el dato. */
@@ -421,11 +432,9 @@ function SceneOfferList({ offers, disabled, onOffer }: { offers: PublicActionOff
  * tipo en español (antes se veían `warrant:ines`, `ines` y `EV-06` solos). */
 function SceneMeta({ view }: { view: PlayerViewDto }) {
   const t = useTranslation();
-  const evidenceLabel = (type: string) => { const key = evidenceTypeKeys[type]; return key ? t(key) : type; };
-  const requestLabel = (type: string) => { const key = requestTypeKeys[type]; return key ? t(key) : type; };
   return <div className="game-scene-meta">
-    {view.objects.length > 0 && <p>{t('game.inPossession', { items: view.objects.map(item => `${item.id} (${evidenceLabel(item.type)})`).join(', ') })}</p>}
-    {view.pendingRequests.length > 0 && <p>{t('game.pendingRequests', { items: view.pendingRequests.map(item => `${requestLabel(item.type)} (min ${item.dueMinute})`).join(', ') })}</p>}
+    {view.objects.length > 0 && <p>{t('game.inPossession', { items: view.objects.map(item => `${item.id} (${evidenceTypeLabel(item.type, t)})`).join(', ') })}</p>}
+    {view.pendingRequests.length > 0 && <p>{t('game.pendingRequests', { items: view.pendingRequests.map(item => `${requestTypeLabel(item.type, t)} (min ${item.dueMinute})`).join(', ') })}</p>}
     {view.warrants.length > 0 && <p>{t('game.warrants', { items: view.warrants.map(warrantText).join(', ') })}</p>}
     {view.detentions.length > 0 && <p>{t('game.detentions', { items: view.detentions.map(id => getNPC(id)?.name ?? id).join(', ') })}</p>}
   </div>;
@@ -822,32 +831,33 @@ function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSu
   onDraft: (value: string) => void; onSubmit: (event: FormEvent) => void; onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onCancel: () => void; onRecover: () => void;
 }) {
+  const t = useTranslation();
   return <section className="game-order" aria-labelledby="order-heading">
     <div className="game-order-label">
-      <label id="order-heading" htmlFor="order-input">Tu siguiente acción</label>
-      <span>Escribe con tus palabras</span>
+      <label id="order-heading" htmlFor="order-input">{t('game.orderTitle')}</label>
+      <span>{t('game.orderHint')}</span>
     </div>
     <form onSubmit={onSubmit}>
       <span className="game-prompt-symbol" aria-hidden="true">&gt;</span>
       <textarea id="order-input" data-testid="order-input" ref={inputRef} rows={3} value={draft}
         onChange={event => onDraft(event.target.value)} onKeyDown={onKeyDown}
-        disabled={closed || busy} placeholder="p. ej. inspeccionar la sala, hablar con Lucía…" />
+        disabled={closed || busy} placeholder={t('game.orderPlaceholder')} />
       <button type="submit" className="game-primary-button" data-testid="order-submit" disabled={closed || !draft.trim() || busy}>
-        {orderPhase.kind === 'interpreting' ? 'Interpretando…' : 'Interpretar orden'}
+        {orderPhase.kind === 'interpreting' ? t('game.interpreting') : t('game.interpretOrder')}
       </button>
     </form>
-    <div className="game-order-bottom"><p>Ctrl+Enter para enviar · Las herramientas no consumen tiempo.</p></div>
-    <p className="game-order-hint">Puedes ordenar: inspeccionar un lugar, hablar con alguien, viajar, consultar… Tras cada acción el resultado aparece en la consola. Al hablar con alguien se abre la conversación para preguntarle. <Link to="/glosario">Ver glosario</Link></p>
-    {orderPhase.kind === 'clarification' && <div className="game-clarification" role="dialog" aria-label="Aclaración">
-      <p><strong>Antes de actuar:</strong> {orderPhase.question}</p>
-      <p>Orden original: «{orderPhase.original}»</p>
-      <button type="button" onClick={onCancel}>Entendido, la reviso</button>
+    <div className="game-order-bottom"><p>{t('game.orderKeys')}</p></div>
+    <p className="game-order-hint">{t('game.orderHelp')}<Link to="/glosario">{t('game.viewGlossary')}</Link></p>
+    {orderPhase.kind === 'clarification' && <div className="game-clarification" role="dialog" aria-label={t('game.clarification')}>
+      <p><strong>{t('game.beforeActing')}</strong> {orderPhase.question}</p>
+      <p>{t('game.originalOrder', { original: orderPhase.original })}</p>
+      <button type="button" onClick={onCancel}>{t('game.understood')}</button>
     </div>}
-    {orderPhase.kind === 'error' && <p className="game-error" role="alert">{orderPhase.message} <button type="button" onClick={onCancel}>Cerrar</button></p>}
+    {orderPhase.kind === 'error' && <p className="game-error" role="alert">{orderPhase.message} <button type="button" onClick={onCancel}>{t('common.close')}</button></p>}
     {orderPhase.kind === 'recovering' && <div className="game-recovering" role="alert">
       <p>{orderPhase.message}</p>
-      <button type="button" onClick={onRecover}>Recuperar resultado</button>
-      <button type="button" onClick={onCancel}>Descartar</button>
+      <button type="button" onClick={onRecover}>{t('game.recoverResult')}</button>
+      <button type="button" onClick={onCancel}>{t('game.discard')}</button>
     </div>}
   </section>;
 }
@@ -858,10 +868,11 @@ function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSu
  * la de destino. No bloquea nada: los clics pasan por debajo salvo el botón
  * «Seguir», y se cierra sola. */
 function TravelOverlay({ travel, onDismiss }: { travel: { from: string; to: string; detail: string }; onDismiss: () => void }) {
+  const t = useTranslation();
   return <div className="game-travel" data-testid="travel-animation" role="status">
     <div className="game-travel-panel">
-      <p className="game-overline">Viaje</p>
-      <p><strong>De {travel.from} a {travel.to}</strong>{travel.detail ? ` · ${travel.detail}` : ''}</p>
+      <p className="game-overline">{t('game.travel')}</p>
+      <p><strong>{t('game.travelFromTo', { from: travel.from, to: travel.to })}</strong>{travel.detail ? ` · ${travel.detail}` : ''}</p>
       <div className="game-travel-route" aria-hidden="true">
         <span className="game-travel-line" />
         <svg className="game-travel-plane" viewBox="0 0 24 16" shapeRendering="crispEdges" focusable="false">
@@ -873,8 +884,8 @@ function TravelOverlay({ travel, onDismiss }: { travel: { from: string; to: stri
         <span className="game-travel-city game-travel-from">{travel.from}</span>
         <span className="game-travel-city game-travel-to">{travel.to}</span>
       </div>
-      <p className="game-panel-note">El reloj ya avanzó: estás en {travel.to}.</p>
-      <button type="button" onClick={onDismiss}>Seguir</button>
+      <p className="game-panel-note">{t('game.travelNote', { to: travel.to })}</p>
+      <button type="button" onClick={onDismiss}>{t('game.continue')}</button>
     </div>
   </div>;
 }
@@ -928,19 +939,20 @@ function PreviewDialog({ phase, confirmRef, onConfirm, onCancel }: {
   phase: Extract<OrderPhase, { kind: 'preview' }>; confirmRef: RefObject<HTMLButtonElement | null>;
   onConfirm: () => void; onCancel: () => void;
 }) {
+  const t = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   return <div className="game-preview-backdrop">
     <div className="game-preview" role="dialog" aria-modal="true" aria-labelledby="preview-heading" data-testid="preview-dialog"
       ref={dialogRef} onKeyDown={event => { if (dialogRef.current) trapTabKey(event, dialogRef.current); }}>
-      <h2 id="preview-heading">Confirmar acción</h2>
+      <h2 id="preview-heading">{t('game.confirmAction')}</h2>
       <p><strong>{phase.offer.label}</strong>{phase.offer.detail ? ` · ${phase.offer.detail}` : ''}</p>
       {phase.response.preview
         ? <p>{phase.response.preview.description}</p>
-        : <p>Esta acción se ejecutará al confirmar.</p>}
-      {phase.response.preview && <p className="game-preview-facts"><span>Duración estimada: {phase.response.preview.estimatedMinutes} min</span><span>Hora prevista: min {phase.response.preview.estimatedEndTime}</span></p>}
+        : <p>{t('game.confirmNote')}</p>}
+      {phase.response.preview && <p className="game-preview-facts"><span>{t('game.estimatedDuration', { minutes: phase.response.preview.estimatedMinutes })}</span><span>{t('game.estimatedEnd', { minute: phase.response.preview.estimatedEndTime })}</span></p>}
       <div className="game-preview-actions">
-        <button type="button" className="game-primary-button" ref={confirmRef} data-testid="preview-confirm" onClick={onConfirm}>Confirmar</button>
-        <button type="button" data-testid="preview-cancel" onClick={onCancel}>Cancelar</button>
+        <button type="button" className="game-primary-button" ref={confirmRef} data-testid="preview-confirm" onClick={onConfirm}>{t('common.confirm')}</button>
+        <button type="button" data-testid="preview-cancel" onClick={onCancel}>{t('common.cancel')}</button>
       </div>
     </div>
   </div>;
@@ -955,16 +967,17 @@ const atlasPositions: Record<string, { x: number; y: number }> = {
 };
 
 function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+  const t = useTranslation();
   const travelOffers = view.offers.filter(offer => offer.action.type === 'travel');
   return <div>
-    <p className="game-overline">Atlas A.C.M.E.</p>
-    <h4>Tres ciudades, un expediente</h4>
-    <div className="game-atlas" role="img" aria-label={`Mapa esquemático de las ciudades del expediente: ${view.cities.map(city => city.name).join(', ')}.`}><div className="game-atlas-land" />{view.cities.map(city => {
+    <p className="game-overline">{t('game.atlasOverline')}</p>
+    <h4>{t('game.atlasTitle')}</h4>
+    <div className="game-atlas" role="img" aria-label={t('game.atlasAria', { cities: view.cities.map(city => city.name).join(', ') })}><div className="game-atlas-land" />{view.cities.map(city => {
       const position = atlasPositions[city.id];
       if (!position) return null;
       return <span key={city.id} className="game-atlas-city" style={{ left: position.x + '%', top: position.y + '%' }}>{city.name}</span>;
     })}</div>
-    <label>Buscar ciudad <input type="search" data-testid="map-search" placeholder="Madrid, París, Lisboa…"
+    <label>{t('game.searchCity')} <input type="search" data-testid="map-search" placeholder={t('game.searchPlaceholder')}
       onChange={event => {
         const query = event.target.value.toLowerCase();
         event.currentTarget.closest('div')?.querySelectorAll<HTMLElement>('[data-city]')?.forEach(el => {
@@ -976,20 +989,21 @@ function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolea
         const travel = travelOffers.find(offer => offer.action.params.toCityId === city.id);
         const current = city.id === view.position.city.id;
         return <li key={city.id} data-city={city.id}>
-          <span><strong>{city.name}, {city.country}</strong><small>{current ? 'Estás aquí' : 'Destino conocido'}</small></span>
+          <span><strong>{city.name}, {city.country}</strong><small>{current ? t('game.youAreHere') : t('game.knownDestination')}</small></span>
           {travel && !current && <button type="button" data-testid={`travel-${city.id}`}
             disabled={busy}
-            onClick={event => onOffer(travel, event.currentTarget)}>Viajar · {travel.detail ?? ''}</button>}
+            onClick={event => onOffer(travel, event.currentTarget)}>{t('game.travelButton', { detail: travel.detail ?? '' })}</button>}
         </li>;
       })}
     </ul>
-    <h4>Lugares conocidos</h4>
-    <ul className="game-destination-list">{view.locations.map(location => <li key={location.id}><span><strong>{location.name}</strong>{location.id === view.position.location.id ? ' (aquí)' : ''}<small>{location.description}</small></span></li>)}</ul>
+    <h4>{t('game.knownPlaces')}</h4>
+    <ul className="game-destination-list">{view.locations.map(location => <li key={location.id}><span><strong>{location.name}</strong>{location.id === view.position.location.id ? t('game.hereSuffix') : ''}<small>{location.description}</small></span></li>)}</ul>
   </div>;
 }
 
 function BriefingText({ briefing }: { briefing: NonNullable<PlayerViewDto['briefing']> }) {
-  return <div><p><em>{briefing.speaker} te pone en situación:</em></p>{briefing.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
+  const t = useTranslation();
+  return <div><p><em>{t('initialRun.briefingIntro', { speaker: briefing.speaker })}</em></p>{briefing.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
 }
 
 /** Introducción del caso: qué ha ocurrido y qué tienes que resolver. Se
@@ -997,12 +1011,13 @@ function BriefingText({ briefing }: { briefing: NonNullable<PlayerViewDto['brief
  * guardada por partida en esta pestaña; se puede volver a abrir desde la
  * barra de herramientas y siempre está en el dossier. */
 function BriefingSection({ view, onDismiss }: { view: PlayerViewDto; onDismiss: () => void }) {
+  const t = useTranslation();
   if (!view.briefing) return null;
-  return <section className="game-briefing" aria-label="Introducción del caso">
-    <p className="game-overline">Introducción del caso</p>
+  return <section className="game-briefing" aria-label={t('initialRun.briefingTitle')}>
+    <p className="game-overline">{t('initialRun.briefingTitle')}</p>
     <h2>{view.briefing.title}</h2>
     <BriefingText briefing={view.briefing} />
-    <button type="button" onClick={onDismiss}>Entendido, a investigar</button>
+    <button type="button" onClick={onDismiss}>{t('game.understoodInvestigate')}</button>
   </section>;
 }
 
@@ -1012,8 +1027,9 @@ function IntroPanel({ view, open, onDismiss }: { view: PlayerViewDto; open: bool
 }
 
 function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void }) {
+  const t = useTranslation();
   if (!view.briefing) return null;
-  return <button type="button" onClick={onOpen}>Introducción</button>;
+  return <button type="button" onClick={onOpen}>{t('game.introButton')}</button>;
 }
 
 /** Resumen al retomar la partida (§13): se abre solo al entrar en una
@@ -1021,52 +1037,57 @@ function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void
  * esta pestaña; queda recuperable desde la barra de herramientas. Los datos
  * salen de `resumeSummary` (vista del jugador + estado del motor). */
 function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boolean; onDismiss: () => void }) {
+  const t = useTranslation();
   if (!open) return null;
   const summary = resumeSummary(view, lookupFromView(view), (id, lookup) => discoveryText(id, lookup, textsFromView(view)));
-  return <section className="game-briefing" data-testid="resume-panel" aria-label="Resumen al retomar">
-    <p className="game-overline">Resumen al retomar</p>
-    <h2>Así quedó la investigación</h2>
-    <p>Minuto {summary.minute} de {summary.deadlineMinutes} · quedan {summary.remainingMinutes} min · Estás en {summary.currentCity}, {summary.currentLocation}.</p>
-    <h4>Objetivos</h4>
-    <ul>{summary.objectives.map(objective => <li key={objective.description}>{objective.achieved ? '✓' : '○'} <span className="game-sr-only">{objectiveStateText(objective.achieved)}: </span>{objective.description}</li>)}</ul>
-    <h4>Ciudades visitadas</h4>
+  return <section className="game-briefing" data-testid="resume-panel" aria-label={t('game.resumeTitle')}>
+    <p className="game-overline">{t('game.resumeTitle')}</p>
+    <h2>{t('game.resumeHeading')}</h2>
+    <p>{t('game.resumeLine', { minute: summary.minute, deadline: summary.deadlineMinutes, remaining: summary.remainingMinutes, city: summary.currentCity, location: summary.currentLocation })}</p>
+    <h4>{t('game.objectives')}</h4>
+    <ul>{summary.objectives.map(objective => <li key={objective.description}>{objective.achieved ? '✓' : '○'} <span className="game-sr-only">{objectiveStateText(objective.achieved, t)}: </span>{objective.description}</li>)}</ul>
+    <h4>{t('game.visitedCities')}</h4>
     <p>{summary.visitedCities.join(', ')}</p>
-    <h4>Últimos hallazgos</h4>
+    <h4>{t('game.lastFindings')}</h4>
     {summary.lastDiscoveries.length === 0
-      ? <p>Sin hallazgos todavía.</p>
+      ? <p>{t('game.noFindings')}</p>
       : <ul>{summary.lastDiscoveries.map((discovery, index) => <li key={index}>{discovery}</li>)}</ul>}
-    <p>Detenciones: {summary.detentions} · Órdenes: {summary.warrants} · Solicitudes pendientes: {summary.pendingRequests.length === 0
-      ? 'ninguna'
-      : summary.pendingRequests.map(request => `${requestTypeLabels[request.type] ?? request.type} (min ${request.dueMinute})`).join(', ')}.</p>
-    <button type="button" onClick={onDismiss}>Seguir investigando</button>
+    <p>{t('game.resumeCounts', {
+      detentions: summary.detentions, warrants: summary.warrants,
+      pending: summary.pendingRequests.length === 0
+        ? t('game.none')
+        : summary.pendingRequests.map(request => `${requestTypeLabel(request.type, t)} (min ${request.dueMinute})`).join(', '),
+    })}</p>
+    <button type="button" onClick={onDismiss}>{t('game.resumeContinue')}</button>
   </section>;
 }
 
 function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewDto; onRead?: (text: string) => void; canRead?: boolean; noVoices?: boolean }) {
+  const t = useTranslation();
   const lookup = lookupFromView(view);
   const npcName = (id: string) => lookup.npcName(id);
   return <div>
-    <div><h4>Ficha del expediente</h4><p>Delito: {caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating)}.</p></div>
-    {view.briefing && <div><h4>Introducción del caso</h4><BriefingText briefing={view.briefing} /></div>}
-    <h4>Evidencias en tu poder</h4>
+    <div><h4>{t('game.dossierSheet')}</h4><p>{t('game.dossierCrime', { label: caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating, t) })}</p></div>
+    {view.briefing && <div><h4>{t('initialRun.briefingTitle')}</h4><BriefingText briefing={view.briefing} /></div>}
+    <h4>{t('game.evidenceOwned')}</h4>
     {view.objects.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin evidencias recogidas.</p></div>
-      : <table><thead><tr><th>ID</th><th>Tipo</th><th>Procedencia</th><th>Minuto</th><th>Admisible</th></tr></thead>
-        <tbody>{view.objects.map(item => <tr key={item.id}><td>{item.id}</td><td>{evidenceTypeLabels[item.type] ?? item.type}</td><td>{item.origin}</td><td>{item.minute}</td><td>{item.admissible ? 'Sí' : 'No'}</td></tr>)}</tbody></table>}
-    <h4>Hallazgos</h4>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noEvidence')}</p></div>
+      : <table><thead><tr><th>ID</th><th>{t('game.col.type')}</th><th>{t('game.col.origin')}</th><th>{t('game.col.minute')}</th><th>{t('game.col.admissible')}</th></tr></thead>
+        <tbody>{view.objects.map(item => <tr key={item.id}><td>{item.id}</td><td>{evidenceTypeLabel(item.type, t)}</td><td>{item.origin}</td><td>{item.minute}</td><td>{item.admissible ? t('common.yes') : t('common.no')}</td></tr>)}</tbody></table>}
+    <h4>{t('game.findings')}</h4>
     {view.dossier.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin hallazgos todavía.</p></div>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noFindings')}</p></div>
       : view.dossier.map((entry, index) => {
         const text = discoveryText(entry, lookup, textsFromView(view));
-        return <article key={index} className="game-evidence-card"><span className="game-evidence-kind">Hallazgo</span><p>{text}</p>
-          {canRead && onRead && <p><button type="button" data-testid={`dossier-read-${index}`} onClick={() => onRead(text)}>Leer</button></p>}
+        return <article key={index} className="game-evidence-card"><span className="game-evidence-kind">{t('game.finding')}</span><p>{text}</p>
+          {canRead && onRead && <p><button type="button" data-testid={`dossier-read-${index}`} onClick={() => onRead(text)}>{t('game.read')}</button></p>}
         </article>;
       })}
     <NoVoicesNotice show={noVoices} testId="tts-no-voices-dossier" />
-    <p className="game-panel-note">Nota de procedimiento: la ausencia de registro no demuestra inocencia.</p>
-    <h4>Conversación registrada</h4>
+    <p className="game-panel-note">{t('game.procedureNote')}</p>
+    <h4>{t('game.recordedConversation')}</h4>
     {view.conversation.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>Sin conversaciones registradas.</p></div>
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noConversations')}</p></div>
       : <ul className="game-destination-list">{view.conversation.map((entry, index) => <li key={index}><span>{conversationRecordText(entry, npcName, undefined, id => lookup.locationName(id))}</span></li>)}</ul>}
   </div>;
 }
@@ -1084,29 +1105,30 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
   onDraft: (value: string) => void; onSend: (event: FormEvent) => void;
   placeholder?: string; note?: string; onRead?: (text: string) => void; canRead?: boolean; noVoices?: boolean;
 }) {
+  const t = useTranslation();
   if (!npc) {
     return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span>
-      <p>Habla primero con alguien en persona («hablar con…» o la acción «Hablar con») y la conversación se abrirá aquí.</p></div>;
+      <p>{t('game.chatEmpty')}</p></div>;
   }
   const role = chatRole(findChatEntry(view, npc.id), getNPC(npc.id)?.role ?? '');
   return <div className="game-chat">
     <p className="game-chat-npc"><Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" /><span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
     <ol className="game-chat-turns" data-testid="chat-turns" aria-live="polite">
       {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
-        <span className="game-chat-speaker">{turn.from === 'you' ? 'Tú' : npc.name}</span>
+        <span className="game-chat-speaker">{turn.from === 'you' ? t('game.you') : npc.name}</span>
         <span>{turn.text}</span>
-        {turn.from === 'npc' && canRead && onRead && <button type="button" data-testid={`chat-read-${index}`} onClick={() => onRead(turn.text)}>Leer</button>}
+        {turn.from === 'npc' && canRead && onRead && <button type="button" data-testid={`chat-read-${index}`} onClick={() => onRead(turn.text)}>{t('game.read')}</button>}
       </li>)}
     </ol>
     <NoVoicesNotice show={noVoices} testId="tts-no-voices-chat" />
     <form onSubmit={onSend} className="game-chat-form">
       <input type="text" data-testid="chat-input" value={draft} disabled={busy} maxLength={4000}
-        placeholder={placeholder ?? 'Pregúntale por lo que sabe: su tarea, lo que vio…'} aria-label="Pregunta para el personaje"
+        placeholder={placeholder ?? t('game.chatPlaceholder')} aria-label={t('game.chatAria')}
         onChange={event => onDraft(event.target.value)} />
-      <button type="submit" data-testid="chat-send" disabled={!draft.trim() || busy}>{busy ? 'Preguntando…' : 'Preguntar'}</button>
+      <button type="submit" data-testid="chat-send" disabled={!draft.trim() || busy}>{busy ? t('game.asking') : t('game.ask')}</button>
     </form>
     {error && <p className="game-error" role="alert">{error}</p>}
-    <p className="game-panel-note">{note ?? 'Hablar en persona no consume tiempo. Preguntar aquí tampoco: el reloj solo avanza al actuar.'}</p>
+    <p className="game-panel-note">{note ?? t('game.chatNote')}</p>
   </div>;
 }
 
