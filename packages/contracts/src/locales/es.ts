@@ -91,7 +91,7 @@ export const ES_MESSAGES = {
   'newRun.difficulty.hardNote': 'La mitad de tiempo. Para quien ya conoce el caso.',
   'newRun.difficulty': 'Dificultad',
   'newRun.exploration': 'Exploración',
-  'newRun.exploration.freeNote': 'Las ciudades del expediente se descubren investigando; el atlas muestra todas las ciudades admitidas del catálogo.',
+  'newRun.exploration.freeNote': 'Las ciudades del expediente se descubren investigando; el atlas muestra los destinos turísticos y las ciudades que ya has descubierto.',
   'newRun.exploration.guidedNote': 'Las ciudades del expediente se conocen desde el principio.',
   'newRun.explorationHelp': 'Independiente de la dificultad: en libre, un viaje a una ciudad equivocada también consume tiempo.',
   'newRun.deadline': ' · plazo {hours}',
