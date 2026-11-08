@@ -20,7 +20,7 @@ import type { Database } from '../database/connection.ts';
 import { createSessionStore } from './store.ts';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
-import { emailVerifications, profiles, recoveryTokens, sessions, runs } from '../database/schema.ts';
+import { detectiveProfiles, emailVerifications, officialResults, profiles, recoveryTokens, sessions, runs } from '../database/schema.ts';
 
 function deny(reply: FastifyReply, request: FastifyRequest, status: number, code: string) {
   return reply.code(status).send({ error: { code, message: 'Solicitud no autorizada o servicio no disponible.', requestId: request.id } });
@@ -408,11 +408,18 @@ export function registerPublicAuth(app: FastifyInstance, config: AppConfig, data
     // nombre y credencial desaparecen). La fila se conserva porque las
     // partidas referencian al perfil y la app nunca borra partidas
     // (migraciones 0003/0004: sin DELETE sobre runs); los tokens se borran.
+    // El perfil de detective y los resultados oficiales del usuario sí se
+    // borran en la misma transacción: son datos del jugador y la baja de
+    // cuenta (GDPR art. 17) no debe dejar huérfanos. El borrado de una
+    // partida (`delete_run`) sigue sin tocar los resultados oficiales:
+    // el registro de carrera sobrevive a borrar una partida por diseño.
     const deletedKey = `deleted:${randomUUID()}`;
     await database.orm.transaction(async tx => {
       await tx.delete(sessions).where(eq(sessions.profileId, session.profile.id));
       await tx.delete(emailVerifications).where(eq(emailVerifications.profileId, session.profile.id));
       await tx.delete(recoveryTokens).where(eq(recoveryTokens.profileId, session.profile.id));
+      await tx.delete(detectiveProfiles).where(eq(detectiveProfiles.userId, session.profile.id));
+      await tx.delete(officialResults).where(eq(officialResults.ownerId, session.profile.id));
       await tx.update(profiles).set({
         localKey: deletedKey,
         displayName: 'Cuenta eliminada',

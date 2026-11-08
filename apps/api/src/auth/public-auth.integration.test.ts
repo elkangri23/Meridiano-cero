@@ -14,8 +14,10 @@ describe('Registro público (Fase B)', () => {
   const origin = config.origin;
   const emailA = 'prueba-a@sintetico.invalid';
   const emailB = 'prueba-b@sintetico.invalid';
+  const emailC = 'prueba-c@sintetico.invalid';
   const passwordA = 'contraseña-sintética-A-123';
   const passwordB = 'contraseña-sintética-B-123';
+  const passwordC = 'contraseña-sintética-C-123';
   let cookieA = '';
   let csrfA = '';
   let profileA = '';
@@ -37,8 +39,10 @@ describe('Registro público (Fase B)', () => {
     // borrar perfiles (sin DELETE sobre profiles por diseño).
     const owner = createDatabase(readDatabaseUrl(process.env.DATABASE_MIGRATION_URL));
     try {
-      await owner.pool.query('DELETE FROM sessions USING profiles WHERE sessions.profile_id = profiles.id AND profiles.local_key IN ($1, $2)', [emailA, emailB]);
-      await owner.pool.query('DELETE FROM profiles WHERE local_key IN ($1, $2)', [emailA, emailB]);
+      await owner.pool.query('DELETE FROM sessions USING profiles WHERE sessions.profile_id = profiles.id AND profiles.local_key IN ($1, $2, $3)', [emailA, emailB, emailC]);
+      await owner.pool.query('DELETE FROM official_results USING profiles WHERE official_results.owner_id = profiles.id AND profiles.local_key IN ($1, $2, $3)', [emailA, emailB, emailC]);
+      await owner.pool.query('DELETE FROM detective_profiles USING profiles WHERE detective_profiles.user_id = profiles.id AND profiles.local_key IN ($1, $2, $3)', [emailA, emailB, emailC]);
+      await owner.pool.query('DELETE FROM profiles WHERE local_key IN ($1, $2, $3)', [emailA, emailB, emailC]);
       await owner.pool.query('DELETE FROM profiles WHERE local_key LIKE $1', ['deleted:%']);
     } finally {
       await owner.pool.end();
@@ -132,5 +136,37 @@ describe('Registro público (Fase B)', () => {
     const sessionsLeft = await database.pool.query('SELECT COUNT(*)::int AS n FROM sessions WHERE profile_id=$1', [profileA]);
     expect(sessionsLeft.rows[0].n).toBe(0);
     expect((await app.inject({ method: 'POST', url: '/api/v1/auth/login', headers: headers(), payload: { email: emailA, password: 'nueva-contraseña-A-456' } })).statusCode).toBe(401);
+  });
+  it('borrado de cuenta borra también el perfil de detective y los resultados oficiales, sin tocar otras cuentas', async () => {
+    // El resultado oficial se inserta de forma controlada: el camino
+    // normal es cerrar un caso entero y aquí solo se comprueba el
+    // borrado, no el cierre. El perfil de detective sí se crea por API.
+    const created = await register(emailC, passwordC, 'Detective C');
+    expect(created.statusCode).toBe(200);
+    const cookieC = (created.headers['set-cookie'] as string).split(';')[0] ?? '';
+    const csrfC = created.json().csrfToken as string;
+    const profileC = created.json().profile.id as string;
+    const profileB = (await database.pool.query('SELECT id FROM profiles WHERE local_key=$1', [emailB])).rows[0].id as string;
+    const patched = await app.inject({ method: 'PATCH', url: '/api/v1/profile/detective', headers: headers({ cookie: cookieC, 'x-csrf-token': csrfC }), payload: { alias: 'Detective C', avatar: 'forense' } });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().alias).toBe('Detective C');
+    const hashC = 'a'.repeat(64);
+    const hashB = 'b'.repeat(64);
+    await database.pool.query(
+      "INSERT INTO official_results(owner_id, definition_hash, content_hash, first_result, operation_id) VALUES ($1, $2, $2, '{}'::jsonb, gen_random_uuid()), ($3, $4, $4, '{}'::jsonb, gen_random_uuid())",
+      [profileC, hashC, profileB, hashB]);
+    const before = await database.pool.query('SELECT COUNT(*)::int AS n FROM detective_profiles WHERE user_id=$1', [profileC]);
+    expect(before.rows[0].n).toBe(1);
+    const response = await app.inject({ method: 'DELETE', url: '/api/v1/account', headers: headers({ cookie: cookieC, 'x-csrf-token': csrfC }), payload: { confirm: true, password: passwordC } });
+    expect(response.statusCode).toBe(204);
+    const detectiveLeft = await database.pool.query('SELECT COUNT(*)::int AS n FROM detective_profiles WHERE user_id=$1', [profileC]);
+    expect(detectiveLeft.rows[0].n).toBe(0);
+    const resultsLeft = await database.pool.query('SELECT COUNT(*)::int AS n FROM official_results WHERE owner_id=$1', [profileC]);
+    expect(resultsLeft.rows[0].n).toBe(0);
+    // La otra cuenta no se ve afectada: su resultado oficial sigue y
+    // puede entrar con su contraseña.
+    const resultsB = await database.pool.query('SELECT COUNT(*)::int AS n FROM official_results WHERE owner_id=$1', [profileB]);
+    expect(resultsB.rows[0].n).toBe(1);
+    expect((await app.inject({ method: 'POST', url: '/api/v1/auth/login', headers: headers(), payload: { email: emailB, password: passwordB } })).statusCode).toBe(200);
   });
 });
