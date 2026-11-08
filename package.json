@@ -13,7 +13,7 @@
     "dev:test": "pnpm --filter @meridiano/engine... build && concurrently \"pnpm --filter @meridiano/api dev\" \"pnpm --filter @meridiano/web dev\"",
     "build": "pnpm -r build",
     "typecheck": "pnpm --filter @meridiano/engine... build && pnpm -r typecheck",
-    "lint": "eslint apps packages && pnpm check:imports",
+    "lint": "eslint apps packages && pnpm check:imports && pnpm check:i18n",
     "check:imports": "pnpm --filter @meridiano/contracts build && node scripts/dev/check-imports.mjs",
     "test": "pnpm --filter @meridiano/engine... build && vitest run",
     "verify:guards": "pnpm --filter @meridiano/api... build && node scripts/dev/verify-guards.mjs",
@@ -27,7 +27,8 @@
     "security:dependencies": "pnpm audit --audit-level high",
     "check:format": "node scripts/dev/check-whitespace.mjs",
     "scan:secrets": "node scripts/dev/scan-secrets.mjs",
-    "eval:ai": "node --experimental-strip-types apps/api/src/ai/evaluate-cli.ts"
+    "eval:ai": "node --experimental-strip-types apps/api/src/ai/evaluate-cli.ts",
+    "check:i18n": "node scripts/dev/check-i18n.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
