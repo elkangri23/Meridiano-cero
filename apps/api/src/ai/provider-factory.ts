@@ -12,15 +12,31 @@ import { createCompatibleProvider } from './compat-adapter.ts';
 import { createCompatibleOllamaProvider } from './ollama-adapter.ts';
 import { createDefaultMockProvider } from './mock.ts';
 import { resolveAIConnection } from './ai-connections.ts';
+import { resolveMessage, type Language, type LocaleKey } from '@meridiano/contracts';
 import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
 
 export interface ProviderCatalogEntry {
   id: string;
-  label: string;
+  /** Clave de la etiqueta (la API la resuelve en el idioma de la petición). */
+  labelKey: LocaleKey;
   needsKey: boolean;
   needsBaseUrl: boolean;
   /** La baseUrl es fija del catálogo y el usuario no la cambia. */
+  fixedBaseUrl: boolean;
+  defaultBaseUrl: string;
+  defaultModel: string;
+  /** Clave de la ayuda (la API la resuelve en el idioma de la petición). */
+  hintKey: LocaleKey;
+}
+
+/** Entrada del catálogo tal como la recibe la web: etiqueta y ayuda ya
+ * resueltas en el idioma de la petición. */
+export interface LocalizedProviderCatalogEntry {
+  id: string;
+  label: string;
+  needsKey: boolean;
+  needsBaseUrl: boolean;
   fixedBaseUrl: boolean;
   defaultBaseUrl: string;
   defaultModel: string;
@@ -28,25 +44,41 @@ export interface ProviderCatalogEntry {
 }
 
 export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
-  { id: 'freellmapi', label: 'FreeLLMAPI', needsKey: true, needsBaseUrl: false, fixedBaseUrl: true,
+  { id: 'freellmapi', labelKey: 'settings.providerLabel.freellmapi', needsKey: true, needsBaseUrl: false, fixedBaseUrl: true,
     defaultBaseUrl: 'https://api.freellmapi.com/v1', defaultModel: 'gpt-4o-mini',
-    hint: 'Servicio compatible con OpenAI. En este servidor es el proveedor predeterminado.' },
-  { id: 'openai', label: 'OpenAI', needsKey: true, needsBaseUrl: false, fixedBaseUrl: true,
+    hintKey: 'settings.providerHint.freellmapi' },
+  { id: 'openai', labelKey: 'settings.providerLabel.openai', needsKey: true, needsBaseUrl: false, fixedBaseUrl: true,
     defaultBaseUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-4o-mini',
-    hint: 'Tu clave de OpenAI; los tokens los pagas tú.' },
-  { id: 'anthropic', label: 'Anthropic (Claude)', needsKey: true, needsBaseUrl: false, fixedBaseUrl: true,
+    hintKey: 'settings.providerHint.openai' },
+  { id: 'anthropic', labelKey: 'settings.providerLabel.anthropic', needsKey: true, needsBaseUrl: false, fixedBaseUrl: true,
     defaultBaseUrl: 'https://api.anthropic.com', defaultModel: 'claude-sonnet-4-5',
-    hint: 'Tu clave de Anthropic; los tokens los pagas tú.' },
-  { id: 'google', label: 'Google (Gemini)', needsKey: true, needsBaseUrl: false, fixedBaseUrl: true,
+    hintKey: 'settings.providerHint.anthropic' },
+  { id: 'google', labelKey: 'settings.providerLabel.google', needsKey: true, needsBaseUrl: false, fixedBaseUrl: true,
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta', defaultModel: 'gemini-2.5-flash',
-    hint: 'Tu clave de Google AI Studio; los tokens los pagas tú.' },
-  { id: 'ollama', label: 'Ollama local', needsKey: false, needsBaseUrl: true, fixedBaseUrl: false,
+    hintKey: 'settings.providerHint.google' },
+  { id: 'ollama', labelKey: 'settings.providerLabel.ollama', needsKey: false, needsBaseUrl: true, fixedBaseUrl: false,
     defaultBaseUrl: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b',
-    hint: 'Solo funciona en una instalación en casa con Ollama en este equipo.' },
-  { id: 'openai-compatible', label: 'OpenAI-compatible (LM Studio u otro)', needsKey: false, needsBaseUrl: true, fixedBaseUrl: false,
+    hintKey: 'settings.providerHint.ollama' },
+  { id: 'openai-compatible', labelKey: 'settings.providerLabel.openaiCompatible', needsKey: false, needsBaseUrl: true, fixedBaseUrl: false,
     defaultBaseUrl: 'http://localhost:1234/v1', defaultModel: 'local-model',
-    hint: 'LM Studio en http://localhost:1234/v1 u otro endpoint compatible. En el servidor solo se admiten destinos HTTPS públicos.' },
+    hintKey: 'settings.providerHint.openaiCompatible' },
 ];
+
+/** Catálogo con etiqueta y ayuda resueltas en el idioma pedido (los
+ * nombres propios —FreeLLMAPI, OpenAI, Anthropic, Google— no cambian;
+ * las etiquetas con texto y las ayudas sí). */
+export function localizedCatalog(language: Language): LocalizedProviderCatalogEntry[] {
+  return PROVIDER_CATALOG.map(entry => ({
+    id: entry.id,
+    label: resolveMessage(language, entry.labelKey),
+    needsKey: entry.needsKey,
+    needsBaseUrl: entry.needsBaseUrl,
+    fixedBaseUrl: entry.fixedBaseUrl,
+    defaultBaseUrl: entry.defaultBaseUrl,
+    defaultModel: entry.defaultModel,
+    hint: resolveMessage(language, entry.hintKey),
+  }));
+}
 
 export function catalogEntry(adapterId: string): ProviderCatalogEntry | undefined {
   return PROVIDER_CATALOG.find(entry => entry.id === adapterId);

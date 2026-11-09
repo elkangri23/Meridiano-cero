@@ -15,7 +15,8 @@ import {
   setAIConnectionStatus,
   type AIConnectionInput,
 } from './ai-connections.ts';
-import { PROVIDER_CATALOG, catalogEntry, buildProviderFromAdapter, resolveRequestProvider, type ProviderCatalogEntry } from './provider-factory.ts';
+import { localizedCatalog, catalogEntry, buildProviderFromAdapter, resolveRequestProvider, type ProviderCatalogEntry } from './provider-factory.ts';
+import { parseLanguage } from '@meridiano/case-schema';
 import { validateConnectionBaseUrl } from './destination-policy.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -155,7 +156,9 @@ export function registerAiConnectionRoutes(app: FastifyInstance, config: AppConf
     const connections = await listAIConnections(database, ownerId);
     const resolved = await resolveRequestProvider(database, ownerId, config);
     return reply.send({
-      catalog: PROVIDER_CATALOG,
+      // El catálogo se localiza con la cabecera `x-meridiano-language`:
+      // antes se servían las etiquetas y ayudas en español tal cual.
+      catalog: localizedCatalog(parseLanguage(request.headers['x-meridiano-language'])),
       connections,
       effective: {
         source: resolved.source,

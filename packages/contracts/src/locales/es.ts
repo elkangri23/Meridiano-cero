@@ -841,6 +841,21 @@ export const ES_MESSAGES = {
   'settings.connectionNamePlaceholder': 'Mi Ollama',
   'settings.saveConnection': 'Guardar conexión',
   'settings.connectionSaved': 'Conexión guardada y activada.',
+  // Etiquetas y ayudas del catálogo de proveedores de IA (la API las
+  // resuelve en el idioma de la petición; antes eran literales en español
+  // servidos tal cual por el catálogo).
+  'settings.providerLabel.freellmapi': 'FreeLLMAPI',
+  'settings.providerLabel.openai': 'OpenAI',
+  'settings.providerLabel.anthropic': 'Anthropic (Claude)',
+  'settings.providerLabel.google': 'Google (Gemini)',
+  'settings.providerLabel.ollama': 'Ollama local',
+  'settings.providerLabel.openaiCompatible': 'OpenAI-compatible (LM Studio u otro)',
+  'settings.providerHint.freellmapi': 'Servicio compatible con OpenAI. En este servidor es el proveedor predeterminado.',
+  'settings.providerHint.openai': 'Tu clave de OpenAI; los tokens los pagas tú.',
+  'settings.providerHint.anthropic': 'Tu clave de Anthropic; los tokens los pagas tú.',
+  'settings.providerHint.google': 'Tu clave de Google AI Studio; los tokens los pagas tú.',
+  'settings.providerHint.ollama': 'Solo funciona en una instalación en casa con Ollama en este equipo.',
+  'settings.providerHint.openaiCompatible': 'LM Studio en http://localhost:1234/v1 u otro endpoint compatible. En el servidor solo se admiten destinos HTTPS públicos.',
 
   // Etiquetas compartidas (antes mapas de etiquetas en el código).
   'labels.crime.robo': 'Robo internacional',
@@ -879,6 +894,11 @@ export const ES_MESSAGES = {
   'labels.irregular.force_entry': 'Acceso forzado',
   'labels.irregular.bribe': 'Soborno',
   'labels.irregular.impersonate': 'Suplantación',
+  'labels.palette.default': 'Predeterminada',
+  'labels.palette.protanopia': 'Protanopia (rojo-verde)',
+  'labels.palette.deuteranopia': 'Deuteranopia (rojo-verde)',
+  'labels.palette.tritanopia': 'Tritanopia (azul-amarillo)',
+  'labels.palette.highContrast': 'Alto contraste (paleta)',
   'labels.evidenceType.object': 'objeto',
   'labels.evidenceType.observation': 'observación',
   'labels.evidenceType.testimony': 'testimonio',

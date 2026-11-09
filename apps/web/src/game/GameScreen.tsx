@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { archiveApi } from '../archive/client';
 import { profileApi } from '../auth/client';
 import { avatarLabel, ProfileSection } from '../auth/ProfileSection';
-import { paletteLabels, usePreferences } from '../preferences';
+import { paletteLabelKeys, usePreferences } from '../preferences';
 import { resumeSummary } from './resume-summary';
 import { aiApi, AiError } from '../ai/client';
 import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
@@ -103,7 +103,7 @@ function PaletteSetting({ palette, onPalette }: { palette: PaletteMode; onPalett
   const t = useTranslation();
   return <label className="game-setting"><span>{t('settings.palette')}</span>
     <select value={palette === 'high-contrast' ? 'default' : palette} onChange={event => onPalette(event.target.value as PaletteMode)}>
-      {(['default', 'protanopia', 'deuteranopia', 'tritanopia'] as const).map(mode => <option key={mode} value={mode}>{paletteLabels[mode]}</option>)}
+      {(['default', 'protanopia', 'deuteranopia', 'tritanopia'] as const).map(mode => <option key={mode} value={mode}>{t(paletteLabelKeys[mode])}</option>)}
     </select>
   </label>;
 }

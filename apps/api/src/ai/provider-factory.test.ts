@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  PROVIDER_CATALOG, catalogEntry, buildProviderFromAdapter, buildAdminProvider,
+  PROVIDER_CATALOG, localizedCatalog, catalogEntry, buildProviderFromAdapter, buildAdminProvider,
   createUnavailableProvider, defaultModelFor,
 } from './provider-factory.ts';
 import { AiError } from './provider.ts';
@@ -30,6 +30,28 @@ describe('catálogo de proveedores', () => {
     expect(catalogEntry('freellmapi')?.fixedBaseUrl).toBe(true);
     expect(defaultModelFor('freellmapi')).toBe('gpt-4o-mini');
     expect(catalogEntry('inexistente')).toBeUndefined();
+  });
+
+  it('el catálogo se localiza: etiquetas y ayudas en español, inglés y francés', () => {
+    const es = localizedCatalog('es');
+    expect(es.find(entry => entry.id === 'ollama')?.label).toBe('Ollama local');
+    expect(es.find(entry => entry.id === 'ollama')?.hint).toBe('Solo funciona en una instalación en casa con Ollama en este equipo.');
+    expect(es.find(entry => entry.id === 'openai-compatible')?.label).toBe('OpenAI-compatible (LM Studio u otro)');
+    const en = localizedCatalog('en');
+    expect(en.find(entry => entry.id === 'ollama')?.label).toBe('Local Ollama');
+    expect(en.find(entry => entry.id === 'ollama')?.hint).toBe('Only works on a home setup with Ollama on this machine.');
+    expect(en.find(entry => entry.id === 'openai-compatible')?.label).toBe('OpenAI-compatible (LM Studio or other)');
+    expect(en.find(entry => entry.id === 'freellmapi')?.label).toBe('FreeLLMAPI');
+    const fr = localizedCatalog('fr');
+    expect(fr.find(entry => entry.id === 'ollama')?.hint).toBe('Fonctionne uniquement sur une installation à domicile avec Ollama sur cet ordinateur.');
+    expect(fr.find(entry => entry.id === 'openai-compatible')?.label).toBe('OpenAI-compatible (LM Studio ou autre)');
+    // Sin español residual en inglés ni francés: ninguna etiqueta ni ayuda
+    // de los proveedores es el texto español.
+    for (const entry of [...en, ...fr]) {
+      expect(entry.label).not.toContain('u otro');
+      expect(entry.hint).not.toContain('Solo funciona');
+      expect(entry.hint).not.toContain('los tokens los pagas');
+    }
   });
 
   it('construye cada adaptador con su identificador y modelo', () => {

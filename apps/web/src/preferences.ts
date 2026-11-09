@@ -71,11 +71,13 @@ export function translateUi(key: LocaleKey, vars?: TranslateVars): string {
   return createTranslator(current.language).t(key, vars);
 }
 
-/** Etiquetas de las paletas en el selector de Ajustes. */
-export const paletteLabels: Record<PaletteMode, string> = {
-  default: 'Predeterminada',
-  protanopia: 'Protanopia (rojo-verde)',
-  deuteranopia: 'Deuteranopia (rojo-verde)',
-  tritanopia: 'Tritanopia (azul-amarillo)',
-  'high-contrast': 'Alto contraste (paleta)',
+/** Claves de las etiquetas de las paletas en el selector de Ajustes (los
+ * textos viven en los locales; antes eran literales en español aquí y se
+ * veían en español con la interfaz en inglés o francés). */
+export const paletteLabelKeys: Record<PaletteMode, LocaleKey> = {
+  default: 'labels.palette.default',
+  protanopia: 'labels.palette.protanopia',
+  deuteranopia: 'labels.palette.deuteranopia',
+  tritanopia: 'labels.palette.tritanopia',
+  'high-contrast': 'labels.palette.highContrast',
 };

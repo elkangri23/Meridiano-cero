@@ -2,7 +2,8 @@
 // y el alto contraste como clase; el test usa un document mínimo porque la
 // suite unitaria corre en node (sin jsdom).
 import { describe, expect, it } from 'vitest';
-import { applyPreferences, paletteLabels } from './preferences';
+import { createTranslator } from '@meridiano/contracts';
+import { applyPreferences, paletteLabelKeys } from './preferences';
 
 /** Preferencias completas sin importar la librería (el doble local evita
  * que el test añada otra violación web-isolation; la forma real la cubre el
@@ -37,9 +38,19 @@ function stubDocument(): { classes: Set<string> } {
 }
 
 describe('Preferencias persistentes (§15)', () => {
-  it('cada paleta de la librería tiene etiqueta en español', () => {
-    expect(Object.keys(paletteLabels).sort()).toEqual(['default', 'deuteranopia', 'high-contrast', 'protanopia', 'tritanopia']);
-    for (const label of Object.values(paletteLabels)) expect(label.length).toBeGreaterThan(0);
+  it('cada paleta de la librería tiene etiqueta traducida en los tres idiomas', () => {
+    expect(Object.keys(paletteLabelKeys).sort()).toEqual(['default', 'deuteranopia', 'high-contrast', 'protanopia', 'tritanopia']);
+    for (const language of ['es', 'en', 'fr'] as const) {
+      const t = createTranslator(language).t;
+      for (const key of Object.values(paletteLabelKeys)) {
+        const label = t(key);
+        expect(label.length, `${language}:${key}`).toBeGreaterThan(0);
+        expect(label, `${language}:${key}`).not.toBe(key);
+      }
+    }
+    // En inglés y francés no queda español residual en las etiquetas.
+    expect(createTranslator('en').t(paletteLabelKeys.default)).toBe('Default');
+    expect(createTranslator('fr').t(paletteLabelKeys.protanopia)).toBe('Protanopie (rouge-vert)');
   });
 
   it('la paleta de daltonismo pone su clase y quita las demás', () => {

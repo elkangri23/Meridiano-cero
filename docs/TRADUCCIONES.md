@@ -112,8 +112,13 @@ inglés " " (o ' ' dentro de una frase), francés « » con espacios. Los
 nombres propios de personas, ciudades y lugares concretos (Lucía, Tomás,
 Madrid, París, Instituto Horizonte) NO se traducen; los nombres
 descriptivos de lugares genéricos (sala de embalaje, archivo de
-conservación) SÍ. Los placeholders `{var}` se preservan EXACTOS (mismo
-nombre, misma cantidad). «Recoger» (evidencia) es *Collect* / *Ramasser*,
+conservación) SÍ. **Ciudades, siempre con grafía española en la prosa
+traducida (decisión de Antonio, 2026-11-09)**: París (nunca *Paris*),
+Barcelona (nunca *Barcelone*), Lisboa (nunca *Lisbon* / *Lisbonne*),
+Málaga (nunca *Malaga*), Sevilla, Bilbao, Valencia, Zaragoza, Madrid.
+La interfaz y el motor ya las usaban así; la prosa de los casos en inglés
+y francés se igualó en el lote de arreglos (EN 4, FR 104 sustituciones).
+Los placeholders `{var}` se preservan EXACTOS (mismo nombre, misma cantidad). «Recoger» (evidencia) es *Collect* / *Ramasser*,
 distinto de «Recuperar» (objeto) que es *Recover* / *Récupérer*.
 
 | Español | English | Français |
