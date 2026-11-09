@@ -25,6 +25,10 @@ import { EngineStateError } from './state-error.js';
 export { EngineStateError } from './state-error.js';
 import { buildFinalReport, completeFinalReport } from './final-report.js';
 import { advanceMinute, hasExpired, seededDelay } from './clock.js';
+/** Retraso de viaje del motor, reutilizado por el chequeo determinista de
+ * longitud de ruta del generador (packages/generator/src/stages.ts): el
+ * generador debe medir las rutas con el mismo modelo de costes que el motor. */
+export { seededDelay } from './clock.js';
 import type {
   CaseDefinition,
   CaseRun,

@@ -16,6 +16,13 @@
 // persistencia) son deterministas.
 
 import { FORENSIC_TYPES, GEOGRAPHIC_CATALOG, arrestTypeForCaseId, crimeAllowedForRating, getRoute, hasKnowledgeContent, isKnowledgeLabelText, knowledgeContentAnchors, type ArrestType, type CaseDefinition, type CaseMechanics, type CaseTexts, type ContentRating, type ForensicType, type KnowledgeContentAnchors, type RemoteChannel } from '@meridiano/case-schema';
+// El chequeo determinista de longitud de ruta (B1) mide las rutas con el
+// mismo modelo de costes que el motor: el retraso de viaje lo aporta el
+// motor (`seededDelay`); los costes materiales (inspección, detención,
+// recuperación) se replican en `routeLengthMinutes` con los valores de
+// `packages/engine/src/timed-action.ts` y quedan fijados por el test de
+// exactitud contra `simulateCase` en `pipeline.test.ts`.
+import { seededDelay } from '@meridiano/engine';
 // Tipos compartidos del trabajo y delitos generables: viven en
 // `job-types.ts` para no cerrar un ciclo entre etapas, pipeline y
 // validador. La superficie pública no cambia: se re-exportan aquí.
@@ -39,6 +46,241 @@ export const DEADLINE_BY_DURATION: Record<GenerationParams['duration'], number> 
  * para que el modelo diseñe rutas que quepan, en vez de adivinarlo. */
 export function routeBudgetMinutes(duration: GenerationParams['duration']): number {
   return Math.floor(DEADLINE_BY_DURATION[duration] / 2);
+}
+
+// ── Longitud determinista de ruta (B1) ───────────────────────────────────────
+//
+// La etapa 4b ya recibe el presupuesto en minutos (lote A), pero el modelo
+// lo incumplía sin que nadie se lo dijera con cifras: la simulación de la
+// etapa 8 era la primera que medía la ruta, y su error no llegaba al
+// reintento de la 4b con el minuto exacto. Este chequeo mide cada ruta
+// (dorada y alternativa) con el mismo modelo de costes que el motor —
+// `materialMinutes` + `confirmTravel` + `seededDelay` + el corte por plazo
+// de `advanceMinute`/`hasExpired` — y la rechaza en la validación de la
+// etapa 4, antes de la simulación, con el minuto exacto y el desglose por
+// tipo de coste, para que el reintento de la 4b sepa qué recortar y el mundo
+// 4a válido se conserve.
+
+/** Costes materiales por acción, en minutos. Son los de
+ * `packages/engine/src/timed-action.ts` (`materialMinutes`): inspección
+ * de sala 10 / de elemento 20 / re-inspección 0; detención coordinada
+ * (automática) 30 / en persona (interactiva) 15; recuperación 20. El test
+ * de exactitud contra `simulateCase` en `pipeline.test.ts` los fija. */
+const INSPECT_ROOM_MINUTES = 10;
+const INSPECT_ELEMENT_MINUTES = 20;
+const DETAIN_AUTOMATIC_MINUTES = 30;
+const DETAIN_INTERACTIVE_MINUTES = 15;
+const RECOVER_MINUTES = 20;
+const DOCUMENT_SEND_MINUTES = 30;
+const IRREGULAR_MINUTES = 30;
+
+export interface RouteLengthInput {
+  budgetMinutes: number;
+  duration: GenerationParams['duration'];
+  seed: number;
+}
+
+export interface RouteLengthBreakdown {
+  totalMinutes: number;
+  travelMinutes: number;
+  travelCount: number;
+  waitMinutes: number;
+  inspectMinutes: number;
+  detainMinutes: number;
+  recoverMinutes: number;
+  /** La ruta se interrumpió al llegar al plazo: el reloj se clavó en el
+   * plazo y las acciones restantes no se ejecutaron. */
+  interrupted: boolean;
+}
+
+/** Duración base de un viaje entre dos ciudades del expediente: la de
+ * `geography.travelDurations` (la misma que el motor encuentra primero en
+ * `def.travelDurations`); entre ciudades del expediente sin duración
+ * declarada el motor no viaja (`undefined`), y fuera del expediente manda
+ * el catálogo. Devuelve `undefined` cuando el motor no podría viajar. */
+function routeTravelBaseMinutes(geography: SelectedGeography, fromCityId: string, toCityId: string): number | undefined {
+  const cased = geography.travelDurations.find(
+    (d) => d.fromCityId === fromCityId && d.toCityId === toCityId,
+  );
+  if (cased) return cased.minutes;
+  const fromIsCase = geography.cities.some((city) => city.id === fromCityId);
+  const toIsCase = geography.cities.some((city) => city.id === toCityId);
+  if (fromIsCase && toIsCase) return undefined;
+  return getRoute(fromCityId, toCityId)?.minutes;
+}
+
+/** Estado del recorrido de una ruta al medirla: ciudad actual, viajes
+ * confirmados (índice del retraso `seededDelay`) y evidencias ya
+ * inspeccionadas (la re-inspección cuesta 0). */
+interface RouteWalkState {
+  currentCity: string;
+  tripCount: number;
+  inspected: Set<string>;
+}
+
+interface RouteActionCost {
+  cost: number;
+  travelled: boolean;
+}
+
+/** Coste de un viaje: duración base de la ruta + retraso del motor
+ * (`seededDelay`, 5 % de los viajes). Actualiza el estado solo si el
+ * motor podría viajar (destino distinto y ruta existente). */
+function travelActionCost(params: Record<string, unknown>, geography: SelectedGeography, seed: number, state: RouteWalkState): RouteActionCost {
+  const to = params.toCityId;
+  if (typeof to !== 'string' || to === state.currentCity) return { cost: 0, travelled: false };
+  const base = routeTravelBaseMinutes(geography, state.currentCity, to);
+  if (base === undefined) return { cost: 0, travelled: false };
+  const cost = base + seededDelay(seed, state.tripCount);
+  state.tripCount++;
+  state.currentCity = to;
+  return { cost, travelled: true };
+}
+
+/** Coste de una espera: los minutos pedidos, si son un número positivo. */
+function waitActionCost(params: Record<string, unknown>): number {
+  const minutes = params.minutes;
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes <= 0) return 0;
+  return minutes;
+}
+
+/** Coste de una inspección: sala 10 / elemento 20 la primera vez que se
+ * revela esa evidencia; 0 si no hay inspeccionable o ya se reveló. El
+ * coste lo decide la ACCIÓN, no el inspeccionable (motor:
+ * `inspectMinutes`). */
+function inspectActionCost(
+  params: Record<string, unknown>,
+  mechanics: { inspectables?: Array<{ locationId: string; elementId?: string; evidenceId: string }> },
+  state: RouteWalkState,
+): number {
+  const targetId = params.targetId;
+  const elementId = typeof params.elementId === 'string' ? params.elementId : undefined;
+  const inspectable = (mechanics.inspectables ?? []).find(
+    (entry) => entry.locationId === targetId && (entry.elementId ?? '') === (elementId ?? ''),
+  );
+  if (!inspectable || state.inspected.has(inspectable.evidenceId)) return 0;
+  state.inspected.add(inspectable.evidenceId);
+  return elementId === undefined ? INSPECT_ROOM_MINUTES : INSPECT_ELEMENT_MINUTES;
+}
+
+/** Coste de una detención: coordinada (automática) 30 / en persona 15. */
+function detainActionCost(params: Record<string, unknown>): number {
+  return params.mode === 'automatic' ? DETAIN_AUTOMATIC_MINUTES : DETAIN_INTERACTIVE_MINUTES;
+}
+
+/** Coste de enviar un documento: 30; escribir un mensaje sin documento, 0. */
+function communicateActionCost(params: Record<string, unknown>): number {
+  return typeof params.documentId === 'string' ? DOCUMENT_SEND_MINUTES : 0;
+}
+
+/** Costes fijos por tipo de acción (motor: `materialMinutes`). */
+const FIXED_ACTION_MINUTES: Record<string, number> = {
+  recover: RECOVER_MINUTES,
+  irregular: IRREGULAR_MINUTES,
+};
+
+/** Coste de una acción de la ruta con el modelo del motor. */
+function routeActionCost(
+  action: { type: string; params: Record<string, unknown> },
+  mechanics: { inspectables?: Array<{ locationId: string; elementId?: string; evidenceId: string }> },
+  geography: SelectedGeography,
+  seed: number,
+  state: RouteWalkState,
+): RouteActionCost {
+  const params = action.params ?? {};
+  if (action.type === 'travel') return travelActionCost(params, geography, seed, state);
+  if (action.type === 'wait') return { cost: waitActionCost(params), travelled: false };
+  if (action.type === 'inspect') return { cost: inspectActionCost(params, mechanics, state), travelled: false };
+  if (action.type === 'detain') return { cost: detainActionCost(params), travelled: false };
+  if (action.type === 'communicate') return { cost: communicateActionCost(params), travelled: false };
+  const fixed = FIXED_ACTION_MINUTES[action.type];
+  return { cost: fixed ?? 0, travelled: false };
+}
+
+/**
+ * Mide una ruta con el modelo de costes del motor, sin jugarla.
+ * `mechanics` aporta los inspeccionables (para distinguir sala/elemento y
+ * la re-inspección); `geography`, las ciudades y sus duraciones de viaje;
+ * `deadlineMinutes`, el plazo del expediente: como en el motor, si el reloj
+ * alcanza el plazo la ruta se interrumpe ahí. Las acciones que el motor
+ * ejecuta en el acto (consulta, análisis, orden, charla, recogida, cierre)
+ * cuestan 0 minutos de reloj; sus retardos maduran con esperas o viajes
+ * posteriores, así que no suman aquí. Un viaje o una inspección que el
+ * motor no podría ejecutar cuesta 0: la ruta falla en otro sitio (forma o
+ * simulación), no aquí.
+ */
+export function routeLengthMinutes(
+  path: Array<{ type: string; params: Record<string, unknown> }>,
+  mechanics: { inspectables?: Array<{ locationId: string; elementId?: string; evidenceId: string }> },
+  geography: SelectedGeography,
+  seed: number,
+  deadlineMinutes: number,
+): RouteLengthBreakdown {
+  const breakdown: RouteLengthBreakdown = { totalMinutes: 0, travelMinutes: 0, travelCount: 0, waitMinutes: 0, inspectMinutes: 0, detainMinutes: 0, recoverMinutes: 0, interrupted: false };
+  const state: RouteWalkState = { currentCity: geography.cities[0]?.id ?? '', tripCount: 0, inspected: new Set() };
+  for (const action of path) {
+    const { cost, travelled } = routeActionCost(action, mechanics, geography, seed, state);
+    // El reloj se clava en el plazo: solo se contabiliza la parte del
+    // coste que cabe antes del corte, para que el desglose sume el total.
+    const applied = Math.min(cost, deadlineMinutes - breakdown.totalMinutes);
+    breakdown.totalMinutes += applied;
+    addCostToBreakdown(breakdown, action.type, applied, travelled);
+    if (breakdown.totalMinutes >= deadlineMinutes) {
+      breakdown.interrupted = true;
+      break;
+    }
+  }
+  return breakdown;
+}
+
+function addCostToBreakdown(breakdown: RouteLengthBreakdown, type: string, cost: number, travelled: boolean): void {
+  if (type === 'travel') {
+    breakdown.travelMinutes += cost;
+    if (travelled) breakdown.travelCount++;
+  } else if (type === 'wait') breakdown.waitMinutes += cost;
+  else if (type === 'inspect') breakdown.inspectMinutes += cost;
+  else if (type === 'detain') breakdown.detainMinutes += cost;
+  else if (type === 'recover') breakdown.recoverMinutes += cost;
+}
+
+/** Etiqueta de duración para el mensaje de rechazo de longitud. */
+function durationLabel(duration: GenerationParams['duration']): string {
+  if (duration === 'short') return 'corta';
+  if (duration === 'medium') return 'media';
+  return 'larga';
+}
+
+/**
+ * Rechazo determinista de longitud de una ruta (B1): si la ruta excede el
+ * presupuesto, añade un error con el minuto exacto y el desglose por tipo
+ * de coste, para que el reintento de la 4b sepa qué recortar. El error
+ * empieza por el nombre del campo (`goldenPath`/`alternativePath`) para
+ * que `isStage4bError` lo clasifique como error de la 4b y el mundo 4a
+ * válido se conserve en el reintento. Sin mecánica o sin rutas no hay
+ * nada que medir: otros errores lo dirán.
+ */
+function checkRouteLength(
+  output: Record<string, unknown>,
+  geography: SelectedGeography,
+  length: RouteLengthInput,
+  errors: string[],
+  field = 'goldenPath',
+): void {
+  if (!Array.isArray(output[field])) return;
+  const mechanics = output.mechanics as { inspectables?: Array<{ locationId: string; elementId?: string; evidenceId: string }> } | undefined;
+  if (!mechanics || !Array.isArray(mechanics.inspectables)) return;
+  const deadlineMinutes = DEADLINE_BY_DURATION[length.duration];
+  const result = routeLengthMinutes(
+    output[field] as Array<{ type: string; params: Record<string, unknown> }>,
+    mechanics,
+    geography,
+    length.seed,
+    deadlineMinutes,
+  );
+  if (result.totalMinutes <= length.budgetMinutes) return;
+  const routeName = field === 'alternativePath' ? 'alternativa' : 'dorada';
+  const over = result.totalMinutes - length.budgetMinutes;
+  errors.push(`${field} (ruta ${routeName}) dura ${result.totalMinutes} min y supera el presupuesto de ruta de ${length.budgetMinutes} min (duración ${durationLabel(length.duration)}): viajes ${result.travelCount} (${result.travelMinutes} min), esperas ${result.waitMinutes} min, inspecciones ${result.inspectMinutes} min, detención ${result.detainMinutes} min, recuperación ${result.recoverMinutes} min${result.interrupted ? '; la ruta se interrumpe al llegar al plazo' : ''}. Acorta la ruta en al menos ${over} min: quita un viaje o esperas que no aporten evidencias nuevas.`);
 }
 
 /** Generador pseudoaleatorio determinista por semilla (mulberry32). */
@@ -817,7 +1059,19 @@ function validateClueWorld(output: unknown, geography: SelectedGeography, castId
   checkClueTexts(output, castIds, knowledgeIds, errors, geography);
 }
 
-function validateClueRules(output: unknown, world: unknown, geography: SelectedGeography, errors: string[], arrestType?: ArrestType): void {
+/** Contexto de validación de la etapa 4. `routeLength` activa el chequeo
+ * determinista de longitud de ruta (B1); sin él, la validación no mide
+ * las rutas (compatibilidad con las llamadas y tests existentes). */
+export interface StageValidationContext {
+  geography: SelectedGeography;
+  castIds: string[];
+  knowledgeIds?: string[];
+  world?: unknown;
+  arrestType?: ArrestType;
+  routeLength?: RouteLengthInput;
+}
+
+function validateClueRules(output: unknown, world: unknown, geography: SelectedGeography, errors: string[], arrestType?: ArrestType, routeLength?: RouteLengthInput): void {
   if (!isRecord(output)) { errors.push('La red de pistas debe ser un objeto.'); return; }
   checkKeys(output, ['mechanics', 'goldenPath', 'alternativePath'], errors);
   // Las comprobaciones de la mecánica leen las evidencias del mundo (4a)
@@ -828,6 +1082,14 @@ function validateClueRules(output: unknown, world: unknown, geography: SelectedG
   checkRoutePath(merged, geography.cities[0]?.id ?? '', errors, arrestType, 'goldenPath');
   checkRoutePath(merged, geography.cities[0]?.id ?? '', errors, arrestType, 'alternativePath');
   checkRoutesDistinct(merged, errors);
+  // B1: la longitud se mide antes de la simulación, con el minuto exacto
+  // y el desglose, para que el reintento de la 4b sepa qué recortar. Va
+  // después de la forma: si la ruta ni siquiera tiene forma válida, la
+  // simulación tampoco correría y el minuto no sería fiable.
+  if (routeLength) {
+    checkRouteLength(merged, geography, routeLength, errors, 'goldenPath');
+    checkRouteLength(merged, geography, routeLength, errors, 'alternativePath');
+  }
 }
 
 // Cada evidencia (salvo EV-11, el objeto de la recuperación, que se obtiene
@@ -900,21 +1162,21 @@ function evidenceSource(id: string, type: string, granted: GrantedSets): { grant
   return { granted: false, reason: 'tipo de evidencia desconocido' };
 }
 
-function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[], arrestType?: ArrestType): void {
+function validateClues(output: unknown, geography: SelectedGeography, castIds: string[], knowledgeIds: string[], errors: string[], arrestType?: ArrestType, routeLength?: RouteLengthInput): void {
   validateClueWorld(output, geography, castIds, knowledgeIds, errors);
-  validateClueRules(output, output, geography, errors, arrestType);
+  validateClueRules(output, output, geography, errors, arrestType, routeLength);
 }
 
 /** Valida una de las dos mitades de la etapa 4 (a = mundo, b = reglas). */
 export function validateStagePart(
   part: 'a' | 'b',
   output: unknown,
-  context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[]; world?: unknown; arrestType?: ArrestType },
+  context: StageValidationContext,
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (checkSchemaEcho(output, errors)) return { valid: false, errors };
   if (part === 'a') validateClueWorld(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors);
-  else validateClueRules(output, context.world, context.geography, errors, context.arrestType);
+  else validateClueRules(output, context.world, context.geography, errors, context.arrestType, context.routeLength);
   return { valid: errors.length === 0, errors };
 }
 
@@ -928,12 +1190,12 @@ function validateReview(output: unknown, errors: string[]): void {
 /** Valida la forma de la salida del modelo para una etapa LLM. El fondo
  * (coherencia, referencias cruzadas, jugabilidad) lo comprueban el
  * validador v1.5 y el simulador en las etapas 6 y 8. */
-export function validateStageOutput(stage: GenerationStage, output: unknown, context: { geography: SelectedGeography; castIds: string[]; knowledgeIds?: string[]; arrestType?: ArrestType }): { valid: boolean; errors: string[] } {
+export function validateStageOutput(stage: GenerationStage, output: unknown, context: StageValidationContext): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (checkSchemaEcho(output, errors)) return { valid: false, errors };
   if (stage === 1) validatePremise(output, context.geography.cities, errors);
   else if (stage === 3) validateNpcs(output, context.castIds, errors);
-  else if (stage === 4) validateClues(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors, context.arrestType);
+  else if (stage === 4) validateClues(output, context.geography, context.castIds, context.knowledgeIds ?? [], errors, context.arrestType, context.routeLength);
   else if (stage === 7) validateReview(output, errors);
   return { valid: errors.length === 0, errors };
 }

@@ -25,6 +25,7 @@ import {
   validateStageOutput,
   validateStagePart,
   type ResolvedChoice,
+  type RouteLengthInput,
   type SelectedGeography,
 } from './stages.js';
 import { validateGenerationParams } from './validator.js';
@@ -300,6 +301,14 @@ async function withStageTimeout<T>(ms: number, run: (signal: AbortSignal) => Pro
   }
 }
 
+/** Contexto de longitud de ruta (B1) para la validación de la etapa 4:
+ * presupuesto de la duración pedida y semilla del borrador. Con él, el
+ * rechazo por exceso de longitud llega al reintento de la 4b con el minuto
+ * exacto y el desglose por tipo de coste. */
+function routeLengthFor(draft: CaseDraft): RouteLengthInput {
+  return { budgetMinutes: routeBudgetMinutes(draft.params.duration), duration: draft.params.duration, seed: draft.params.seed ?? 0 };
+}
+
 /** Una etapa LLM (1, 3, 4 o 7): llama al modelo con su contexto y esquema,
  * valida la forma de la salida y devuelve el JSON. Sin LLM o con salida
  * inválida, rechaza con un error claro. */
@@ -318,8 +327,8 @@ async function runLlmStage(
   const stageContext = buildStageContext(stage, choice, draft.params, geography, prior, feedback, part, caseId);
   const output = await withStageTimeout(config.stageTimeoutMs, signal => llm.generate({ stage, context: stageContext, schema: stageOutputSchema(stage, part), signal }));
   const validation = part
-    ? validateStagePart(part, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft), world: prior.world, arrestType: arrestTypeForCaseId(caseId) })
-    : validateStageOutput(stage, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft), arrestType: arrestTypeForCaseId(caseId) });
+    ? validateStagePart(part, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft), world: prior.world, arrestType: arrestTypeForCaseId(caseId), routeLength: routeLengthFor(draft) })
+    : validateStageOutput(stage, output, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft), arrestType: arrestTypeForCaseId(caseId), routeLength: routeLengthFor(draft) });
   if (!validation.valid) throw new StageOutputError(`Etapa ${stage} inválida: ${validation.errors.join('; ')}`, output);
   return output;
 }
@@ -356,7 +365,7 @@ async function runSplitStage4(
   const rules = await runLlmStage(4, draft, choice, geography, config, { ...prior, world }, feedback, 'b');
   const merged = { ...(world as Record<string, unknown>), ...(rules as Record<string, unknown>) };
   const validation = validateStageOutput(4, merged, { geography, castIds: castIds(draft), knowledgeIds: knowledgeIds(draft),
-    arrestType: arrestTypeForCaseId(draftCaseId(draft, choice, config)) });
+    arrestType: arrestTypeForCaseId(draftCaseId(draft, choice, config)), routeLength: routeLengthFor(draft) });
   if (!validation.valid) {
     // El mundo sigue siendo válido: el reintento solo rehace 4b.
     if (!validation.errors.every(isStage4bError)) delete draft.stage4World;

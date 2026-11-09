@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { validateCaseDefinition } from '@meridiano/case-schema';
 import { createInMemoryCheckpointStore } from './checkpoint.js';
 import { createGeneratorService, runPipeline, type GenerationParams, type PipelineConfig, type StageLlm } from './pipeline.js';
-import { assembleDefinition, buildStageContext, resolveGenerationChoice, selectGeography, stageOutputSchema, validateStageOutput, validateStagePart, type SelectedGeography } from './stages.js';
+import { assembleDefinition, buildStageContext, resolveGenerationChoice, routeLengthMinutes, selectGeography, stageOutputSchema, validateStageOutput, validateStagePart, type SelectedGeography } from './stages.js';
+import { simulateCase } from './simulator.js';
 
 // Doble del modelo: construye las salidas de etapa a partir del contexto que
 // recibe (las ciudades elegidas), con el mismo esqueleto que el fixture del
@@ -1317,6 +1318,138 @@ describe('presupuesto de ruta en el contexto de la etapa 4b', () => {
     const context = buildStageContext(4, choice, PARAMS, geography,
       { premise: outputs.premise, npcs: outputs.npcs }, undefined, 'a', 'generado-fraude-test');
     expect(context.budgetMinutes).toBeUndefined();
+  });
+});
+
+// B1: chequeo determinista de longitud de ruta en la validación de la
+// etapa 4. La longitud pura debe coincidir con el minuto que el motor
+// simula para la misma ruta (mismo modelo de costes); el rechazo lleva el
+// minuto exacto y el desglose para que el reintento de la 4b corrija.
+describe('chequeo determinista de longitud de ruta (B1)', () => {
+  const MEDIUM_LENGTH = { budgetMinutes: 1440, duration: 'medium' as const, seed: 7 };
+  const SEED = PARAMS.seed ?? 0;
+
+  function lengthContext(geography: SelectedGeography) {
+    const outputs = fakeOutputs(geography);
+    return { outputs, clues: structuredClone({ ...outputs.cluesWorld, ...outputs.cluesRules }) };
+  }
+
+  function padRoute(clues: Record<string, unknown>, field: 'goldenPath' | 'alternativePath', geography: SelectedGeography, budget: number, over: number): number {
+    const path = clues[field] as Array<{ type: string; params: Record<string, unknown> }>;
+    const mechanics = clues.mechanics as { inspectables: Array<{ locationId: string; elementId?: string; evidenceId: string }> };
+    const length = routeLengthMinutes(path, mechanics, geography, SEED, 2880);
+    const wait = budget - length.totalMinutes + over;
+    // Antes del cierre: una espera tras `finish` no se jugaría.
+    path.splice(path.length - 1, 0, { type: 'wait', params: { minutes: wait } });
+    // La ruta queda en budget + over minutos exactos.
+    return budget + over;
+  }
+
+  it('la longitud pura coincide con el minuto simulado por el motor (dorada y alternativa)', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const choice = resolveGenerationChoice(PARAMS);
+    const definition = assembleDefinition({ caseId: 'generado-fraude-test', choice, params: PARAMS, geography, premise: outputs.premise, npcs: outputs.npcs, clues: outputs.clues });
+    const simulated = simulateCase(definition, outputs.cluesRules.goldenPath, 1440, outputs.cluesRules.alternativePath);
+    expect(simulated.playable).toBe(true);
+    const mechanics = outputs.cluesRules.mechanics;
+    expect(routeLengthMinutes(outputs.cluesRules.goldenPath, mechanics, geography, SEED, 2880).totalMinutes).toBe(simulated.minute);
+    expect(simulated.alternative).toBeDefined();
+    expect(routeLengthMinutes(outputs.cluesRules.alternativePath, mechanics, geography, SEED, 2880).totalMinutes).toBe(simulated.alternative?.minute);
+  });
+
+  it('rechaza la ruta dorada que supera el presupuesto con el minuto exacto y el desglose', () => {
+    const geography = selectGeography(PARAMS);
+    const { clues } = lengthContext(geography);
+    const total = padRoute(clues, 'goldenPath', geography, 1440, 100);
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'], routeLength: MEDIUM_LENGTH });
+    expect(result.valid).toBe(false);
+    const error = result.errors.find(item => item.startsWith('goldenPath'));
+    expect(error).toBeDefined();
+    expect(error).toContain(`dura ${total} min`);
+    expect(error).toContain('presupuesto de ruta de 1440 min');
+    expect(error).toContain('al menos 100 min');
+    expect(error).toContain('viajes');
+    expect(error).toContain('esperas');
+    expect(error).toContain('inspecciones');
+  });
+
+  it('rechaza la ruta alternativa que supera el presupuesto (mismo mensaje, otro campo)', () => {
+    const geography = selectGeography(PARAMS);
+    const { clues } = lengthContext(geography);
+    const total = padRoute(clues, 'alternativePath', geography, 1440, 50);
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'], routeLength: MEDIUM_LENGTH });
+    expect(result.valid).toBe(false);
+    const error = result.errors.find(item => item.startsWith('alternativePath'));
+    expect(error).toBeDefined();
+    expect(error).toContain(`dura ${total} min`);
+    expect(error).toContain('ruta alternativa');
+    expect(error).toContain('al menos 50 min');
+  });
+
+  it('acepta la ruta justo en el presupuesto y rechaza un minuto por encima (límite exacto)', () => {
+    const geography = selectGeography(PARAMS);
+    const { clues } = lengthContext(geography);
+    const total = padRoute(clues, 'goldenPath', geography, 1440, 0);
+    expect(total).toBe(1440);
+    const exact = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'], routeLength: MEDIUM_LENGTH });
+    expect(exact.valid).toBe(true);
+    const over = structuredClone(clues);
+    (over.goldenPath as Array<{ type: string; params: Record<string, unknown> }>).splice(
+      (over.goldenPath as Array<unknown>).length - 1, 0, { type: 'wait', params: { minutes: 1 } });
+    const result = validateStageOutput(4, over, { geography, castIds: ['carmen', 'jorge', 'pablo'], routeLength: MEDIUM_LENGTH });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(item => item.includes('dura 1441 min'))).toBe(true);
+  });
+
+  it('sin routeLength en el contexto no mide las rutas (compatibilidad)', () => {
+    const geography = selectGeography(PARAMS);
+    const { clues } = lengthContext(geography);
+    padRoute(clues, 'goldenPath', geography, 1440, 100);
+    const result = validateStageOutput(4, clues, { geography, castIds: ['carmen', 'jorge', 'pablo'] });
+    expect(result.valid).toBe(true);
+  });
+
+  it('el rechazo por longitud llega al reintento de la 4b con el minuto exacto y conserva el mundo 4a', async () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    let stage4aCalls = 0;
+    let stage4bCalls = 0;
+    const contexts: Array<Record<string, unknown>> = [];
+    const llm: StageLlm = {
+      async generate({ stage, context }) {
+        if (stage === 1) return outputs.premise;
+        if (stage === 3) return outputs.npcs;
+        if (stage === 4) {
+          contexts.push(context as Record<string, unknown>);
+          if ((context as Record<string, unknown>).part === 'a') {
+            stage4aCalls++;
+            return outputs.cluesWorld;
+          }
+          stage4bCalls++;
+          if (stage4bCalls === 1) {
+            // Ruta dorada 100 min por encima del presupuesto de media
+            // (1440): solo falla la longitud, el mundo es válido.
+            const broken = structuredClone(outputs.cluesRules);
+            padRoute(broken, 'goldenPath', geography, 1440, 100);
+            return broken;
+          }
+          return outputs.cluesRules;
+        }
+        if (stage === 7) return { coherent: true, issues: [] };
+        throw new Error(`Etapa inesperada: ${stage}`);
+      },
+    };
+    const config = configWith(llm);
+    const service = createGeneratorService(config);
+    const draft = await service.createDraft(PARAMS);
+    const result = await runPipeline(draft, config);
+    expect(result.success).toBe(true);
+    expect(stage4aCalls).toBe(1);
+    expect(stage4bCalls).toBe(2);
+    const secondFeedback = contexts[2]?.repairFeedback as string[] | undefined;
+    expect(secondFeedback?.join(' ')).toMatch(/dura \d+ min/);
+    expect(secondFeedback?.join(' ')).toContain('presupuesto de ruta de 1440 min');
   });
 });
 

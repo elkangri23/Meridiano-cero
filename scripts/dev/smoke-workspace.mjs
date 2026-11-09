@@ -28,7 +28,11 @@ try {
   assert.match(await module.text(), /createRoot/);
   const archive = await fetch(base + '/src/archive/Archive.tsx');
   assert.equal(archive.status, 200);
-  assert.match(await archive.text(), /Archivo de partidas/);
+  // La cadena visible vive en el locale (packages/contracts/src/locales/es.ts,
+  // 'archive.title'): el componente usa t("archive.title"), así que la fuente
+  // TSX ya no contiene el literal desde la migración i18n del archivo
+  // (83c706fc8). El h1 renderizado lo afirma la E2E (primer-caso.spec.ts).
+  assert.match(await archive.text(), /archive\.title/);
   const health = await fetch(base + '/api/v1/health');
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { status: 'ok' });
