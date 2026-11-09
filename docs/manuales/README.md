@@ -3,7 +3,7 @@
 Actualizado: 2026-10-28. Existen base web/API, motor, prototipo y servicios IA parciales. No hay distribución instalable del juego completo. [Estado actual](../plan/ESTADO.md) separa capacidades, pruebas y pendientes; cada manual distingue uso disponible y objetivo futuro.
 
 
-- [Uso del juego](USO.md): experiencia y herramientas que implementaremos.
+- [Uso del juego](../COMO-JUGAR.md): manual de uso actual para el jugador.
 - [IA local y evaluación](IA-LOCAL.md): comandos y límites de T3-04.
 - [Desarrollo](DESARROLLO.md): entorno, arquitectura y flujo de contribución.
 - [Instalación](INSTALACION.md): arranque local y autoalojamiento previstos.

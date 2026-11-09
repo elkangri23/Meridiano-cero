@@ -80,6 +80,8 @@ Dos categorías: escenarios investigables, finitos y definidos previamente; y de
 
 Entrada libre de órdenes generales («examino la sala») o específicas («reviso la cerradura»). La inspección general describe lo claramente visible; las evidencias ocultas requieren una acción concreta. El juego interpreta acciones plausibles no incluidas en menús, pero solo sobre elementos y resultados permitidos por el expediente.
 
+El texto libre se interpreta con un modelo de lenguaje, no por palabras clave: el modelo solo elige entre las acciones que el juego ofrece en ese momento. Pedir por texto libre una orden, una detención o el cierre del caso solo funciona cuando esa acción está disponible; si aún no lo está, el juego no hace otra cosa en su lugar: explica qué falta para poder hacerla (por ejemplo, que aún no hay pruebas que autoricen la orden o que falta una orden válida para detener), sin revelar cuál es el paso concreto que desbloquea la acción.
+
 Se pueden encadenar órdenes en un mensaje: se ejecutan por orden y se suma su coste sin detenerse por pistas encontradas. Si una acción es imposible o faltan decisiones necesarias, se pausa la secuencia y se pregunta si cancelar o continuar con acciones independientes viables. No se cobra tiempo por acciones omitidas.
 
 Maletín de evidencias integrado en el dossier, sin límites artificiales ni combinaciones absurdas. Recoger un objeto requiere orden explícita o una acción que lo implique. Se distinguen objetos físicos, observaciones, testimonios, resultados y registros. Las relaciones se guardan con su procedencia y grado de corroboración, sin desvelar la solución.
@@ -128,7 +130,7 @@ Central con llamadas, WhatsApp, SMS, correo y fax, según contactos disponibles.
 
 Laboratorio para huellas, documentos, fotografías, audio, muestras y materiales cuando proceda. Resultados predeterminados, tiempos estimados, solicitudes simultáneas y hechos presentados sin interpretaciones que revelen culpabilidad. Terminal de inteligencia consultable en lenguaje natural para identidades, viajes, empresas, vehículos, propiedades y otros registros previamente definidos; ausencia de registro no demuestra inocencia.
 
-La detención exige orden emitida por la autoridad ficticia común A.C.M.E. El jugador aporta sospechoso y pruebas. La orden acredita suficiencia para detener, no culpabilidad; puede concederse contra inocentes. Pruebas obtenidas irregularmente pueden ser inadmisibles. Denegación de orden no cierra automáticamente el caso.
+La detención exige orden emitida por la autoridad ficticia común A.C.M.E. El jugador aporta sospechoso y pruebas. La orden acredita suficiencia para detener, no culpabilidad; puede concederse contra inocentes. Pruebas obtenidas irregularmente pueden ser inadmisibles. Denegación de orden no cierra automáticamente el caso. Pedir una orden o una detención por texto libre antes de reunir los requisitos no se malinterpreta como otra acción: el juego explica qué falta, sin dar la pista del paso concreto.
 
 12. Detenciones y resolución
 

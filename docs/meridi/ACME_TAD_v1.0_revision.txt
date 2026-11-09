@@ -140,6 +140,10 @@ La definición completa del caso se conserva en el servidor. El cliente recibe p
 
 Flujo: texto libre → intérprete IA produce intención estructurada → validador de esquema → resolución determinista del motor → persistencia transaccional → narrador IA limitado a hechos autorizados → respuesta visual. Si el intérprete falla, se solicita aclaración sin alterar el estado.
 
+Intérprete de texto libre (POST /api/v1/ai/interpret): la web (GameScreen.interpretOrder) envía texto, escena y ofertas actuales; el director (director.interpretAction, apps/api/src/ai/director.ts) llama al proveedor con la función interpretAction (SPEC-005). El modelo solo ve las ofertas actualmente disponibles y solo puede devolver sus ids; actionSelection valida la salida. Antes del modelo, un pre-paso determinista (apps/api/src/ai/interpreter.ts) empareja en español, inglés y francés las peticiones de orden («Solicitar orden…» → request_warrant:<sospechoso>) y de detención (verbo detener/coordinar sin «orden» → detain:<sospechoso>) cuando están ofrecidas, sin llamar al modelo; si no están ofrecidas, responde aclaración, nunca otra acción. Red de seguridad: si el texto pide claramente orden, detención o cierre y el modelo devuelve otra cosa, el director responde con una aclaración (invalid_response).
+
+Guardarraíl: el texto libre nunca resuelve a cerrar el caso, detener o pedir orden salvo que esa acción exacta esté ofrecida. Aclaraciones de bloqueo (packages/engine/src/action-availability.ts, describeLockedActions, con las mismas reglas que offers.ts/arrest.ts): la ruta acepta runId opcional y, con partida, calcula por sospechoso qué falta y devuelve aclaración estructurada (locked_warrant/locked_detain + missing[] + suspectName); la web la compone en el idioma del jugador con las claves game.interpret.* (13 claves, es/en/fr). La aclaración nombra la categoría de lo que falta (sospechoso desconocido, sin pruebas que autoricen, orden en curso, ya tienes la orden, sin orden, ubicación o identidad desconocida, no presente, ya detenido), no el paso concreto: nombrar el paso sería una pista, prohibido por DEC-016.
+
 Entrada normalizada
 
 Ejemplo
@@ -186,7 +190,7 @@ Casos rechazados se regeneran con presupuesto máximo de intentos y error claro 
 
 9. Adaptadores y configuración de IA
 
-Interfaz común por función: generateCase, validateCase, interpretAction, narrateResult y converse; cada una recibe esquemas y límites específicos. Configuración independiente para generador, validador y director de partida. Proveedores iniciales: Ollama, LM Studio, OpenAI-compatible, OpenAI, Anthropic, Gemini; FreeLLMAPI según protocolo verificado.
+Interfaz común por función: generateCase, validateCase, interpretAction, narrateResult y converse; cada una recibe esquemas y límites específicos. El prompt de interpretAction refuerza la distinción entre pedir orden, detener y cerrar el caso para las paráfrasis que el pre-paso determinista no caza. Configuración independiente para generador, validador y director de partida. Proveedores iniciales: Ollama, LM Studio, OpenAI-compatible, OpenAI, Anthropic, Gemini; FreeLLMAPI según protocolo verificado.
 
 Cada adaptador declara capacidades (JSON estructurado, contexto, herramientas, streaming), timeout, reintentos acotados y estimación de coste. Un test de conexión no garantiza calidad de generación: se ofrecen pruebas funcionales y avisos para modelos insuficientes. El cambio de modelo no altera casos ya fijados.
 
@@ -202,7 +206,7 @@ SSRF: bloquear rangos internos, loopback, metadatos cloud, redirecciones no veri
 
 En instalaciones privadas permitir acceso a Ollama local mediante política explícita del administrador; no reutilizar las restricciones de la instancia pública sin considerar su entorno.
 
-Prompt injection: documentos y mensajes NPC tratados como datos; salida IA validada por esquema y lista de hechos permitidos.
+Prompt injection: documentos y mensajes NPC tratados como datos; salida IA validada por esquema y lista de hechos permitidos. El intérprete nunca resuelve texto libre a cerrar el caso, detener o pedir orden salvo que esa acción esté ofrecida en ese momento; si el modelo confunde una de esas tres peticiones, el director responde con una aclaración (invalid_response) en lugar de ejecutar la acción equivocada.
 
 Límites por usuario, IP, modelo, función y gasto global; cola con concurrencia máxima, cancelación, backoff y corte de emergencia.
 
@@ -249,6 +253,10 @@ Estado de generación y análisis.
 GET/POST /ai/config, POST /ai/test
 
 Proveedores, capacidades y pruebas.
+
+POST /ai/interpret
+
+Interpretar texto libre contra las ofertas actuales; con runId opcional, aclaraciones de bloqueo cuando la acción pedida no está disponible.
 
 Para eventos de generación y mensajes se puede comenzar con polling y evolucionar a SSE; no se requieren WebSockets desde el primer prototipo. Todas las rutas se versionarán (/api/v1).
 

@@ -10,7 +10,7 @@ explica cómo hacerlo y cómo se comprueba.
 ## Cómo funciona el sistema
 
 - Los textos de la interfaz viven en `packages/contracts/src/locales/`:
-  `es.ts` es el idioma de referencia (completo, 1112 claves),
+  `es.ts` es el idioma de referencia (completo, 1142 claves),
   `en.ts` y `fr.ts` están completos en los tres idiomas.
 - Las claves son planas con prefijo de sección: `common.*` (palabras
   compartidas), `settings.*` (Ajustes), `game.*` (pantalla de juego),
