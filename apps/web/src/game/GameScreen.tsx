@@ -7,6 +7,7 @@ import { avatarLabel, ProfileSection } from '../auth/ProfileSection';
 import { paletteLabelKeys, usePreferences } from '../preferences';
 import { resumeSummary } from './resume-summary';
 import { aiApi, AiError } from '../ai/client';
+import type { AiInterpretation } from '../ai/client';
 import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
 import type { AiConnection, ConnectionsResponse, ConnectionTestResult, ProviderCatalogEntry } from '../ai/connections';
 import { gameApi, GameError } from './client';
@@ -18,6 +19,7 @@ import { portraitSeed, teamPortraitSeed } from './portraits';
 import { createMusicEngine, type EffectKind } from './music';
 import { groupOffers, groupTalkOffers } from './scene-offers';
 import type { TalkGroup } from './scene-offers';
+import { lockedClarificationText } from './interpret-clarification';
 import { buildIntelFacts, INTEL_ID, INTEL_NAME, intelGreeting, intelNoRecord, intelPersona, intelRefusal, selectIntelFacts } from './intel-terminal';
 import { ELENA_ID, ELENA_NAME, elenaPersona, elenaRefusal, teamGreeting, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
@@ -63,6 +65,14 @@ function requestTypeLabel(type: string, t: TranslateFn): string {
 function channelLabel(channel: string, t: TranslateFn): string {
   const key = channelKeys[channel];
   return key ? t(key) : channel;
+}
+
+/** Pregunta de la aclaración tras una orden libre: si el texto pide una
+ * orden o una detención bloqueada, dice qué falta en el idioma del
+ * jugador; si no, el mensaje del servidor o la ambigua genérica. */
+function clarificationQuestion(t: TranslateFn, result: AiInterpretation): string {
+  if (result.locked) return lockedClarificationText(t, result.locked);
+  return result.message ?? t('game.notice.ambiguousOrder');
 }
 
 /** Dificultad de la partida, tal como se enseña en la cabecera junto al
@@ -2631,9 +2641,9 @@ export function GameScreen() {
     const controller = new AbortController();
     try {
       const result = await aiApi.interpret(text, { location: view.position.location.id, description: view.position.location.description },
-        view.offers.map(offer => ({ id: offer.id, label: offer.label })), controller.signal, { csrfToken: identity.csrfToken });
+        view.offers.map(offer => ({ id: offer.id, label: offer.label })), controller.signal, { csrfToken: identity.csrfToken }, { runId });
       if (result.kind === 'clarification') {
-        setOrderPhase({ kind: 'clarification', question: result.message ?? t('game.notice.ambiguousOrder'), original: text });
+        setOrderPhase({ kind: 'clarification', question: clarificationQuestion(t, result), original: text });
         setNotice(t('game.notice.clarificationNeededOrder'));
         return;
       }

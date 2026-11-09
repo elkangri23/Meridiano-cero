@@ -1,12 +1,18 @@
 import { AiError, record } from './provider.ts';
 import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
+import { describeLockedActions } from '@meridiano/engine';
+import type { LockedAction } from '@meridiano/engine';
+import { cookieToken } from '../auth/session-security.ts';
+import { tokenDigest } from '../auth/store.ts';
+import { definitionForRun } from '../game/catalog.ts';
 import { createAuthorizer } from './authorize.ts';
 import { createDirector } from './director.ts';
 import { interpretationSchema, factualSchema, converseSchema } from './schemas.ts';
 import type { AiRequest } from './provider.ts';
-import { RunStoreError } from '../game/runs.ts';
+import { RunStoreError, readFullRun } from '../game/runs.ts';
 import type { PublicFact, PublicScene, NpcContext, ConversationMemory, SpeechAct, ActionOffer } from './context.ts';
 import { speechActs } from './context.ts';
 import { checkQuota, recordUsage, estimateTokens } from './ai-quota.ts';
@@ -34,23 +40,49 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
     return { ...resolved, director: createDirector(resolved.provider) };
   }
 
-  function toInterpretRequest(body: unknown): AiRequest {
+  function interpretRequestFields(body: unknown): { text: string; scene: Record<string, unknown>; offers: Array<Record<string, unknown>>; requestId: string; runId?: string } {
     if (!isRecord(body)) throw new RunStoreError('INVALID_REQUEST');
-    const { text, scene, offers, requestId } = body;
+    const { text, scene, offers, requestId, runId } = body;
     if (typeof text !== 'string' || !isRecord(scene) || !Array.isArray(offers) || typeof requestId !== 'string') {
       throw new RunStoreError('INVALID_REQUEST');
     }
+    if (runId !== undefined && typeof runId !== 'string') throw new RunStoreError('INVALID_REQUEST');
+    return { text, scene, offers, requestId,
+      ...(typeof runId === 'string' && runId.length > 0 ? { runId } : {}) };
+  }
+
+  function toInterpretRequest(body: unknown): { request: AiRequest; runId?: string } {
+    const { text, scene, offers, requestId, runId } = interpretRequestFields(body);
     if (text.length > 4000 || offers.length > 64) {
       throw new AiError('budget_exceeded');
     }
     return {
-      operation: 'interpretAction',
-      requestId,
-      schema: interpretationSchema,
-      context: { text, scene: { location: scene.location, description: scene.description },
-        offers: offers.map(o => ({ id: o.id, label: o.label })) },
-      signal: new AbortController().signal,
+      request: {
+        operation: 'interpretAction',
+        requestId,
+        schema: interpretationSchema,
+        context: { text, scene: { location: scene.location, description: scene.description },
+          offers: offers.map(o => ({ id: o.id, label: o.label })) },
+        signal: new AbortController().signal,
+      },
+      ...(runId ? { runId } : {}),
     };
+  }
+
+  /** Acciones de orden/detención bloqueadas en esta partida, para que el
+   * intérprete explique qué falta en vez de inventar otra acción. Sin
+   * partida (prototipo) o si la carga falla, no hay bloqueos: el
+   * comportamiento es el de siempre. */
+  async function lockedActionsForRun(database: Database, request: FastifyRequest, runId: string): Promise<LockedAction[]> {
+    try {
+      const token = cookieToken(request.headers.cookie);
+      if (!token) return [];
+      const run = await readFullRun(database, tokenDigest(token), runId);
+      const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes, run.explorationMode);
+      return describeLockedActions(definition, run);
+    } catch {
+      return [];
+    }
   }
 
   function toNarrateRequest(body: unknown): AiRequest {
@@ -129,7 +161,8 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
   app.post('/api/v1/ai/interpret', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
     const ownerId = await authorize(request);
     const { provider: aiProvider, director } = await resolveFor(ownerId);
-    const aiRequest = toInterpretRequest(request.body);
+    const { request: aiRequest, runId } = toInterpretRequest(request.body);
+    const locked = runId ? await lockedActionsForRun(database, request, runId) : [];
 
     // Estimar tokens
     const estimatedTokens = estimateTokens(JSON.stringify(aiRequest.context));
@@ -151,7 +184,7 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
 
     const startTime = performance.now();
     try {
-      const result = await director.interpretAction(aiRequest.context.text as string, aiRequest.context.scene as PublicScene, aiRequest.context.offers as ActionOffer[], callOptions);
+      const result = await director.interpretAction(aiRequest.context.text as string, aiRequest.context.scene as PublicScene, aiRequest.context.offers as ActionOffer[], callOptions, locked);
 
       // Registrar uso exitoso
       await recordUsage(database, {

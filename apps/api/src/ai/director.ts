@@ -3,11 +3,14 @@ import type { AiProvider, AiErrorCode } from './provider.ts';
 import type { ActionOffer, ConversationMemory, NpcContext, PublicFact, PublicScene, SpeechAct } from './context.ts';
 import { memoryForContext, permittedNpcFacts, remember, restoreMemory, speechActs } from './context.ts';
 import { converseSchema, factualSchema, interpretationSchema, MAX_CONVERSE_TEXT_LENGTH } from './schemas.ts';
+import { lockedMessageEs, matchLockedAction, matchOfferedAction } from './interpreter.ts';
+import type { LockedAction, LockedMissing } from '@meridiano/engine';
 
 export interface CallOptions { requestId: string; signal?: AbortSignal }
 export type Interpretation =
   | { kind: 'actions'; actionIds: string[] }
-  | { kind: 'clarification'; message: string; reason: AiErrorCode | 'ambiguous' };
+  | { kind: 'clarification'; message: string; reason: AiErrorCode | 'ambiguous' | 'locked_warrant' | 'locked_detain';
+      locked?: { type: 'warrant' | 'detain'; suspectName: string | null; missing: LockedMissing[] } };
 export interface Narrative {
   text: string;
   factIds: string[];
@@ -107,12 +110,26 @@ function factualFallback(
 export function createDirector(provider: AiProvider) {
   async function interpretAction(
     text: string, scene: PublicScene, offers: readonly ActionOffer[], options: CallOptions,
+    locked: readonly LockedAction[] = [],
   ): Promise<Interpretation> {
     if (!inputWithinBudget(text) || offers.length > 64) {
       return { kind: 'clarification', message: 'Acota la orden antes de interpretarla.', reason: 'budget_exceeded' };
     }
     if (new Set(offers.map(offer => offer.id)).size !== offers.length) {
       throw new Error('Las ofertas de acción deben tener IDs únicos.');
+    }
+    // Pre-paso determinista (lote intérprete de texto libre): las tres
+    // lecturas documentadas —pedir orden, coordinar detención, cerrar el
+    // caso— se resuelven sin el modelo cuando el emparejamiento es único;
+    // si el texto pide una orden o una detención bloqueada, la aclaración
+    // dice qué falta en vez de dejar que el modelo invente otra acción.
+    // Todo lo demás sigue yendo al LLM como hasta ahora.
+    const offered = matchOfferedAction(text, offers, locked);
+    if (offered) return { kind: 'actions', actionIds: [offered] };
+    const blocked = matchLockedAction(text, locked);
+    if (blocked) {
+      return { kind: 'clarification', message: lockedMessageEs(blocked),
+        reason: blocked.type === 'warrant' ? 'locked_warrant' : 'locked_detain', locked: blocked };
     }
     const context = { text, scene: { location: scene.location, description: scene.description },
       offers: offers.map(offer => ({ id: offer.id, label: offer.label })) };

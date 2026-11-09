@@ -4,6 +4,7 @@ import { createDirector } from './director.ts';
 import { createMockProvider } from './mock.ts';
 import { emptyMemory, remember, restoreMemory } from './context.ts';
 import type { AiRequest } from './provider.ts';
+import type { LockedAction } from '@meridiano/engine';
 
 const options = { requestId: 'synthetic-request' };
 const scene = { location: 'Sala', description: 'Una caja visible.' };
@@ -48,6 +49,66 @@ describe('Interpretación sin autoridad sobre el motor', () => {
     const input = { ...scene, solution: 'PRIVATE_SENTINEL' };
     await service.interpretAction('Examinar', input, offers, options);
     expect(JSON.stringify(captured)).not.toContain('PRIVATE_SENTINEL');
+  });
+});
+describe('Pre-paso determinista del intérprete de texto libre', () => {
+  const throwingProvider = {
+    providerId: 'throwing',
+    model: 'none',
+    request: async (): Promise<never> => { throw new AiError('unavailable'); },
+  };
+  const warrantOffers = [
+    { id: 'inspect-room', label: 'Examinar la sala' },
+    { id: 'request_warrant:ines', label: 'Solicitar orden contra Inés Valera' },
+    { id: 'finish', label: 'Cerrar el caso y presentar el informe' },
+  ];
+  const detainOffers = [
+    { id: 'inspect-room', label: 'Examinar la sala' },
+    { id: 'request_warrant:ines', label: 'Solicitar orden contra Inés Valera' },
+    { id: 'detain:ines', label: 'Coordinar la detención de Inés Valera con las autoridades' },
+    { id: 'finish', label: 'Cerrar el caso y presentar el informe' },
+  ];
+  const lockedEarly: LockedAction[] = [
+    { type: 'warrant', suspectId: 'ines', suspectName: 'Inés Valera', missing: ['suspect_unknown', 'no_authorizing_evidence'] },
+    { type: 'warrant', suspectId: 'tomas', suspectName: 'Tomás Ríos', missing: ['suspect_unknown', 'no_authorizing_evidence'] },
+    { type: 'detain', suspectId: 'ines', suspectName: 'Inés Valera', missing: ['no_warrant'] },
+    { type: 'detain', suspectId: 'tomas', suspectName: 'Tomás Ríos', missing: ['no_warrant'] },
+  ];
+
+  it('pedir una orden es la oferta de solicitar orden, sin llamar al proveedor (caso grave 1)', async () => {
+    const service = createDirector(throwingProvider);
+    expect(await service.interpretAction('Solicitar orden de detención', scene, warrantOffers, options))
+      .toEqual({ kind: 'actions', actionIds: ['request_warrant:ines'] });
+    expect(await service.interpretAction('Solicitar una orden', scene, warrantOffers, options))
+      .toEqual({ kind: 'actions', actionIds: ['request_warrant:ines'] });
+  });
+
+  it('coordinar la detención es la oferta de detención, sin llamar al proveedor (caso 2)', async () => {
+    const service = createDirector(throwingProvider);
+    expect(await service.interpretAction('Coordinar la detención de Inés Valera', scene, detainOffers, options))
+      .toEqual({ kind: 'actions', actionIds: ['detain:ines'] });
+    expect(await service.interpretAction('Detener a Inés Valera', scene, detainOffers, options))
+      .toEqual({ kind: 'actions', actionIds: ['detain:ines'] });
+  });
+
+  it('pedir orden o detener antes de desbloquearlo aclara qué falta, sin llamar al proveedor (casos 3 y 4)', async () => {
+    const service = createDirector(throwingProvider);
+    const noWarrantOffers = [
+      { id: 'inspect-room', label: 'Examinar la sala' },
+      { id: 'finish', label: 'Cerrar el caso y presentar el informe' },
+    ];
+    const warrant = await service.interpretAction('Solicitar orden de detención', scene, noWarrantOffers, options, lockedEarly);
+    expect(warrant).toMatchObject({ kind: 'clarification', reason: 'locked_warrant' });
+    expect(warrant.kind === 'clarification' ? warrant.message : '').toContain('Todavía no puedes pedir una orden');
+    const detain = await service.interpretAction('Detener a Inés Valera', scene, noWarrantOffers, options, lockedEarly);
+    expect(detain).toMatchObject({ kind: 'clarification', reason: 'locked_detain' });
+    expect(detain.kind === 'clarification' ? detain.message : '').toContain('Primero necesitas una orden válida');
+  });
+
+  it('lo demás sigue yendo al proveedor (el pre-paso no se entromete)', async () => {
+    const service = createDirector(throwingProvider);
+    expect(await service.interpretAction('Examina la sala', scene, offers, options))
+      .toMatchObject({ kind: 'clarification', reason: 'unavailable' });
   });
 });
 describe('Narración factual y fallos posteriores a la ejecución', () => {

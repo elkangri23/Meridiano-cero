@@ -15,6 +15,8 @@ export { canIssueWarrant, knownSuspect } from './warrants.js';
 export { knowsEvidence } from './fixed-evidence.js';
 export { misconductFactsForNpc } from './irregular.js';
 export { arrestFactsForNpc } from './arrest.js';
+export { describeLockedActions } from './action-availability.js';
+export type { LockedAction, LockedMissing } from './action-availability.js';
 export { availableOffers } from './offers.js';
 export { visibleCaseCityIds, discoveredCityIds } from './discovery.js';
 export { liveObjectives, completeFinalReport, scoreForReport, SCORE_MAX, buildFinalReport } from './final-report.js';

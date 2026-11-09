@@ -720,6 +720,22 @@ export const FR_MESSAGES: Record<LocaleKey, string> = {
   'game.notice.interpretedAs': 'Interprété comme : {label}.',
   'game.notice.committing': 'Confirmation… Ne ferme pas l\'onglet.',
   'game.notice.ambiguousOrder': 'L\'ordre est ambigu.',
+  // Clarification pour un mandat ou une arrestation bloqués (lot
+  // interpréteur de texte libre) : elle dit ce qui manque, sans inventer
+  // une autre action.
+  'game.interpret.lockedWarrant': 'Tu ne peux pas encore demander un mandat contre {name}.',
+  'game.interpret.lockedWarrantGeneric': 'Tu ne peux pas encore demander un mandat.',
+  'game.interpret.lockedDetain': 'Tu ne peux pas encore arrêter {name}.',
+  'game.interpret.lockedDetainGeneric': 'Tu ne peux arrêter personne pour l\'instant.',
+  'game.interpret.missing.suspect_unknown': 'Tu dois d\'abord connaître la personne : parle à cette personne ou trouve des preuves qui la désignent.',
+  'game.interpret.missing.no_authorizing_evidence': 'Il te manque des preuves qui autorisent le mandat.',
+  'game.interpret.missing.warrant_pending': 'Le mandat est en cours : attends qu\'il soit résolu.',
+  'game.interpret.missing.warrant_granted': 'Tu as déjà le mandat.',
+  'game.interpret.missing.no_warrant': 'Il te faut d\'abord un mandat valide.',
+  'game.interpret.missing.location_unknown': 'Tu ne sais pas encore où se trouve cette personne.',
+  'game.interpret.missing.identity_unknown': 'Tu ne connais pas encore l\'identité de cette personne.',
+  'game.interpret.missing.not_at_location': 'Pour arrêter en personne, tu dois être au même endroit que cette personne.',
+  'game.interpret.missing.already_detained': 'Tu as déjà arrêté cette personne.',
   'game.notice.saveExists': 'Sauvegarde déjà existante (nouvelle tentative).',
   'game.notice.saveConfirmed': 'Sauvegarde « {name} » confirmée.',
   'game.notice.saveLoadedLog': 'Sauvegarde « {name} » chargée.',

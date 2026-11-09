@@ -1,10 +1,29 @@
 
 
+/** Motivos por los que una orden o detención está bloqueada (lote
+ * intérprete de texto libre): los mismos códigos que devuelve el
+ * servidor en `interpretation.locked.missing`. */
+export type LockedMissing =
+  | 'suspect_unknown'
+  | 'no_authorizing_evidence'
+  | 'warrant_pending'
+  | 'warrant_granted'
+  | 'no_warrant'
+  | 'location_unknown'
+  | 'identity_unknown'
+  | 'not_at_location'
+  | 'already_detained';
+
 export interface AiInterpretation {
   kind: 'actions' | 'clarification';
   actionIds?: string[];
   message?: string;
   reason?: string;
+  /** Acción bloqueada que pide el texto (lote intérprete de texto libre):
+   * el tipo, el sospechoso (o null si el texto no nombra a nadie) y lo
+   * que falta para poder hacerla. La web lo compone en el idioma del
+   * jugador desde las claves `game.interpret.*`. */
+  locked?: { type: 'warrant' | 'detain'; suspectName: string | null; missing: LockedMissing[] };
 }
 
 export interface AiNarrative {
@@ -32,7 +51,7 @@ export interface AiAuth {
 }
 
 export interface AiApi {
-  interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiInterpretation>;
+  interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth, options?: { runId?: string }): Promise<AiInterpretation>;
   narrate(facts: Array<{ id: string; text: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiNarrative>;
   converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string; knownFactIds: string[]; revealableFactIds: string[]; refusal?: string }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult>;
   health(signal: AbortSignal): Promise<AiHealth>;
@@ -152,10 +171,10 @@ async function read(response: Response): Promise<Record<string, unknown>> {
 }
 
 export const aiApi: AiApi = {
-  async interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiInterpretation> {
+  async interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth, options?: { runId?: string }): Promise<AiInterpretation> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (auth) headers['x-csrf-token'] = auth.csrfToken;
-    const response = await request('/api/v1/ai/interpret', signal, { method: 'POST', headers, body: JSON.stringify({ text, scene, offers, requestId: crypto.randomUUID() }) }, { timeoutMs: AI_TIMEOUTS.interpret });
+    const response = await request('/api/v1/ai/interpret', signal, { method: 'POST', headers, body: JSON.stringify({ text, scene, offers, requestId: crypto.randomUUID(), ...(options?.runId ? { runId: options.runId } : {}) }) }, { timeoutMs: AI_TIMEOUTS.interpret });
     const body = await read(response);
     const interpretation = body.interpretation;
     if (!interpretation || typeof interpretation !== 'object' || !('kind' in interpretation)) throw new AiError('invalid');

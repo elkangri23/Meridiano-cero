@@ -39,6 +39,7 @@ Salida: JSON con { kind, actionIds }
 - kind debe ser 'actions' si el texto corresponde a una o varias de las acciones disponibles, o 'clarification' si es ambiguo o no corresponde a ninguna.
 - actionIds: lista con los ids EXACTOS de las acciones elegidas, copiados tal cual de la entrada (1 a 8). Si kind es 'clarification', actionIds debe ser [].
 - No inventes ids ni acciones que no estén en la entrada.
+- Orden, detención y cierre son acciones DISTINTAS aunque compartan palabras: pedir una orden («Solicitar orden», «Solicitar una orden», «Request a warrant», «Demander un mandat») es la acción de solicitar orden, NUNCA cerrar el caso; coordinar o ejecutar una detención («Coordinar la detención», «Detener a…», «Coordinate the arrest», «Arrêter…») es la acción de detención, NUNCA solicitar la orden; cerrar el caso («Cerrar el caso», «Close the case», «Clore le dossier») es solo la acción de cierre. Si el texto pide una de ellas y esa acción NO está entre las disponibles, es 'clarification' (no elijas otra acción parecida).
 NO ejecutes la acción, solo interpreta.`,
 
     narrateResult: `

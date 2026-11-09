@@ -727,6 +727,23 @@ export const ES_MESSAGES = {
   'game.notice.interpretedAs': 'Interpretado como: {label}.',
   'game.notice.committing': 'Confirmando… No cierres la pestaña.',
   'game.notice.ambiguousOrder': 'La orden es ambigua.',
+  // Aclaración de una orden o detención bloqueada (lote intérprete de
+  // texto libre): dice qué falta para poder hacerla, sin inventar otra
+  // acción. La introducción nombra al sospechoso cuando el texto lo
+  // nombra; si no, la versión genérica.
+  'game.interpret.lockedWarrant': 'Todavía no puedes pedir una orden contra {name}.',
+  'game.interpret.lockedWarrantGeneric': 'Todavía no puedes pedir una orden.',
+  'game.interpret.lockedDetain': 'Todavía no puedes detener a {name}.',
+  'game.interpret.lockedDetainGeneric': 'Todavía no puedes detener a nadie.',
+  'game.interpret.missing.suspect_unknown': 'Primero tienes que conocer a la persona: habla con esa persona o encuentra pruebas que la señalen.',
+  'game.interpret.missing.no_authorizing_evidence': 'Te faltan pruebas que autoricen la orden.',
+  'game.interpret.missing.warrant_pending': 'La orden está en curso: espera a que se resuelva.',
+  'game.interpret.missing.warrant_granted': 'Ya tienes la orden.',
+  'game.interpret.missing.no_warrant': 'Primero necesitas una orden válida.',
+  'game.interpret.missing.location_unknown': 'Aún no sabes dónde está esa persona.',
+  'game.interpret.missing.identity_unknown': 'Aún no conoces la identidad de esa persona.',
+  'game.interpret.missing.not_at_location': 'Para detener en persona tienes que estar en el mismo lugar que esa persona.',
+  'game.interpret.missing.already_detained': 'Ya has detenido a esa persona.',
   'game.notice.saveExists': 'Guardado ya existente (reintento).',
   'game.notice.saveConfirmed': 'Guardado «{name}» confirmado.',
   'game.notice.saveLoadedLog': 'Cargado el guardado «{name}».',
