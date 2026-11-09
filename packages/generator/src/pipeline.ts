@@ -15,7 +15,7 @@ import { createValidationReport, validateCaseDefinition, validateGeneratedConten
 import type { CaseDefinition } from '@meridiano/case-schema';
 import type { CaseRun } from '@meridiano/case-schema';
 import {
-  DEADLINE_BY_DURATION,
+  routeBudgetMinutes,
   stageOutputSchema,
   assembleDefinition,
   buildStageContext,
@@ -389,7 +389,7 @@ function checkGoldenPathPlayable(
   if (!premise || !npcs || !Array.isArray(goldenPath)) throw new StageOutputError('Etapa 4 inválida: falta la premisa, los NPC o la ruta dorada.', clues);
   if (!Array.isArray(alternativePath)) throw new StageOutputError('Etapa 4 inválida: falta la ruta alternativa (GDD §4/§18: el caso debe resolverse por dos vías distintas).', clues);
   const definition = assembleDefinitionOrFail(clues, premise, npcs, draft, choice, geography, config);
-  const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
+  const budgetMinutes = routeBudgetMinutes(draft.params.duration);
   const simulation = simulateCase(definition, goldenPath, budgetMinutes, alternativePath);
   if (!simulation.playable) throw new StageOutputError(`Etapa 4 inválida: las rutas no se pueden jugar: ${simulation.errors.join('; ')}${simulation.diagnosis ? ` Diagnóstico: ${simulation.diagnosis}` : ''}`, clues);
 }
@@ -476,7 +476,7 @@ async function reviewStage(draft: CaseDraft, choice: ResolvedChoice, geography: 
   if (!config.enableSemanticReview) return { coherent: true };
   const definition = draft.definition;
   if (!definition || !draft.goldenPath) throw new Error('Sin definición que revisar.');
-  const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
+  const budgetMinutes = routeBudgetMinutes(draft.params.duration);
   const output = await runLlmStage(7, draft, choice, geography, config, { definition, goldenPath: draft.goldenPath, alternativePath: draft.alternativePath, budgetMinutes });
   const review = output as { coherent: boolean; issues: string[] };
   if (!review.coherent) throw new StageGateError(review.issues);
@@ -491,7 +491,7 @@ function simulateStage(draft: CaseDraft, config: PipelineConfig): { playable: bo
   const definition = draft.definition;
   if (!definition || !draft.goldenPath) throw new Error('Sin definición que simular.');
   if (!draft.alternativePath) throw new Error('Sin ruta alternativa que simular (GDD §4/§18).');
-  const budgetMinutes = Math.floor(DEADLINE_BY_DURATION[draft.params.duration] / 2);
+  const budgetMinutes = routeBudgetMinutes(draft.params.duration);
   const simulation = simulateCase(definition, draft.goldenPath, budgetMinutes, draft.alternativePath);
   draft.simulation = simulation;
   if (!simulation.playable) throw new StageGateError(simulation.diagnosis ? [...simulation.errors, `Diagnóstico: ${simulation.diagnosis}`] : simulation.errors);

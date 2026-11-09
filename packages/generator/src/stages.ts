@@ -32,6 +32,15 @@ export const DEADLINE_BY_DURATION: Record<GenerationParams['duration'], number> 
   long: 5760,
 };
 
+/** Presupuesto de ruta en minutos: la mitad del plazo del expediente.
+ * Es el plazo de la partida en dificultad difícil; el simulador exige que
+ * cada ruta (dorada y alternativa) quepa en él, para que el caso sea
+ * completable en cualquier dificultad. La etapa 4b lo recibe en su contexto
+ * para que el modelo diseñe rutas que quepan, en vez de adivinarlo. */
+export function routeBudgetMinutes(duration: GenerationParams['duration']): number {
+  return Math.floor(DEADLINE_BY_DURATION[duration] / 2);
+}
+
 /** Generador pseudoaleatorio determinista por semilla (mulberry32). */
 export function seededRandom(seed: number): () => number {
   let value = seed >>> 0;
@@ -181,6 +190,7 @@ function stage4Context(base: StageContext, prior: Record<string, unknown>, part?
   if (part === 'b') {
     const world = prior.world as Record<string, unknown> | undefined;
     return { ...base, part, premise: prior.premise, npcs: prior.npcs, locations: world?.locations, evidence: world?.evidence,
+      budgetMinutes: routeBudgetMinutes(base.duration),
       ...(caseId ? { arrestType: arrestTypeForCaseId(caseId) } : {}) };
   }
   return { ...base, premise: prior.premise, npcs: prior.npcs };

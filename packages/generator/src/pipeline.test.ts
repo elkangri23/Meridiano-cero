@@ -1294,6 +1294,32 @@ describe('puerta de varias rutas (GDD §4/§18)', () => {
   });
 });
 
+describe('presupuesto de ruta en el contexto de la etapa 4b', () => {
+  function stage4bContextFor(duration: GenerationParams['duration']) {
+    const params = { ...PARAMS, duration };
+    const geography = selectGeography(params);
+    const outputs = fakeOutputs(geography);
+    const choice = resolveGenerationChoice(params);
+    return buildStageContext(4, choice, params, geography,
+      { premise: outputs.premise, npcs: outputs.npcs, world: outputs.cluesWorld }, undefined, 'b', 'generado-fraude-test');
+  }
+
+  it('la 4b recibe budgetMinutes: la mitad del plazo (720 en corta, 1440 en media, 2880 en larga)', () => {
+    expect(stage4bContextFor('short').budgetMinutes).toBe(720);
+    expect(stage4bContextFor('medium').budgetMinutes).toBe(1440);
+    expect(stage4bContextFor('long').budgetMinutes).toBe(2880);
+  });
+
+  it('la 4a no recibe presupuesto: el mundo no diseña rutas', () => {
+    const geography = selectGeography(PARAMS);
+    const outputs = fakeOutputs(geography);
+    const choice = resolveGenerationChoice(PARAMS);
+    const context = buildStageContext(4, choice, PARAMS, geography,
+      { premise: outputs.premise, npcs: outputs.npcs }, undefined, 'a', 'generado-fraude-test');
+    expect(context.budgetMinutes).toBeUndefined();
+  });
+});
+
 describe('validación de la etapa 4 (delayMinutes)', () => {
   it('rechaza una consulta con delayMinutes 0 (el resultado quedaría en curso)', () => {
     const geography = selectGeography(PARAMS);

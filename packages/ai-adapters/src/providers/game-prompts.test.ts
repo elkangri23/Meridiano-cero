@@ -87,4 +87,13 @@ describe('prompt de generación', () => {
     expect(prompt).toContain('call');
     expect(prompt).toContain('solo habla en persona');
   });
+
+  it('la etapa 4b recibe el presupuesto en minutos y la orientación de rutas cortas', () => {
+    const prompt = buildGameFunctionPrompt('generateCase');
+    expect(prompt).toContain('budgetMinutes');
+    expect(prompt).toContain('720 en corta');
+    expect(prompt).toContain('1440 en media');
+    expect(prompt).toContain('2880 en larga');
+    expect(prompt).toContain('cada viaje entre ciudades cuesta de 120 a 720 minutos');
+  });
 });
