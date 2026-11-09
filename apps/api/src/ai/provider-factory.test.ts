@@ -8,6 +8,17 @@ import {
 } from './provider-factory.ts';
 import { AiError } from './provider.ts';
 import type { AppConfig } from '../config.ts';
+import type { LocalizedProviderCatalogEntry } from './provider-factory.ts';
+
+/** Sin español residual en el catálogo localizado: ninguna etiqueta ni
+ * ayuda es el texto español. */
+function expectNoSpanishResidual(catalog: LocalizedProviderCatalogEntry[]): void {
+  for (const entry of catalog) {
+    expect(entry.label).not.toContain('u otro');
+    expect(entry.hint).not.toContain('Solo funciona');
+    expect(entry.hint).not.toContain('los tokens los pagas');
+  }
+}
 
 function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -32,7 +43,7 @@ describe('catálogo de proveedores', () => {
     expect(catalogEntry('inexistente')).toBeUndefined();
   });
 
-  it('el catálogo se localiza: etiquetas y ayudas en español, inglés y francés', () => {
+  it('el catálogo se localiza en español e inglés', () => {
     const es = localizedCatalog('es');
     expect(es.find(entry => entry.id === 'ollama')?.label).toBe('Ollama local');
     expect(es.find(entry => entry.id === 'ollama')?.hint).toBe('Solo funciona en una instalación en casa con Ollama en este equipo.');
@@ -42,16 +53,14 @@ describe('catálogo de proveedores', () => {
     expect(en.find(entry => entry.id === 'ollama')?.hint).toBe('Only works on a home setup with Ollama on this machine.');
     expect(en.find(entry => entry.id === 'openai-compatible')?.label).toBe('OpenAI-compatible (LM Studio or other)');
     expect(en.find(entry => entry.id === 'freellmapi')?.label).toBe('FreeLLMAPI');
+    expectNoSpanishResidual(en);
+  });
+
+  it('el catálogo se localiza en francés', () => {
     const fr = localizedCatalog('fr');
     expect(fr.find(entry => entry.id === 'ollama')?.hint).toBe('Fonctionne uniquement sur une installation à domicile avec Ollama sur cet ordinateur.');
     expect(fr.find(entry => entry.id === 'openai-compatible')?.label).toBe('OpenAI-compatible (LM Studio ou autre)');
-    // Sin español residual en inglés ni francés: ninguna etiqueta ni ayuda
-    // de los proveedores es el texto español.
-    for (const entry of [...en, ...fr]) {
-      expect(entry.label).not.toContain('u otro');
-      expect(entry.hint).not.toContain('Solo funciona');
-      expect(entry.hint).not.toContain('los tokens los pagas');
-    }
+    expectNoSpanishResidual(fr);
   });
 
   it('construye cada adaptador con su identificador y modelo', () => {
