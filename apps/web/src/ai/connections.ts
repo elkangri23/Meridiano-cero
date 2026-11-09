@@ -2,6 +2,7 @@
 // Las credenciales nunca viajan de vuelta: las respuestas solo indican si
 // existe credencial, nunca su valor.
 
+import { createPreferenceStore } from '@meridiano/contracts';
 import type { AiAuth } from './client';
 
 export interface ProviderCatalogEntry {
@@ -90,6 +91,10 @@ async function request(
   // content-type application/json y cuerpo vacío (400).
   if (init.body !== undefined) headers['content-type'] = 'application/json';
   if (auth) headers['x-csrf-token'] = auth.csrfToken;
+  // El idioma viaja en cada llamada: el catálogo de proveedores se sirve
+  // localizado y el cambio en Ajustes debe reflejarse sin recargar (antes
+  // no se mandaba y el catálogo quedaba siempre en español).
+  headers['x-meridiano-language'] = createPreferenceStore().load().language;
   let response: Response;
   try {
     response = await fetch(path, { ...init, headers, credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]) });
