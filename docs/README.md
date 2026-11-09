@@ -4,7 +4,7 @@ Revisión de bordes de ejecución: [hallazgos y 90 escenarios](quality/BORDES-EJ
 
 [Evidencia y límites de esta revisión documental](quality/REVISION-BORDES.md).
 
-Actualizado: 2026-10-28. Base PostgreSQL con migrador/sesión, motor, prototipo y servicios IA combinados. [Estado integrado](plan/ESTADO.md), [registro de merge](quality/INTEGRACION-T3-04.md): 157 pruebas correctas y controles globales heredados pendientes. API de partidas, guardados y evaluación real siguen sin conectar.
+Actualizado: 2026-11-09. Base PostgreSQL con migrador/sesión, motor, investigación jugable e IA conectada (FreeLLMAPI en el VPS, LLM configurable por usuario). [Estado integrado](plan/ESTADO.md), [registro de merge](quality/INTEGRACION-T3-04.md): 1294 pruebas unitarias y 152 de integración, con E2E efectiva 92/92 y smoke en producción. API de partidas, guardados y evaluación real conectados.
 
 ## Orden de lectura
 
@@ -24,7 +24,7 @@ Actualizado: 2026-10-28. Base PostgreSQL con migrador/sesión, motor, prototipo 
 
 Las doce specs tienen contenido desarrollado. Las cifras propuestas que necesitan medición, equilibrio o datos del proveedor se identifican expresamente y se cierran en la tarea correspondiente. Los manuales distinguen comandos existentes, ejecuciones registradas y procedimientos futuros; consultar el estado antes de usar un runbook.
 
-La autorización actual establece el plan de implementación y la entrega inicial documental. Los ADR de estructura aceptados derivan de ese plan; los parámetros del caso fijo son una propuesta concreta para el primer hito. Las fases 1 y 3 están en curso; la fase 2 tiene implementación funcional con calidad pendiente; las fases 4–7 no han comenzado.
+El plan de implementación está ejecutado: fases A–C hechas, generador de casos, lotes T5, i18n en español, inglés y francés y traducción desplegados; el estado vivo es [ESTADO.md](plan/ESTADO.md). Los ADR de estructura aceptados derivan de ese plan; los parámetros del caso fijo son una propuesta concreta para el primer hito.
 
 Cada requisito tiene un ID estable, fuente, spec, tarea responsable y escenario de aceptación. Un escenario definido no constituye evidencia de que el producto funcione. Al ejecutar una tarea, registrar comando, entorno, revisión y resultado en el registro del hito; nunca sustituir esta evidencia por una casilla marcada.
 
@@ -36,15 +36,15 @@ Plantillas: [spec](templates/spec.md), [ADR](templates/adr.md), [tarea](template
 
 ## Avance T3
 
-[Interfaz inicial y verificaciones](quality/T3-inicio.md), [frontera de presentación](specs/T3-presentacion-inicial.md). Prototipo solo en desarrollo: http://127.0.0.1:5174/prototype. No es una investigación jugable ni una IA conectada.
+[Interfaz inicial y verificaciones](quality/T3-inicio.md), [frontera de presentación](specs/T3-presentacion-inicial.md). Prototipo solo en desarrollo: http://127.0.0.1:5174/prototype, con datos sintéticos. La investigación jugable y la IA conectada existen en la web y en producción.
 
-[Integración IA T3-04 y evidencia parcial](quality/T3-04.md), con [manual de evaluación](manuales/IA-LOCAL.md). Modelo real y conexión a partidas pendientes.
+[Integración IA T3-04 y evidencia parcial](quality/T3-04.md), con [manual de evaluación](manuales/IA-LOCAL.md). Modelo real conectado (FreeLLMAPI en el VPS, LLM configurable por usuario) y partidas jugables en producción.
 
 [Contrato de proveedores y claves por entorno](specs/IA-proveedores.md): Ollama doméstico, FreeLLMAPI en trabajo/VPS, instalaciones propias configurables y proveedor común con claves personales opcionales en VPS.
 
 ## Contratos técnicos desarrollados para programar T3
 
-[API](specs/API-juego.md), [guardados](specs/GUARDADOS.md), [conversaciones](specs/CONVERSACIONES.md) y [68 subcasos de aceptación](quality/T3-aceptacion-detallada.md). Incluyen campos, validaciones, errores, transacciones, reintentos y comportamiento entre ramas. El código actual aún debe adaptarse; no son pruebas ejecutadas ni cierre automático de tareas.
+[API](specs/API-juego.md), [guardados](specs/GUARDADOS.md), [conversaciones](specs/CONVERSACIONES.md) y [68 subcasos de aceptación](quality/T3-aceptacion-detallada.md). Incluyen campos, validaciones, errores, transacciones, reintentos y comportamiento entre ramas. Las specs están implementadas, con pruebas ejecutadas (1294 unitarias, 152 de integración, E2E 92/92); un escenario definido sigue sin ser por sí solo evidencia de que el producto funcione: la evidencia es la verificación registrada.
 
 [Revisión de contradicciones y mejoras de coste bajo/medio](quality/REVISION-CONTRATOS-T3.md), con alcance de rama y pendientes previos a integración.
 

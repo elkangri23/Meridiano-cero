@@ -11,7 +11,7 @@
 | Corroboración | Relación sustentada entre evidencias, sin juicio de culpabilidad automático |
 | NPC | Personaje con conocimiento y condiciones de comunicación limitados |
 | Motor | Reglas deterministas que modifican estado y reloj |
-| Intérprete | IA que traduce texto en intención estructurada, sin ejecutarla |
+| Intérprete | IA que traduce texto en intención estructurada, sin ejecutarla; nunca resuelve a cerrar el caso, detener o pedir una orden salvo que esa acción esté ofrecida, y si no lo está aclara qué falta (la categoría, no el paso concreto) |
 | Narrador | Redacción limitada a eventos y hechos autorizados |
 | Generador | Pipeline que prepara un expediente completo |
 | Validador duro | Comprobaciones deterministas que no puede anular una IA |
