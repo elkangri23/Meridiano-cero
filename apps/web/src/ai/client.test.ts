@@ -67,4 +67,24 @@ describe('plazos del cliente de IA', () => {
     expect(body.npc?.persona).toContain('se niega a declarar sobre el robo');
     expect(body.npc?.refusal).toBe('No voy a declarar sobre el robo.');
   });
+
+  it('las tres operaciones mandan la cabecera de idioma, como el resto de clientes', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation((input: unknown) => {
+      const url = String(input);
+      const body = url.includes('/interpret')
+        ? { interpretation: { kind: 'actions', actionIds: [] } }
+        : url.includes('/narrate')
+          ? { narrative: { text: 'La caja está a la vista.', factIds: [], act: 'state', source: 'model' } }
+          : narrativeBody;
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
+    });
+    vi.stubGlobal('fetch', fetcher);
+    await aiApi.interpret('inspeccionar la sala',
+      { location: 'MAD-SALA', description: 'Sala de embalaje' },
+      [{ id: 'inspect:MAD-SALA', label: 'Inspeccionar Sala de embalaje' }], signal(), auth);
+    await aiApi.narrate([{ id: 'EV-01', text: 'La caja está a la vista.' }], signal(), auth);
+    await aiApi.converse(inesInput, signal(), auth);
+    const languages = fetcher.mock.calls.map(call => (call[1] as { headers?: Record<string, string> } | undefined)?.headers?.['x-meridiano-language']);
+    expect(languages).toEqual(['es', 'es', 'es']);
+  });
 });

@@ -27,3 +27,15 @@ export function hasLegacyAstrolabioRules(value: unknown): boolean {
   if (!Array.isArray(value) || value.length !== ruleManifest.length) return false;
   return new Set(value).size === ruleManifest.length && value.every(rule => typeof rule === 'string' && ruleManifest.includes(rule));
 }
+
+/** Una definición es el expediente fijo aunque su id se haya reasignado
+ * (copia importada): el manifiesto de reglas es contenido único del
+ * astrolabio, no un identificador. Sin esto, revalidar la copia con su id
+ * nuevo cae en la rama genérica de v1.5 y la rechaza (rules no vacías,
+ * solution por identidad, tokens de conocimiento legados, canales del
+ * catálogo fijo) y el catálogo la da por inexistente (404 al exportarla). */
+export function isLegacyAstrolabioDefinition(def: unknown): boolean {
+  if (typeof def !== 'object' || def === null || Array.isArray(def)) return false;
+  const record = def as Record<string, unknown>;
+  return record.id === LEGACY_ASTROLABIO_ID || hasLegacyAstrolabioRules(record.rules);
+}

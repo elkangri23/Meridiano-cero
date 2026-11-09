@@ -137,6 +137,33 @@ describe('Intercambio de expedientes (T4-05 expuesto)', () => {
     expect(response.json().runId).toBeTruthy();
   });
 
+  // Copia importada del caso fijo (quirk preexistente): importar el fijo
+  // reasigna su id a `importado-<hex>`, y la rama legada del validador se
+  // decidía por el id, así que la copia dejaba de validar y exportarla
+  // daba 404 aunque fuera propia. La detección legada es ahora por
+  // contenido (manifiesto de reglas): la copia se lista, se juega y se
+  // exporta como cualquier expediente propio.
+  it('importar el fichero del caso fijo crea una copia exportable y jugable', async () => {
+    const fixedDefinition = structuredClone(astrolabioDefinition) as unknown as Record<string, unknown>;
+    fixedDefinition.catalogMeta = { crimeType: 'robo', contentRating: 'familiar' };
+    const file = createExport(fixedDefinition, { difficulty: 'normal', duration: 'medium', region: 'europa', seed: fixedDefinition.seed as number, catalogVersion: fixedDefinition.catalogVersion as string });
+    if (!file.success || !file.export) throw new Error('No se pudo construir el fichero del fijo: ' + file.errors.join(' '));
+    const imported = await app.inject({ method: 'POST', url: '/api/v1/cases/import', headers: jsonHeadersFor(other), payload: JSON.stringify(file.export) });
+    expect(imported.statusCode).toBe(201);
+    expect(imported.json().alreadyExisted).toBe(false);
+    expect(imported.json().caseId).toMatch(/^importado-[a-f0-9]{8}$/);
+    const importedFixedCaseId = imported.json().caseId as string;
+    const summary = await app.inject({ method: 'GET', url: `/api/v1/cases/${importedFixedCaseId}`, headers: headersFor(other) });
+    expect(summary.statusCode).toBe(200);
+    expect(summary.json().canStart).toBe(true);
+    expect(summary.json().ownedByMe).toBe(true);
+    const exported = await app.inject({ method: 'GET', url: `/api/v1/cases/${importedFixedCaseId}/export`, headers: headersFor(other) });
+    expect(exported.statusCode).toBe(200);
+    const parsed = JSON.parse(exported.body);
+    expect(parsed.definition.id).toBe(importedFixedCaseId);
+    expect(validateImport(parsed).success).toBe(true);
+  });
+
   it('reimportar el propio fichero exportado no duplica', async () => {
     const exported = await app.inject({ method: 'GET', url: `/api/v1/cases/${importedCaseId}/export`, headers: headersFor(other) });
     expect(exported.statusCode).toBe(200);

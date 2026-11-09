@@ -36,6 +36,18 @@ export function chatRole(entry: NpcChatEntry | undefined, fallback: string): str
   return entry?.role ?? fallback;
 }
 
+/** Rol que se enseña en la escena y en la charla: el de la entrada del
+ * caso en curso; sin entrada, el del catálogo SOLO si el caso es el fijo.
+ * En un generado los ids se reutilizan (lucia, marta) con roles distintos
+ * al fijo, así que el respaldo del catálogo filtraría un rol erróneo si
+ * faltara alguna vez la entrada `npcChat`. Sin entrada y sin ser el caso
+ * fijo, no se inventa ningún rol. */
+export function sceneRole(view: PlayerViewDto | null | undefined, npcId: string, catalogRole?: string): string {
+  const entry = findChatEntry(view, npcId);
+  if (view?.caseId === 'astrolabio-tres-ciudades') return chatRole(entry, catalogRole ?? '');
+  return entry?.role ?? '';
+}
+
 export function chatNpcName(entry: NpcChatEntry | undefined, fallback: string | undefined): string | undefined {
   return entry?.name ?? fallback;
 }

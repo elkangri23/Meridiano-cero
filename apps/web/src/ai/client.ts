@@ -3,6 +3,7 @@
 /** Motivos por los que una orden o detención está bloqueada (lote
  * intérprete de texto libre): los mismos códigos que devuelve el
  * servidor en `interpretation.locked.missing`. */
+import { createPreferenceStore } from '@meridiano/contracts';
 export type LockedMissing =
   | 'suspect_unknown'
   | 'no_authorizing_evidence'
@@ -172,7 +173,7 @@ async function read(response: Response): Promise<Record<string, unknown>> {
 
 export const aiApi: AiApi = {
   async interpret(text: string, scene: { location: string; description: string }, offers: Array<{ id: string; label: string }>, signal: AbortSignal, auth?: AiAuth, options?: { runId?: string }): Promise<AiInterpretation> {
-    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-meridiano-language': createPreferenceStore().load().language };
     if (auth) headers['x-csrf-token'] = auth.csrfToken;
     const response = await request('/api/v1/ai/interpret', signal, { method: 'POST', headers, body: JSON.stringify({ text, scene, offers, requestId: crypto.randomUUID(), ...(options?.runId ? { runId: options.runId } : {}) }) }, { timeoutMs: AI_TIMEOUTS.interpret });
     const body = await read(response);
@@ -182,7 +183,7 @@ export const aiApi: AiApi = {
   },
 
   async narrate(facts: Array<{ id: string; text: string }>, signal: AbortSignal, auth?: AiAuth): Promise<AiNarrative> {
-    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-meridiano-language': createPreferenceStore().load().language };
     if (auth) headers['x-csrf-token'] = auth.csrfToken;
     const response = await request('/api/v1/ai/narrate', signal, { method: 'POST', headers, body: JSON.stringify({ facts, requestId: crypto.randomUUID() }) }, { timeoutMs: AI_TIMEOUTS.narrate, retries: 1 });
     const body = await read(response);
@@ -192,7 +193,7 @@ export const aiApi: AiApi = {
   },
 
   async converse(input: { runId: string; text: string; npc: { id: string; name: string; persona: string; knownFactIds: string[]; revealableFactIds: string[]; refusal?: string }; facts: Array<{ id: string; text: string }>; memory: unknown; allowedActs: string[] }, signal: AbortSignal, auth?: AiAuth): Promise<AiConverseResult> {
-    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-meridiano-language': createPreferenceStore().load().language };
     if (auth) headers['x-csrf-token'] = auth.csrfToken;
     const response = await request('/api/v1/ai/converse', signal, { method: 'POST', headers, body: JSON.stringify({ ...input, requestId: crypto.randomUUID() }) }, { timeoutMs: AI_TIMEOUTS.converse, retries: 1 });
     const body = await read(response);

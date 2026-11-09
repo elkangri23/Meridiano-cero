@@ -294,18 +294,6 @@ function inspectAction(def: CaseDefinition, run: CaseRun, action: Action, langua
 
 // ── Procesamiento de solicitudes programadas ──────────────────────────────────
 
-function payloadString(request: ScheduledResult, field: string): string | undefined {
-  if (typeof request.payload !== 'object' || request.payload === null || !Object.hasOwn(request.payload, field)) return undefined;
-  const value = (request.payload as Record<string, unknown>)[field];
-  return typeof value === 'string' ? value : undefined;
-}
-
-function matureAnalysis(run: CaseRun, request: ScheduledResult): CaseRun {
-  const evidenceId = payloadString(request, 'evidenceId');
-  if (!evidenceId || run.discoveries.includes(`analysis:${evidenceId}`)) return run;
-  return { ...run, discoveries: [...run.discoveries, `analysis:${evidenceId}`] };
-}
-
 function maturedEvents(requests: ScheduledResult[], run: CaseRun): EngineEvent[] {
   return requests.map(request => makeEvent(request.dueMinute,
     run.discoveries.includes('warrant-denied:' + request.id) ? 'warrant_denied' : 'request_matured',
@@ -349,7 +337,6 @@ function processMaturedRequests(def: CaseDefinition, run: CaseRun, newMinute: nu
     if (!due) { remaining.push(request); continue; }
     matured.push(request);
     if (request.type === 'warrant') currentRun = matureSelectedWarrant(def, currentRun, request);
-    if (request.type === 'analyze') currentRun = matureAnalysis(currentRun, request);
     if (request.type === 'fixed_evidence') currentRun = isFixedCase(def)
       ? matureEvidence(def, currentRun, request)
       : matureGeneratedEvidence(def, currentRun, request);

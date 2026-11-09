@@ -19,6 +19,10 @@ const errorKeys: Record<AuthErrorKind, LocaleKey> = {
 };
 
 function messageOf(error: unknown, t: TranslateFn): string {
+  // Las comprobaciones del propio formulario (contraseñas distintas) ya
+  // dejan el mensaje traducido como cadena: se enseña tal cual, no como
+  // «Error inesperado.».
+  if (typeof error === 'string') return error;
   return error instanceof AuthError ? t(errorKeys[error.kind]) : t('auth.error.unexpected');
 }
 

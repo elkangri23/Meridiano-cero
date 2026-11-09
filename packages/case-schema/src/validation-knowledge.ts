@@ -1,6 +1,6 @@
 import { check, identifier, type DataRecord } from './validation-fields.js';
 import type { EntityGroups } from './validation-entities.js';
-import { LEGACY_ASTROLABIO_ID, legacyAstrolabioKnowledge, legacyAstrolabioSuspect } from './legacy-astrolabio.js';
+import { isLegacyAstrolabioDefinition, legacyAstrolabioKnowledge, legacyAstrolabioSuspect } from './legacy-astrolabio.js';
 
 function factIds(def: DataRecord, errors: string[]): Set<string> {
   if (!Array.isArray(def.facts) || def.facts.length > 2048) return new Set();
@@ -11,7 +11,7 @@ function factIds(def: DataRecord, errors: string[]): Set<string> {
 }
 
 function solutionLink(def: DataRecord, groups: EntityGroups, errors: string[]): void {
-  if (def.id === LEGACY_ASTROLABIO_ID) {
+  if (isLegacyAstrolabioDefinition(def)) {
     const suspect = typeof def.solution === 'string' ? legacyAstrolabioSuspect(def.solution) : undefined;
     check(suspect !== undefined && def.solution === suspect.identity && groups.npcs.some(npc => npc.id === suspect.id), 'solution NPC inexistente o identidad incompatible', errors);
     return;
@@ -26,7 +26,7 @@ export function validateKnowledge(def: DataRecord, groups: EntityGroups, errors:
     if (!Array.isArray(npc.knowledge) || npc.knowledge.length > 2048) continue;
     check(new Set(npc.knowledge).size === npc.knowledge.length, 'npcs.knowledge duplicado', errors);
     for (const token of npc.knowledge) {
-      const legacy = def.id === LEGACY_ASTROLABIO_ID && legacyAstrolabioKnowledge(npc.id, token);
+      const legacy = isLegacyAstrolabioDefinition(def) && legacyAstrolabioKnowledge(npc.id, token);
       check(identifier(token) && (facts.has(token) || legacy), 'npcs.knowledge referencia inexistente', errors);
     }
   }

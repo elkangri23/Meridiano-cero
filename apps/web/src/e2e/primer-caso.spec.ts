@@ -54,6 +54,13 @@ test.describe('E2E - Archive y Prototype', () => {
   });
 
   test('debe mostrar el panel de confirmación al enviar orden', async ({ page }) => {
+    // /api/v1/ai/interpret exige sesión (cookie + x-csrf-token): sin ella el
+    // prototipo no puede enseñar el panel. Se entra en desarrollo local y
+    // se vuelve al prototipo con la sesión puesta.
+    await page.goto('/');
+    await page.waitForSelector('#root > *', { timeout: 10000 });
+    await page.click('button:has-text("Entrar en desarrollo local")');
+    await expect(page.locator('.archive-create').first().getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
     await page.goto('/prototype');
     await page.waitForSelector('#root > *', { timeout: 10000 });
     await page.fill('input[placeholder="¿Qué quieres hacer o preguntar?"]', 'Examinar la sala');

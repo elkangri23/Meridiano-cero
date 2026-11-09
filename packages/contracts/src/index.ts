@@ -1,5 +1,12 @@
 import { resolveMessage, SUPPORTED_LANGUAGES } from './i18n.js';
 import type { LocaleKey, TranslateFn } from './i18n.js';
+/** Canal remoto de la central de comunicaciones (GDD §10): los mismos
+ * cinco canales del motor (`communications.ts`). No todos los contactos
+ * tienen todos los canales; la vista solo ofrece los de cada uno.
+ * Fuente única en `npc-catalog.ts` (tipo + lista + etiquetas); el índice
+ * solo la re-exporta, sin una segunda definición local. */
+import { REMOTE_CHANNELS } from './npc-catalog.js';
+import type { RemoteChannel } from './npc-catalog.js';
 
 /** Solo estado público de proceso; no acredita DB, sesión ni juego operativo. */
 export interface HealthResponse { status: 'ok' }
@@ -683,11 +690,6 @@ export function isInitialPlayerViewDto(value: unknown): value is InitialPlayerVi
  * conocimiento, saludos y negativas si las trae). Sin esto, un NPC generado
  * llegaba al director sin hechos ni persona y cada pregunta salía como
  * «He registrado tu consulta.». */
-/** Canal remoto de la central de comunicaciones (GDD §10): los mismos
- * cinco canales del motor (`communications.ts`). No todos los contactos
- * tienen todos los canales; la vista solo ofrece los de cada uno. */
-export type RemoteChannel = 'call' | 'whatsapp' | 'sms' | 'email' | 'fax';
-
 /** Un envío de la central: mensaje o documento a un contacto. Es el
  * historial que enseña la ventana de comunicaciones: quién, por dónde,
  * qué documento (si lo hay) y cuándo se envió y cuándo llegó el acuse.
@@ -1083,10 +1085,9 @@ function publicNpcChatFact(value: unknown): value is NpcChatEntry['knowledge'][n
   if (!dtoRecord(value, 'id,text')) return false;
   return boundedString(value.id, 128) && typeof value.text === 'string' && value.text.length > 0 && value.text.length <= 2000;
 }
-const REMOTE_CHANNELS: RemoteChannel[] = ['call', 'whatsapp', 'sms', 'email', 'fax'];
 function publicChannels(value: unknown): value is RemoteChannel[] {
   return Array.isArray(value) && value.length <= 5 &&
-    value.every(item => typeof item === 'string' && (REMOTE_CHANNELS as string[]).includes(item)) &&
+    value.every(item => typeof item === 'string' && (REMOTE_CHANNELS as readonly string[]).includes(item)) &&
     new Set(value).size === value.length;
 }
 function npcChatKeys(value: Record<string, unknown>): boolean {
@@ -1131,7 +1132,7 @@ function communicationRecordKeys(keys: string[]): boolean {
 }
 function communicationRecordText(value: Record<string, unknown>): boolean {
   if (!boundedString(value.id, 128) || !boundedString(value.recipientId, 128)) return false;
-  if (typeof value.channel !== 'string' || !(REMOTE_CHANNELS as string[]).includes(value.channel)) return false;
+  if (typeof value.channel !== 'string' || !(REMOTE_CHANNELS as readonly string[]).includes(value.channel)) return false;
   if (typeof value.requestText !== 'string' || value.requestText.trim().length === 0 || value.requestText.length > 4000) return false;
   return value.documentId === undefined || boundedString(value.documentId, 128);
 }
@@ -1333,7 +1334,7 @@ export {
   REMOTE_CHANNEL_LABELS, REMOTE_CHANNEL_KEYS, remoteChannelLabel,
   remoteChannelInSentence, QUERY_TYPES, getNPC, getNPCsByCity, getQueryType,
   getChannelCost, searchNPCs,
-  type NPCProfile, type CommunicationChannel, type QueryType,
+  type NPCProfile, type CommunicationChannel, type QueryType, type RemoteChannel,
 } from './npc-catalog.js';
 
 // Sistema de locales (`i18n.ts` + `locales/`): el español es el idioma

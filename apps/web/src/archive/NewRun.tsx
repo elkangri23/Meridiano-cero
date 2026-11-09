@@ -134,7 +134,7 @@ function CreationContent({ state, model }: Props) {
     <CrimeField playableCrimes={playableCrimes} crime={crime} resolvedCrime={resolvedCrime} busy={busy} surprised={surprised} selectedCase={selectedCase} onChoose={chooseCrimeAndReset} onSurprise={surprise} />
     <ContentField content={content} busy={busy} hasGeneral={hasGeneral} onChange={chooseContent} />
     {matchingCases.length > 1 && <CaseField cases={matchingCases} selectedCase={selectedCase} busy={busy} onChange={setCaseId} />}
-    {selectedCase && <p>{t('newRun.caseLine', { title: displayCaseTitle(selectedCase.title), label: caseLabel(selectedCase.crimeType, selectedCase.contentRating, t), ref: shortCaseRef(selectedCase.caseId) })}</p>}
+    {selectedCase && <p>{t('newRun.caseLine', { title: displayCaseTitle(selectedCase.title), label: caseLabel(selectedCase.crimeType, selectedCase.contentRating, t), hours: hours(selectedCase.deadlineMinutes), ref: shortCaseRef(selectedCase.caseId) })}</p>}
     <ExportOwnCaseButton model={model} selectedCase={selectedCase} busy={busy} />
     {!selectedCase && state.cases.length > 0 && <p>{t('newRun.noMatching')}</p>}
     <button type="submit" disabled={busy || !selectedCase}>{t('newRun.start')}</button>{state.cases.length === 0 && <p>{t('newRun.noCases')}</p>}
@@ -181,10 +181,10 @@ function ContentField({ content, busy, hasGeneral, onChange }: ContentFieldProps
     <label><input type="radio" name="content" value="general" checked={content === 'general'} disabled={!hasGeneral} onChange={() => onChange('general')} /> {t(CONTENT_RATING_KEYS.general)}{hasGeneral ? t('newRun.contentGeneralHelp') : t('newRun.contentGeneralEmpty')}</label>
   </fieldset>;
 }
-type CaseFieldProps = { cases: { caseId: string; title: string; crimeType: CrimeType; contentRating: ContentRating }[]; selectedCase: { caseId: string } | undefined; busy: boolean; onChange: (caseId: string) => void };
+type CaseFieldProps = { cases: { caseId: string; title: string; crimeType: CrimeType; contentRating: ContentRating; deadlineMinutes: number }[]; selectedCase: { caseId: string } | undefined; busy: boolean; onChange: (caseId: string) => void };
 function CaseField({ cases, selectedCase, busy, onChange }: CaseFieldProps) {
   const t = useTranslation();
-  return <fieldset disabled={busy}><legend>{t('newRun.case')}</legend>{cases.map(item => <label key={item.caseId}><input type="radio" name="case" value={item.caseId} checked={selectedCase?.caseId === item.caseId} onChange={() => onChange(item.caseId)} /> {t('newRun.caseOption', { title: displayCaseTitle(item.title), label: caseLabel(item.crimeType, item.contentRating, t), ref: shortCaseRef(item.caseId) })}</label>)}</fieldset>;
+  return <fieldset disabled={busy}><legend>{t('newRun.case')}</legend>{cases.map(item => <label key={item.caseId}><input type="radio" name="case" value={item.caseId} checked={selectedCase?.caseId === item.caseId} onChange={() => onChange(item.caseId)} /> {t('newRun.caseOption', { title: displayCaseTitle(item.title), label: caseLabel(item.crimeType, item.contentRating, t), hours: hours(item.deadlineMinutes), ref: shortCaseRef(item.caseId) })}</label>)}</fieldset>;
 }
 function PendingCreation({ state, model }: Props) {
   const t = useTranslation();

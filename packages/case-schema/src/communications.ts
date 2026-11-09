@@ -1,7 +1,7 @@
 // Canales remotos y registro de comunicaciones de la central (GDD §10).
 // La central solo ofrece a cada contacto los canales que tiene sentido
 // usar con él; el resto no se ofrece ni se acepta.
-import { LEGACY_ASTROLABIO_ID } from './legacy-astrolabio.js';
+import { isLegacyAstrolabioDefinition } from './legacy-astrolabio.js';
 import { getNPC, REMOTE_CHANNELS, type CommunicationChannel, type RemoteChannel } from '@meridiano/contracts';
 import type { CaseDefinition, CommunicationRecord, IrregularKind, MisconductRecord, NPC } from './types.js';
 
@@ -56,7 +56,7 @@ export function normalizeRemoteChannels(value: unknown): RemoteChannel[] | null 
 export function channelsForNpc(def: CaseDefinition, npc: NPC): RemoteChannel[] {
   const own = normalizeRemoteChannels(npc.channels);
   if (own) return own;
-  if (def.id === LEGACY_ASTROLABIO_ID) {
+  if (isLegacyAstrolabioDefinition(def)) {
     const profile = getNPC(npc.id);
     if (profile) {
       const wanted = new Set(profile.channels.flatMap(channel => CATALOG_CHANNEL_MAP[channel]));

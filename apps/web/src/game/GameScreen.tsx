@@ -12,7 +12,7 @@ import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
 import type { AiConnection, ConnectionsResponse, ConnectionTestResult, ProviderCatalogEntry } from '../ai/connections';
 import { gameApi, GameError } from './client';
 import { needsConfirmationDialog } from './action-confirmation';
-import { chatFacts, chatGreeting, chatNpcName, chatPersona, chatRefusal, chatRole, findChatEntry } from './npc-chat';
+import { chatFacts, chatGreeting, chatNpcName, chatPersona, chatRefusal, findChatEntry, sceneRole } from './npc-chat';
 import { SceneArt } from './scene-art';
 import { Portrait } from './portrait';
 import { portraitSeed, teamPortraitSeed } from './portraits';
@@ -438,7 +438,7 @@ function SceneNpcGroup({ group, view, disabled, onOffer }: { group: TalkGroup; v
   const npcId = group.npcId;
   const entry = findChatEntry(view, npcId);
   const name = chatNpcName(entry, getNPC(npcId)?.name) ?? npcNamesFromView(view).get(npcId) ?? npcId;
-  const role = chatRole(entry, getNPC(npcId)?.role ?? '');
+  const role = sceneRole(view, npcId, getNPC(npcId)?.role);
   return <div className="game-scene-npc">
     <Portrait seed={portraitSeed(view.caseId, npcId)} name={name} size="small" />
     <span><strong>{name}</strong>{role ? ` · ${role}` : ''}</span>
@@ -1169,7 +1169,7 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
     return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span>
       <p>{t('game.chatEmpty')}</p></div>;
   }
-  const role = chatRole(findChatEntry(view, npc.id), getNPC(npc.id)?.role ?? '');
+  const role = sceneRole(view, npc.id, getNPC(npc.id)?.role);
   return <div className="game-chat">
     <p className="game-chat-npc"><Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" /><span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
     <ol className="game-chat-turns" data-testid="chat-turns" aria-live="polite">

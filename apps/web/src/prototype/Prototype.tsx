@@ -7,6 +7,7 @@ import { ToolPanel } from './ToolPanel';
 import { Confirmation } from './Confirmation';
 import { aiApi, type AiInterpretation } from '../ai/client';
 import { AiError } from '../ai/client';
+import { authApi } from '../auth/client';
 import { useTranslation } from '../i18n';
 import './prototype.css';
 
@@ -54,7 +55,12 @@ export function Prototype() {
     setNotice(t('prototype.notice.interpreting'));
     const controller = new AbortController();
     try {
-      const result = await aiApi.interpret(text, { location: sampleView.position.cityId, description: t('prototype.sampleConversation') }, tools.map(item => ({ id: item.id, label: t(item.labelKey) })), controller.signal);
+      // El prototipo es público, pero /api/v1/ai/interpret exige sesión
+      // (cookie + x-csrf-token): si la hay, se reutiliza para que el panel
+      // de confirmación aparezca; sin sesión la petición se rechaza y se
+      // enseña el aviso de error, como antes.
+      const session = await authApi.me(controller.signal).catch(() => null);
+      const result = await aiApi.interpret(text, { location: sampleView.position.cityId, description: t('prototype.sampleConversation') }, tools.map(item => ({ id: item.id, label: t(item.labelKey) })), controller.signal, session ? { csrfToken: session.csrfToken } : undefined);
       setInterpretation(result);
       applyInterpretation(result);
     } catch (e) {

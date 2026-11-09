@@ -21,6 +21,18 @@ async function cleanupAccount(page: Page) {
 }
 
 test.describe('Entrada web: registro, login y partida', () => {
+  test('contraseñas distintas en el registro dicen que no coinciden, no «Error inesperado»', async ({ page }) => {
+    await page.goto('/registro');
+    await page.waitForSelector('#root > *', { timeout: 10000 });
+    await page.getByLabel('Correo').fill(`e2e-distintas-${stamp}@sintetico.invalid`);
+    await page.getByLabel('Nombre de detective').fill(displayName);
+    await page.getByLabel('Contraseña', { exact: true }).fill(password);
+    await page.getByLabel('Repite la contraseña').fill('contraseña-e2e-654321');
+    await page.getByRole('button', { name: 'Crear cuenta' }).click();
+    await expect(page.locator('text=Las contraseñas no coinciden.')).toBeVisible();
+    await expect(page.locator('text=Error inesperado.')).toBeHidden();
+  });
+
   // Un solo registro por pasada: el límite de registro es 5 intentos / 5 min
   // por IP y la API local comparte la IP con todas las pruebas. El test de
   // registro deja la cuenta viva para el test de login, que la borra al final.
