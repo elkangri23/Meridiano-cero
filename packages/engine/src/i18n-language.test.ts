@@ -69,7 +69,7 @@ describe('motor en otro idioma', () => {
   it('los textos del caso fijo se resuelven en francés con su caso', () => {
     const id = astrolabioDefinition.id;
     expect(evidenceText('EV-01', undefined, id, 'fr'))
-      .toBe('La caisse est bien en vue. Son étiquette renvoie aux archives de Paris.');
+      .toBe('La caisse est bien en vue. Son étiquette renvoie aux archives de París.');
     expect(npcGreeting('lucia', undefined, id, 'fr'))
       .toBe('Je suis Lucía, conservatrice de l\'Instituto Horizonte. Comment puis-je t\'aider ?');
     expect(objectiveText('obj-detener', id, 'fr')).toBe('Arrêter Inés avec un mandat valide');
