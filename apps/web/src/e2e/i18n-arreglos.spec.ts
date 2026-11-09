@@ -52,8 +52,47 @@ async function travelTo(page: Page, cityId: string, minute: number) {
   await expect(page.getByTestId(`travel-${cityId}`)).toBeHidden();
 }
 
-/** Elige un idioma en Ajustes (el botón se busca por testid porque su texto
- * cambia con el idioma). */
+/** Registra una cuenta nueva (perfil sin casos cerrados) y empieza una
+ * partida del caso fijo. La entrada local de desarrollo comparte un perfil
+ * que ya tiene un caso cerrado en la BD de desarrollo, así que la evaluación
+ * de carrera vacía solo se alcanza con una cuenta recién creada. */
+async function registerAndStartRun(page: Page) {
+  const stamp = Date.now().toString(36);
+  const email = `e2e-i18n-arreglos-${stamp}@sintetico.invalid`;
+  const password = 'Prueba-I18n-Arreglos-2026!';
+  await page.goto('/registro');
+  await page.waitForSelector('#root > *', { timeout: 10000 });
+  await page.getByLabel('Correo').fill(email);
+  await page.getByLabel('Nombre de detective').fill('Detective Arreglos');
+  await page.getByLabel('Contraseña', { exact: true }).fill(password);
+  await page.getByLabel('Repite la contraseña').fill(password);
+  await page.getByRole('button', { name: 'Crear cuenta' }).click();
+  await expect(page.locator('text=Revisa tu correo').first()).toBeVisible();
+  await page.getByRole('link', { name: 'Ir al archivo' }).click();
+  const creation = page.locator('.archive-create').first();
+  await expect(creation.getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
+  await creation.getByRole('radio', { name: 'Robo internacional', exact: true }).check();
+  await creation.getByRole('button', { name: 'Empezar partida' }).click();
+  await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
+  await expect(page.getByTestId('clock')).toContainText('0 min');
+  await page.getByRole('button', { name: 'Entendido, a investigar' }).click();
+  return password;
+}
+
+/** Borra la cuenta de prueba (sin fallar el test si la limpieza no puede
+ * completarse: lo que se verifica es el texto, no el borrado). */
+async function cleanupAccount(page: Page, password: string) {
+  const me = await page.request.get('/api/v1/me');
+  if (!me.ok()) return;
+  const session = await me.json();
+  const response = await page.request.delete('/api/v1/account', {
+    headers: { Origin: 'http://127.0.0.1:5173', 'x-csrf-token': session.csrfToken },
+    data: { confirm: true, password },
+  });
+  if (response.status() !== 204) {
+    console.warn(`limpieza de la cuenta de prueba: DELETE /api/v1/account devolvió ${response.status()}`);
+  }
+}
 async function chooseLanguage(page: Page, lang: 'es' | 'en' | 'fr') {
   await page.getByTestId('toolbar-settings').click();
   const selector = page.getByTestId('settings-language');
@@ -135,7 +174,10 @@ test.describe('E2E arreglos i18n', () => {
   test('la nota de idioma es correcta y Ajustes no deja residuos en español en EN ni FR', async ({ page }) => {
     await openGameScreen(page);
     await page.getByTestId('toolbar-settings').click();
-    const settings = page.getByRole('dialog', { name: 'Ajustes' });
+    // La ventana de Ajustes se localiza por su contenido, no por su nombre
+    // accesible: al cambiar de idioma el nombre pasa de «Ajustes» a
+    // «Settings» / «Réglages» y un localizador por nombre quedaría obsoleto.
+    const settings = page.locator('.game-window:has([data-testid="settings-language"])');
     await expect(settings).toBeVisible();
     const selector = page.getByTestId('settings-language');
     const palette = page.locator('select:has(option[value="protanopia"])');
@@ -174,7 +216,7 @@ test.describe('E2E arreglos i18n', () => {
   });
 
   test('la evaluación de carrera en francés dice «clôture un dossier», no «clos un dossier»', async ({ page }) => {
-    await openGameScreen(page);
+    const password = await registerAndStartRun(page);
     await chooseLanguage(page, 'fr');
     await page.getByTestId('toolbar-team').click();
     await expect(page.getByRole('dialog', { name: 'Équipe A.C.M.E.' })).toBeVisible();
@@ -182,6 +224,7 @@ test.describe('E2E arreglos i18n', () => {
     await expect(page.getByTestId('team-turns')).toContainText('clôture un dossier');
     await expect(page.getByTestId('team-turns')).not.toContainText('clos un dossier');
     await page.keyboard.press('Escape');
+    await cleanupAccount(page, password);
   });
 
   test('la prosa de los casos usa la grafía española de las ciudades en EN y FR', async ({ page }) => {
