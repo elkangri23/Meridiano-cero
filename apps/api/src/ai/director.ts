@@ -3,7 +3,7 @@ import type { AiProvider, AiErrorCode } from './provider.ts';
 import type { ActionOffer, ConversationMemory, NpcContext, PublicFact, PublicScene, SpeechAct } from './context.ts';
 import { memoryForContext, permittedNpcFacts, remember, restoreMemory, speechActs } from './context.ts';
 import { converseSchema, factualSchema, interpretationSchema, MAX_CONVERSE_TEXT_LENGTH } from './schemas.ts';
-import { lockedMessageEs, matchLockedAction, matchOfferedAction } from './interpreter.ts';
+import { detectInterpreterType, lockedMessageEs, matchLockedAction, matchOfferedAction, offeredActionType } from './interpreter.ts';
 import type { LockedAction, LockedMissing } from '@meridiano/engine';
 
 export interface CallOptions { requestId: string; signal?: AbortSignal }
@@ -32,6 +32,17 @@ function actionSelection(value: unknown, offers: readonly ActionOffer[]): Interp
   const ids = value.actionIds;
   if (value.kind !== 'actions' || ids.length === 0 || ids.some(id => !offers.some(offer => offer.id === id))) return null;
   return { kind: 'actions', actionIds: [...ids] };
+}
+/** Red de seguridad (lote intérprete de texto libre): si el texto pide
+ * claramente una de las tres acciones delicadas (orden, detención,
+ * cierre) y el modelo devuelve otra cosa, es la confusión documentada
+ * (pedir orden → cerrar el caso; coordinar detención → solicitar orden):
+ * aclaración en vez de ejecutar una acción que no se pidió. Los textos
+ * que piden varias acciones o ninguna de las tres no disparan la red. */
+function actionTypesDiffer(text: string, actionIds: readonly string[]): boolean {
+  const wanted = detectInterpreterType(text);
+  if (wanted === null) return false;
+  return !actionIds.some(id => offeredActionType(id) === wanted);
 }
 function factSelection(value: unknown, facts: readonly PublicFact[], acts: readonly SpeechAct[]) {
   if (!record(value) || !exactKeys(value, ['act', 'factIds']) || !strings(value.factIds, 16)) return null;
@@ -131,13 +142,22 @@ export function createDirector(provider: AiProvider) {
       return { kind: 'clarification', message: lockedMessageEs(blocked),
         reason: blocked.type === 'warrant' ? 'locked_warrant' : 'locked_detain', locked: blocked };
     }
+    return interpretWithProvider(text, scene, offers, options);
+  }
+  async function interpretWithProvider(
+    text: string, scene: PublicScene, offers: readonly ActionOffer[], options: CallOptions,
+  ): Promise<Interpretation> {
     const context = { text, scene: { location: scene.location, description: scene.description },
       offers: offers.map(offer => ({ id: offer.id, label: offer.label })) };
     try {
       ensureActive(options.signal);
       const response = await provider.request({ ...options, operation: 'interpretAction', schema: interpretationSchema, context });
       ensureActive(options.signal);
-      return actionSelection(response.payload, offers) ??
+      const selection = actionSelection(response.payload, offers);
+      if (selection?.kind === 'actions' && actionTypesDiffer(text, selection.actionIds)) {
+        return { kind: 'clarification', message: 'No se pudo interpretar la orden con seguridad.', reason: 'invalid_response' };
+      }
+      return selection ??
         { kind: 'clarification', message: 'No se pudo interpretar la orden con seguridad.', reason: 'invalid_response' };
     } catch (error) {
       return { kind: 'clarification', message: 'No se pudo interpretar la orden. Puedes volver a intentarlo.', reason: errorCode(error, options.signal) };

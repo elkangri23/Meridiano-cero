@@ -144,14 +144,30 @@ describe('emparejar la acción bloqueada (lectura rara 3)', () => {
     expect(match?.type).toBe('warrant');
   });
 
-  it('con motivos distintos y sin nombre no adivina al sospechoso', () => {
+  it('con motivos distintos y sin nombre no adivina al sospechoso, salvo la orden saliente', () => {
     const locked: LockedAction[] = [
-      { type: 'warrant', suspectId: 'ines', suspectName: 'Inés Valera', missing: ['warrant_granted'] },
+      { type: 'warrant', suspectId: 'ines', suspectName: 'Inés Valera', missing: ['no_authorizing_evidence'] },
       { type: 'warrant', suspectId: 'tomas', suspectName: 'Tomás Ríos', missing: ['suspect_unknown', 'no_authorizing_evidence'] },
     ];
     expect(matchLockedAction('Solicitar una orden', locked)).toBeNull();
-    expect(matchLockedAction('Solicitar orden contra Inés', locked)).toEqual({
+    // Pero una orden en curso o concedida sí es el estado saliente: el
+    // jugador pregunta por la orden que conoce.
+    const pending: LockedAction[] = [
+      { type: 'warrant', suspectId: 'ines', suspectName: 'Inés Valera', missing: ['warrant_pending'] },
+      { type: 'warrant', suspectId: 'tomas', suspectName: 'Tomás Ríos', missing: ['suspect_unknown', 'no_authorizing_evidence'] },
+    ];
+    expect(matchLockedAction('Solicitar una orden', pending)).toEqual({
+      type: 'warrant', suspectName: 'Inés Valera', missing: ['warrant_pending'],
+    });
+    const granted: LockedAction[] = [
+      { type: 'warrant', suspectId: 'ines', suspectName: 'Inés Valera', missing: ['warrant_granted'] },
+      { type: 'warrant', suspectId: 'tomas', suspectName: 'Tomás Ríos', missing: ['suspect_unknown', 'no_authorizing_evidence'] },
+    ];
+    expect(matchLockedAction('Solicitar una orden', granted)).toEqual({
       type: 'warrant', suspectName: 'Inés Valera', missing: ['warrant_granted'],
+    });
+    expect(matchLockedAction('Solicitar orden contra Tomás', granted)).toEqual({
+      type: 'warrant', suspectName: 'Tomás Ríos', missing: ['suspect_unknown', 'no_authorizing_evidence'],
     });
   });
 

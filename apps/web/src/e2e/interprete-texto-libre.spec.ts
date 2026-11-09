@@ -107,6 +107,10 @@ test.describe('E2E - Intérprete de texto libre (lecturas raras)', () => {
   test('pedir orden tras HV-17 en París abre la oferta de solicitar orden, no cerrar el caso (caso grave 1)', async ({ page }) => {
     await openGameScreen(page);
     await reachWarrantOffer(page);
+    // La consulta HV-17 tarda 30 min en madurar (EV-04): sin esperar,
+    // la oferta de orden aún no existe y el texto libre aclara el
+    // bloqueo; tras la espera, la orden está ofrecida.
+    await playOffer(page, 'offer-wait:30', 240);
     await freeOrder(page, 'Solicitar orden de detención');
     const preview = page.getByTestId('preview-dialog');
     await expect(preview).toBeVisible();

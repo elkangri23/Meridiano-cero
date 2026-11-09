@@ -105,6 +105,41 @@ describe('Pre-paso determinista del intérprete de texto libre', () => {
     expect(detain.kind === 'clarification' ? detain.message : '').toContain('Primero necesitas una orden válida');
   });
 
+  it('sin nombre, la orden en curso o concedida es el estado saliente (E2E: orden en curso y concedida)', async () => {
+    const service = createDirector(throwingProvider);
+    const noWarrantOffers = [
+      { id: 'inspect-room', label: 'Examinar la sala' },
+      { id: 'finish', label: 'Cerrar el caso y presentar el informe' },
+    ];
+    const pending: LockedAction[] = [
+      { type: 'warrant', suspectId: 'ines', suspectName: 'Inés Valera', missing: ['warrant_pending'] },
+      { type: 'warrant', suspectId: 'tomas', suspectName: 'Tomás Ríos', missing: ['suspect_unknown', 'no_authorizing_evidence'] },
+    ];
+    const asked = await service.interpretAction('Solicitar una orden', scene, noWarrantOffers, options, pending);
+    expect(asked).toMatchObject({ kind: 'clarification', reason: 'locked_warrant' });
+    expect(asked.kind === 'clarification' ? asked.message : '').toContain('La orden está en curso');
+    const granted: LockedAction[] = [
+      { type: 'warrant', suspectId: 'ines', suspectName: 'Inés Valera', missing: ['warrant_granted'] },
+      { type: 'warrant', suspectId: 'tomas', suspectName: 'Tomás Ríos', missing: ['suspect_unknown', 'no_authorizing_evidence'] },
+    ];
+    const again = await service.interpretAction('Solicitar una orden', scene, noWarrantOffers, options, granted);
+    expect(again).toMatchObject({ kind: 'clarification', reason: 'locked_warrant' });
+    expect(again.kind === 'clarification' ? again.message : '').toContain('Ya tienes la orden');
+  });
+
+  it('la red de seguridad aclara si el modelo devuelve otra acción delicada (caso grave 1)', async () => {
+    const noWarrantOffers = [
+      { id: 'inspect-room', label: 'Examinar la sala' },
+      { id: 'finish', label: 'Cerrar el caso y presentar el informe' },
+    ];
+    const finishService = director({ kind: 'actions', actionIds: ['finish'] });
+    expect(await finishService.interpretAction('Solicitar orden de detención', scene, noWarrantOffers, options))
+      .toMatchObject({ kind: 'clarification', reason: 'invalid_response' });
+    const inspectService = director({ kind: 'actions', actionIds: ['inspect-room'] });
+    expect(await inspectService.interpretAction('Solicitar una orden', scene, noWarrantOffers, options))
+      .toMatchObject({ kind: 'clarification', reason: 'invalid_response' });
+  });
+
   it('lo demás sigue yendo al proveedor (el pre-paso no se entromete)', async () => {
     const service = createDirector(throwingProvider);
     expect(await service.interpretAction('Examina la sala', scene, offers, options))

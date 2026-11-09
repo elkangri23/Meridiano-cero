@@ -249,6 +249,16 @@ export function matchLockedAction(text: string, locked: readonly LockedAction[])
   return unnamedLockedMatch(type, candidates);
 }
 
+/** Tipo de acción de un id de oferta (`request_warrant:ines` → orden,
+ * `detain:ines` → detención, `finish` → cierre), o null si no es una
+ * de las tres. */
+export function offeredActionType(id: string): InterpreterActionType | null {
+  if (id === 'finish' || id.startsWith('finish:')) return 'finish';
+  if (id.startsWith('request_warrant:')) return 'warrant';
+  if (id.startsWith('detain:')) return 'detain';
+  return null;
+}
+
 /** Bloqueo sin nombre en el texto: uno solo, o varios con los mismos
  * motivos (respuesta genérica); con motivos distintos no se sabe a quién
  * se refiere. */
@@ -259,6 +269,21 @@ function unnamedLockedMatch(type: 'warrant' | 'detain', candidates: readonly Loc
     return { type, suspectName: first.suspectName, missing: first.missing };
   }
   const firstMissing = JSON.stringify(first.missing);
-  if (!candidates.every(entry => JSON.stringify(entry.missing) === firstMissing)) return null;
-  return { type, suspectName: null, missing: first.missing };
+  if (candidates.every(entry => JSON.stringify(entry.missing) === firstMissing)) {
+    return { type, suspectName: null, missing: first.missing };
+  }
+  return salientLockedMatch(type, candidates);
+}
+
+/** Sin nombre y con motivos distintos: si un único sospechoso tiene una
+ * orden en curso o (para la orden) ya concedida, ese es el estado
+ * saliente — el jugador pregunta por la orden que conoce — y la
+ * aclaración lo nombra. Si no hay uno solo, no se adivina. */
+function salientLockedMatch(type: 'warrant' | 'detain', candidates: readonly LockedAction[]): LockedMatch | null {
+  const salient = candidates.filter(entry =>
+    entry.missing.includes('warrant_pending') ||
+    (type === 'warrant' && entry.missing.includes('warrant_granted')));
+  if (salient.length !== 1) return null;
+  const only = salient[0];
+  return only ? { type, suspectName: only.suspectName, missing: only.missing } : null;
 }
