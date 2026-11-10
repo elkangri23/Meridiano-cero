@@ -410,7 +410,7 @@ function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, onLogou
         <span className="game-avatar" title={`${t('profile.avatar')}: ${avatar} · ${detective}`} aria-hidden="true">{avatar.slice(0, 1).toUpperCase()}</span>
       </div>
       <div className="game-header-actions">
-        <Link to="/">{t('archive.title')}</Link>
+        <Link to="/archivo">{t('archive.title')}</Link>
         {onLogout && <button type="button" onClick={onLogout}>{t('archive.logout')}</button>}
       </div>
     </div>
@@ -1948,7 +1948,7 @@ function UnavailableScreen({ phase, notice }: { phase: ScreenPhase; notice: stri
       ? <p className="game-notice" role="status">{t('game.loading')}</p>
       : <><h1>{t('game.unavailable')}</h1>
         <p className="game-notice" role="status">{notice}</p>
-        <p><Link to="/">{t('glossary.backArchive')}</Link></p>
+        <p><Link to="/archivo">{t('glossary.backArchive')}</Link></p>
         {phase === 'error' && <p><button type="button" onClick={() => window.location.reload()}>{t('common.retry')}</button></p>}</>}
   </main>;
 }

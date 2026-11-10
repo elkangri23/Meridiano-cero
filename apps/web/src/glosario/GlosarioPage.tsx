@@ -47,7 +47,7 @@ export function Glosario() {
         {active === 'faq' && <FaqSection />}
       </div>
       <footer className="glosario-footer">
-        <Link to="/">{t('glossary.backArchive')}</Link>
+        <Link to="/archivo">{t('glossary.backArchive')}</Link>
         <Link to="/prototype">{t('glossary.backPrototype')}</Link>
         <span>{t('glossary.footer')}</span>
       </footer>

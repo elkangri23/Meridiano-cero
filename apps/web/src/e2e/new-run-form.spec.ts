@@ -8,7 +8,7 @@ test.use({ viewport: { width: 1920, height: 1000 } });
 
 test.describe('Formulario de nueva partida: dificultad visible sin desplazar', () => {
   test('las tres opciones de dificultad están en el viewport a 1920×1000', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/archivo');
     await page.waitForSelector('#root > *', { timeout: 10000 });
     await page.click('button:has-text("Entrar en desarrollo local")');
     const creation = page.locator('.archive-create').first();
@@ -21,7 +21,7 @@ test.describe('Formulario de nueva partida: dificultad visible sin desplazar', (
   });
 
   test('el expediente fijo no lleva la marca de una sola vía (tiene dos rutas)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/archivo');
     await page.waitForSelector('#root > *', { timeout: 10000 });
     await page.click('button:has-text("Entrar en desarrollo local")');
     const creation = page.locator('.archive-create').first();
@@ -33,7 +33,7 @@ test.describe('Formulario de nueva partida: dificultad visible sin desplazar', (
   });
 
   test('el generado de varias rutas tampoco lleva la marca', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/archivo');
     await page.waitForSelector('#root > *', { timeout: 10000 });
     await page.click('button:has-text("Entrar en desarrollo local")');
     const creation = page.locator('.archive-create').first();

@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 
 /** Abre la pantalla de juego del caso fijo desde el archivo local. */
 async function openGameScreen(page: Page) {
-  await page.goto('/');
+  await page.goto('/archivo');
   await page.waitForSelector('#root > *', { timeout: 10000 });
   await page.click('button:has-text("Entrar en desarrollo local")');
   const creation = page.locator('.archive-create').first();
@@ -19,7 +19,7 @@ async function openGameScreen(page: Page) {
  * no está en la BD dev, el test se salta: el mecanismo ya está cubierto por
  * los unitarios de player-view en francés. */
 async function openGeneratedGameScreen(page: Page) {
-  await page.goto('/');
+  await page.goto('/archivo');
   await page.waitForSelector('#root > *', { timeout: 10000 });
   await page.click('button:has-text("Entrar en desarrollo local")');
   const creation = page.locator('.archive-create').first();

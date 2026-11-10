@@ -1,53 +1,66 @@
-/* Archivo: lenguaje visual del prototipo pixel-art (/prototype).
- * Paleta y motivos tomados de apps/web/src/prototype/prototype.css.
- * Solo presentación: clases, testids y textos de lógica intactos. */
-body:has(.archive) { background:#000000; color:#ffffff; }
+/* Archivo: rediseño A2 (claro, moderno) — fase 2.
+ * Mismos tokens que la pantalla de juego (game.css): papel #F8F7F4,
+ * tinta #101828, dorado #C9A227 (como texto su variante oscura #7A5E06),
+ * teal #0E7C7B, Playfair Display para títulos, Plus Jakarta Sans para el
+ * cuerpo. Solo presentación: clases, testids y textos de lógica intactos. */
+body:has(.archive) { background:#F8F7F4; color:#101828; }
 .archive {
-  --paper:#ffffff; --muted:#aaaaaa; --gold:#ffff55; --edge:#aaaaaa;
-  --panel:#0000aa; --ink:#000000; --teal:#00aaaa;
+  --paper:#101828; --muted:#4B5565; --gold:#7A5E06; --gold-bright:#C9A227;
+  --edge:#E7E2D6; --edge-strong:#D9D2BF;
+  --panel:#FFFFFF; --panel-soft:#FBFAF7; --ink:#101828; --teal:#0E7C7B;
+  --teal-dark:#0A5C5B; --teal-bg:#E3F2F1; --gold-bg:#FBF3D9;
+  --sky:#2F6FED; --rust:#9A3412; --grey:#667085; --error:#9A3412;
+  --green:#1E7A46; --green-bg:#E7F4EC; --white:#FFFFFF;
+  --shadow:0 4px 20px -2px rgba(16,24,40,.05),0 2px 6px -1px rgba(16,24,40,.03);
+  --shadow-lg:0 14px 34px -6px rgba(16,24,40,.12),0 4px 12px -2px rgba(16,24,40,.05);
+  --serif:"Playfair Display",Georgia,serif;
+  --sans:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
   box-sizing:border-box; max-width:1440px; min-height:100svh; margin:0 auto; padding:32px 24px;
-  font:16px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; color:var(--paper);
+  font-family:var(--sans); font-size:16px; line-height:1.55; color:var(--paper);
 }
 .archive * { box-sizing:border-box; }
 .archive h1,.archive p { margin:0; }
-.archive h1 { font-size:clamp(1.5rem,3vw,2.5rem); line-height:1.25; color:var(--paper); font-weight:500; letter-spacing:.05em; }
-.archive button,.archive select { font:inherit; border-radius:0; border:2px outset #ffffff; background:#aaaaaa; color:#000000; padding:8px 12px; min-height:44px; }
-.archive a { color:var(--gold); text-underline-offset:4px; }
-.archive a:focus-visible { outline:3px solid var(--gold); outline-offset:4px; }
-.archive button:disabled { opacity:1; color:#555555; cursor:default; }
-.archive button:focus-visible,.archive select:focus-visible,.archive-scroll:focus-visible { outline:3px solid var(--gold); outline-offset:4px; }
-.archive .text-button { background:transparent; color:var(--gold); border:0; padding:4px; text-decoration:underline; font-size:.85em; min-height:0; }
-.archive-overline { font-size:.67em; letter-spacing:.13em; color:var(--muted); font-weight:600; text-transform:uppercase; }
+.archive h1 { font-family:var(--serif); font-size:clamp(1.5rem,3vw,2.5rem); line-height:1.15; color:var(--ink); font-weight:700; letter-spacing:-.01em; }
+.archive h2 { font-family:var(--serif); font-weight:700; line-height:1.25; }
+.archive button,.archive select { font:inherit; border-radius:9px; border:1px solid var(--edge-strong); background:#FFFFFF; color:var(--ink); padding:8px 12px; min-height:44px; }
+.archive button:hover { background:var(--panel-soft); }
+.archive a { color:var(--teal-dark); text-underline-offset:4px; }
+.archive a:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+.archive button:disabled { opacity:1; color:#667085; cursor:default; }
+.archive button:focus-visible,.archive select:focus-visible,.archive-scroll:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+.archive .text-button { background:transparent; color:var(--teal-dark); border:0; padding:4px; text-decoration:underline; font-size:.85em; min-height:0; }
+.archive-overline { font-size:.67em; letter-spacing:.13em; color:var(--muted); font-weight:700; text-transform:uppercase; }
 
-/* Cabecera de agencia del prototipo. */
+/* Cabecera de agencia. */
 .archive-header { display:flex; align-items:center; gap:18px; border-bottom:1px solid var(--edge); padding:16px 0 28px; }
-.archive-header p { font-size:.67em; letter-spacing:.13em; color:var(--muted); font-weight:600; text-transform:uppercase; }
-.archive-mark { position:relative; display:grid; place-items:center; width:62px; height:62px; border:2px solid var(--gold); background:var(--panel); color:var(--gold); font-size:2.4rem; font-weight:700; flex-shrink:0; }
-.archive-mark span { position:absolute; bottom:1px; right:3px; font-size:.8rem; background:#000000; padding:1px; }
+.archive-header p { font-size:.67em; letter-spacing:.13em; color:var(--muted); font-weight:700; text-transform:uppercase; }
+.archive-mark { position:relative; display:grid; place-items:center; width:62px; height:62px; border:2px solid var(--gold-bright); border-radius:12px; background:var(--ink); color:#FFFFFF; font-family:var(--serif); font-size:2.4rem; font-weight:700; flex-shrink:0; }
+.archive-mark span { position:absolute; bottom:1px; right:3px; font-size:.8rem; font-family:var(--sans); background:var(--gold-bright); color:var(--ink); padding:1px 3px; border-radius:3px; }
 .archive-banner { padding:16px 0; color:var(--muted); }
 
-/* Sesión: tira del expediente del prototipo. */
-.archive-session { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; background:var(--panel); border:2px solid var(--edge); padding:12px 16px; }
+/* Sesión: tira del expediente. */
+.archive-session { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; background:var(--panel); border:1px solid var(--edge); border-radius:14px; box-shadow:var(--shadow); padding:12px 16px; }
 .archive-actions { display:flex; flex-wrap:wrap; gap:12px; }
-.archive-connection { display:flex; align-items:center; gap:8px; margin-bottom:12px; padding:8px 12px; background:#000000; border:2px solid var(--gold); }
+.archive-connection { display:flex; align-items:center; gap:8px; margin-bottom:12px; padding:8px 12px; background:var(--panel-soft); border:1px solid var(--edge); border-radius:9px; }
 .archive-connection .archive-connection-error { color:var(--error); font-size:.8em; }
 .archive .archive-notice { padding:20px 0; min-height:72px; color:var(--gold); }
 
 /* Lista de partidas. */
 .archive-list { border-top:1px solid var(--edge); padding-top:16px; }
-.archive-list h2 { margin:8px 0; color:var(--paper); font-size:1.15rem; font-weight:700; }
+.archive-list h2 { margin:8px 0; color:var(--ink); font-size:1.15rem; font-weight:700; }
 .archive-list label { display:flex; gap:12px; align-items:center; margin-bottom:16px; }
-.archive-scroll { overflow-x:auto; border:1px solid var(--edge); }
+.archive-scroll { overflow-x:auto; border:1px solid var(--edge); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); }
 .archive table { border-collapse:collapse; width:100%; text-align:left; min-width:760px; }
-.archive caption { text-align:left; padding:12px; background:var(--panel); }
-.archive th,.archive td { padding:12px; border-bottom:1px solid #555555; }
-.archive th { color:var(--gold); font-weight:400; }
-.archive code { font:inherit; }
+.archive caption { text-align:left; padding:12px; background:var(--panel-soft); color:var(--muted); font-size:.85em; }
+.archive th,.archive td { padding:12px; border-bottom:1px solid var(--edge); }
+.archive th { color:var(--gold); font-weight:700; font-size:.75em; letter-spacing:.08em; text-transform:uppercase; }
+.archive code { font-family:var(--mono); background:var(--panel-soft); padding:0 4px; border-radius:4px; }
 .archive-pages { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 0; }
 
-/* Nueva partida: sección de comando del prototipo (fondo negro). */
-.archive-create { border:2px solid var(--edge); background:#000000; padding:18px 20px; margin-bottom:24px; }
-.archive-create h2 { margin:8px 0; color:var(--paper); font-size:1.15rem; font-weight:700; }
+/* Nueva partida: tarjeta blanca. */
+.archive-create { border:1px solid var(--edge); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); padding:18px 20px; margin-bottom:24px; }
+.archive-create h2 { margin:8px 0; color:var(--ink); font-size:1.15rem; font-weight:700; }
 .archive-create p { margin-bottom:12px; }
 .archive-create form { display:flex; gap:16px; flex-wrap:wrap; align-items:start; }
 .archive-create label { display:grid; gap:8px; max-width:100%; }
@@ -61,16 +74,17 @@ body:has(.archive) { background:#000000; color:#ffffff; }
 .archive-create .content-field { flex-basis:100%; }
 .archive-create .difficulty-options { display:flex; gap:8px 24px; flex-wrap:wrap; }
 .archive-create .difficulty-options label { display:flex; gap:8px; align-items:baseline; }
-.archive-create select { max-width:100%; background:#ffffff; }
-.archive-create button[type="submit"] { background:var(--gold); color:#000000; }
-.archive-create button[type="submit"]:disabled { opacity:.55; color:#555555; }
+.archive-create select { max-width:100%; background:#FFFFFF; }
+.archive-create button[type="submit"] { background:var(--gold-bright); color:var(--ink); border-color:var(--gold-bright); font-weight:700; }
+.archive-create button[type="submit"]:hover { background:#B8931F; }
+.archive-create button[type="submit"]:disabled { opacity:.55; color:#667085; }
 
-/* Ficha inicial: panel azul del prototipo. */
-.archive-initial { border:2px solid var(--edge); background:var(--panel); padding:16px; margin-bottom:24px; overflow-wrap:anywhere; }
-.archive-initial h2 { margin:0 0 12px; color:var(--paper); font-size:1.2rem; font-weight:700; }
-.archive-initial h3 { margin:16px 0 8px; font-size:1rem; color:var(--gold); font-weight:400; }
+/* Ficha inicial: tarjeta blanca. */
+.archive-initial { border:1px solid var(--edge); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); padding:16px; margin-bottom:24px; overflow-wrap:anywhere; }
+.archive-initial h2 { margin:0 0 12px; color:var(--ink); font-size:1.2rem; font-weight:700; }
+.archive-initial h3 { margin:16px 0 8px; font-size:1rem; color:var(--gold); font-weight:700; }
 .archive-initial p { margin-bottom:12px; }
-.archive-initial h2:focus { outline:3px solid var(--gold); outline-offset:4px; }
+.archive-initial h2:focus { outline:2px solid var(--gold); outline-offset:2px; }
 
 .archive footer { display:flex; justify-content:space-between; gap:10px; border-top:1px solid var(--edge); margin-top:32px; padding-top:16px; color:var(--muted); font-size:.85rem; flex-wrap:wrap; }
 @media (max-width:850px) { .archive-header { gap:12px; } }

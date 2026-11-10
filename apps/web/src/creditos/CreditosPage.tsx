@@ -76,7 +76,7 @@ export function Creditos() {
         {active === 'trademark' && <section className="creditos-section"><h2>{t('credits.trademarkTitle')}</h2><p>{t('credits.trademarkBody')}</p></section>}
       </div>
       <footer className="creditos-footer">
-        <Link to="/">{t('credits.backArchive')}</Link>
+        <Link to="/archivo">{t('credits.backArchive')}</Link>
         <Link to="/glosario">{t('credits.backGlossary')}</Link>
         <span>{t('credits.footer')}</span>
       </footer>

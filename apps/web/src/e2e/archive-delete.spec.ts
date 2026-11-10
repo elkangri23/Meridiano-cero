@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /** Crear con dificultad desde el formulario, ver la intro y borrar desde el archivo. */
 test('crear con dificultad difícil muestra la intro y se puede borrar desde el archivo', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/archivo');
   await page.waitForSelector('#root > *', { timeout: 10000 });
   await page.click('button:has-text("Entrar en desarrollo local")');
   const creation = page.locator('.archive-create').first();

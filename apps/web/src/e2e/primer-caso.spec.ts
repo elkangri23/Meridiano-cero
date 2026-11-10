@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('E2E - Archive y Prototype', () => {
   test('debe cargar la página principal (Archive)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/archivo');
     // Esperar a que la app React monte
     await page.waitForSelector('#root > *', { timeout: 10000 });
     await expect(page.locator('h1')).toContainText('Archivo de partidas');
@@ -57,7 +57,7 @@ test.describe('E2E - Archive y Prototype', () => {
     // /api/v1/ai/interpret exige sesión (cookie + x-csrf-token): sin ella el
     // prototipo no puede enseñar el panel. Se entra en desarrollo local y
     // se vuelve al prototipo con la sesión puesta.
-    await page.goto('/');
+    await page.goto('/archivo');
     await page.waitForSelector('#root > *', { timeout: 10000 });
     await page.click('button:has-text("Entrar en desarrollo local")');
     await expect(page.locator('.archive-create').first().getByRole('heading', { name: 'Nueva partida' })).toBeVisible();
@@ -73,7 +73,7 @@ test.describe('E2E - Archive y Prototype', () => {
 
 test.describe('E2E - Accesibilidad básica', () => {
   test('Archive debe tener skip link y ser navegable con teclado', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/archivo');
     await page.waitForSelector('#root > *', { timeout: 10000 });
     // Verificar skip link
     const skipLink = page.locator('a.skip-link');

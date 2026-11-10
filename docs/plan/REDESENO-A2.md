@@ -18,10 +18,43 @@ textos de narración. La partida en curso del autor no se toca.
 
 ## Alcance
 
-Solo juego y ajustes de IA: Puesto de Mando, escena, interrogatorio,
-tablero de evidencias (ventana del dossier) y ajustes, incluida la
-sección de conexiones de IA. Archivo, login y registro, glosario,
-créditos y preferencias conservan su aspecto actual.
+### Fase 1 (hecha): juego y ajustes de IA
+Puesto de Mando, escena, interrogatorio, tablero de evidencias (ventana
+del dossier) y ajustes, incluida la sección de conexiones de IA.
+
+### Fase 2 (hecha): toda la web + landing nueva
+Antonio vio la web mezclada (juego nuevo, resto antiguo) y no le gustó:
+esta fase deja TODA la web con un solo aspecto. Se restilan con los
+mismos tokens el archivo (ahora en `/archivo`), el acceso
+(registro/login/verificar/recuperar), el glosario, los créditos, el
+prototipo (solo tokens mínimos: sigue siendo la maqueta antigua con
+datos sintéticos) y las preferencias. Se crea una landing pública nueva
+en `/` (ver abajo). El arte pixel-art SVG de escenas y retratos se
+queda como está: no hay fotos ni arte nuevo salvo el retrato de Inés,
+ya usado en el interrogatorio.
+
+## Landing pública en `/`
+
+- Visitante sin sesión: ve la landing. Usuario con sesión: redirige a
+  `/archivo`. Cerrar sesión lleva a la landing. Las rutas `/archivo`,
+  `/runs/:runId`, `/login`, `/registro`, `/glosario`, `/creditos` y
+  `/prototype` no cambian. Los E2E que iban a `/` para entrar al archivo
+  van ahora a `/archivo` (ver `apps/web/src/e2e/landing.spec.ts`).
+- Contenido solo con hechos verificados: qué es el juego (público, para
+  jugar en casa y crear tus propios casos), cómo se juega (investigar,
+  interrogar, viajar, resolver, con plazo 96/48/24 h), qué se necesita
+  (navegador; Ollama o LM Studio en local, o FreeLLMAPI por defecto en
+  el servidor; cada persona configura su LLM y su clave), y los datos
+  13 casos (1 fijo + 12 generados), 9 ciudades, 28 rutas, 3 idiomas
+  (es/en/fr) y gratis. Sin estadísticas de jugadores, porcentajes,
+  testimonios, casos de éxito ni ninguna cifra no verificada.
+- Nombre provisional «Meridiano-cero» en un solo sitio fácil de cambiar
+  (`landing.brand`); la decisión de nombre/marca sigue pendiente con
+  Antonio. «A.C.M.E.» solo como agencia de ficción dentro del juego.
+- Sin «Quiénes somos», sin dirección y sin soporte inventado: el pie
+  enlaza al glosario, a los créditos, al login y al registro.
+- Responsive y mobile-first, en es/en/fr (con selector de idioma en el
+  pie, que guarda la preferencia como el resto de la app).
 
 ## Decisiones aplicadas
 

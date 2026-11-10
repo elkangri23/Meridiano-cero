@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Archive } from './archive/Archive';
+import { Landing } from './landing/Landing';
 import { Creditos } from './creditos/CreditosPage';
 import { Glosario } from './glosario/GlosarioPage';
 import { Prototype } from './prototype/Prototype';
@@ -16,7 +17,8 @@ function App() {
     <I18nProvider language={preferences.language}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Archive />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/archivo" element={<Archive />} />
           <Route path="/glosario" element={<Glosario />} />
           <Route path="/creditos" element={<Creditos />} />
           <Route path="/prototype" element={<Prototype />} />

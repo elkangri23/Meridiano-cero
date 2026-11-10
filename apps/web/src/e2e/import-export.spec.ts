@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
 // se comprueba la UI con clics reales.
 test.describe('Importar expediente en el archivo', () => {
   test('un fichero inválido muestra el motivo del servidor', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/archivo');
     await page.waitForSelector('#root > *', { timeout: 10000 });
     await page.click('button:has-text("Entrar en desarrollo local")');
     const archive = page.locator('.archive-create').first();

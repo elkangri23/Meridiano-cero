@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
  * entre pasadas: las aserciones son relativas (antes/después), nunca
  * absolutas sobre el conteo de casos o los puntos. */
 async function loginDev(page: Page) {
-  await page.goto('/');
+  await page.goto('/archivo');
   await page.waitForSelector('#root > *', { timeout: 10000 });
   await page.click('button:has-text("Entrar en desarrollo local")');
   const creation = page.locator('.archive-create').first();

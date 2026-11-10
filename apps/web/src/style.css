@@ -1,16 +1,17 @@
-html { color-scheme: dark; background: #10191c; color: #e3eee8; font-family: ui-monospace, monospace; }
+html { color-scheme: light; background: #F8F7F4; color: #101828; font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 body { margin: 0; }
 main { max-width: 48rem; margin: 8vh auto; padding: 2rem; line-height: 1.7; }
 h1 { line-height: 1.2; font-size: clamp(2rem, 6vw, 3rem); }
-.eyebrow { color: #9ed7b3; font-size: .85rem; }
-button { font: inherit; padding: .7rem 1rem; background: #b3e5bf; color: #102219; border: 0; cursor: pointer; }
+.eyebrow { color: #7A5E06; font-size: .85rem; }
+button { font: inherit; padding: .7rem 1rem; background: #C9A227; color: #101828; border: 1px solid #C9A227; border-radius: 9px; cursor: pointer; }
 button:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
 button:disabled { opacity: .65; cursor: wait; }
 
-/* Paletas de daltonismo (§15): anulan las variables del juego y del archivo
- * (las reglas .game/.archive las definen con menos especificidad, así que
+/* Paletas de daltonismo (§15): anulan las variables del juego, del archivo
+ * y del resto de pantallas (las reglas .game/.archive/.glosario/.creditos/
+ * .prototype/.landing las definen con menos especificidad, así que
  * estas ganan). Lo mismo para el alto contraste: su regla vivía solo en
- * game.css y no llegaba al archivo; aquí cubre ambas pantallas. --teal solo
+ * game.css y no llegaba al archivo; aquí cubre todas las pantallas. --teal solo
  * se usa como fondo o borde (tierra del atlas, borde del chat) y como
  * fondo de botón teal con texto blanco (5,01:1); el botón activo de la
  * barra usa tinta con texto blanco. Las paletas no tocan --panel (sigue
@@ -20,7 +21,7 @@ button:disabled { opacity: .65; cursor: wait; }
  * panel, blanco sobre tinta, tinta sobre dorado claro y blanco sobre
  * teal, en las cinco paletas. --sky y --rust no se usan como texto en
  * ningún sitio, así que no se verifican como pares. */
-html.game-font-accessible .game, html.game-font-accessible .archive {
+html.game-font-accessible .game, html.game-font-accessible .archive, html.game-font-accessible .glosario, html.game-font-accessible .creditos, html.game-font-accessible .prototype, html.game-font-accessible .landing {
   font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 /* Foco visible discreto (§15): contorno fino pero siempre presente; el
@@ -30,16 +31,16 @@ html.game-focus-subtle .game button:focus-visible, html.game-focus-subtle .game 
 html.game-focus-subtle .game input:focus-visible, html.game-focus-subtle .game textarea:focus-visible,
 html.game-focus-subtle .game a:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
 html.game-focus-subtle .game-window-titlebar h3:focus-visible { outline:2px solid var(--gold); }
-html.game-high-contrast .game, html.game-high-contrast .archive {
+html.game-high-contrast .game, html.game-high-contrast .archive, html.game-high-contrast .glosario, html.game-high-contrast .creditos, html.game-high-contrast .prototype, html.game-high-contrast .landing {
   --panel:#000000; --paper:#FFFFFF; --ink:#000000; --edge:#ffffff; --muted:#ffffff; --gold:#FFE14D; --gold-bright:#FFE14D; --error:#FF8800;
 }
-html.palette-protanopia .game, html.palette-protanopia .archive {
+html.palette-protanopia .game, html.palette-protanopia .archive, html.palette-protanopia .glosario, html.palette-protanopia .creditos, html.palette-protanopia .prototype, html.palette-protanopia .landing {
   --gold:#6B5B00; --teal:#006B7A; --sky:#0066CC; --rust:#8A4B00; --error:#B42318;
 }
-html.palette-deuteranopia .game, html.palette-deuteranopia .archive {
+html.palette-deuteranopia .game, html.palette-deuteranopia .archive, html.palette-deuteranopia .glosario, html.palette-deuteranopia .creditos, html.palette-deuteranopia .prototype, html.palette-deuteranopia .landing {
   --gold:#6B5B00; --teal:#005F7A; --sky:#0066CC; --rust:#7A4A00; --error:#B42318;
 }
-html.palette-tritanopia .game, html.palette-tritanopia .archive {
+html.palette-tritanopia .game, html.palette-tritanopia .archive, html.palette-tritanopia .glosario, html.palette-tritanopia .creditos, html.palette-tritanopia .prototype, html.palette-tritanopia .landing {
   --gold:#6B5B00; --teal:#007A99; --sky:#00876A; --rust:#8A4B00; --error:#B42318;
 }
 

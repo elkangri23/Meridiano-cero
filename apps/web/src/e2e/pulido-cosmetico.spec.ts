@@ -9,7 +9,7 @@ import type { Page } from '@playwright/test';
 /** Crea una partida desde la UI del archivo en el modo elegido; la
  * creación confirmada navega sola a su pantalla de juego. */
 async function openGameScreen(page: Page, mode: 'guided' | 'free' = 'guided') {
-  await page.goto('/');
+  await page.goto('/archivo');
   await page.waitForSelector('#root > *', { timeout: 10000 });
   await page.click('button:has-text("Entrar en desarrollo local")');
   const creation = page.locator('.archive-create').first();

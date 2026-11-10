@@ -33,10 +33,10 @@ function connectionStatusLabel(status: ConnectionStatus, t: TranslateFn): string
 }
 function connectionStatusColor(status: ConnectionStatus): string {
   switch (status) {
-    case 'online': return '#ffff55';
-    case 'offline': return '#ff5555';
-    case 'reconnecting': return '#ffff55';
-    default: return '#aaaaaa';
+    case 'online': return '#1E7A46';
+    case 'offline': return '#9A3412';
+    case 'reconnecting': return '#7A5E06';
+    default: return '#667085';
   }
 }
 
@@ -171,7 +171,7 @@ function Archive() {
         <ProfileSection identity={identity} profile={detectiveProfile} onSaved={setDetectiveProfile} />
       </section>}
       {state.profile && <CareerSection />}
-      <footer><Link to="/glosario">{t('archive.glossary')}</Link> · <Link to="/creditos">{t('archive.credits')}</Link> · {t('archive.footer')}</footer>
+      <footer><Link to="/">{t('landing.brand')}</Link> · <Link to="/glosario">{t('archive.glossary')}</Link> · <Link to="/creditos">{t('archive.credits')}</Link> · {t('archive.footer')}</footer>
     </main>
   );
 }

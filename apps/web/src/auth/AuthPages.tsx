@@ -34,7 +34,7 @@ function AuthShell({ title, children }: { title: string; children: ReactNode }) 
     <header className="archive-header"><span className="archive-mark" aria-hidden="true">M<span>0</span></span><div><p>MERIDIANO-CERO</p><h1 tabIndex={-1} ref={heading}>{title}</h1></div></header>
     <p className="archive-banner">{t('auth.banner')}</p>
     {children}
-    <footer><Link to="/">{t('archive.title')}</Link> · <Link to="/glosario">{t('archive.glossary')}</Link></footer>
+    <footer><Link to="/archivo">{t('archive.title')}</Link> · <Link to="/glosario">{t('archive.glossary')}</Link></footer>
   </main>;
 }
 
@@ -61,7 +61,7 @@ export function RegisterPage() {
   const [error, setError] = useState('');
   const [created, setCreated] = useState<AuthSession | null>(null);
   const [resent, setResent] = useState(false);
-  useEffect(() => { if (existing) navigate('/', { replace: true }); }, [existing, navigate]);
+  useEffect(() => { if (existing) navigate('/archivo', { replace: true }); }, [existing, navigate]);
   if (existing === undefined) return <AuthShell title={t('archive.createAccount')}><p role="status">{t('auth.checkingSession')}</p></AuthShell>;
   if (created) {
     return <AuthShell title={t('auth.checkEmail')}>
@@ -70,7 +70,7 @@ export function RegisterPage() {
         <p>{t('auth.verifyNote')}</p>
         <p>{t('auth.sessionStarted')}</p>
         <div className="archive-actions">
-          <Link to="/">{t('auth.goArchive')}</Link>
+          <Link to="/archivo">{t('auth.goArchive')}</Link>
           <button type="button" disabled={busy} onClick={() => {
             setBusy(true); setError(''); setResent(false);
             void authApi.resendVerification(created, new AbortController().signal)
@@ -111,13 +111,13 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { if (existing) navigate('/', { replace: true }); }, [existing, navigate]);
+  useEffect(() => { if (existing) navigate('/archivo', { replace: true }); }, [existing, navigate]);
   if (existing === undefined) return <AuthShell title={t('archive.login')}><p role="status">{t('auth.checkingSession')}</p></AuthShell>;
   function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true); setError('');
     void authApi.login(email, password, new AbortController().signal)
-      .then(() => navigate('/')).catch(setError).finally(() => setBusy(false));
+      .then(() => navigate('/archivo')).catch(setError).finally(() => setBusy(false));
   }
   return <AuthShell title={t('archive.login')}>
     <form className="auth-form" onSubmit={submit}>
@@ -145,9 +145,9 @@ export function VerifyPage() {
   return <AuthShell title={t('auth.verifyTitle')}>
     <section className="auth-form">
       {state === 'checking' && <p role="status">{t('auth.checkingLink')}</p>}
-      {state === 'ok' && <><p className="auth-ok" role="status">{t('archive.verified')}</p><Link to="/">{t('auth.goArchive')}</Link></>}
+      {state === 'ok' && <><p className="auth-ok" role="status">{t('archive.verified')}</p><Link to="/archivo">{t('auth.goArchive')}</Link></>}
       {state === 'failed' && <><p className="auth-error" role="alert">{t('auth.linkInvalid')}</p><div className="auth-links"><Link to="/login">{t('archive.login')}</Link><Link to="/registro">{t('archive.createAccount')}</Link></div></>}
-      {state === 'missing' && <><p role="status">{t('auth.linkMissing')}</p><div className="auth-links"><Link to="/login">{t('archive.login')}</Link><Link to="/">{t('auth.archiveShort')}</Link></div></>}
+      {state === 'missing' && <><p role="status">{t('auth.linkMissing')}</p><div className="auth-links"><Link to="/login">{t('archive.login')}</Link><Link to="/archivo">{t('auth.archiveShort')}</Link></div></>}
     </section>
   </AuthShell>;
 }
