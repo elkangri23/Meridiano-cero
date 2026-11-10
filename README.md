@@ -1,6 +1,6 @@
 # Meridiano-cero
 
-Videojuego de investigación internacional; A.C.M.E. es el nombre provisional. Estado de desarrollo al 2026-11-09: base PostgreSQL con migrador y sesión local, motor, archivo web conectado MS-DOS, prototipo pixel art separado y frontera IA independiente del proveedor. La investigación completa está conectada (escena, acciones, laboratorio forense, terminal de inteligencia, central de comunicaciones, objetivos e informe final), los guardados manuales persisten y la evaluación real del modelo existe (FreeLLMAPI cableado en el VPS, LLM configurable por usuario). El juego está desplegado y es jugable en producción en meridianocero.laurafernandezenfermeria.com, con registro público, en español, inglés y francés, con generador de casos e intérprete de texto libre.
+Videojuego de investigación internacional; A.C.M.E. es el nombre provisional (pendiente de confirmación antes de publicar). Estado de desarrollo al 2026-11-10 (lote 4): base PostgreSQL con migrador y sesión local, motor, archivo web conectado, prototipo pixel art separado y frontera IA independiente del proveedor. La investigación completa está conectada (escena, acciones, laboratorio forense, terminal de inteligencia, central de comunicaciones, objetivos e informe final), los guardados manuales persisten y la evaluación real del modelo existe (FreeLLMAPI cableado en el VPS, LLM configurable por usuario). El juego está desplegado y es jugable en producción en meridianocero.laurafernandezenfermeria.com, con registro público, en español, inglés y francés, con generador de casos e intérprete de texto libre. La estética actual es de archivo estilo MS-DOS; el rediseño moderno (A2, maqueta aprobada como referencia de aspiración) está pendiente de implementar.
 
 ## Estado y contratos
 
@@ -42,7 +42,7 @@ pnpm eval:ai --mock
 python3 scripts/verify_docs.py
 ~~~
 
-Verificación actual (2026-11-09): 1294 pruebas unitarias, 152 de integración y E2E efectiva 92/92, con smoke en producción; la evaluación con proveedor real ya se ha hecho en producción. [Registro de integración](docs/quality/INTEGRACION-T3-04.md): resultados del merge de T3-04, controles pendientes y alcance exacto de entonces.
+Verificación actual (2026-11-10, lote 4): 1321 pruebas unitarias, 153 de integración y E2E efectiva re-ejecutada en el stack de desarrollo del VPS, con smoke en producción; la evaluación con proveedor real ya se ha hecho en producción (generación en pausa por colapso de FreeLLMAPI). [Registro del lote](docs/quality/T6-04-distribucion.md): inventario de licencias, clon limpio verificado y simulacro de desastre medido.
 
 ## Contexto del proyecto
 

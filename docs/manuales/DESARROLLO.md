@@ -1,6 +1,6 @@
 # Desarrollo y contribución
 
-Actualizado: 2026-10-28. Consultar [estado actual](../plan/ESTADO.md), [backlog](../plan/BACKLOG.md) y evidencia de la tarea antes de trabajar. El proyecto tiene código ejecutable, pero no una investigación completa jugable.
+Actualizado: 2026-11-10 (lote 4). Consultar [estado actual](../plan/ESTADO.md), [backlog](../plan/BACKLOG.md) y evidencia de la tarea antes de trabajar. El juego está completo y es jugable en producción; la investigación completa está conectada (escena, acciones, laboratorio forense, terminal de inteligencia, central de comunicaciones, objetivos e informe final), los guardados manuales persisten y hay generador de casos e intérprete de texto libre.
 
 ## Estructura existente
 
@@ -10,9 +10,9 @@ Actualizado: 2026-10-28. Consultar [estado actual](../plan/ESTADO.md), [backlog]
 - packages/case-schema: definición y validación del expediente.
 - packages/engine: motor, fixture y pruebas sin IA.
 
-Son seis proyectos de producto más la raíz pnpm; packages/ai-adapters se incorporó desde el último main y aún no está consumido por la API. Hay compose.yaml, migrador con ledger y sesiones PostgreSQL. El comando db:migrate existe; faltan API/guardado de partidas conectados. No existen todavía worker, generador o biblioteca UI independientes.
+Son seis proyectos de producto más la raíz pnpm; packages/ai-adapters está consumido por la API (proveedores mock, Ollama, OpenAI-compatible y FreeLLMAPI), y existe el generador de casos. Hay compose.yaml, migrador con ledger y sesiones PostgreSQL. El comando db:migrate existe; la API y el guardado de partidas están conectados. No existen todavía worker ni biblioteca UI independientes.
 
-Las direcciones de dependencias son las de SPEC-012. Los siete fallos de imports heredados, incluidos crypto en engine y la reexportación contracts/case-schema, están registrados como pendientes; no se presentan como arquitectura ya conforme.
+Las direcciones de dependencias son las de SPEC-012. Verificación 2026-11-10 (lote 4): dependency-cruiser sin infracciones (458 módulos, 1541 dependencias); los siete fallos de imports heredados están cerrados.
 
 ## Entorno y primer arranque
 
@@ -47,10 +47,11 @@ Abrir http://127.0.0.1:5174/prototype. Usa muestras públicas y no requiere Olla
 |---|---|
 | pnpm dev | Compila contracts y arranca scripts dev de los proyectos que los tienen |
 | pnpm build | Compilación del workspace; no afirmar que pasó por tener builds parciales |
-| pnpm typecheck | Tipos del workspace; la evidencia T3 acredita el typecheck API |
-| pnpm lint | ESLint e imports; actualmente bloqueado por errores heredados |
-| pnpm check:imports | Dependency-cruiser; siete infracciones conocidas |
-| pnpm test | HTTP base, motor e IA; última suite: 157 pruebas correctas |
+| pnpm typecheck | Tipos del workspace; en verde 2026-11-10 (lote 4) |
+| pnpm lint | ESLint e imports; en verde 2026-11-10 (lote 4) |
+| pnpm check:imports | Dependency-cruiser; sin infracciones (458 módulos, 1541 dependencias) |
+| pnpm test | Unitarios; 1321 pruebas correctas en 107 ficheros (2026-11-10) |
+| pnpm test:integration | Integración con PostgreSQL real; 153 pruebas correctas en 17 ficheros (2026-11-10) |
 | pnpm eval:ai --mock | Corpus v2, diecisiete escenarios con oráculo determinista |
 | pnpm eval:ai --probe | Inventario Ollama; no evaluación de calidad |
 | pnpm scan:secrets | Detector local de patrones, no auditoría completa |
@@ -58,7 +59,7 @@ Abrir http://127.0.0.1:5174/prototype. Usa muestras públicas y no requiere Olla
 | pnpm verify:guards | Pruebas negativas de tipos/imports/ciclos; no revalidadas tras T3 |
 | pnpm smoke | Comprobaciones HTTP heredadas; no E2E del juego ni prueba de persistencia |
 
-No ejecutar verify:guards con watchers/build/typecheck concurrentes: crea archivos inválidos temporales. Existen test:integration y verify:persistence para base aislada; no hay backup/restore de producto ni test:e2e del juego. Los comandos futuros se separan en [instalación](INSTALACION.md) y [operación](OPERACION.md).
+No ejecutar verify:guards con watchers/build/typecheck concurrentes: crea archivos inválidos temporales. Existen test:integration y verify:persistence para base aislada; el backup/restore de producto está verificado con simulacro medido ([T6-05](../quality/T6-05-desastre.md)) y hay test:e2e del juego (ver [PRUEBAS](PRUEBAS.md)). Los comandos futuros se separan en [instalación](INSTALACION.md) y [operación](OPERACION.md).
 
 La base vigente usa compose.yaml: PostgreSQL con secretos por archivos y puerto 15432 de loopback. El archivo docker-compose.yml heredado contiene otro stack y no es el procedimiento integrado recomendado. No mezclar sus volúmenes ni inferir que ambos fueron probados.
 
@@ -79,6 +80,6 @@ No modificar originales de docs/meridi, credenciales, instalación WSL ni otros 
 
 [IA local](IA-LOCAL.md) explica transporte, memoria y evaluación. Un mock aprobado no acredita comprensión ni ausencia de contradicciones de un modelo real. Sin URL/modelo disponibles no se instala ni descarga nada automáticamente.
 
-[Última evidencia](../quality/T3-04.md): build API, typecheck API, lint IA y 157 pruebas correctos; doce errores globales de lint, siete de imports y avisos de formato siguen abiertos en la combinación. Sin E2E ni aceptación OWASP completa.
+[Última evidencia](../quality/T6-04-distribucion.md) (lote 4, 2026-11-10): build, typecheck, lint, imports, i18n, 1321 pruebas unitarias y 153 de integración en verde; E2E efectiva re-ejecutada en el stack de desarrollo del VPS como parte del lote; evaluación real del modelo hecha en producción con FreeLLMAPI (generación en pausa desde 2026-11-10 por colapso del proveedor). Sin aceptación OWASP completa.
 
 Dependencias nuevas requieren necesidad, mantenimiento y licencia justificados. No crear capas vacías ni criptografía propia. Mantener secretos, prompts y conversaciones fuera de logs y de evidencias públicas.

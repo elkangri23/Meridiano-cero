@@ -1,6 +1,6 @@
 # Pruebas y evidencia
 
-Actualizado: 2026-10-28. Existen Vitest, controles de tipos/lint/imports, evaluación IA con doble y verificador documental. Última suite de producto: 157 pruebas correctas, doce archivos; corpus v2: 17 escenarios con mock. Evidencia en [T3-04](../quality/T3-04.md). La integración registra doce errores de lint, siete de imports y 22 avisos de formato heredados; [detalle](../quality/INTEGRACION-T3-04.md). No se han ejecutado E2E del juego, evaluación real ni una auditoría completa OWASP.
+Actualizado: 2026-11-10 (lote 4). Existen Vitest, controles de tipos/lint/imports, evaluación IA con doble y verificador documental. Última suite: 1321 pruebas unitarias correctas en 107 ficheros y 153 de integración en 17 ficheros; corpus v2: 17 escenarios con mock. E2E del juego ejecutada en el stack de desarrollo del VPS (ver cifra en [T6-04](../quality/T6-04-distribucion.md)); evaluación real hecha en producción con FreeLLMAPI (generación en pausa por colapso del proveedor, 2026-11-10). Sin auditoría completa OWASP.
 Catálogo: [40 escenarios de aceptación](../quality/ACEPTACION.md).
 
 ## Pirámide de comprobaciones

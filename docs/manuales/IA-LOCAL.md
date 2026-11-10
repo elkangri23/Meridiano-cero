@@ -1,6 +1,6 @@
 # IA local: adaptador y evaluación de T3-04
 
-Estado: servicios de servidor implementados y probados con datos sintéticos. Evaluación real e integración con partidas pendientes. No configura la IA del prototipo visual.
+Estado: servicios de servidor implementados y probados con datos sintéticos. Evaluación real hecha en producción con FreeLLMAPI; la generación está en pausa desde 2026-11-10 por colapso del proveedor (piloto lote 3: 0/6). No configura la IA del prototipo visual.
 
 ## Comandos disponibles
 
