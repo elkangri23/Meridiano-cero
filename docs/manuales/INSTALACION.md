@@ -12,7 +12,9 @@ rama `distribucion-2026-11-10`) y simulacro de desastre con restore aislado
   tenlo en el PATH (por ejemplo, `corepack enable` con el pnpm fijado en
   `packageManager`, o el ejecutable directo de pnpm). Sin pnpm en el PATH,
   `pnpm db:migrate` falla con `pnpm: not found` aunque el `pnpm` del
-  instalador funcione.
+  instalador funcione. En el VPS el Node del host es el 20.19.6 y corepack
+  está roto: pnpm 12.15.0 se usa dentro del contenedor `node:24.22.1` con
+  el repo montado (ver `scripts/drill-build.sh` como ejemplo).
 - PostgreSQL 16 o superior. Con Docker: `compose.yaml` (solo la base de
   datos de desarrollo). Sin Docker: un PostgreSQL local con los mismos
   roles y puertos (verificado 2026-11-10 con PostgreSQL 16 instalado por
@@ -34,6 +36,8 @@ docker compose -f compose.yaml up -d --wait   # o PostgreSQL local en 15432
 pnpm db:migrate
 ~~~
 
+- En el VPS el plugin `docker compose` no está instalado: usar el
+  binario `docker-compose` con los mismos argumentos.
 - `pnpm setup:local` genera `.env` y `.local-secrets/` (contraseñas de
   los roles). No sobrescribir secretos ni compartirlos.
 - `pnpm db:migrate` aplica las migraciones con ledger: desde una base
@@ -43,6 +47,13 @@ pnpm db:migrate
 - `setup:local` genera `REGISTRATION_ENABLED=false`. Para registrarse en
   una instalación local, poner `REGISTRATION_ENABLED=true` en `.env`
   antes de arrancar la API.
+- Segunda instancia en la misma máquina: `setup:local` genera siempre
+  los mismos puertos. Editar el `.env` generado antes de arrancar
+  (`API_PORT`, `PUBLIC_ORIGIN`, `PG_HOST_PORT`) y arrancar la base de
+  datos con un proyecto Compose distinto para no compartir volumen ni red
+  (`docker compose -p <proyecto> -f compose.yaml up -d --wait`); la web
+  de desarrollo se arranca con su propio puerto (p. ej. `vite dev --port
+  <puerto>` dentro de `apps/web`) y `PUBLIC_ORIGIN` debe coincidir con él.
 - Arranque de desarrollo (API desde fuente + web con proxy a la API):
 
 ~~~text
@@ -94,12 +105,21 @@ healthchecks y volumen persistente), probado en el VPS. Secuencia:
 5. Aplicar migraciones de forma controlada (`pnpm db:migrate` contra la
    base de despliegue; nunca migraciones concurrentes desde cada réplica).
 6. Ejecutar arranque Compose y comprobar health/readiness.
-7. Crear primer administrador mediante bootstrap de un uso.
+7. Crear la primera cuenta mediante el registro público de la web (con
+   `REGISTRATION_ENABLED=true` temporal si el registro está cerrado).
 8. Mantener registro cerrado o activarlo conscientemente
    (`REGISTRATION_ENABLED`).
 9. Ejecutar test de proveedor y caso fijo.
 10. Crear backup y probar restauración antes de uso importante
     ([runbook T6-05](../quality/T6-05-desastre.md)).
+
+Nota sobre el primer administrador: no existe un comando de bootstrap
+ejecutable en esta versión. El registro crea cuentas de jugador
+(`role: player`); SPEC-009 prevé un «bootstrap de un uso» para el primer
+administrador, pero no está implementado: `runInitialSetup`
+(`packages/case-schema/src/setup-admin.ts`) es código de biblioteca sin
+comando ni endpoint conectado, y apunta a una tabla `users` que el
+esquema actual no tiene.
 
 **Bloqueo de publicación:** nada se publica (ni releases, ni imágenes
 públicas, ni registros) hasta que Antonio confirme nombre y marca. El
@@ -138,6 +158,19 @@ versión, entorno y resultados; no darlo por hecho por usar Docker.
 Verificado 2026-11-10 (clon limpio, mock): API+web sanas y partida
 jugable sin tocar el VPS; resultado en
 [registro F6](../quality/T6-04-distribucion.md).
+
+Para traer un caso generado desde otra instancia (sesión iniciada; la
+exportación solo necesita la cookie, la importación además el CSRF):
+
+~~~text
+curl -s -b cookies.txt http://127.0.0.1:3000/api/v1/cases/<id>/export > caso.json
+curl -s -b cookies.txt -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' --data @caso.json http://127.0.0.1:3000/api/v1/cases/import
+~~~
+
+La importación devuelve 201 si el caso es nuevo y 200 si ya existía
+(`alreadyExisted: true`); el cuerpo está limitado a 2 MiB. Verificado el
+2026-11-10 con el caso `generado-21d02570`: tras importar, el catálogo
+pasó de 1 a 2 casos y la partida del caso importado fue jugable.
 
 ## Lo que acompaña a la primera distribución
 

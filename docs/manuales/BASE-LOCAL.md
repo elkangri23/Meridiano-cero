@@ -1,5 +1,13 @@
 # Base local de fase 1
 
+> Documento de la fase 1 (octubre de 2026). La instalación actual está
+> en [INSTALACION](INSTALACION.md); este documento conserva los detalles
+> técnicos de la base local (sesión, migraciones, integración aislada)
+> que siguen vigentes. Sus afirmaciones de alcance («no hay juego
+> completo», «sin acciones ni guardados», «no es todavía una
+> investigación jugable») son de su fase y están superadas: el juego es
+> jugable y el autoalojamiento está documentado en INSTALACION.md.
+
 Estado: implementación de T1-02/03/04; no juego completo. Contratos de referencia: SPEC-004/009/011. Resultados y limitaciones en las evidencias de T1.
 
 ## Requisitos y alcance
@@ -19,6 +27,8 @@ pnpm dev
 ```
 
 Abrir http://127.0.0.1:5173. La raíz muestra el archivo real de la sesión, con filtros y páginas. Entrar en desarrollo local solicita sesión explícita cuando LOCAL_DEV_AUTH_ENABLED=true; la creación de partidas requiere selección y botón explícitos y no inicia todavía la investigación. La API escucha en 127.0.0.1:3000. GET /api/v1/health devuelve proceso vivo; GET /api/v1/ready exige DB y migraciones exactas.
+
+En el VPS el plugin `docker compose` no está instalado: usar el binario `docker-compose` con los mismos argumentos.
 
 setup:local crea .env y .local-secrets con contraseñas aleatorias. No imprime ni sobrescribe secretos existentes. Si hay configuración previa, revisar/conservar, no borrar para repetir un comando. .env.example solo es una plantilla sin credenciales. No ejecutar docker compose config para compartir su salida junto a archivos privados.
 
@@ -103,7 +113,17 @@ Invoke-RestMethod -Uri "$meridianoApi/runs/$($meridianoRun.runId)" -WebSession $
 
 Si se pierde la respuesta de creación, reutilizar meridianoIntent con la misma clave; no generar otra. Las cookies permanecen en la sesión HTTP y CSRF en memoria, sin copiar claves a archivos. Adaptar los puertos al entorno configurado, nunca habilitar bootstrap local en un VPS público.
 
-Esta entrega solo inicia/recupera estado inicial: canSave/canLoad=false, sin acciones ni guardados disponibles. Un estado incompatible responde 503 sin modificarlo. No es todavía una investigación jugable. [Alcance y pruebas](../quality/T3-02-http-inicial.md).
+Equivalente en curl (Linux/macOS), con la API en 3000 y el origen web en 5173:
+
+~~~bash
+API=http://127.0.0.1:3000/api/v1
+curl -s -c cookies.txt -H 'Origin: http://127.0.0.1:5173' -H 'Content-Type: application/json' -d '{}' $API/auth/local-session > login.json
+CSRF=$(python3 -c "import json;print(json.load(open('login.json'))['csrfToken'])")
+curl -s -b cookies.txt $API/cases
+curl -s -b cookies.txt -H 'Origin: http://127.0.0.1:5173' -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' -d "{\"caseId\":\"astrolabio-tres-ciudades\",\"idempotencyKey\":\"$(cat /proc/sys/kernel/random/uuid)\"}" $API/runs
+~~~
+
+Esta entrega solo inicia/recupera estado inicial: canSave/canLoad=false, sin acciones ni guardados disponibles. Un estado incompatible responde 503 sin modificarlo. No es todavía una investigación jugable. [Alcance de la fase 1, superado: hoy la investigación es jugable; ver INSTALACION.md.] [Alcance y pruebas](../quality/T3-02-http-inicial.md).
 
 ## Límites y diagnóstico local de resiliencia
 

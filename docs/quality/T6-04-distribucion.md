@@ -8,13 +8,16 @@ Depende de T6-05 (ejecutada primero, ver
 
 Método: `pnpm licenses list --json` en la raíz y en cada workspace (el
 de raíz solo cubre sus dev; fastify/pg/react faltaban hasta hacerlo por
-workspace). Ficheros de trabajo (no versionados): `licenses-all.json`,
-`licenses-apps_api.json`, `licenses-apps_web.json`,
-`licenses-packages_*.json`, `licenses-merged.json`.
+workspace). Fichero canónico (no versionado):
+`licenses-merged.json` (274 entradas / 270 nombres únicos). Los JSON
+por workspace son la fuente de la unión; `licenses-all.json` (parcial:
+185 entradas, le faltan 89, entre ellas todo el runtime de `apps/api`
+y `react`/`react-dom`) y `licenses-workspaces.json` (vacío, `{}`) eran
+engañosos y se retiraron.
 
-**Total unión raíz+workspaces: 274 paquetes únicos, todos permisivos.**
-Cero GPL/AGPL/LGPL/propietarias/desconocidas. Sin dependencias git/github
-en `pnpm-lock.yaml`.
+**Total unión raíz+workspaces: 274 entradas / 270 nombres únicos,
+todos permisivos.** Cero GPL/AGPL/LGPL/propietarias/desconocidas. Sin
+dependencias git/github en `pnpm-lock.yaml`.
 
 | Licencia | Paquetes |
 |---|---|
@@ -35,10 +38,18 @@ en `pnpm-lock.yaml`.
 
 Runtime verificado: fastify MIT 5.12.7, pg MIT 8.23.1, drizzle-orm
 Apache-2.0 0.45.4, argon2 MIT 0.45.2, react/react-dom MIT 19.3.1,
-react-router-dom MIT 6.30.6, drizzle-kit MIT 0.31.11, Playwright
+react-router-dom MIT 6.30.6, drizzle-kit MIT 0.31.11, @playwright/test
 Apache-2.0 1.64.1, vite MIT 8.3.5, vitest MIT 5.0.5, typescript
 Apache-2.0 6.0.3, eslint MIT 10.13.0. Cookies sin `@fastify/cookie`:
 código propio en `apps/api/src/auth/session-security.ts`.
+
+Añadidas en NOTICE.md tras la revisión: `@eslint/js` 10.0.1,
+`typescript-eslint` 8.72.1, `@types/react` 19.3.0, `@types/react-dom`
+19.3.0, `@types/pg` 8.23.1 y `@types/node` (todas MIT); en `/creditos`
+las 5 primeras (`@types/node` ya estaba allí). «Playwright» corregido
+en ambos a la directa real `@playwright/test`; PostgreSQL/pnpm/Ollama
+movidos en NOTICE.md a apartado propio de servicios externos; añadido
+el asset TTS (voces del sistema) en ambos.
 
 **Hallazgo: Zod NO es dependencia.** NOTICE.md lo listaba, pero tiene
 cero referencias en el código y no está en el lockfile ni en ningún
@@ -60,9 +71,9 @@ ESLint, dependency-cruiser, concurrently; nota de inventario completo
 
 - Página pública `/creditos` (`apps/web/src/creditos/`): secciones
   Autoría / Licencia / Dependencias / Arte y sonido / Nombre y marca.
-  Enlazada desde el pie del Archive (`archive.credits`). Datos: 17
-  dependencias directas y 5 assets. Claves `credits.*` (54) +
-  `archive.credits` en es/en/fr; `check:i18n` OK (1202 claves, 215
+  Enlazada desde el pie del Archive (`archive.credits`). Datos: 22
+  dependencias directas y 6 assets. Claves `credits.*` (54) +
+  `archive.credits` en es/en/fr; `check:i18n` OK (1205 claves, 215
   ficheros). Test `creditos.test.ts` 3/3 en verde.
 - `AUTHORS.md`: único autor, Antonio Moles (`git log` solo muestra a
   Antonio, con 2 emails).
@@ -107,6 +118,42 @@ lote 3: 0/6); este lote no genera nada.
 Manuales reescritos/verificados: `INSTALACION.md` (reescrita con los
 procedimientos ejecutados) y `OPERACION.md` (estado y secciones de
 backup/restore/actualización con las cifras medidas del simulacro).
+
+Segunda verificación de clon limpio (2026-11-10, `git archive HEAD` de
+la rama en `71e1883`, stack en `/opt/meridiano-cero-clean`): API
+`meridiano-clean-api` 127.0.0.1:13001, web 127.0.0.1:15174, Postgres
+127.0.0.1:15441. health/ready 200, web 200, `/creditos` 200; registro
+`prueba-limpia-chochi@ejemplo.com` 200; proveedor efectivo
+mock/`deterministic-ci`, 0 conexiones; catálogo en BD nueva n=1 (solo
+`astrolabio-tres-ciudades`); import del fixture `generado-21d02570` →
+201 (catálogo n=2); partida del fijo jugable (minuto 0→10→30, EV-02)
+y del generado importado jugable (Bilbao, 12 ofertas). Smoke 19 PASS /
+2 FAIL (los 2 son el mismo hecho: catálogo n=1, no 13).
+
+Defecto 13 (instalación nueva = solo caso fijo; los 12 generados
+viven únicamente en la BD de producción): resuelto documentando
+explícitamente en [INSTALACION](../manuales/INSTALACION.md) que el
+clon limpio trae solo el fijo, con el procedimiento ejecutable de
+exportar/importar (`GET /api/v1/cases/:caseId/export`,
+`POST /api/v1/cases/import`, ≤2 MiB, 201 nuevo / 200 ya existente),
+verificado con `generado-21d02570`. No se publican ficheros de casos
+en este lote: los 12 generados siguen viviendo solo en producción.
+
+Manuales corregidos con los 13 defectos de la verificación de clon
+limpio: INSTALACION.md (pnpm en el VPS, binario `docker-compose`,
+segunda instancia con puertos y proyecto propios, paso 7 — no existe
+bootstrap de administrador ejecutable, ver nota —, comandos de
+exportar/importar), BASE-LOCAL.md (cabecera de fase 1, equivalente
+curl del ejemplo PowerShell, nota de binario), IA-LOCAL.md (proveedor
+efectivo de la API), DESARROLLO.md (estética MS-DOS superseded por el
+rediseño moderno A2), OPERACION.md (comandos del ensayo).
+
+Nota sobre el paso 7 de INSTALACION.md: no hay comando de bootstrap
+de administrador en esta versión. El registro crea cuentas de jugador
+(`role: player`); SPEC-009 prevé un «bootstrap de un uso», pero
+`runInitialSetup` (`packages/case-schema/src/setup-admin.ts`) es
+código de biblioteca sin comando ni endpoint conectado y apunta a una
+tabla `users` que el esquema actual no tiene.
 
 ## 5. Nombre y marca — DECISIÓN PENDIENTE Y BLOQUEANTE (Antonio)
 

@@ -40,6 +40,19 @@ pérdida máxima y resultado registrados en
 [T6-05-desastre](../quality/T6-05-desastre.md). La existencia de un
 archivo de backup no demuestra recuperabilidad; el ensayo sí.
 
+Comandos del ensayo (en una copia del repo dedicada al drill, nunca en
+el checkout de producción; el script se niega si existe `.env.prod`):
+
+~~~text
+sh scripts/backup-prod.sh    # copia de producción (rotación 7)
+sh scripts/drill-setup.sh    # secretos propios, .env.drill (mock, sin correo), solo la BD del drill
+sh scripts/drill-build.sh    # compila la rama en node:24.22.1 y verifica los dist
+node scripts/drill-smoke.mjs # 18 comprobaciones: health/ready/web, /creditos, registro, catálogo, partida jugable
+~~~
+
+Secuencia completa paso a paso, con las cifras de las dos ejecuciones,
+en [T6-05-desastre](../quality/T6-05-desastre.md).
+
 Nunca borrar volúmenes o reemplazar DB de producción como paso de diagnóstico sin operación explícita y copia verificada.
 
 Hallazgos del ensayo que condicionan la operación:

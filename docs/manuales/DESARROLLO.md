@@ -39,7 +39,7 @@ Para revisar solo el prototipo:
 pnpm --filter @meridiano/web dev --port 5174
 ~~~
 
-Abrir http://127.0.0.1:5174/prototype. Usa muestras públicas y no requiere Ollama ni una partida. Se excluye de producción. Mantener reglas MS-DOS/pixel art, fuente legible alternativa y accesibilidad de SPEC-006; no convertir el prototipo en motor de reglas.
+Abrir http://127.0.0.1:5174/prototype. Usa muestras públicas y no requiere Ollama ni una partida. Se excluye de producción. Mantener las reglas de la muestra del prototipo (su estética retro es solo una muestra; el juego sigue el rediseño moderno A2 decidido el 2026-11-10), fuente legible alternativa y accesibilidad de SPEC-006; no convertir el prototipo en motor de reglas.
 
 ## Comandos y límites
 

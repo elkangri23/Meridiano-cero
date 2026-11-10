@@ -30,6 +30,26 @@ node --experimental-strip-types apps/api/src/ai/evaluate-cli.ts --model NOMBRE:E
 
 El operador puede guardar la salida en un archivo nuevo. El informe identifica fecha, runtime, hardware general, modelo/digest, versión Ollama, parámetros, corpus, resultados, latencias y tokens observados cuando se entregan. No incluye prompts, respuestas completas, nombre del equipo ni credenciales. Uso desconocido queda en null, nunca se presenta como cero.
 
+## Proveedor efectivo de la API
+
+La CLI anterior evalúa el adaptador Ollama; el proveedor que usa la API
+en marcha es otro ajuste. Con sesión iniciada:
+
+~~~text
+curl -s -b cookies.txt http://127.0.0.1:3000/api/v1/ai/connections
+~~~
+
+devuelve el proveedor efectivo, por ejemplo
+`{"source":"mock","providerId":"mock","model":"deterministic-ci","connectionId":null,"connectionName":null}`
+cuando no hay ninguna conexión configurada: es el valor por defecto, sin
+llamadas reales. `AI_PROVIDER` en `.env` fija el proveedor por defecto
+de la instancia (`mock`, `ollama`, `freellmapi`, `openai`, `anthropic`,
+`google`, `openai-compatible`, `none`); cada usuario puede además
+configurar sus propias conexiones desde la web, que tienen prioridad
+sobre el de la instancia. Verificado en el drill y en el clon limpio del
+lote 4 (T6-04/T6-05): en ambos, el proveedor efectivo era
+`mock`/`deterministic-ci` con cero conexiones.
+
 ## Servicios y autoridad
 
 createOllamaProvider transporta interpretAction, narrateResult y converse; createDirector prepara el contexto y valida resultados. Generación y revisión de expedientes aún no se implementan. El doble CI se selecciona expresamente y no sustituye silenciosamente al proveedor cuando falla.
