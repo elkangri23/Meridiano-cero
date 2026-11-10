@@ -310,3 +310,22 @@ en el caso viejo generado-21d02570, minuto 0→10).
 - `scripts/drill-failures.sh` es la versión consolidada y corregida
   de las pruebas de fallo (los intentos intermedios `drill-diskfull2/3`
   tenían defectos y no se versionan).
+
+### 8.4 Desmontaje de la segunda ejecución
+
+Parados y borrados los 10 contenedores del drill y del clon limpio
+(`meridiano-drill-api/web/db`, `meridiano-drill-corrupt-db`,
+`meridiano-drill-diskfull-db`, `meridiano-drill-upgrade-db/api`,
+`meridiano-clean-api/web/db`), los 4 volúmenes
+(`meridiano-drill_meridiano_drill_data`, `meridiano-drill-corrupt-data`,
+`meridiano-drill-upgrade-data`, `meridiano-clean-data`), las redes
+`meridiano-drill_default` y `meridiano-clean_default`, los directorios
+`/opt/meridiano-cero-drill` y `/opt/meridiano-cero-clean`, y los
+ficheros de trabajo en `/tmp` (`drill-*.sh`, `drill_check*.py`,
+`drill_verify.py`, `restore-*.log`, `restore-drill.sh`,
+`restore-upgrade.sql`, `drill-corrupt.sql.gz`). Verificación final:
+producción health/ready/web 200, runs=1 (00ec2578 en
+generado-21d02570), cases=12, 0/0/0, 1 perfil activo, migraciones 13.
+Las cuentas de prueba solo existieron en BDs aisladas
+(`prueba-desastre`, `prueba-actualizacion`, `prueba-limpia`, todas
+`@ejemplo.com`) y desaparecieron con sus volúmenes.
