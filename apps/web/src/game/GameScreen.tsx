@@ -407,8 +407,7 @@ function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, onLogou
         <div><p className="game-overline">{t('game.agency')}</p><h1>Meridiano cero</h1></div>
       </div>
       <div className="game-detective">
-        <span className="game-avatar" title={t('profile.avatar') + `: ${avatar}`} aria-hidden="true">{avatar.slice(0, 1).toUpperCase()}</span>
-        <div><strong>{t('game.detectiveLine', { name: detective })}</strong><small>{t('game.refLine', { ref: view.runId.slice(0, 8), version: view.version })}</small></div>
+        <span className="game-avatar" title={`${t('profile.avatar')}: ${avatar} · ${detective}`} aria-hidden="true">{avatar.slice(0, 1).toUpperCase()}</span>
       </div>
       <div className="game-header-actions">
         <Link to="/">{t('archive.title')}</Link>
@@ -522,7 +521,8 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
     <p className="game-overline" id="objectives-heading">{t('game.objectives')}</p>
     <ul>{view.objectives.map(objective =>
       <li key={objective.id} data-testid={`objective-${objective.id}`} data-achieved={objective.achieved}>
-        <span aria-hidden="true">{objective.achieved ? '✓' : '○'}</span> <span className="game-sr-only">{objectiveStateText(objective.achieved, t)}: </span>{objective.description}
+        <span className="game-objective-mark" aria-hidden="true">{objective.achieved ? '✓' : '○'}</span>{objective.description}
+        <span className={`game-objective-state ${objective.achieved ? 'game-objective-state--done' : 'game-objective-state--todo'}`}>{objectiveStateText(objective.achieved, t)}</span>
       </li>)}
     </ul>
   </section>;
@@ -1136,7 +1136,7 @@ function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewD
     {view.objects.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noEvidence')}</p></div>
       : <table><thead><tr><th>{t('game.col.evidence')}</th><th>{t('game.col.type')}</th><th>{t('game.col.origin')}</th><th>{t('game.col.minute')}</th><th>{t('game.col.admissible')}</th></tr></thead>
-        <tbody>{view.objects.map(item => <tr key={item.id}><td>{view.evidenceTexts[item.id] ?? item.id}</td><td>{evidenceTypeLabel(item.type, t)}</td><td>{item.origin}</td><td>{item.minute}</td><td>{item.admissible ? t('common.yes') : t('common.no')}</td></tr>)}</tbody></table>}
+        <tbody>{view.objects.map(item => <tr key={item.id}><td>{view.evidenceTexts[item.id] ?? item.id}</td><td>{evidenceTypeLabel(item.type, t)}</td><td>{lookup.locationName(item.origin) ?? lookup.cityName(item.origin) ?? item.origin}</td><td>{item.minute}</td><td>{item.admissible ? t('common.yes') : t('common.no')}</td></tr>)}</tbody></table>}
     <h4>{t('game.findings')}</h4>
     {view.dossier.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noFindings')}</p></div>
@@ -1175,7 +1175,9 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
   }
   const role = sceneRole(view, npc.id, getNPC(npc.id)?.role);
   return <div className="game-chat">
-    <p className="game-chat-npc"><Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" /><span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
+    <p className="game-chat-npc">{npc.id === 'ines'
+      ? <img className="game-portrait-photo" src="/images/ines-retrato.jpg" alt="" data-testid="portrait-photo" />
+      : <Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" />}<span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
     <ol className="game-chat-turns" data-testid="chat-turns" aria-live="polite">
       {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
         <span className="game-chat-speaker">{turn.from === 'you' ? t('game.you') : npc.name}</span>

@@ -815,7 +815,7 @@ export const EN_MESSAGES: Record<LocaleKey, string> = {
 
   // Tool windows.
   'windows.map': 'Map',
-  'windows.dossier': 'Dossier',
+  'windows.dossier': 'Evidence board',
   'windows.lab': 'Laboratory',
   'windows.comms': 'Communications center',
   'windows.team': 'A.C.M.E. Team',

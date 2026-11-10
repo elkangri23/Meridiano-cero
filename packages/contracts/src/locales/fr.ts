@@ -819,7 +819,7 @@ export const FR_MESSAGES: Record<LocaleKey, string> = {
 
   // Ventanas de herramienta.
   'windows.map': 'Carte',
-  'windows.dossier': 'Dossier',
+  'windows.dossier': 'Tableau des preuves',
   'windows.lab': 'Laboratoire',
   'windows.comms': 'Centrale de communications',
   'windows.team': 'Équipe A.C.M.E.',

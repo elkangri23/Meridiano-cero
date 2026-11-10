@@ -832,7 +832,7 @@ export const ES_MESSAGES = {
 
   // Ventanas de herramienta.
   'windows.map': 'Mapa',
-  'windows.dossier': 'Dossier',
+  'windows.dossier': 'Tablero de evidencias',
   'windows.lab': 'Laboratorio',
   'windows.comms': 'Central de comunicaciones',
   'windows.team': 'Equipo A.C.M.E.',

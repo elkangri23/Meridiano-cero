@@ -11,14 +11,15 @@ button:disabled { opacity: .65; cursor: wait; }
  * (las reglas .game/.archive las definen con menos especificidad, así que
  * estas ganan). Lo mismo para el alto contraste: su regla vivía solo en
  * game.css y no llegaba al archivo; aquí cubre ambas pantallas. --teal solo
- * se usa como fondo o borde (tierra del atlas, borde del chat), nunca como
- * texto ni como fondo de botón activo: el botón activo usa #005555 fijo.
- * Pares verificados con script (WCAG AA >= 4.5, ver
+ * se usa como fondo o borde (tierra del atlas, borde del chat) y como
+ * fondo de botón teal con texto blanco (5,01:1); el botón activo de la
+ * barra usa tinta con texto blanco. Las paletas no tocan --panel (sigue
+ * blanco): solo ajustan dorado, teal y error a variantes oscuras legibles
+ * sobre papel. Pares verificados con script (WCAG AA >= 4.5, ver
  * scripts/dev/contrast-audit.mjs): papel, dorado, apagado y error sobre
- * panel y sobre negro, en las cinco paletas. --error se aclaró en la
- * paleta por defecto (#ff5555 → #ff7777, era 4,23 sobre panel) y en
- * tritanopia (#ff5522 → #ff8855, era 3,79 sobre panel). --sky y --rust no
- * se usan como texto en ningún sitio, así que no se verifican como pares. */
+ * panel, blanco sobre tinta, tinta sobre dorado claro y blanco sobre
+ * teal, en las cinco paletas. --sky y --rust no se usan como texto en
+ * ningún sitio, así que no se verifican como pares. */
 html.game-font-accessible .game, html.game-font-accessible .archive {
   font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -30,16 +31,16 @@ html.game-focus-subtle .game input:focus-visible, html.game-focus-subtle .game t
 html.game-focus-subtle .game a:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
 html.game-focus-subtle .game-window-titlebar h3:focus-visible { outline:2px solid var(--gold); }
 html.game-high-contrast .game, html.game-high-contrast .archive {
-  --panel:#000000; --ink:#000000; --edge:#ffffff; --muted:#ffffff;
+  --panel:#000000; --paper:#FFFFFF; --ink:#000000; --edge:#ffffff; --muted:#ffffff; --gold:#FFE14D; --gold-bright:#FFE14D; --error:#FF8800;
 }
 html.palette-protanopia .game, html.palette-protanopia .archive {
-  --panel:#0000aa; --gold:#ffe14d; --teal:#0077aa; --sky:#66bbff; --rust:#cc7700; --error:#ff8800;
+  --gold:#6B5B00; --teal:#006B7A; --sky:#0066CC; --rust:#8A4B00; --error:#B42318;
 }
 html.palette-deuteranopia .game, html.palette-deuteranopia .archive {
-  --panel:#0000aa; --gold:#ffe14d; --teal:#006699; --sky:#66ccff; --rust:#b36b00; --error:#ff8800;
+  --gold:#6B5B00; --teal:#005F7A; --sky:#0066CC; --rust:#7A4A00; --error:#B42318;
 }
 html.palette-tritanopia .game, html.palette-tritanopia .archive {
-  --panel:#4a0096; --gold:#ffd400; --teal:#007a99; --sky:#33cc99; --rust:#cc5500; --error:#ff8855;
+  --gold:#6B5B00; --teal:#007A99; --sky:#00876A; --rust:#8A4B00; --error:#B42318;
 }
 
 /* Perfil de detective (§13): filas del formulario, con el mismo lenguaje

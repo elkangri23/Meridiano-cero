@@ -60,17 +60,18 @@ const pairs = [
   ['dorado sobre panel', t => [t.gold, t.panel], 4.5],
   ['apagado sobre panel', t => [t.muted, t.panel], 4.5],
   ['error sobre panel', t => [t.error, t.panel], 4.5],
-  ['papel sobre negro', t => [t.paper, BLACK], 4.5],
-  ['dorado sobre negro', t => [t.gold, BLACK], 4.5],
-  ['apagado sobre negro', t => [t.muted, BLACK], 4.5],
-  ['error sobre negro', t => [t.error, BLACK], 4.5],
+  ['blanco sobre tinta (botones, burbuja propia)', t => [t.white, t.ink], 4.5],
+  ['dorado claro sobre tinta', t => [t['gold-bright'], t.ink], 4.5],
+  ['tinta sobre dorado claro (botón primario)', t => [t.ink, t['gold-bright']], 4.5],
+  ['blanco sobre teal (botón teal)', t => [t.white, t.teal], 4.5],
   ['dorado sobre panel (foco, 3:1)', t => [t.gold, t.panel], 3],
 ];
 const fixedPairs = [
-  ['blanco sobre #005555 (botón activo)', [WHITE, '#005555'], 4.5],
-  ['negro sobre dorado (botón primario)', [BLACK, '#ffff55'], 4.5],
-  ['negro sobre #aaaaaa (botones, cabecera escena)', [BLACK, '#aaaaaa'], 4.5],
+  ['tinta sobre dorado #C9A227 (botón primario)', ['#101828', '#C9A227'], 4.5],
+  ['blanco sobre teal #0E7C7B (botón teal)', [WHITE, '#0E7C7B'], 4.5],
+  ['blanco sobre tinta #101828 (botón activo, burbuja propia)', [WHITE, '#101828'], 4.5],
   ['negro sobre blanco (campos de ventana)', [BLACK, WHITE], 4.5],
+  ['verde sobre verde claro (objetivo logrado)', ['#1E7A46', '#E7F4EC'], 4.5],
 ];
 
 let failures = 0;
@@ -91,7 +92,7 @@ for (const [label, [fg, bg], min] of fixedPairs) {
   if (!ok) failures++;
   console.log(`  ${ok ? 'PASS' : 'FAIL'} ${label}: ${value.toFixed(2)} (mín ${min})`);
 }
-const oldActive = ratio(WHITE, defaults.teal);
-console.log(`\nINFO blanco sobre teal ${defaults.teal} (antiguo botón activo, ya no se usa como fondo): ${oldActive.toFixed(2)} < 4.5 — resto documentado, no fallo.`);
+const goldBrightOnPanel = ratio(defaults['gold-bright'], defaults.panel);
+console.log(`\nINFO dorado claro ${defaults['gold-bright']} sobre panel ${defaults.panel}: ${goldBrightOnPanel.toFixed(2)} < 4.5 — solo bordes y acentos, nunca texto; el texto dorado usa ${defaults.gold}.`);
 console.log(failures === 0 ? '\nContraste AA: todos los pares pasan.' : `\nContraste AA: ${failures} pares por debajo del mínimo.`);
 process.exit(failures === 0 ? 0 : 1);
