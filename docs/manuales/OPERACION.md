@@ -1,6 +1,10 @@
 # Operación, recuperación y diagnóstico
 
-Estado: runbook objetivo de distribución, pendiente de ensayo. Existen servicios de desarrollo y CLI de IA, pero no instalación de producto aceptada ni operación pública. Para sus límites actuales consultar [ESTADO](../plan/ESTADO.md). Los procedimientos siguientes no son evidencia de ejecución.
+Estado: runbook de desastre ejecutado el 2026-11-10 (lote 4, T6-05):
+restore aislado con RPO/RTO medidos y bordes BOR-077/078/079/085/090
+verificados; evidencia en [T6-05-desastre](../quality/T6-05-desastre.md).
+Los procedimientos siguientes se apoyan en ese ensayo; lo que siga sin
+ensayar se marca como tal.
 Contrato: SPEC-009/010/011. No incluir secretos ni conversaciones en evidencias públicas.
 
 ## Arranque y parada
@@ -13,15 +17,55 @@ Parada: dejar de aceptar nuevas acciones, terminar transacciones en curso, cance
 
 Registrar versión origen/destino y revisión de código. Revisar cambios de esquema y compatibilidad de partidas. Crear y verificar backup; ejecutar migración una sola vez; arrancar nueva versión; comprobar readiness y smoke del fixture. No ejecutar migraciones concurrentes desde cada réplica.
 
+Actualización compatible verificada 2026-11-10 (T6-05): el código de la
+rama `distribucion-2026-11-10` aplicó `migrate-cli` sobre los datos
+restaurados de producción sin tocarlos (ledger sigue en 13, la partida
+de Antonio sigue en revisión 13 con el mismo hash de definición) y la
+API+web arrancaron sanas con esos datos.
+
 Si falla: detener nuevas escrituras, preservar diagnóstico sin secretos y decidir rollback según compatibilidad. Una migración irreversible exige restauración, no solo volver a una imagen vieja. Probar en copia antes de cambiar tráfico.
 
 ## Backups y restauración
 
-Copia consistente de PostgreSQL, referencias a versiones y configuración no secreta. Claves por canal separado protegido. Cifrar copias y restringir acceso. Retención, RPO y RTO se fijan con recursos del despliegue y se miden en ensayo.
+Copia consistente de PostgreSQL, referencias a versiones y configuración no secreta. Claves por canal separado protegido. Cifrar copias y restringir acceso. Retención 7 (rotación automática, cron diario 03:00 UTC en el VPS).
 
-Ensayo mínimo: instancia limpia, restaurar backup, verificar migraciones/hash de definiciones, acceder a guardado, confirmar pendientes/reloj, ejecutar una acción y comprobar idempotencia. Registrar duración, pérdida máxima y resultado. La existencia de un archivo de backup no demuestra recuperabilidad.
+Medido 2026-11-10 (T6-05, backup `meridiano-20261110-184844.sql.gz`,
+222.370 bytes, 0,35 s): RPO 410 s (antigüedad del backup en el inicio
+del restore; peor caso con el cron diario, ~24 h); restore en entorno
+aislado 0,43 s; RTO a API+web sanas 31–34 s y a partida jugable 43 s
+desde el inicio del restore. Ensayo mínimo ejecutado: instancia limpia,
+restore, verificación de migraciones/hash de definiciones, acceso a
+guardado, acción ejecutada y comprobación de idempotencia; duración,
+pérdida máxima y resultado registrados en
+[T6-05-desastre](../quality/T6-05-desastre.md). La existencia de un
+archivo de backup no demuestra recuperabilidad; el ensayo sí.
 
 Nunca borrar volúmenes o reemplazar DB de producción como paso de diagnóstico sin operación explícita y copia verificada.
+
+Hallazgos del ensayo que condicionan la operación:
+
+- Disco lleno (BOR-077): con el disco al 100 %, las lecturas y las
+  escrituras pequeñas siguen funcionando (espacio libre dentro de las
+  páginas ya asignadas y reciclado de WAL); las escrituras grandes
+  fallan limpio (`could not extend file`, 503 `DEPENDENCY_UNAVAILABLE`
+  en la API, sin partida parcial). Si se agota el WAL, postgres hace
+  PANIC y se detiene antes que confirmar una escritura. **`/ready`
+  sigue en 200 con el disco lleno: la readiness no detecta falta de
+  espacio; hay que alertar por espacio en disco, no solo por readiness.**
+- Backup corrupto (BOR-079): el restore falla sin falso éxito y el
+  entorno sigue sano; hay que borrar la base temporal del intento.
+- Migración futura en el ledger (BOR-078): `migrate-cli` rechaza
+  (`MIGRATION_FAILED`) y el ledger queda intacto; con esa fila, la API
+  arranca con health 200 y ready 503.
+- Restore con cliente antiguo (BOR-090): la sesión creada después del
+  backup devuelve 401 y el reintento de una acción confirmada con la
+  misma clave de idempotencia no se ejecuta (401, sin resurrección de
+  partidas borradas por el restore).
+- Memoria (BOR-085/090): la API sirve health con límites de 160/96/64 MB
+  en reposo; no se alcanzó OOM en reposo. Los trabajos restaurados
+  estaban todos terminales (22 done / 47 failed) y ninguno se reanudó;
+  el consumo de IA no cambió y el proveedor efectivo del drill era mock,
+  sin llamadas reales ni correo.
 
 ## Monitorización y alertas
 
