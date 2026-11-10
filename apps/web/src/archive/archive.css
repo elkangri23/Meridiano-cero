@@ -34,7 +34,7 @@ body:has(.archive) { background:#F8F7F4; color:#101828; }
 
 /* Cabecera de agencia. */
 .archive-header { display:flex; align-items:center; gap:18px; border-bottom:1px solid var(--edge); padding:16px 0 28px; }
-.archive-header p { font-size:.67em; letter-spacing:.13em; color:var(--muted); font-weight:700; text-transform:uppercase; }
+.archive-header p { font-size:.67em; letter-spacing:.13em; color:var(--muted); font-weight:700; text-transform:uppercase; margin:0 0 8px; }
 .archive-mark { position:relative; display:grid; place-items:center; width:62px; height:62px; border:2px solid var(--gold-bright); border-radius:12px; background:var(--ink); color:#FFFFFF; font-family:var(--serif); font-size:2.4rem; font-weight:700; flex-shrink:0; }
 .archive-mark span { position:absolute; bottom:1px; right:3px; font-size:.8rem; font-family:var(--sans); background:var(--gold-bright); color:var(--ink); padding:1px 3px; border-radius:3px; }
 .archive-banner { padding:16px 0; color:var(--muted); }
