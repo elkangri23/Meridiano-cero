@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generadoFraudeDefinition } from '@meridiano/engine';
-import { analyzeWarrantRoutes, diagnoseGoldenPathFailure, obtainableWithout, simulateCase, warrantEvidenceOfPath, type GoldenPathAction } from './simulator.js';
+import { astrolabioDefinition, generadoFraudeDefinition } from '@meridiano/engine';
+import { analyzeWarrantRoutes, diagnoseGoldenPathFailure, hasMultipleRoutes, obtainableWithout, simulateCase, warrantEvidenceOfPath, type GoldenPathAction } from './simulator.js';
 
 // La ruta dorada del fixture, como en el test del motor: inspeccionar,
 // recoger, analizar, hablar, consultar, viajar, orden, detener, recuperar.
@@ -397,5 +397,49 @@ describe('analyzeWarrantRoutes', () => {
     expect(warrantEvidenceOfPath(GOLDEN_PATH, 'carmen')).toEqual(['EV-06', 'EV-07', 'EV-08']);
     expect(warrantEvidenceOfPath(ALTERNATIVE_PATH, 'carmen')).toEqual(['EV-03', 'EV-04', 'EV-05']);
     expect(warrantEvidenceOfPath(ALTERNATIVE_PATH)).toEqual(['EV-03', 'EV-04', 'EV-05']);
+  });
+});
+
+describe('hasMultipleRoutes', () => {
+  it('el fixture tiene par independiente y acceso en los dos lados', () => {
+    expect(hasMultipleRoutes(generadoFraudeDefinition)).toBe(true);
+  });
+
+  it('una sola combinación no admite dos rutas', () => {
+    const definition = structuredClone(generadoFraudeDefinition);
+    const suspect = definition.mechanics?.suspects.find(entry => entry.id === 'carmen');
+    if (!suspect) throw new Error('Sin sospechosa en el fixture.');
+    suspect.warrantCombinations = [['EV-03', 'EV-04']];
+    expect(hasMultipleRoutes(definition)).toBe(false);
+  });
+
+  it('par independiente sin acceso en un lado no es dos rutas (como generado-25b39aed y generado-8621c8a9)', () => {
+    // La única evidencia de acceso (EV-08) exige EV-07, que exige EV-06:
+    // pertenece a la segunda cadena y la primera ruta no puede recuperar.
+    const definition = structuredClone(generadoFraudeDefinition);
+    const suspect = definition.mechanics?.suspects.find(entry => entry.id === 'carmen');
+    if (!suspect) throw new Error('Sin sospechosa en el fixture.');
+    suspect.accessEvidenceIds = ['EV-08'];
+    expect(analyzeWarrantRoutes(definition).independentPairs).toEqual([{ first: 0, second: 1 }]);
+    expect(hasMultipleRoutes(definition)).toBe(false);
+  });
+
+  it('sin evidencias de acceso la recuperación es imposible en ambas rutas', () => {
+    const definition = structuredClone(generadoFraudeDefinition);
+    const suspect = definition.mechanics?.suspects.find(entry => entry.id === 'carmen');
+    if (!suspect) throw new Error('Sin sospechosa en el fixture.');
+    suspect.accessEvidenceIds = [];
+    expect(hasMultipleRoutes(definition)).toBe(false);
+  });
+
+  it('sin orden de acceso el par independiente basta', () => {
+    const definition = structuredClone(generadoFraudeDefinition);
+    if (!definition.mechanics) throw new Error('Sin mecánica en el fixture.');
+    definition.mechanics.recovery.requiresAccessWarrant = false;
+    expect(hasMultipleRoutes(definition)).toBe(true);
+  });
+
+  it('el caso fijo no se puede analizar desde la mecánica: lo decide el catálogo', () => {
+    expect(hasMultipleRoutes(astrolabioDefinition)).toBe(false);
   });
 });

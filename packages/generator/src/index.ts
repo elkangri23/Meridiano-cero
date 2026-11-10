@@ -117,10 +117,13 @@ export type {
 
 export {
   simulateCase,
+  analyzeWarrantRoutes,
+  hasMultipleRoutes,
 } from './simulator.js';
 
 export type {
   GoldenPathAction,
   SimulationCheck,
   SimulationResult,
+  WarrantRouteAnalysis,
 } from './simulator.js';

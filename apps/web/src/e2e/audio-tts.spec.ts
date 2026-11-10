@@ -166,6 +166,29 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     expect(state.cancelled).toBeGreaterThan(0);
   });
 
+  test('en auto la voz sigue el idioma de la interfaz: en inglés lee con la voz inglesa', async ({ page }) => {
+    await openGameScreen(page);
+    // Cambiar el idioma en Ajustes (el botón se busca por testid porque
+    // su texto cambia con el idioma).
+    await page.getByTestId('toolbar-settings').click();
+    const selector = page.getByTestId('settings-language');
+    await expect(selector).toBeVisible();
+    await selector.selectOption('en');
+    await expect(selector).toHaveValue('en');
+    await page.keyboard.press('Escape');
+    await page.getByTestId('toolbar-settings').click();
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings).toBeVisible();
+    await settings.getByTestId('tts-enabled').check();
+    await page.keyboard.press('Escape');
+    await page.getByTestId('offer-inspect:MAD-SALA').click();
+    await expect(page.getByTestId('clock')).toContainText('10 min');
+    await page.getByTestId('tts-read').click();
+    const state = await ttsState(page);
+    expect(state.spoken.length).toBe(1);
+    expect(state.spoken[0]?.voice).toBe('English Voice');
+  });
+
   test('autoRead lee la narración nueva sin pulsar nada', async ({ page }) => {
     await openGameScreen(page);
     await enableTts(page, true);

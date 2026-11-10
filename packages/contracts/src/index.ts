@@ -187,6 +187,14 @@ export interface CaseSummary {
   deadlineMinutes: number;
   contentVersion: number;
   canStart: boolean;
+  /** true si el expediente admite dos rutas de resolución (C2, lote
+   * pequeños del catálogo 2026-11-10): el caso fijo siempre, por sus rutas
+   * A/B (SPEC-003:86); el generado, si su mecánica tiene un par de
+   * combinaciones de orden independiente con acceso en los dos lados
+   * (`hasMultipleRoutes` del generador). Es un proxy computable desde la
+   * definición guardada, no una simulación: la marca de «una sola vía»
+   * que enseña la UI sale de aquí. */
+  hasMultipleRoutes: boolean;
   /** true si el expediente generado es del usuario que consulta el
    * catálogo; el caso fijo nunca es propio (DEC-011: solo el dueño
    * autorizado puede descargar el expediente completo). */
@@ -528,9 +536,9 @@ function caseModes(value: Record<string, unknown>): boolean {
     (value.contentRating === 'familiar' || value.contentRating === 'general');
 }
 function caseItem(value: unknown): value is CaseSummary {
-  if (!dtoRecord(value, 'canStart,caseId,contentMode,contentRating,contentVersion,crimeType,deadlineMinutes,difficulty,explorationMode,ownedByMe,title')) return false;
+  if (!dtoRecord(value, 'canStart,caseId,contentMode,contentRating,contentVersion,crimeType,deadlineMinutes,difficulty,explorationMode,hasMultipleRoutes,ownedByMe,title')) return false;
   if (typeof value.caseId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.caseId) || !shortText(value.title)) return false;
-  return caseModes(value) && positiveInteger(value.deadlineMinutes) && positiveInteger(value.contentVersion) && typeof value.canStart === 'boolean' && typeof value.ownedByMe === 'boolean';
+  return caseModes(value) && positiveInteger(value.deadlineMinutes) && positiveInteger(value.contentVersion) && typeof value.canStart === 'boolean' && typeof value.hasMultipleRoutes === 'boolean' && typeof value.ownedByMe === 'boolean';
 }
 export function isCaseListDto(value: unknown): value is CaseListDto {
   if (!dtoRecord(value, 'items,nextCursor') || value.nextCursor !== null || !Array.isArray(value.items) || value.items.length > 100) return false;

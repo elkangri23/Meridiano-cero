@@ -55,6 +55,10 @@ body:has(.archive) { background:#000000; color:#ffffff; }
  * compacta: antes quedaba al final de la fila junto al delito (13
  * opciones) y el `align-items:end` la empujaba bajo el pliegue. */
 .archive-create .difficulty-field { flex-basis:100%; }
+/* El contenido, igual: sin fila propia, el fieldset compartía fila con
+ * el delito y la nota de «Général» se comprimía hasta parecer cortada
+ * (lote pequeños del catálogo 2026-11-10; el francés es el más largo). */
+.archive-create .content-field { flex-basis:100%; }
 .archive-create .difficulty-options { display:flex; gap:8px 24px; flex-wrap:wrap; }
 .archive-create .difficulty-options label { display:flex; gap:8px; align-items:baseline; }
 .archive-create select { max-width:100%; background:#ffffff; }

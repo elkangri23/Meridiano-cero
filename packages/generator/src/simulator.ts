@@ -665,6 +665,32 @@ export function analyzeWarrantRoutes(definition: CaseDefinition): WarrantRouteAn
   return { solutionId: solution.id, combinations, independentPairs, reasons };
 }
 
+/** ¿Admite el expediente dos rutas de resolución? Proxy computable desde
+ * la definición guardada (C2, lote pequeños del catálogo 2026-11-10): par
+ * independiente de combinaciones de orden (precondición estructural de
+ * la etapa 6) y, si la recuperación exige orden de acceso, una evidencia
+ * de acceso obtenible sin la cadena de la otra ruta en cada lado. No es
+ * la puerta completa: no simula las rutas ni comprueba el presupuesto,
+ * así que un caso futuro podría marcarse como multi-ruta con la
+ * alternativa fuera de presupuesto. Sin mecánica (caso fijo) no se puede
+ * analizar: devuelve false y el catálogo decide el fijo aparte
+ * (SPEC-003:86, dos rutas A/B). */
+export function hasMultipleRoutes(definition: CaseDefinition): boolean {
+  const analysis = analyzeWarrantRoutes(definition);
+  if (analysis.independentPairs.length === 0) return false;
+  if (definition.mechanics?.recovery.requiresAccessWarrant !== true) return true;
+  const solution = definition.mechanics?.suspects.find(entry => entry.id === definition.solution);
+  const accessIds = solution?.accessEvidenceIds ?? [];
+  if (accessIds.length === 0) return false;
+  return analysis.independentPairs.some(pair => {
+    const first = analysis.combinations[pair.first] ?? [];
+    const second = analysis.combinations[pair.second] ?? [];
+    const firstAccess = accessIds.some(id => obtainableWithout(definition, id, new Set(second)));
+    const secondAccess = accessIds.some(id => obtainableWithout(definition, id, new Set(first)));
+    return firstAccess && secondAccess;
+  });
+}
+
 /** Comprobación de independencia de una ruta: cada evidencia de su orden
  * debe poder obtenerse sin ninguna evidencia de la orden de la otra ruta.
  * Sin mecánica declarada (caso fijo) no se puede analizar: no se añade

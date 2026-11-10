@@ -111,7 +111,11 @@ describe('informe final completo por HTTP (GDD §12)', () => {
     expect((report.evidenceFound as Array<Record<string, unknown>>).map(entry => entry.id))
       .toEqual(['EV-01', 'EV-02', 'EV-03', 'EV-04', 'EV-05', 'EV-11']);
     expect((report.evidenceMissed as Array<Record<string, unknown>>).map(entry => entry.id))
-      .toEqual(['EV-06', 'EV-07', 'EV-08', 'EV-09', 'EV-10']);
+      .toEqual(['EV-06', 'EV-09', 'EV-10']);
+    // Las decisivas ya se enseñan en «Decisive evidence»: no se repiten
+    // en «omitidas» (lote pequeños del catálogo 2026-11-10).
+    const decisive = new Set((truth.keyEvidence as Array<Record<string, unknown>>).map(entry => entry.id));
+    expect((report.evidenceMissed as Array<Record<string, unknown>>).some(entry => decisive.has(entry.id))).toBe(false);
     expect(report.detentions).toEqual([
       { suspectId: 'ines', suspectName: 'Inés Valera', correct: true, withWarrant: true },
     ]);

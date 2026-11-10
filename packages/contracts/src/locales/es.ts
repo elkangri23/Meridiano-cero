@@ -104,10 +104,11 @@ export const ES_MESSAGES = {
   'newRun.contentFamiliarNote': 'sin asesinatos ni temas perturbadores.',
   'newRun.contentGeneral': 'General',
   'newRun.contentGeneralHelp': ' — temas serios permitidos, sin detalle explícito ni gore.',
-  'newRun.contentGeneralEmpty': ' · Sin expedientes validados todavía — el único expediente disponible es apto para Familiar.',
+  'newRun.contentGeneralEmpty': ' · Sin expedientes validados todavía — los expedientes disponibles son aptos para Familiar.',
   'newRun.case': 'Expediente',
   'newRun.caseLine': 'Expediente: {title} — {label} · {hours} · {ref}.',
   'newRun.caseOption': '{title} — {label} · {hours} · {ref}',
+  'newRun.caseSingleRoute': ' · una sola vía',
   'newRun.noMatching': 'Todavía no hay expedientes validados de este delito y contenido.',
   'newRun.start': 'Empezar partida',
   'newRun.noCases': 'No hay expedientes disponibles.',
@@ -727,6 +728,15 @@ export const ES_MESSAGES = {
   'game.notice.interpretedAs': 'Interpretado como: {label}.',
   'game.notice.committing': 'Confirmando… No cierres la pestaña.',
   'game.notice.ambiguousOrder': 'La orden es ambigua.',
+  /** Pregunta de la aclaración tras una orden libre, por motivo del
+   * servidor (lote pequeños del catálogo 2026-11-10): los literales
+   * españoles del director se resuelven aquí, en el idioma del jugador,
+   * sin tocar el servidor; 'unavailable' cubre también 'timeout' y
+   * 'cancelled', que en el servidor comparten el mismo mensaje. */
+  'game.notice.interpretClarification.ambiguous': 'Aclara la acción y su objetivo.',
+  'game.notice.interpretClarification.budget_exceeded': 'Acota la orden antes de interpretarla.',
+  'game.notice.interpretClarification.invalid_response': 'No se pudo interpretar la orden con seguridad.',
+  'game.notice.interpretClarification.unavailable': 'No se pudo interpretar la orden. Puedes volver a intentarlo.',
   // Aclaración de una orden o detención bloqueada (lote intérprete de
   // texto libre): dice qué falta para poder hacerla, sin inventar otra
   // acción. La introducción nombra al sospechoso cuando el texto lo

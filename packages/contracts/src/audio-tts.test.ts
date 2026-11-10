@@ -78,6 +78,82 @@ describe('audio-tts', () => {
     vi.unstubAllGlobals();
   });
 
+  it('en auto la voz sigue el idioma de la interfaz y el lang declarado sigue a la voz', () => {
+    const voices = [
+      { name: 'Voz ES', lang: 'es-ES', localService: true, default: true },
+      { name: 'English Voice', lang: 'en-US', localService: true, default: false },
+      { name: 'Voix FR', lang: 'fr-FR', localService: true, default: false },
+    ];
+    const calls: SpeechSynthesisUtterance[] = [];
+    const globals = testGlobals();
+    globals.speechSynthesis = {
+      getVoices: () => voices,
+      speak: (u: SpeechSynthesisUtterance) => { calls.push(u); },
+      pause: vi.fn(),
+      resume: vi.fn(),
+      cancel: vi.fn(),
+    } as unknown as SpeechSynthesis;
+    globals.SpeechSynthesisUtterance = FakeUtterance as unknown as typeof SpeechSynthesisUtterance;
+    const c = createTTSController();
+    expect(c.speak('hello', { language: 'en' })).toBe(true);
+    expect(calls[0]?.voice?.name).toBe('English Voice');
+    expect(calls[0]?.lang).toBe('en-US');
+    expect(c.speak('bonjour', { language: 'fr' })).toBe(true);
+    expect(calls[1]?.voice?.name).toBe('Voix FR');
+    expect(calls[1]?.lang).toBe('fr-FR');
+    delete globals.speechSynthesis;
+    delete globals.SpeechSynthesisUtterance;
+    vi.unstubAllGlobals();
+  });
+
+  it('en auto sin voz del idioma cae a la española sin dejar de hablar', () => {
+    const voices = [
+      { name: 'Voz ES', lang: 'es-ES', localService: true, default: true },
+      { name: 'English Voice', lang: 'en-US', localService: true, default: false },
+    ];
+    const calls: SpeechSynthesisUtterance[] = [];
+    const globals = testGlobals();
+    globals.speechSynthesis = {
+      getVoices: () => voices,
+      speak: (u: SpeechSynthesisUtterance) => { calls.push(u); },
+      pause: vi.fn(),
+      resume: vi.fn(),
+      cancel: vi.fn(),
+    } as unknown as SpeechSynthesis;
+    globals.SpeechSynthesisUtterance = FakeUtterance as unknown as typeof SpeechSynthesisUtterance;
+    const c = createTTSController();
+    expect(c.speak('bonjour', { language: 'fr' })).toBe(true);
+    expect(calls[0]?.voice?.name).toBe('Voz ES');
+    expect(calls[0]?.lang).toBe('es-ES');
+    delete globals.speechSynthesis;
+    delete globals.SpeechSynthesisUtterance;
+    vi.unstubAllGlobals();
+  });
+
+  it('la voz explícita gana al idioma de la interfaz', () => {
+    const voices = [
+      { name: 'Voz ES', lang: 'es-ES', localService: true, default: true },
+      { name: 'English Voice', lang: 'en-US', localService: true, default: false },
+    ];
+    const calls: SpeechSynthesisUtterance[] = [];
+    const globals = testGlobals();
+    globals.speechSynthesis = {
+      getVoices: () => voices,
+      speak: (u: SpeechSynthesisUtterance) => { calls.push(u); },
+      pause: vi.fn(),
+      resume: vi.fn(),
+      cancel: vi.fn(),
+    } as unknown as SpeechSynthesis;
+    globals.SpeechSynthesisUtterance = FakeUtterance as unknown as typeof SpeechSynthesisUtterance;
+    const c = createTTSController();
+    expect(c.speak('hello', { voice: 'Voz ES', language: 'en' })).toBe(true);
+    expect(calls[0]?.voice?.name).toBe('Voz ES');
+    expect(calls[0]?.lang).toBe('es-ES');
+    delete globals.speechSynthesis;
+    delete globals.SpeechSynthesisUtterance;
+    vi.unstubAllGlobals();
+  });
+
   it('createTTSController con síntesis pero sin voces no habla ni finge hablar', () => {
     const calls: SpeechSynthesisUtterance[] = [];
     const globals = testGlobals();

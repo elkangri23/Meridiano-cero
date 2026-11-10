@@ -94,10 +94,11 @@ export const EN_MESSAGES: Record<LocaleKey, string> = {
   'newRun.contentFamiliarNote': 'no murders or disturbing themes.',
   'newRun.contentGeneral': 'General',
   'newRun.contentGeneralHelp': ' — serious themes allowed, no explicit detail or gore.',
-  'newRun.contentGeneralEmpty': ' · No validated case files yet — the only available case file is suitable for Family.',
+  'newRun.contentGeneralEmpty': ' · No validated case files yet — the available case files are suitable for Family.',
   'newRun.case': 'Case file',
   'newRun.caseLine': 'Case file: {title} — {label} · {hours} · {ref}.',
   'newRun.caseOption': '{title} — {label} · {hours} · {ref}',
+  'newRun.caseSingleRoute': ' · a single route',
   'newRun.noMatching': 'There are no validated case files for this crime and content yet.',
   'newRun.start': 'Start run',
   'newRun.noCases': 'No case files available.',
@@ -717,6 +718,10 @@ export const EN_MESSAGES: Record<LocaleKey, string> = {
   'game.notice.interpretedAs': 'Interpreted as: {label}.',
   'game.notice.committing': 'Confirming… Do not close the tab.',
   'game.notice.ambiguousOrder': 'The order is ambiguous.',
+  'game.notice.interpretClarification.ambiguous': 'Clarify the action and its objective.',
+  'game.notice.interpretClarification.budget_exceeded': 'Narrow down the order before interpreting it.',
+  'game.notice.interpretClarification.invalid_response': 'The order could not be interpreted safely.',
+  'game.notice.interpretClarification.unavailable': 'The order could not be interpreted. You can try again.',
   // Clarification for a blocked warrant or arrest (free-text interpreter
   // batch): it says what is missing, without inventing another action.
   'game.interpret.lockedWarrant': 'You cannot request a warrant against {name} yet.',

@@ -95,10 +95,17 @@ function truthForDefinition(def: CaseDefinition, language: Language = 'es'): Fin
 function evidenceLists(def: CaseDefinition, run: CaseRun, language: Language = 'es'): Pick<FinalReport, 'evidenceFound' | 'evidenceMissed'> {
   const found: FinalReport['evidenceFound'] = [];
   const missed: FinalReport['evidenceMissed'] = [];
+  // Las pruebas decisivas ya se enseñan en `truth.keyEvidence`: no se
+  // repiten en «omitidas» (lote pequeños del catálogo 2026-11-10). En
+  // «halladas» sí se mantienen: esa lista es «qué descubriste jugando»
+  // y la puntuación cuenta las descubiertas desde aquí mismo, así que
+  // quitarlas rompería el desglose de puntos. Comparación por id, nunca
+  // por texto: el texto varía con el idioma.
+  const decisive = new Set(keyEvidenceIds(def));
   for (const evidence of def.evidence) {
     const entry = { id: evidence.id, text: evidenceText(evidence.id, def.texts, def.id, language) ?? evidence.id };
     if (knowsEvidence(run, evidence.id)) found.push(entry);
-    else missed.push(entry);
+    else if (!decisive.has(evidence.id)) missed.push(entry);
   }
   return { evidenceFound: found, evidenceMissed: missed };
 }

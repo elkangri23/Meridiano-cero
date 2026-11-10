@@ -97,10 +97,11 @@ export const FR_MESSAGES: Record<LocaleKey, string> = {
   'newRun.contentFamiliarNote': 'sans meurtres ni sujets perturbants.',
   'newRun.contentGeneral': 'Général',
   'newRun.contentGeneralHelp': ' — sujets sérieux autorisés, sans détail explicite ni gore.',
-  'newRun.contentGeneralEmpty': ' · Aucun dossier validé pour l\'instant — le seul dossier disponible convient au contenu Familial.',
+  'newRun.contentGeneralEmpty': ' · Aucun dossier validé pour l\'instant — les dossiers disponibles conviennent au contenu Familial.',
   'newRun.case': 'Dossier',
   'newRun.caseLine': 'Dossier : {title} — {label} · {hours} · {ref}.',
   'newRun.caseOption': '{title} — {label} · {hours} · {ref}',
+  'newRun.caseSingleRoute': ' · une seule voie',
   'newRun.noMatching': 'Il n\'y a pas encore de dossier validé pour ce délit et ce contenu.',
   'newRun.start': 'Commencer la partie',
   'newRun.noCases': 'Aucun dossier disponible.',
@@ -720,6 +721,10 @@ export const FR_MESSAGES: Record<LocaleKey, string> = {
   'game.notice.interpretedAs': 'Interprété comme : {label}.',
   'game.notice.committing': 'Confirmation… Ne ferme pas l\'onglet.',
   'game.notice.ambiguousOrder': 'L\'ordre est ambigu.',
+  'game.notice.interpretClarification.ambiguous': 'Précise l\'action et son objectif.',
+  'game.notice.interpretClarification.budget_exceeded': 'Précise l\'ordre avant de l\'interpréter.',
+  'game.notice.interpretClarification.invalid_response': 'L\'ordre n\'a pas pu être interprété avec certitude.',
+  'game.notice.interpretClarification.unavailable': 'L\'ordre n\'a pas pu être interprété. Tu peux réessayer.',
   // Clarification pour un mandat ou une arrestation bloqués (lot
   // interpréteur de texte libre) : elle dit ce qui manque, sans inventer
   // une autre action.

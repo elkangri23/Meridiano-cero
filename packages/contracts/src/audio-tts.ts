@@ -2,6 +2,8 @@
 // SPEC-006: voz, velocidad, lectura manual/automática, repetir, pausar.
 // Si el navegador/sistema no tiene voz compatible, la capa cae a texto sin lanzar errores.
 
+import type { Language } from './preferences.js';
+
 export interface TTSVoice {
   name: string;
   lang: string;
@@ -18,6 +20,10 @@ export interface TTSStatus {
 
 export interface TTSOptions {
   voice?: string;
+  /** Idioma de la interfaz (lote pequeños del catálogo 2026-11-10): en
+   * modo `auto` la voz se elige en este idioma; con voz explícita, la
+   * elección del usuario sigue ganando. */
+  language?: Language;
   rate?: number;
   pitch?: number;
   volume?: number;
@@ -72,14 +78,46 @@ export function createTTSController(): TTSController {
     }
   }
 
-  function pickVoice(voiceName?: string): SpeechSynthesisVoice | null {
+  /** Voz preferida: la explícita si existe; si no, la primera del idioma
+   * de la interfaz; si no hay de ese idioma, la española (comportamiento
+   * anterior) y, en último recurso, la primera disponible. */
+  function pickVoice(voiceName?: string, language?: Language): SpeechSynthesisVoice | null {
     const voices = synth ? synth.getVoices() : [];
     if (voiceName) {
       const match = voices.find((v: SpeechSynthesisVoice) => v.name === voiceName);
       if (match) return match;
     }
+    if (language) {
+      const match = voices.find((v: SpeechSynthesisVoice) => String(v.lang || '').toLowerCase().startsWith(language));
+      if (match) return match;
+    }
     const es = voices.find((v: SpeechSynthesisVoice) => String(v.lang || '').toLowerCase().startsWith('es'));
     return es ?? voices[0] ?? null;
+  }
+
+  /** Idioma declarado del enunciado cuando la voz no trae el suyo. */
+  function defaultLang(language?: Language): string {
+    return language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'es-ES';
+  }
+
+  /** Enunciado configurado: voz, idioma declarado, velocidad, tono y
+   * volumen, con los marcadores de estado de lectura. */
+  function buildUtterance(text: string, options: TTSOptions): SpeechSynthesisUtterance {
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = pickVoice(options.voice, options.language);
+    utterance.voice = voice;
+    // El `lang` declarado sigue a la voz elegida (antes quedaba
+    // siempre en español, aunque la voz fuera inglesa o francesa).
+    utterance.lang = voice?.lang || defaultLang(options.language);
+    utterance.rate = options.rate ?? DEFAULT_RATE;
+    utterance.pitch = options.pitch ?? DEFAULT_PITCH;
+    utterance.volume = options.volume ?? DEFAULT_VOLUME;
+    utterance.onstart = () => { speaking = true; paused = false; };
+    utterance.onend = () => { speaking = false; paused = false; };
+    utterance.onerror = () => { speaking = false; paused = false; };
+    utterance.onpause = () => { paused = true; };
+    utterance.onresume = () => { paused = false; };
+    return utterance;
   }
 
   return {
@@ -89,19 +127,7 @@ export function createTTSController(): TTSController {
       // sonaría ni se finge estar hablando.
       if (getVoices().length === 0) return false;
       try {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.voice = pickVoice(options.voice);
-        utterance.lang = utterance.lang || 'es-ES';
-        utterance.rate = options.rate ?? DEFAULT_RATE;
-        utterance.pitch = options.pitch ?? DEFAULT_PITCH;
-        utterance.volume = options.volume ?? DEFAULT_VOLUME;
-        utterance.onstart = () => { speaking = true; paused = false; };
-        utterance.onend = () => { speaking = false; paused = false; };
-        utterance.onerror = () => { speaking = false; paused = false; };
-        utterance.onpause = () => { paused = true; };
-        utterance.onresume = () => { paused = false; };
-
-        synth.speak(utterance);
+        synth.speak(buildUtterance(text, options));
         return true;
       } catch {
         return false;

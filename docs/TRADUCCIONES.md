@@ -10,7 +10,7 @@ explica cómo hacerlo y cómo se comprueba.
 ## Cómo funciona el sistema
 
 - Los textos de la interfaz viven en `packages/contracts/src/locales/`:
-  `es.ts` es el idioma de referencia (completo, 1142 claves),
+  `es.ts` es el idioma de referencia (completo, 1147 claves),
   `en.ts` y `fr.ts` están completos en los tres idiomas.
 - Las claves son planas con prefijo de sección: `common.*` (palabras
   compartidas), `settings.*` (Ajustes), `game.*` (pantalla de juego),
@@ -84,12 +84,20 @@ explica cómo hacerlo y cómo se comprueba.
   `engine.*` a los tres locales.
 - **Huecos que quedan en español por diseño**: los prompts LLM del
   generador (escriben casos en español por diseño) y del director y la
-  conversación (el modelo responde en el idioma de la pregunta del
-  jugador); los mensajes del validador (diagnóstico de importación); la
-  selección de voz TTS; la cronología de las partidas cerradas y las
-  repeticiones por idempotencia (quedan en el idioma de la primera
-  petición); los países y lugares de los resultados oficiales de carrera
-  ya guardados (la fila guarda solo nombres en español, sin ids).
+  conversación (la charla libre con NPC es en español por diseño en los
+  tres idiomas de interfaz: el prompt de `converse` ordena responder en
+  español, y el modelo no responde en el idioma de la pregunta del
+  jugador); los mensajes del validador (diagnóstico de importación y de
+  generación); la cronología de las partidas cerradas y las repeticiones
+  por idempotencia (cada resumen queda guardado en el idioma de la
+  petición que confirmó esa acción: una partida puede mezclar idiomas si
+  se cambió a mitad de partida, y la repetición devuelve el texto
+  guardado tal cual); los países y lugares de los resultados oficiales
+  de carrera ya guardados (la fila guarda solo nombres en español, sin
+  ids; el título del caso sí se retraduce al leerlo).
+- **La voz TTS ya no es un hueco** (lote pequeños del catálogo
+  2026-11-10): en modo `auto` la voz se elige en el idioma de la
+  interfaz; con voz explícita, la elección del usuario sigue ganando.
 - **No traduzcas nunca**: nombres propios de personas, ciudades y lugares,
   identificadores (`EV-03`, `HV-17`, `obj-detener`), ni la convención
   narrativa del Traductor A.C.M.E. (GDD SPEC-006): el idioma de juego no

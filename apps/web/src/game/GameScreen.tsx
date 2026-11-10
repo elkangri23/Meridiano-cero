@@ -19,7 +19,7 @@ import { portraitSeed, teamPortraitSeed } from './portraits';
 import { createMusicEngine, type EffectKind } from './music';
 import { groupOffers, groupTalkOffers } from './scene-offers';
 import type { TalkGroup } from './scene-offers';
-import { lockedClarificationText } from './interpret-clarification';
+import { interpretClarificationText } from './interpret-clarification';
 import { buildIntelFacts, INTEL_ID, INTEL_NAME, intelGreeting, intelNoRecord, intelPersona, intelRefusal, selectIntelFacts } from './intel-terminal';
 import { ELENA_ID, ELENA_NAME, elenaPersona, elenaRefusal, teamGreeting, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
@@ -69,10 +69,12 @@ function channelLabel(channel: string, t: TranslateFn): string {
 
 /** Pregunta de la aclaración tras una orden libre: si el texto pide una
  * orden o una detención bloqueada, dice qué falta en el idioma del
- * jugador; si no, el mensaje del servidor o la ambigua genérica. */
+ * jugador; si no, el motivo del servidor se resuelve en el idioma del
+ * jugador (`game.notice.interpretClarification.*`), y solo si el motivo
+ * es desconocido se enseña el mensaje del servidor o la ambigua
+ * genérica. */
 function clarificationQuestion(t: TranslateFn, result: AiInterpretation): string {
-  if (result.locked) return lockedClarificationText(t, result.locked);
-  return result.message ?? t('game.notice.ambiguousOrder');
+  return interpretClarificationText(t, result);
 }
 
 /** Dificultad de la partida, tal como se enseña en la cabecera junto al
@@ -741,7 +743,9 @@ function useTtsSpeaker(preferences: PresentationPreferences, controller: TTSCont
     }
     controller.cancel();
     // `exactOptionalPropertyTypes`: la voz solo se pasa si no es 'auto'.
-    const options: TTSOptions = { rate: preferences.tts.rate, volume: preferences.audio.narrationVolume / 100 };
+    // La voz sigue el idioma de la interfaz (lote pequeños del catálogo
+    // 2026-11-10): en `auto` el controlador elige voz de ese idioma.
+    const options: TTSOptions = { rate: preferences.tts.rate, volume: preferences.audio.narrationVolume / 100, language: preferences.language };
     if (preferences.tts.voice !== 'auto') options.voice = preferences.tts.voice;
     const ok = controller.speak(text, options);
     if (ok) {

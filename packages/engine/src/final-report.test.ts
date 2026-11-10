@@ -74,9 +74,23 @@ describe('informe final completo (GDD §12)', () => {
     const report = buildFinalReport(astrolabioDefinition, run, 'finished');
     expect(report.evidenceFound.map(entry => entry.id)).toEqual(['EV-01', 'EV-02']);
     expect(report.evidenceFound[0]?.text).toBe('La caja está a la vista. Su etiqueta remite al archivo de París.');
+    // Las decisivas ya se enseñan en «Decisive evidence»: no se repiten
+    // en «omitidas» (lote pequeños del catálogo 2026-11-10).
     expect(report.evidenceMissed.map(entry => entry.id)).toEqual(
-      ['EV-03', 'EV-04', 'EV-05', 'EV-06', 'EV-07', 'EV-08', 'EV-09', 'EV-10', 'EV-11']);
+      ['EV-03', 'EV-06', 'EV-09', 'EV-10', 'EV-11']);
     expect(report.evidenceMissed[0]?.text).toBe('La huella técnica es compatible con una herramienta de la serie HV-17. No acusa a nadie por sí sola.');
+    const decisive = new Set(report.truth.keyEvidence.map(entry => entry.id));
+    expect(report.evidenceMissed.some(entry => decisive.has(entry.id))).toBe(false);
+  });
+
+  it('en un caso generado las decisivas tampoco se repiten en omitidas', () => {
+    const report = buildFinalReport(generadoFraudeDefinition, freshGeneratedRun(), 'finished');
+    expect(report.truth.keyEvidence.map(entry => entry.id)).toEqual(['EV-03', 'EV-04', 'EV-11']);
+    expect(report.evidenceFound).toEqual([]);
+    expect(report.evidenceMissed.map(entry => entry.id)).toEqual(
+      ['EV-01', 'EV-02', 'EV-05', 'EV-06', 'EV-07', 'EV-08', 'EV-09', 'EV-10']);
+    const decisive = new Set(report.truth.keyEvidence.map(entry => entry.id));
+    expect(report.evidenceMissed.some(entry => decisive.has(entry.id))).toBe(false);
   });
 
   it('las detenciones distinguen correcta y errónea, y si había orden', () => {

@@ -86,6 +86,16 @@ describe('Intercambio de expedientes (T4-05 expuesto)', () => {
     expect(theirs.json().items.find((item: { caseId: string }) => item.caseId === seedCaseId).ownedByMe).toBe(false);
   });
 
+  it('el catálogo marca las varias rutas: el fijo sí, el generado de una sola vía no', async () => {
+    const mine = await app.inject({ method: 'GET', url: '/api/v1/cases', headers: headersFor(player) });
+    expect(mine.statusCode).toBe(200);
+    // El fijo tiene dos rutas A/B (SPEC-003:86); el expediente de prueba
+    // (generado-21d02570) tiene una sola vía: su segunda combinación
+    // depende de la primera, así que no pasa la puerta de varias rutas.
+    expect(mine.json().items.find((item: { caseId: string }) => item.caseId === astrolabioDefinition.id).hasMultipleRoutes).toBe(true);
+    expect(mine.json().items.find((item: { caseId: string }) => item.caseId === seedCaseId).hasMultipleRoutes).toBe(false);
+  });
+
   it('exportar el expediente propio descarga un fichero válido', async () => {
     const response = await app.inject({ method: 'GET', url: `/api/v1/cases/${seedCaseId}/export`, headers: headersFor(player) });
     expect(response.statusCode).toBe(200);

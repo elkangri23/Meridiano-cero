@@ -9,6 +9,12 @@ function freshRun() {
   return createInitialRun(astrolabioDefinition, 'synthetic-owner', 'synthetic-run', hashDefinition(astrolabioDefinition));
 }
 
+/** Ningún id de la primera lista aparece en la segunda (deduplicación por id). */
+function expectDisjoint(decisive: { id: string }[], missed: { id: string }[]): void {
+  const ids = new Set(decisive.map(entry => entry.id));
+  expect(missed.some(entry => ids.has(entry.id))).toBe(false);
+}
+
 describe('motor en otro idioma', () => {
   it('las ofertas salen en francés: inspeccionar, hablar, viajar y cerrar', () => {
     const offers = availableOffers(astrolabioDefinition, freshRun(), 'fr');
@@ -56,11 +62,14 @@ describe('motor en otro idioma', () => {
     expect(closed.status).toBe('case_closed');
     if (closed.status !== 'case_closed') throw new Error('expected case_closed');
     const report = completeFinalReport(astrolabioDefinition, closed.run, 'fr');
-    expect(report).not.toBeNull();
-    expect(report?.score.breakdown[0]?.label).toBe('Objectifs réussis');
+    if (!report) throw new Error('expected report');
+    expect(report.score.breakdown[0]?.label).toBe('Objectifs réussis');
     // La primera prueba clave es EV-04, no EV-01 (FIXED_KEY_EVIDENCE).
-    expect(report?.truth.keyEvidence[0]?.id).toBe('EV-04');
-    expect(report?.truth.keyEvidence[0]?.text).toBe('Le registre signé attribue l\'outil HV-17 à Inés Valera.');
+    expect(report.truth.keyEvidence[0]?.id).toBe('EV-04');
+    expect(report.truth.keyEvidence[0]?.text).toBe('Le registre signé attribue l\'outil HV-17 à Inés Valera.');
+    // La deduplicación es por id, independiente del idioma: ninguna
+    // decisiva se repite en «omitidas» tampoco en francés.
+    expectDisjoint(report.truth.keyEvidence, report.evidenceMissed);
     // En español, el mismo informe guardado se devuelve tal cual.
     const spanish = completeFinalReport(astrolabioDefinition, closed.run);
     expect(spanish?.score.breakdown[0]?.label).toBe('Objetivos logrados');

@@ -124,4 +124,17 @@ describe('Resumen al retomar la partida (§13)', () => {
     const summary = resumeSummary(viewFixture({ clock: { minute: 3000, deadlineMinutes: 2880 } }), lookup, discover);
     expect(summary.remainingMinutes).toBe(0);
   });
+
+  it('sin descubrimientos la lista queda vacía y la UI enseña «sin hallazgos»', () => {
+    // Partida empezada solo con esperas: minuto > 0 y dossier vacío. El
+    // panel no sale en blanco: resumeSummary devuelve la lista vacía y
+    // ResumePanel enseña `game.noFindings` (lote pequeños del catálogo
+    // 2026-11-10; el vacío literal observado dos veces no se reproduce
+    // desde los datos).
+    const summary = resumeSummary(viewFixture({ clock: { minute: 30, deadlineMinutes: 2880 }, dossier: [] }), lookup, discover);
+    expect(summary.minute).toBe(30);
+    expect(summary.lastDiscoveries).toEqual([]);
+    expect(summary.objectives).toHaveLength(2);
+    expect(summary.visitedCities).toEqual(['Madrid', 'París']);
+  });
 });

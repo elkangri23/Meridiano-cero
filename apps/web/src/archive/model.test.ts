@@ -96,7 +96,7 @@ describe('T3: archivo, cuenta y respuestas tardías', () => {
   it('catálogo permite crear una vez; doble activación no envía otro POST y confirmación no expone clave', async () => {
     const transport = api(); const data = new Map<string, string>();
     const memory = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); }, removeItem: (key: string) => { data.delete(key); } };
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 100, contentVersion: 1, canStart: true, ownedByMe: false }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'synthetic', title: 'Caso sintético', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 100, contentVersion: 1, canStart: true, hasMultipleRoutes: true, ownedByMe: false }], nextCursor: null });
     const delayed = deferred<void>(); transport.create.mockReturnValue(delayed.promise);
     transport.lookup.mockResolvedValue({ schemaVersion: 1, kind: 'create_run', status: 'committed', runId });
     const model = createArchiveModel(transport, memory); await model.refresh();
@@ -158,7 +158,7 @@ describe('T4-08: generación de casos en el archivo', () => {
     const transport = api(); const model = createArchiveModel(transport); await model.refresh();
     const done = { ...job, status: 'done' as const, caseId: 'generado-fraude-1', stage: 9 };
     transport.generationJobs.mockResolvedValue({ items: [done] });
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, hasMultipleRoutes: false, ownedByMe: true }], nextCursor: null });
     await model.refreshJobs();
     expect(model.getSnapshot().jobs).toEqual([done]);
     expect(model.getSnapshot().cases.map(item => item.caseId)).toContain('generado-fraude-1');
@@ -170,7 +170,7 @@ describe('T4-08: generación de casos en el archivo', () => {
     expect(model.getSnapshot().notice).toContain('en cola');
     const done = { ...job, status: 'done' as const, caseId: 'generado-fraude-1', stage: 9 };
     transport.generationJobs.mockResolvedValue({ items: [done] });
-    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true }], nextCursor: null });
+    transport.cases.mockResolvedValue({ items: [{ caseId: 'generado-fraude-1', title: 'Caso sintético generado', contentMode: 'generated', crimeType: 'fraude', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, hasMultipleRoutes: false, ownedByMe: true }], nextCursor: null });
     await model.refreshJobs();
     expect(model.getSnapshot().notice).toContain('Expediente listo: Caso sintético generado');
     expect(model.getSnapshot().notice).not.toContain('en cola');
@@ -190,7 +190,7 @@ describe('T4-08: generación de casos en el archivo', () => {
 });
 
 describe('T4-05: intercambio de expedientes en el archivo', () => {
-  const importedCase: CaseSummary = { caseId: 'importado-1a2b3c4d', title: 'Caso importado', contentMode: 'generated', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, ownedByMe: true };
+  const importedCase: CaseSummary = { caseId: 'importado-1a2b3c4d', title: 'Caso importado', contentMode: 'generated', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, hasMultipleRoutes: false, ownedByMe: true };
   it('exportar devuelve el fichero y avisa de que contiene la solución', async () => {
     const transport = api(); const model = createArchiveModel(transport); await model.refresh();
     const blob = new Blob(['{"version":"1.0.0"}'], { type: 'application/json' });

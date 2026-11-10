@@ -4,6 +4,7 @@ import { caseText, deadlineMinutesForDifficulty, type Difficulty, type Language 
 import type { CaseDefinition } from '@meridiano/case-schema';
 import type { CaseSummary } from '@meridiano/contracts';
 import type { ContentRating, CrimeType, ExplorationMode } from '@meridiano/contracts';
+import { hasMultipleRoutes } from '@meridiano/generator';
 import { astrolabioDefinition } from '@meridiano/engine';
 import type { Database } from '../database/connection.ts';
 import { generatedCases } from '../database/schema.ts';
@@ -131,6 +132,11 @@ export function caseSummaryFor(definition: CaseDefinition, ownedByMe = false, la
     deadlineMinutes: definition.deadlineMinutes,
     contentVersion: definition.contentVersion,
     canStart: validateCaseDefinition(definition).valid,
+    // Varias rutas (C2, lote pequeños del catálogo 2026-11-10): el caso
+    // fijo tiene dos (A/B, SPEC-003:86) pero su definición no trae
+    // mecánica, así que el cálculo del generador daría false; el generado
+    // se calcula desde su mecánica (par independiente con acceso).
+    hasMultipleRoutes: definition.contentMode === 'fixed' ? true : hasMultipleRoutes(definition),
     ownedByMe,
   };
 }
