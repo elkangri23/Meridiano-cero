@@ -171,7 +171,7 @@ function Archive() {
         <ProfileSection identity={identity} profile={detectiveProfile} onSaved={setDetectiveProfile} />
       </section>}
       {state.profile && <CareerSection />}
-      <footer><Link to="/glosario">{t('archive.glossary')}</Link> · {t('archive.footer')}</footer>
+      <footer><Link to="/glosario">{t('archive.glossary')}</Link> · <Link to="/creditos">{t('archive.credits')}</Link> · {t('archive.footer')}</footer>
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Archive } from './archive/Archive';
+import { Creditos } from './creditos/CreditosPage';
 import { Glosario } from './glosario/GlosarioPage';
 import { Prototype } from './prototype/Prototype';
 import { GameScreen } from './game/GameScreen';
@@ -17,6 +18,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Archive />} />
           <Route path="/glosario" element={<Glosario />} />
+          <Route path="/creditos" element={<Creditos />} />
           <Route path="/prototype" element={<Prototype />} />
           <Route path="/runs/:runId" element={<GameScreen />} />
           <Route path="/registro" element={<RegisterPage />} />

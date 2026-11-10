@@ -1,0 +1,25 @@
+body:has(.creditos) { background:#000000; color:#ffffff; }
+.creditos { box-sizing:border-box; max-width:1120px; min-height:100svh; margin:0 auto; padding:32px 24px; font:16px/1.6 ui-monospace,Consolas,monospace; }
+.creditos * { box-sizing:border-box; }
+.creditos h1,.creditos h2,.creditos h3 { margin:0; }
+.creditos h1 { font-size:clamp(1.4rem,4vw,2.2rem); line-height:1.3; color:#ffff55; }
+.creditos h2 { font-size:1.15rem; color:#ffff55; margin-bottom:8px; }
+.creditos p { margin:0 0 12px; }
+.creditos a { color:#ffff55; }
+.creditos a:focus-visible,.creditos button:focus-visible { outline:3px solid #ffff55; outline-offset:4px; }
+.creditos-header { display:flex; align-items:center; gap:20px; border-bottom:2px solid #aaaaaa; padding-bottom:24px; }
+.creditos-header p { font-size:.75rem; letter-spacing:.15em; }
+.creditos-mark { position:relative; display:grid; place-items:center; width:56px; height:56px; border:4px double #ffff55; color:#ffff55; font-size:2rem; flex-shrink:0; }
+.creditos-mark span { position:absolute; bottom:0; right:3px; font-size:.8rem; background:#000000; }
+.creditos-nav { display:flex; flex-wrap:wrap; gap:12px; padding:20px 0; border-bottom:1px solid #aaaaaa; margin-bottom:24px; }
+.creditos-nav button { font:inherit; border-radius:0; border:2px outset #ffffff; background:#aaaaaa; color:#000000; padding:8px 12px; min-height:44px; cursor:pointer; }
+.creditos-nav button[aria-pressed="true"] { background:#ffff55; color:#000000; }
+.creditos-section { border:2px solid #aaaaaa; padding:16px 20px; margin-bottom:20px; }
+.creditos-section h2 { display:flex; align-items:center; gap:10px; }
+.creditos-section h2::before { content:'>'; color:#ffff55; }
+.creditos-section table { width:100%; border-collapse:collapse; margin:12px 0; }
+.creditos-section th,.creditos-section td { border:1px solid #aaaaaa; padding:8px 10px; text-align:left; vertical-align:top; }
+.creditos-section th { color:#ffff55; }
+.creditos-footer { border-top:1px solid #aaaaaa; margin-top:32px; padding-top:16px; color:#aaaaaa; font-size:.85rem; }
+.creditos-footer a { margin-right:16px; }
+@media (max-width:520px) { .creditos { padding:16px; } .creditos-header { gap:12px; } .creditos-nav { gap:8px; } }
