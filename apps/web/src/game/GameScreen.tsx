@@ -462,6 +462,12 @@ function SceneNpcGroup({ group, view, disabled, onOffer }: { group: TalkGroup; v
   </div>;
 }
 
+/** Recuento con singular/plural (fase 4): «1 acción», «3 acciones»,
+ * como `labOne`/`labMany`. Sin esto el recuento decía «1 acciones». */
+function sceneCount(t: TranslateFn, oneKey: LocaleKey, manyKey: LocaleKey, count: number): string {
+  return count === 1 ? t(oneKey) : t(manyKey, { count });
+}
+
 /** Iconos de las tarjetas de oferta (fase 4): decorativos, sin texto. */
 function InspectIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.8-3.8" /></svg>;
@@ -527,25 +533,25 @@ function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDt
   if (view.status === 'closed') return <p className="game-scene-closed">{t('game.closedNote')}</p>;
   return <>
     {grouped.inspect.length > 0 && <section className="game-scene-group" aria-labelledby="scene-inspect-heading">
-      <div className="game-scene-group-head"><h2 id="scene-inspect-heading">{t('game.scene.inspectTitle')}</h2><span>{t('game.scene.countOffers', { count: grouped.inspect.length })}</span></div>
+      <div className="game-scene-group-head"><h2 id="scene-inspect-heading">{t('game.scene.inspectTitle')}</h2><span>{sceneCount(t, 'game.scene.countOfferOne', 'game.scene.countOffersMany', grouped.inspect.length)}</span></div>
       {grouped.inspect.map(offer => (
         <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<InspectIcon />} />
       ))}
     </section>}
     {grouped.talk.length > 0 && <section className="game-scene-group" aria-labelledby="scene-talk-heading">
-      <div className="game-scene-group-head"><h2 id="scene-talk-heading">{t('game.scene.talkTitle')}</h2><span>{t('game.scene.countPeople', { count: groupTalkOffers(grouped.talk).length })}</span></div>
+      <div className="game-scene-group-head"><h2 id="scene-talk-heading">{t('game.scene.talkTitle')}</h2><span>{sceneCount(t, 'game.scene.countPersonOne', 'game.scene.countPeopleMany', groupTalkOffers(grouped.talk).length)}</span></div>
       {groupTalkOffers(grouped.talk).map(group => (
         <SceneNpcGroup key={group.npcId} group={group} view={view} disabled={disabled} onOffer={onOffer} />
       ))}
     </section>}
     {grouped.travel.length > 0 && <section className="game-scene-group" aria-labelledby="scene-travel-heading">
-      <div className="game-scene-group-head"><h2 id="scene-travel-heading">{t('game.scene.travelTitle')}</h2><span>{t('game.scene.countOffers', { count: grouped.travel.length })}</span></div>
+      <div className="game-scene-group-head"><h2 id="scene-travel-heading">{t('game.scene.travelTitle')}</h2><span>{sceneCount(t, 'game.scene.countOfferOne', 'game.scene.countOffersMany', grouped.travel.length)}</span></div>
       {grouped.travel.map(offer => (
         <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<TravelIcon />} />
       ))}
     </section>}
     {(grouped.other.length > 0 || finishOffer) && <section className="game-scene-group" aria-labelledby="scene-other-heading">
-      <div className="game-scene-group-head"><h2 id="scene-other-heading">{t('game.scene.otherTitle')}</h2><span>{t('game.scene.countOffers', { count: grouped.other.length + (finishOffer ? 1 : 0) })}</span></div>
+      <div className="game-scene-group-head"><h2 id="scene-other-heading">{t('game.scene.otherTitle')}</h2><span>{sceneCount(t, 'game.scene.countOfferOne', 'game.scene.countOffersMany', grouped.other.length + (finishOffer ? 1 : 0))}</span></div>
       {grouped.other.map(offer => (
         <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<OtherIcon />} />
       ))}
@@ -588,7 +594,7 @@ function SceneDossier({ view, onOpenDossier }: { view: PlayerViewDto; onOpenDoss
   const lookup = lookupFromView(view);
   const items = sceneEvidence(view);
   return <section className="game-scene-side-card" aria-labelledby="scene-dossier-heading">
-    <div className="game-scene-side-head"><h2 id="scene-dossier-heading">{t('game.scene.dossierTitle')}</h2><span>{t('game.scene.countClues', { count: items.length })}</span></div>
+    <div className="game-scene-side-head"><h2 id="scene-dossier-heading">{t('game.scene.dossierTitle')}</h2><span>{sceneCount(t, 'game.scene.countClueOne', 'game.scene.countCluesMany', items.length)}</span></div>
     {items.length === 0
       ? <p className="game-scene-side-empty">{t('game.scene.dossierEmpty')}</p>
       : items.map(item => <div key={item.id} className="game-scene-evidence">
