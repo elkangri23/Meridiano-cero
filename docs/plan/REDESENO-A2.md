@@ -79,6 +79,106 @@ fijo (`astrolabio-tres-ciudades`); el resto sigue con SVG procedural.
   hereda la foto de la Lucía del caso fijo. Capturas en
   `~/workspace/redeseno-a2/shots-fase3/`.
 
+### Fase 4 (hecha): la escena reorganizada como la maqueta
+Las fases 1–3 solo cambiaron la piel: la vista real seguía con la
+estructura antigua (tira del expediente, fila de pestañas, botones en
+píldora, consola, caja de texto). Esta fase reorganiza la escena para
+seguir la ORGANIZACIÓN de la maqueta A2, no solo sus colores
+(`apps/web/src/game/GameScreen.tsx`, `game.css`,
+`scene-offers.ts`; 26 claves nuevas `game.scene.*` en es/en/fr).
+
+- Héroe: la ilustración de la escena a todo lo ancho, con encima el
+  chip «Escena de investigación activa», el nombre del lugar, la
+  ciudad y el país, y «Localización 01»; debajo, la descripción del
+  lugar. `SceneArt` se mantiene (`role="img"` + `aria-label`).
+- Columna izquierda, grupos con cabecera numerada: A. Inspeccionar
+  (tarjetas ricas: icono, título con la etiqueta del motor, el
+  detalle del motor cuando lo trae, estado «● Disponible» y botón
+  «Inspeccionar →»); B. Interrogar (tarjeta por NPC: retrato, nombre
+  + rol, un botón por tema con su etiqueta; la sospechosa con su nota
+  de conducta — la negativa real del caso, «No voy a declarar sobre
+  el robo.»); D. Viajes (tarjetas con el tiempo real del motor, p.
+  ej. «180 min», botón «Viajar →»); E. Otras acciones (recoger,
+  consultar, órdenes, detención, irregulares, esperar, recuperar y
+  el cierre del caso, como tarjetas con su detalle y su aviso real).
+- Columna derecha: Dossier en escena (evidencias en poder
+  encontradas en esta escena — procedencia lugar o ciudad —, con
+  tipo, minuto y texto legible, y botón «Ver tablero completo de
+  evidencias»), Estado de la investigación (objetivos con «{done} de
+  {total} objetivos cumplidos», porcentaje y barra) y Operaciones
+  globales (los botones que antes eran la tira de pestañas: Mapa,
+  Tablero de evidencias, Equipo A.C.M.E., Guardados, Ajustes,
+  Informe final, Terminal de inteligencia, Laboratorio, Central de
+  comunicaciones; después Introducción, Resumen, Restablecer
+  distribución y Actualizar vista; Mapa en teal como botón
+  principal).
+- La tira de pestañas DESAPARECE de la vista de escena; la tira del
+  expediente se MANTIENE arriba, sin perder ningún dato. La caja de
+  texto libre del intérprete y la consola narrativa se quedan
+  (corazón del juego, no están en la maqueta), debajo de las dos
+  columnas a todo lo ancho, en ese orden: primero la caja de texto
+  y después la consola.
+- Responsive: bajo 900 px las columnas se apilan (izquierda
+  primero, derecha después); bajo 720 px las tarjetas se apilan
+  con el botón debajo; héroe con min-height 260 px y título 29 px
+  en móvil.
+- Lo que NO se incluyó y por qué: el grupo C de la maqueta
+  (Acciones bloqueadas) no existe — el motor solo expone ofertas
+  disponibles, sin motivo de bloqueo, y no se inventa ninguna; las
+  tarjetas de inspeccionar/hablar/recoger no enseñan coste en
+  minutos porque la oferta pública del motor no lo trae (solo el
+  detalle cuando lo hay: viajes, consultas, análisis, órdenes,
+  detención e irregulares con su aviso real) — el coste real sigue
+  viéndose en el diálogo de confirmación antes de aceptar; el
+  hallazgo no sale en la tarjeta (vive en la consola y en el
+  dossier en escena); el estado «Realizado» no se marca en la
+  tarjeta (la oferta desaparece al completarse y lo realizado se
+  ve en el dossier). Si Antonio quiere costes en las tarjetas, el
+  motor tendría que exponerlos en la oferta (cambio de motor, fase
+  posterior).
+- Testids: se mantienen `offer-<id>`, `offer-finish`,
+  `toolbar-<ventana>`, `open-lab`, `objectives-panel`,
+  `objective-<id>`, `scene-art`, `scene-chat`, `game-scene`,
+  `game-scene-meta` y la clase `.game-scene-npc`; nuevos
+  `offer-card-<id>`, `npc-card-<npcId>` y `scene-dossier-full`.
+  `toolbar-lab` desaparece con la barra (ningún test lo usaba).
+  Los e2e afectados se actualizaron (`irregular.spec.ts`,
+  `pulido-cosmetico.spec.ts`, `auto-arrest.spec.ts`); en
+  `irregular.spec.ts` se corrigieron además sus llamadas a
+  `openWindow(page, 'Dossier')` → `'Tablero de evidencias'`
+  (título real de la ventana desde la fase 2).
+- Hallazgo (preexistente, no causado por esta fase): varios specs
+  e2e siguen buscando el diálogo `'Dossier'` y el botón
+  `'Dossier'`, y `accesibilidad.spec.ts` espera colores pre-A2
+  (`#005555`, foco `#ffff55`); la suite e2e no forma parte del
+  gate, por eso nadie lo detectó. Se reporta sin tocar el resto.
+- Verificación en navegador (2026-11-11, con cuenta de prueba
+  eliminada después): 37/37 comprobaciones en Playwright contra
+  producción — héroe con ilustración y título en Madrid, París y
+  Lisboa; grupos A/B/D/E como tarjetas con coste real (viajes «180
+  min», consultas e irregulares con su aviso); dossier y estado en
+  la columna derecha; Operaciones globales abriendo Mapa, Tablero y
+  Equipo; orden libre «Habla con Lucía sobre su identidad» abre el
+  chat; inspeccionar la sala deja el hallazgo en la consola,
+  inspeccionar la caja desbloquea recoger EV-06 y el dossier en
+  escena pasa a «1 pista»; la nota de conducta de Inés («No voy a
+  declarar sobre el robo.») aparece en su tarjeta de Lisboa;
+  móvil 390 px sin desbordamiento (scrollW 390, una columna, héroe
+  legible); caso generado (Fraude, Bilbao) con NPC en SVG, 10
+  tarjetas y los grupos renderizados. Capturas en
+  `~/workspace/redeseno-a2/shots-fase4/` (f4-01…f4-08).
+- Dos correcciones durante la verificación: el recuento decía «1
+  acciones» (ahora singular/plural: «1 acción», «2 acciones»,
+  claves `game.scene.count*One/Many` en es/en/fr) y la primera
+  comprobación del dossier esperaba evidencia tras inspeccionar la
+  sala (la inspección solo revela hechos; la evidencia llega al
+  recoger, verificado con EV-06).
+- Nota de verificación: inspeccionar y hablar no piden diálogo de
+  confirmación (lote 2: solo lo costoso ≥60 min o irreversible lo
+  pide), así que la verificación usa el chat y la consola, no el
+  diálogo de preview; el endpoint de interpretación responde 200
+  en 0,3 s con la cuenta de prueba.
+
 ## Landing pública en `/`
 
 - Visitante sin sesión: ve la landing. Usuario con sesión: redirige a
