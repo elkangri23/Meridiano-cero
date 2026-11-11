@@ -67,6 +67,14 @@ fijo (`astrolabio-tres-ciudades`); el resto sigue con SVG procedural.
   tal cual: siguen diciendo «pixel-art» aunque las imágenes ya no lo
   son. Si Antonio lo quiere, el arreglo es cambiar ese adjetivo en los
   tres idiomas, sin tocar nada más.
+- Verificación en navegador (2026-11-11, con cuenta de prueba
+  eliminada después): 15/15 comprobaciones en Playwright contra
+  producción — las 3 escenas muestran su ilustración, las 5 fotos
+  aparecen en escena/chat (Tomás a 48 px en chat) y el equipo
+  A.C.M.E. y un caso generado (Fraude, Bilbao) siguen con SVG
+  procedural (0 fotos); la «Lucía Vargas» del caso generado no
+  hereda la foto de la Lucía del caso fijo. Capturas en
+  `~/workspace/redeseno-a2/shots-fase3/`.
 
 ## Landing pública en `/`
 
