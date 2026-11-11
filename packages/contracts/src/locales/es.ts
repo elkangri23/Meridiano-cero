@@ -41,9 +41,9 @@ export const ES_MESSAGES = {
   'objectives.achieved': 'Logrado',
   'objectives.pending': 'Pendiente',
   'chat.fallbackGreeting': 'Soy {name}. ¿Qué quieres saber?',
-  'sceneArt.paris': 'Ilustración pixel-art de un archivo de conservación: estanterías con cajas y legajos, ventana con tejados y mesa con papeles y lámpara.',
-  'sceneArt.lisbon': 'Ilustración pixel-art de un almacén de depósito: rejilla de taquillas de custodia, lámpara colgante y una caja grande en primer plano.',
-  'sceneArt.madrid': 'Ilustración pixel-art de una sala de embalaje: ventana con vistas a la ciudad, mesa con una caja y un cuadro en la pared.',
+  'sceneArt.paris': 'Ilustración cinematográfica de un archivo de conservación: estanterías con cajas y legajos, ventana con tejados y mesa con papeles y lámpara.',
+  'sceneArt.lisbon': 'Ilustración cinematográfica de un almacén de depósito: rejilla de taquillas de custodia, lámpara colgante y una caja grande en primer plano.',
+  'sceneArt.madrid': 'Ilustración cinematográfica de una sala de embalaje: ventana con vistas a la ciudad, mesa con una caja y un cuadro en la pared.',
 
   // Archivo: generador de casos.
   'generation.overline': 'Generador de casos',

@@ -31,9 +31,9 @@ export const EN_MESSAGES: Record<LocaleKey, string> = {
   'objectives.achieved': 'Achieved',
   'objectives.pending': 'Pending',
   'chat.fallbackGreeting': 'I\'m {name}. What do you want to know?',
-  'sceneArt.paris': 'Pixel-art illustration of a conservation archive: shelves with boxes and files, a window with rooftops, and a desk with papers and a lamp.',
-  'sceneArt.lisbon': 'Pixel-art illustration of a deposit warehouse: a grid of custody lockers, a hanging lamp, and a large box in the foreground.',
-  'sceneArt.madrid': 'Pixel-art illustration of a packing room: a window overlooking the city, a desk with a box, and a picture on the wall.',
+  'sceneArt.paris': 'Cinematic illustration of a conservation archive: shelves with boxes and files, a window with rooftops, and a desk with papers and a lamp.',
+  'sceneArt.lisbon': 'Cinematic illustration of a deposit warehouse: a grid of custody lockers, a hanging lamp, and a large box in the foreground.',
+  'sceneArt.madrid': 'Cinematic illustration of a packing room: a window overlooking the city, a desk with a box, and a picture on the wall.',
 
   // Archive: case generator.
   'generation.overline': 'Case generator',

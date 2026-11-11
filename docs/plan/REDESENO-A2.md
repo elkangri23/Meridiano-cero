@@ -63,10 +63,13 @@ fijo (`astrolabio-tres-ciudades`); el resto sigue con SVG procedural.
 - Desviación menor anotada: la foto de Marta se parece bastante a
   Lucía (moño oscuro, blusa azul), aunque la cara es distinta; no se
   regeneró. Pendiente de decisión de Antonio si quiere distinguirla más.
-- Las descripciones accesibles `sceneArt.*` (es/en/fr) se mantienen
-  tal cual: siguen diciendo «pixel-art» aunque las imágenes ya no lo
-  son. Si Antonio lo quiere, el arreglo es cambiar ese adjetivo en los
-  tres idiomas, sin tocar nada más.
+- Arreglo 2026-11-11 (decisión de Antonio: quedarse con esta Marta y
+  arreglar lo de «pixel-art»): las descripciones accesibles `sceneArt.*`
+  (es/en/fr) ya no dicen «pixel-art»: «Ilustración cinematográfica
+  de…» / «Cinematic illustration of…» / «Illustration
+  cinématographique de…» (`packages/contracts/src/locales/{es,en,fr}.ts`,
+  3 claves × 3 idiomas). Solo cambió ese adjetivo; el resto de cada
+  descripción sigue igual.
 - Verificación en navegador (2026-11-11, con cuenta de prueba
   eliminada después): 15/15 comprobaciones en Playwright contra
   producción — las 3 escenas muestran su ilustración, las 5 fotos

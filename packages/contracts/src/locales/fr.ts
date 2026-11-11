@@ -34,9 +34,9 @@ export const FR_MESSAGES: Record<LocaleKey, string> = {
   'objectives.achieved': 'Réussi',
   'objectives.pending': 'En attente',
   'chat.fallbackGreeting': 'Je suis {name}. Que veux-tu savoir ?',
-  'sceneArt.paris': 'Illustration pixel-art d\'un centre de conservation : des étagères pleines de boîtes et de dossiers, une fenêtre sur les toits et une table couverte de papiers et d\'une lampe.',
-  'sceneArt.lisbon': 'Illustration pixel-art d\'un entrepôt de dépôt : une grille de casiers de garde, une lampe suspendue et une grande boîte au premier plan.',
-  'sceneArt.madrid': 'Illustration pixel-art d\'une salle d\'emballage : une fenêtre avec vue sur la ville, une table avec une boîte et un tableau au mur.',
+  'sceneArt.paris': 'Illustration cinématographique d\'un centre de conservation : des étagères pleines de boîtes et de dossiers, une fenêtre sur les toits et une table couverte de papiers et d\'une lampe.',
+  'sceneArt.lisbon': 'Illustration cinématographique d\'un entrepôt de dépôt : une grille de casiers de garde, une lampe suspendue et une grande boîte au premier plan.',
+  'sceneArt.madrid': 'Illustration cinématographique d\'une salle d\'emballage : une fenêtre avec vue sur la ville, une table avec une boîte et un tableau au mur.',
 
   // Archivo: generador de casos.
   'generation.overline': 'Générateur de dossiers',
