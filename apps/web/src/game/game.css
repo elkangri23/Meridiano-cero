@@ -72,11 +72,11 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-case-strip strong { font-size:.9em; font-weight:700; }
 .game-case-strip p { margin-bottom:2px; }
 
-/* Objetivos siempre visibles: franja entre la barra de herramientas
- * y la escena. Logrado: check verde + chip visible, NUNCA tachado. */
-.game-objectives { background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:12px 16px; margin-bottom:16px; box-shadow:var(--shadow); }
-.game-objectives ul { list-style:none; margin:8px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:8px 24px; }
-.game-objectives li { font-size:.9em; text-decoration:none; display:flex; align-items:center; gap:8px; }
+/* Estado de la investigación: tarjeta de la columna derecha de la escena,
+ * con progreso real y barra. Logrado: check verde + chip visible, NUNCA tachado. */
+.game-objectives { background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); }
+.game-objectives ul { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:10px; }
+.game-objectives li { font-size:.9em; text-decoration:none; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .game-objectives li[data-achieved="true"] { color:var(--paper); text-decoration:none; }
 .game-objectives li[data-achieved="true"] .game-objective-mark { color:var(--green); font-weight:700; }
 .game-objectives li[data-achieved="false"] .game-objective-mark { color:var(--muted); }
@@ -104,32 +104,81 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-notice { padding:12px 0; min-height:48px; color:var(--gold); }
 .game-error { color:var(--error); }
 
-/* Barra de herramientas: pastillas de navegación; la activa es tinta. */
-.game-toolbar { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 16px; background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:8px; box-shadow:var(--shadow); }
-.game-toolbar button { text-align:left; color:var(--ink); background:transparent; border:1px solid transparent; font-size:.8em; padding:10px 13px; line-height:1.5; min-height:40px; font-weight:600; }
-.game-toolbar button:hover { background:var(--panel-soft); }
-.game-toolbar button[aria-pressed="true"] { background:var(--ink); border-color:var(--ink); color:#FFFFFF; font-weight:700; }
 
-/* Escena: tarjeta blanca con barra superior, arte y pie de escena. */
+/* Escena reorganizada (fase 4): héroe con la ilustración a todo lo ancho y
+ * el nombre del lugar encima; debajo, dos columnas (acciones a la
+ * izquierda, dossier/estado/operaciones a la derecha). */
 .game-scene { border:1px solid var(--edge); border-radius:18px; background:var(--panel); margin-bottom:16px; box-shadow:var(--shadow); overflow:hidden; }
-.game-scene-top { display:flex; justify-content:space-between; gap:10px; background:var(--panel-soft); color:var(--muted); padding:8px 16px; font-size:.75em; border-bottom:1px solid var(--edge); font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
-.game-scene-art { background:var(--panel-soft); overflow:hidden; border-bottom:1px solid var(--edge); }
-.game-scene-art img { display:block; width:100%; height:auto; }
-.game-scene-caption { padding:16px 20px 0; display:flex; align-items:center; justify-content:space-between; gap:15px; }
-.game-scene-description { padding:8px 20px 0; font-size:.95em; line-height:1.7; }
+.game-scene-hero { position:relative; display:flex; align-items:flex-end; min-height:320px; overflow:hidden; border-bottom:1px solid var(--edge); }
+.game-scene-hero .game-scene-art { position:absolute; inset:0; border-bottom:0; background:var(--panel-soft); overflow:hidden; }
+.game-scene-hero .game-scene-art img { display:block; width:100%; height:100%; object-fit:cover; object-position:center 62%; }
+.game-scene-hero-veil { position:absolute; inset:0; background:linear-gradient(90deg, rgba(10,14,24,.72) 0%, rgba(10,14,24,.45) 46%, rgba(10,14,24,.05) 75%); }
+.game-scene-hero-cap { position:relative; padding:26px 28px; color:#FFFFFF; max-width:min(640px,100%); }
+.game-scene-hero-cap h2 { color:#FFFFFF; font-size:36px; margin-top:10px; }
+.game-scene-hero-cap p { color:#E9E6DC; margin-top:8px; font-size:.9em; }
+.game-scene-hero-chip { display:inline-block; background:rgba(255,255,255,.14); color:#FFFFFF; border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:4px 10px; font-size:.7em; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:normal; line-height:1.4; }
+.game-scene-hero-cap .game-hourglass { color:#FFFFFF; }
+.game-scene-description { padding:16px 20px 0; font-size:.95em; line-height:1.7; }
 .game-scene-meta { padding:8px 20px 0; font-size:.85em; color:var(--muted); }
 .game-scene-meta p { margin-top:4px; }
 
-/* Acciones dentro de la escena: quién hay aquí, viajes y el resto. */
-.game-scene-group { border-top:1px solid var(--edge); padding:16px 20px; }
-.game-scene-group > .game-overline { display:block; margin-bottom:8px; }
-.game-scene-group ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px; }
-.game-scene-group p { margin-top:8px; }
-.game-scene-group p:first-child { margin-top:0; }
-.game-scene-npc { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; }
-.game-scene-npc > span { font-size:.85em; }
-.game-scene-npc strong { color:var(--ink); font-weight:700; }
+/* Rejilla de la escena: izquierda ancha, derecha estrecha (320 px). */
+.game-scene-grid { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:20px; align-items:start; padding:16px 20px 20px; }
+.game-scene-main { display:grid; gap:20px; min-width:0; }
+.game-scene-side { display:grid; gap:20px; min-width:0; }
+
+/* Grupo de acciones: tarjeta con cabecera numerada, como en la maqueta. */
+.game-scene-group { background:var(--panel); border:1px solid var(--edge); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
+.game-scene-group-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; border-bottom:1px solid var(--edge); padding:18px 22px 12px; }
+.game-scene-group-head h2 { font-size:20px; }
+.game-scene-group-head span { color:var(--muted); font-size:.8em; white-space:nowrap; }
+
+/* Tarjeta de oferta: icono, título, detalle y estado; botón a la derecha. */
+.game-scene-card { display:flex; gap:14px; padding:16px 22px; border-top:1px solid #F1EEE5; align-items:flex-start; }
+.game-scene-card:first-of-type { border-top:none; }
+.game-scene-card-icon { width:40px; height:40px; border-radius:10px; background:var(--panel-soft); border:1px solid var(--edge); display:flex; align-items:center; justify-content:center; flex:none; color:var(--ink); }
+.game-scene-card-icon svg { width:22px; height:22px; }
+.game-scene-card-main { flex:1; min-width:0; }
+.game-scene-card-top { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.game-scene-card-cost { font-family:var(--mono); font-size:.75em; color:var(--muted); }
+.game-scene-card-state { color:var(--teal-dark); font-weight:700; font-size:.8em; }
+.game-scene-card h3 { font-family:var(--sans); font-size:.95em; font-weight:700; margin-top:4px; line-height:1.4; }
+.game-scene-card > button { flex:none; align-self:center; }
+.game-scene-card-note { margin-top:10px; background:var(--panel); border:1px solid var(--edge); border-left:4px solid var(--gold-bright); border-radius:9px; padding:11px 14px; font-size:.85em; color:var(--ink); line-height:1.6; }
+
+/* Personaje presente: retrato, nombre y rol, temas como botones. */
+.game-scene-npc { display:flex; gap:14px; padding:16px 22px; border-top:1px solid #F1EEE5; align-items:flex-start; }
+.game-scene-npc:first-of-type { border-top:none; }
+.game-scene-npc.game-scene-npc--suspect { background:#FFFDF4; border:1px solid #E4CF8B; border-radius:14px; margin:6px 14px 16px; padding:14px; }
+.game-scene-npc .game-portrait, .game-scene-npc .game-portrait-photo { flex:none; }
+.game-scene-npc h3 { font-family:var(--sans); font-size:.95em; font-weight:700; line-height:1.4; }
+.game-scene-npc h3 strong { color:var(--ink); }
+.game-scene-npc-topics { display:flex; flex-direction:column; gap:8px; flex:none; }
+.game-scene-npc-topics button { white-space:nowrap; }
 .game-scene-closed { padding:12px; color:var(--muted); font-size:.9em; }
+
+/* Columna derecha: tarjetas de dossier, estado y operaciones. */
+.game-scene-side-card { background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); }
+.game-scene-side-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.game-scene-side-head h2 { font-size:20px; }
+.game-scene-side-head span { color:var(--muted); font-size:.8em; white-space:nowrap; }
+.game-scene-side-empty { color:var(--muted); font-size:.85em; margin-top:12px; }
+.game-scene-evidence { border:1px solid var(--edge); border-radius:12px; padding:13px 15px; margin-top:10px; background:#FFFFFF; }
+.game-scene-evidence-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.game-scene-evidence-type { color:var(--gold); font-size:.7em; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.game-scene-evidence-minute { font-family:var(--mono); font-size:.75em; color:var(--muted); white-space:nowrap; }
+.game-scene-evidence h4 { margin:6px 0 3px; font-size:.9em; font-family:var(--sans); font-weight:700; line-height:1.4; }
+.game-scene-evidence p { color:var(--muted); font-size:.8em; }
+.game-scene-side-full { width:100%; margin-top:14px; }
+.game-scene-progress-line { display:flex; justify-content:space-between; align-items:baseline; margin-top:12px; font-size:.9em; }
+.game-scene-progress-line b:last-child { color:var(--teal-dark); }
+.game-scene-progress { height:7px; background:#ECE8DC; border-radius:99px; overflow:hidden; margin-top:7px; }
+.game-scene-progress i { display:block; height:100%; background:var(--gold-bright); border-radius:99px; }
+.game-scene-ops { display:grid; gap:10px; margin-top:12px; }
+.game-scene-ops button { text-align:left; font-weight:600; font-size:.85em; }
+.game-scene-ops button[aria-pressed="true"] { background:var(--ink); border-color:var(--ink); color:#FFFFFF; font-weight:700; }
+.game .game-scene-ops-primary { background:var(--teal); border-color:var(--teal); color:#FFFFFF; font-weight:700; }
+.game .game-scene-ops-primary:hover { background:var(--teal-dark); }
 
 /* Consola narrativa: cuaderno de campo. */
 .game-console { border:1px solid var(--edge); border-left:4px solid var(--gold-bright); border-radius:14px; background:var(--panel); padding:16px 20px; margin-bottom:16px; box-shadow:var(--shadow); }
@@ -282,14 +331,25 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
   .game-case-strip > div { border-left:none; border-top:1px solid var(--edge); }
   .game-case-strip > div:nth-child(-n+2) { border-top:none; }
   .game-clock { text-align:left; }
-  .game-toolbar { flex-wrap:nowrap; overflow-x:auto; }
-  .game-toolbar button { flex-shrink:0; }
+}
+@media (max-width:900px) {
+  /* La rejilla de la escena se apila: acciones primero, columna derecha después. */
+  .game-scene-grid { grid-template-columns:1fr; }
 }
 @media (max-width:720px) {
   .game { padding:8px; }
   .game-window { position:static; width:auto; box-shadow:var(--shadow); margin-bottom:16px; }
   .game-window-body { max-height:none; }
   .game-case-strip { grid-template-columns:1fr; }
+  /* Las tarjetas se apilan: icono y título arriba, botón debajo. */
+  .game-scene-card { flex-direction:column; gap:10px; }
+  .game-scene-card > button { align-self:flex-start; }
+  .game-scene-npc { flex-direction:column; gap:10px; }
+  .game-scene-npc-topics { align-self:flex-start; }
+  .game-scene-npc-topics button { white-space:normal; text-align:left; }
+  .game-scene-hero { min-height:260px; }
+  .game-scene-hero-cap { padding:20px; }
+  .game-scene-hero-cap h2 { font-size:29px; }
 }
 @media (max-width:520px) {
   .game { margin:10px auto; padding:0 14px; }
@@ -302,7 +362,6 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
   .game-order form button { width:100%; border-left:0; border-top:1px solid var(--edge); border-radius:0 0 9px 9px; }
   .game-order-label > span { display:none; }
   .game-order-bottom { flex-wrap:wrap; }
-  .game-scene-top { font-size:.65em; }
 }
 @media (prefers-reduced-motion:reduce) { .game *, .game *::before, .game *::after { scroll-behavior:auto; animation:none; transition:none; } }
 /* Movimiento reducido manual (§15). */

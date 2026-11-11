@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { PublicActionOffer } from '@meridiano/contracts';
-import { groupOffers, groupTalkOffers } from './scene-offers';
+import type { PlayerViewDto, PublicActionOffer } from '@meridiano/contracts';
+import { groupOffers, groupTalkOffers, offerVerbKey, sceneEvidence } from './scene-offers';
 import { locationArtId } from './scene-art';
 
 function offer(id: string, type: PublicActionOffer['action']['type'], label: string): PublicActionOffer {
@@ -70,6 +70,51 @@ describe('groupTalkOffers: un personaje con varios temas sale una sola vez', () 
 
   it('sin ofertas de hablar no hay grupos', () => {
     expect(groupTalkOffers([])).toEqual([]);
+  });
+});
+
+describe('offerVerbKey: el botón de la tarjeta lleva solo el verbo', () => {
+  it('da verbo a inspeccionar, viajar, recoger, consultar, orden, detención, irregular, esperar y recuperar', () => {
+    expect(offerVerbKey('inspect')).toBe('game.scene.actInspect');
+    expect(offerVerbKey('travel')).toBe('game.scene.actTravel');
+    expect(offerVerbKey('collect')).toBe('game.scene.actCollect');
+    expect(offerVerbKey('query')).toBe('game.scene.actQuery');
+    expect(offerVerbKey('request_warrant')).toBe('game.scene.actWarrant');
+    expect(offerVerbKey('detain')).toBe('game.scene.actDetain');
+    expect(offerVerbKey('irregular')).toBe('game.scene.actIrregular');
+    expect(offerVerbKey('wait')).toBe('game.scene.actWait');
+    expect(offerVerbKey('recover')).toBe('game.scene.actRecover');
+  });
+
+  it('hablar, cerrar y los tipos desconocidos no tienen verbo: el botón usa la etiqueta', () => {
+    expect(offerVerbKey('talk')).toBeUndefined();
+    expect(offerVerbKey('finish')).toBeUndefined();
+    expect(offerVerbKey('analyze')).toBeUndefined();
+    expect(offerVerbKey('inventado')).toBeUndefined();
+  });
+});
+
+describe('sceneEvidence: el dossier en escena enseña lo encontrado aquí', () => {
+  function viewWith(objects: PlayerViewDto['objects']): PlayerViewDto {
+    return {
+      position: { city: { id: 'madrid', name: 'Madrid', country: 'España' }, location: { id: 'MAD-SALA', name: 'Sala de embalaje', description: 'Sala' } },
+      objects,
+    } as unknown as PlayerViewDto;
+  }
+
+  it('enseña las del lugar actual y las de su ciudad, no las de otra escena', () => {
+    const view = viewWith([
+      { id: 'EV-02', type: 'observation', origin: 'MAD-SALA', minute: 10, admissible: true },
+      { id: 'EV-10', type: 'record', origin: 'madrid', minute: 20, admissible: true },
+      { id: 'EV-04', type: 'record', origin: 'PAR-ARCH', minute: 200, admissible: true },
+      { id: 'EV-08', type: 'record', origin: 'LIS-ALM', minute: 400, admissible: true },
+    ]);
+    expect(sceneEvidence(view).map(item => item.id)).toEqual(['EV-02', 'EV-10']);
+  });
+
+  it('sin evidencias en la escena, el dossier queda vacío', () => {
+    const view = viewWith([{ id: 'EV-04', type: 'record', origin: 'PAR-ARCH', minute: 200, admissible: true }]);
+    expect(sceneEvidence(view)).toEqual([]);
   });
 });
 

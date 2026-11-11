@@ -17,7 +17,7 @@ import { SceneArt } from './scene-art';
 import { Portrait } from './portrait';
 import { portraitSeed, teamPortraitSeed } from './portraits';
 import { createMusicEngine, type EffectKind } from './music';
-import { groupOffers, groupTalkOffers } from './scene-offers';
+import { groupOffers, groupTalkOffers, offerVerbKey, sceneEvidence } from './scene-offers';
 import type { TalkGroup } from './scene-offers';
 import { interpretClarificationText } from './interpret-clarification';
 import { buildIntelFacts, INTEL_ID, INTEL_NAME, intelGreeting, intelNoRecord, intelPersona, intelRefusal, selectIntelFacts } from './intel-terminal';
@@ -430,33 +430,72 @@ function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, onLogou
   </header>;
 }
 
-/** Fila de un personaje presente en la escena: nombre y rol una sola vez,
- * con un botón por tema de conversación. Nombre y rol salen de los datos de
- * charla del caso en curso, con el catálogo como respaldo (sin inventar
- * nada). Antes había una fila por oferta y Lucía salía dos veces (su
- * identidad y la caja). */
+/** Tarjeta de un personaje presente en la escena (fase 4 del rediseño A2,
+ * grupo B de la maqueta): retrato, nombre y rol una sola vez, con un botón
+ * por tema de conversación. Nombre y rol salen de los datos de charla del
+ * caso en curso, con el catálogo como respaldo (sin inventar nada). Antes
+ * había una fila por oferta y Lucía salía dos veces (su identidad y la
+ * caja). Si el personaje tiene negativa (la sospechosa, que se niega a
+ * declarar sobre el robo), su nota de conducta sale en la tarjeta: el
+ * texto es el de la negativa del caso, no un invento de la maqueta. La
+ * clase `game-scene-npc` se mantiene: los e2e la usan para los retratos. */
 function SceneNpcGroup({ group, view, disabled, onOffer }: { group: TalkGroup; view: PlayerViewDto; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+  const t = useTranslation();
+  const { preferences } = usePreferences();
   const npcId = group.npcId;
   const entry = findChatEntry(view, npcId);
   const name = chatNpcName(entry, getNPC(npcId)?.name) ?? npcNamesFromView(view).get(npcId) ?? npcId;
   const role = sceneRole(view, npcId, getNPC(npcId)?.role);
-  return <div className="game-scene-npc">
+  const refusal = chatRefusal(entry, npcRefusal(npcId, undefined, view.caseId, preferences.language));
+  return <div className={`game-scene-npc${refusal ? ' game-scene-npc--suspect' : ''}`} data-testid={`npc-card-${npcId}`}>
     <Portrait seed={portraitSeed(view.caseId, npcId)} name={name} size="small" />
-    <span><strong>{name}</strong>{role ? ` · ${role}` : ''}</span>
-    {group.offers.map(offer => (
-      <button key={offer.id} type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
-        onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}</button>
-    ))}
+    <div className="game-scene-card-main">
+      <h3><strong>{name}</strong>{role ? ` · ${role}` : ''}</h3>
+      {refusal && <p className="game-scene-card-note"><b>{t('game.scene.conductNote')}:</b> {refusal}</p>}
+    </div>
+    <div className="game-scene-npc-topics">
+      {group.offers.map(offer => (
+        <button key={offer.id} type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
+          onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}</button>
+      ))}
+    </div>
   </div>;
 }
 
-/** Lista de ofertas con su botón cada una (viajes u otras acciones). */
-function SceneOfferList({ offers, disabled, onOffer }: { offers: PublicActionOffer[]; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
-  return <ul>{offers.map(offer => (
-    <li key={offer.id}>
-      <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
-        onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}{offer.detail ? ` · ${offer.detail}` : ''}</button>
-    </li>))}</ul>;
+/** Iconos de las tarjetas de oferta (fase 4): decorativos, sin texto. */
+function InspectIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.8-3.8" /></svg>;
+}
+function TravelIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12h15" /><path d="m13 6 6 6-6 6" /></svg>;
+}
+function OtherIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 21V4" /><path d="M6 5h11l-2 4 2 4H6" /></svg>;
+}
+
+/** Tarjeta rica de una oferta (fase 4 del rediseño A2, como las de la
+ * maqueta): icono, título con la etiqueta del motor, el detalle del motor
+ * cuando lo trae (coste real en minutos, aviso o plazo) y estado
+ * Disponible; el botón de la derecha lleva solo el verbo. El detalle vive
+ * en la tarjeta, no en el botón: la etiqueta y el aviso se leen antes de
+ * pulsar, y el botón no repite el título. Cerrar el caso no usa verbo: su
+ * botón lleva la etiqueta completa, como antes. */
+function OfferCard({ offer, disabled, onOffer, icon, primary }: { offer: PublicActionOffer; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; icon: ReactNode; primary?: boolean }) {
+  const t = useTranslation();
+  const verbKey = offerVerbKey(offer.action.type);
+  const buttonLabel = primary || !verbKey ? offer.label : t(verbKey);
+  return <div className="game-scene-card" data-testid={`offer-card-${offer.id}`}>
+    <div className="game-scene-card-icon" aria-hidden="true">{icon}</div>
+    <div className="game-scene-card-main">
+      <div className="game-scene-card-top">
+        {offer.detail && <span className="game-scene-card-cost">{offer.detail}</span>}
+        <span className="game-scene-card-state">● {t('game.scene.available')}</span>
+      </div>
+      <h3>{offer.label}</h3>
+    </div>
+    <button type="button" className={primary ? 'game-primary-button' : undefined} data-testid={`offer-${offer.id}`} disabled={disabled}
+      onClick={event => onOffer(offer, event.currentTarget)}>{buttonLabel}</button>
+  </div>;
 }
 
 /** Estado de la escena: evidencias en poder, solicitudes, órdenes y
@@ -475,50 +514,62 @@ function SceneMeta({ view }: { view: PlayerViewDto }) {
   </div>;
 }
 
-/** Acciones de la escena, agrupadas: quién hay aquí, viajes y el resto. */
-function SceneActions({ view, grouped, disabled, onOffer, onOpenLab }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void }) {
+/** Acciones de la escena, agrupadas en tarjetas (fase 4 del rediseño A2):
+ * A inspeccionar, B interrogar, D viajes y E otras acciones, en ese orden
+ * y con el orden del motor dentro de cada grupo. El grupo C de la maqueta
+ * (acciones bloqueadas) no existe aquí: el motor solo expone ofertas
+ * disponibles, sin motivo de bloqueo, así que no se inventa ninguna. El
+ * laboratorio no es una acción de escena: su ventana vive en Operaciones
+ * globales, con el recuento de análisis cuando los hay. */
+function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const t = useTranslation();
   const finishOffer = grouped.finish;
   if (view.status === 'closed') return <p className="game-scene-closed">{t('game.closedNote')}</p>;
   return <>
-    {(grouped.talk.length > 0 || grouped.inspect.length > 0) && <div className="game-scene-group">
-      <p className="game-overline">{t('game.inScene')}</p>
+    {grouped.inspect.length > 0 && <section className="game-scene-group" aria-labelledby="scene-inspect-heading">
+      <div className="game-scene-group-head"><h2 id="scene-inspect-heading">{t('game.scene.inspectTitle')}</h2><span>{t('game.scene.countOffers', { count: grouped.inspect.length })}</span></div>
+      {grouped.inspect.map(offer => (
+        <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<InspectIcon />} />
+      ))}
+    </section>}
+    {grouped.talk.length > 0 && <section className="game-scene-group" aria-labelledby="scene-talk-heading">
+      <div className="game-scene-group-head"><h2 id="scene-talk-heading">{t('game.scene.talkTitle')}</h2><span>{t('game.scene.countPeople', { count: groupTalkOffers(grouped.talk).length })}</span></div>
       {groupTalkOffers(grouped.talk).map(group => (
         <SceneNpcGroup key={group.npcId} group={group} view={view} disabled={disabled} onOffer={onOffer} />
       ))}
-      {grouped.inspect.map(offer => (
-        <p key={offer.id}><button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
-          onClick={event => onOffer(offer, event.currentTarget)}>{offer.label}{offer.detail ? ` · ${offer.detail}` : ''}</button></p>
+    </section>}
+    {grouped.travel.length > 0 && <section className="game-scene-group" aria-labelledby="scene-travel-heading">
+      <div className="game-scene-group-head"><h2 id="scene-travel-heading">{t('game.scene.travelTitle')}</h2><span>{t('game.scene.countOffers', { count: grouped.travel.length })}</span></div>
+      {grouped.travel.map(offer => (
+        <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<TravelIcon />} />
       ))}
-    </div>}
-    {grouped.lab.length > 0 && <div className="game-scene-group">
-      <p className="game-overline">{t(WINDOW_KEYS.lab)}</p>
-      <p><button type="button" data-testid="open-lab" disabled={disabled} onClick={onOpenLab}>
-        {grouped.lab.length === 1 ? t('game.labOne') : t('game.labMany', { count: grouped.lab.length })}</button></p>
-    </div>}
-    {grouped.travel.length > 0 && <div className="game-scene-group">
-      <p className="game-overline">{t('game.travel')}</p>
-      <SceneOfferList offers={grouped.travel} disabled={disabled} onOffer={onOffer} />
-    </div>}
-    {(grouped.other.length > 0 || finishOffer) && <div className="game-scene-group">
-      <p className="game-overline">{t('game.otherActions')}</p>
-      <SceneOfferList offers={grouped.other} disabled={disabled} onOffer={onOffer} />
-      {finishOffer && <p><button type="button" className="game-primary-button" data-testid="offer-finish" disabled={disabled}
-        onClick={event => onOffer(finishOffer, event.currentTarget)}>{finishOffer.label}</button></p>}
-    </div>}
+    </section>}
+    {(grouped.other.length > 0 || finishOffer) && <section className="game-scene-group" aria-labelledby="scene-other-heading">
+      <div className="game-scene-group-head"><h2 id="scene-other-heading">{t('game.scene.otherTitle')}</h2><span>{t('game.scene.countOffers', { count: grouped.other.length + (finishOffer ? 1 : 0) })}</span></div>
+      {grouped.other.map(offer => (
+        <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<OtherIcon />} />
+      ))}
+      {finishOffer && <OfferCard offer={finishOffer} disabled={disabled} onOffer={onOffer} icon={<OtherIcon />} primary />}
+    </section>}
   </>;
 }
 
-/** Objetivos siempre visibles (lote 2 de jugabilidad): el panel vive en el
- * flujo principal, entre la barra de herramientas y la escena, para que el
- * jugador vea en todo momento qué tiene que conseguir y qué lleva logrado.
- * Los objetivos y su estado vienen de la vista del servidor (la misma
- * evaluación que el informe final, pero en vivo); las frases son las del
- * expediente, sin spoilers más allá de lo que ellas mismas dicen. */
+/** Estado de la investigación (fase 4 del rediseño A2): los objetivos
+ * viven en la columna derecha de la escena, con su progreso real y una
+ * barra, como en la maqueta. Antes el panel vivía en el flujo principal,
+ * entre la barra de herramientas y la escena. Los objetivos y su estado
+ * vienen de la vista del servidor (la misma evaluación que el informe
+ * final, pero en vivo); las frases son las del expediente, sin spoilers
+ * más allá de lo que ellas mismas dicen. */
 function ObjectivesSection({ view }: { view: PlayerViewDto }) {
   const t = useTranslation();
+  const done = view.objectives.filter(objective => objective.achieved).length;
+  const total = view.objectives.length;
+  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
   return <section className="game-objectives" aria-labelledby="objectives-heading" data-testid="objectives-panel">
-    <p className="game-overline" id="objectives-heading">{t('game.objectives')}</p>
+    <div className="game-scene-side-head"><h2 id="objectives-heading">{t('game.scene.stateTitle')}</h2></div>
+    <p className="game-scene-progress-line"><b>{t('game.scene.stateSummary', { done, total })}</b><b>{percent}%</b></p>
+    <div className="game-scene-progress" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label={t('game.scene.stateSummary', { done, total })}><i style={{ width: `${percent}%` }} /></div>
     <ul>{view.objectives.map(objective =>
       <li key={objective.id} data-testid={`objective-${objective.id}`} data-achieved={objective.achieved}>
         <span className="game-objective-mark" aria-hidden="true">{objective.achieved ? '✓' : '○'}</span>{objective.description}
@@ -528,23 +579,108 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
   </section>;
 }
 
-/** Escena (lote 1 de jugabilidad): el arte es propio de cada localización
- * (ver scene-art.tsx) y las acciones disponibles del motor se muestran
- * agrupadas dentro de la escena: quién hay aquí (con su rol) y qué se puede
- * inspeccionar, a dónde se puede viajar, y el resto de acciones. Cada oferta
- * sale una sola vez y con su mismo testid, así que la caja de texto libre
- * queda para las órdenes creativas. */
-function SceneSection({ view, disabled, clockPulse, onOffer, onOpenLab, chatPanel }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenLab: () => void; chatPanel?: ReactNode }) {
+/** Dossier en escena (fase 4, columna derecha de la maqueta): las
+ * evidencias en poder encontradas en esta escena, en mini-tarjetas con su
+ * tipo, su minuto y su procedencia real. El botón abre el tablero completo
+ * (la ventana del dossier). */
+function SceneDossier({ view, onOpenDossier }: { view: PlayerViewDto; onOpenDossier: () => void }) {
+  const t = useTranslation();
+  const lookup = lookupFromView(view);
+  const items = sceneEvidence(view);
+  return <section className="game-scene-side-card" aria-labelledby="scene-dossier-heading">
+    <div className="game-scene-side-head"><h2 id="scene-dossier-heading">{t('game.scene.dossierTitle')}</h2><span>{t('game.scene.countClues', { count: items.length })}</span></div>
+    {items.length === 0
+      ? <p className="game-scene-side-empty">{t('game.scene.dossierEmpty')}</p>
+      : items.map(item => <div key={item.id} className="game-scene-evidence">
+        <div className="game-scene-evidence-top"><span className="game-scene-evidence-type">{evidenceTypeLabel(item.type, t)}</span><span className="game-scene-evidence-minute">{item.minute} min</span></div>
+        <h4>{view.evidenceTexts[item.id] ?? item.id}</h4>
+        <p>{lookup.locationName(item.origin) ?? lookup.cityName(item.origin) ?? item.origin}</p>
+      </div>)}
+    <button type="button" className="game-scene-side-full" data-testid="scene-dossier-full" onClick={onOpenDossier}>{t('game.scene.dossierFull')}</button>
+  </section>;
+}
+
+/** Operaciones globales (fase 4, columna derecha de la maqueta): las
+ * ventanas que antes eran la tira de pestañas, en el orden de la maqueta
+ * (Mapa, Tablero, Equipo, Guardados, Ajustes, Informe final, Terminal,
+ * Laboratorio, Central) y después Introducción, Resumen, Restablecer y
+ * Actualizar. Los testid `toolbar-<ventana>` se mantienen para no romper
+ * los e2e; el laboratorio conserva `open-lab` (su botón de escena, con el
+ * recuento de análisis cuando los hay) y `toolbar-lab` desaparece con la
+ * barra: ningún test lo usaba. */
+const SCENE_OPS_ORDER: WindowId[] = ['map', 'dossier', 'team', 'saves', 'settings', 'report', 'intel', 'lab', 'comms'];
+
+function GlobalOps({ view, labCount, openWindows, onOpenWindow, onOpenIntro, canResume, onOpenResume, onResetLayout, onRefresh }: {
+  view: PlayerViewDto; labCount: number; openWindows: Record<WindowId, { open: boolean }>;
+  onOpenWindow: (id: WindowId, trigger: HTMLElement | null) => void;
+  onOpenIntro: () => void; canResume: boolean; onOpenResume: () => void; onResetLayout: () => void; onRefresh: () => void;
+}) {
+  const t = useTranslation();
+  return <section className="game-scene-side-card" aria-labelledby="scene-ops-heading">
+    <div className="game-scene-side-head"><h2 id="scene-ops-heading">{t('game.scene.opsTitle')}</h2></div>
+    <div className="game-scene-ops">
+      {SCENE_OPS_ORDER.map(id => (
+        <button key={id} type="button" data-testid={id === 'lab' ? 'open-lab' : `toolbar-${id}`} aria-pressed={openWindows[id].open}
+          className={id === 'map' ? 'game-scene-ops-primary' : undefined}
+          onClick={event => onOpenWindow(id, event.currentTarget)}>
+          {id === 'lab' && labCount > 0 ? (labCount === 1 ? t('game.labOne') : t('game.labMany', { count: labCount })) : t(WINDOW_KEYS[id])}
+        </button>
+      ))}
+      {view.briefing && <button type="button" onClick={onOpenIntro}>{t('game.introButton')}</button>}
+      {canResume && <button type="button" onClick={onOpenResume}>{t('game.toolbarResume')}</button>}
+      <button type="button" onClick={onResetLayout}>{t('game.toolbarResetLayout')}</button>
+      <button type="button" onClick={onRefresh}>{t('game.toolbarRefresh')}</button>
+    </div>
+  </section>;
+}
+
+/** Acciones globales que la escena necesita en su columna derecha. */
+interface SceneOps {
+  openWindows: Record<WindowId, { open: boolean }>;
+  onOpenWindow: (id: WindowId, trigger: HTMLElement | null) => void;
+  onOpenIntro: () => void;
+  canResume: boolean;
+  onOpenResume: () => void;
+  onResetLayout: () => void;
+  onRefresh: () => void;
+}
+
+/** Escena reorganizada (fase 4 del rediseño A2): héroe con la ilustración
+ * a todo lo ancho y el nombre del lugar encima, y debajo dos columnas —
+ * a la izquierda los grupos A/B/D/E de acciones, a la derecha el dossier
+ * en escena, el estado y las operaciones globales — como en la maqueta.
+ * El arte sigue siendo el de cada localización (ver scene-art.tsx). La
+ * caja de texto libre y la consola no están en la maqueta y se quedan
+ * fuera de la sección, debajo de las columnas. */
+function SceneSection({ view, disabled, clockPulse, onOffer, ops, chatPanel }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; ops: SceneOps; chatPanel?: ReactNode }) {
   const t = useTranslation();
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   const grouped = groupOffers(view.offers);
   return <section className="game-scene" id="game-scene" tabIndex={-1} aria-labelledby="scene-heading">
-    <div className="game-scene-top"><span>{t('game.location', { num: String(locationIndex).padStart(2, '0') })}</span><span>{view.position.city.name.toUpperCase()} · {view.position.city.country}</span></div>
-    <SceneArt locationId={view.position.location.id} />
-    <div className="game-scene-caption"><div><p className="game-overline">{view.position.city.name}</p><h2 id="scene-heading">{view.position.location.name}</h2></div>{clockPulse && <SceneHourglass delta={clockPulse.delta} animKey={clockPulse.key} />}</div>
+    <div className="game-scene-hero">
+      <SceneArt locationId={view.position.location.id} />
+      <div className="game-scene-hero-veil" aria-hidden="true" />
+      <div className="game-scene-hero-cap">
+        <span className="game-scene-hero-chip">{t('game.scene.activeChip')}</span>
+        <h2 id="scene-heading">{view.position.location.name}</h2>
+        <p>{view.position.city.name}, {view.position.city.country} · {t('game.location', { num: String(locationIndex).padStart(2, '0') })}</p>
+        {clockPulse && <SceneHourglass delta={clockPulse.delta} animKey={clockPulse.key} />}
+      </div>
+    </div>
     <p className="game-scene-description">{view.position.location.description}</p>
     <SceneMeta view={view} />
-    <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} onOpenLab={onOpenLab} />
+    <div className="game-scene-grid">
+      <div className="game-scene-main">
+        <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} />
+      </div>
+      <div className="game-scene-side">
+        <SceneDossier view={view} onOpenDossier={() => ops.onOpenWindow('dossier', null)} />
+        <ObjectivesSection view={view} />
+        <GlobalOps view={view} labCount={grouped.lab.length} openWindows={ops.openWindows} onOpenWindow={ops.onOpenWindow}
+          onOpenIntro={ops.onOpenIntro} canResume={ops.canResume} onOpenResume={ops.onOpenResume}
+          onResetLayout={ops.onResetLayout} onRefresh={ops.onRefresh} />
+      </div>
+    </div>
     {chatPanel}
   </section>;
 }
@@ -1085,12 +1221,6 @@ function BriefingSection({ view, onDismiss }: { view: PlayerViewDto; onDismiss: 
 function IntroPanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boolean; onDismiss: () => void }) {
   if (!open || !view.briefing) return null;
   return <BriefingSection view={view} onDismiss={onDismiss} />;
-}
-
-function IntroButton({ view, onOpen }: { view: PlayerViewDto; onOpen: () => void }) {
-  const t = useTranslation();
-  if (!view.briefing) return null;
-  return <button type="button" onClick={onOpen}>{t('game.introButton')}</button>;
 }
 
 /** Resumen al retomar la partida (§13): se abre solo al entrar en una
@@ -2804,27 +2934,24 @@ export function GameScreen() {
     <IntroPanel view={view} open={introOpen} onDismiss={dismissIntro} />
     <ResumePanel view={view} open={resumeOpen} onDismiss={dismissResume} />
 
-    <div className="game-toolbar" role="toolbar" aria-label={t('game.toolbarTools')}>
-      <IntroButton view={view} onOpen={() => setIntroOpen(true)} />
-      {resumeAvailable(view) && <button type="button" onClick={() => setResumeOpen(true)}>{t('game.toolbarResume')}</button>}
-      {(Object.keys(WINDOW_KEYS) as WindowId[]).map(id => (
-        <button key={id} type="button" data-testid={`toolbar-${id}`} aria-pressed={windows.windows[id].open}
-          onClick={event => { if (id === 'team') openTeam(event.currentTarget); else windows.open(id, event.currentTarget); }}>{t(WINDOW_KEYS[id])}</button>
-      ))}
-      <button type="button" onClick={windows.resetLayout}>{t('game.toolbarResetLayout')}</button>
-      <button type="button" onClick={() => void refresh()}>{t('game.toolbarRefresh')}</button>
-    </div>
-
-    <ObjectivesSection view={view} />
-    <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)} onOpenLab={() => windows.open('lab', null)}
+    <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)}
+      ops={{
+        openWindows: windows.windows,
+        onOpenWindow: (id, trigger) => { if (id === 'team') openTeam(trigger); else windows.open(id, trigger); },
+        onOpenIntro: () => setIntroOpen(true),
+        canResume: resumeAvailable(view),
+        onOpenResume: () => setResumeOpen(true),
+        onResetLayout: windows.resetLayout,
+        onRefresh: () => void refresh(),
+      }}
       chatPanel={chatNpc ? <SceneChatPanel npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
         onDraft={setChatDraft} onSend={event => void sendChatMessage(event)}
         onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} onClose={closeChat} /> : null} />
+    <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
+      onDraft={setDraft} onSubmit={interpretOrder} onKeyDown={onOrderKeyDown} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
     <ConsoleSection log={log} orderHistory={orderHistory} reducedMotion={reducedMotion} announceNarration={preferences.accessibility.announceNarration} readBar={<ReadAloudBar text={lastLogText} canRead={audioTts.canRead}
       speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} noVoices={audioTts.noVoices} onRead={() => void audioTts.speak(lastLogText)}
       onRepeat={() => void audioTts.speak(audioTts.lastText)} onPauseResume={audioTts.pauseOrResume} onStop={audioTts.stop} />} />
-    <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
-      onDraft={setDraft} onSubmit={interpretOrder} onKeyDown={onOrderKeyDown} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
 
     <TravelOverlaySlot travel={timeFeedback.travel} onDismiss={timeFeedback.dismissTravel} />
 

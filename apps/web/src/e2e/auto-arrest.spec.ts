@@ -64,11 +64,14 @@ test.describe('E2E - Detenciones automáticas (GDD §12)', () => {
     // (EV-05, el traslado): la orden es la que la identifica, así que la
     // oferta de coordinar la detención está disponible SIN viajar a
     // Lisboa ni hablar con ella.
-    const detain = page.getByTestId('offer-detain:ines');
-    await expect(detain).toBeVisible();
-    await expect(detain).toContainText('Coordinar la detención de Inés Valera con las autoridades');
+    // (Fase 4 del rediseño A2: la etiqueta vive en la tarjeta; el botón
+    // lleva solo el verbo «Detener →».)
+    const detainCard = page.getByTestId('offer-card-detain:ines');
+    await expect(detainCard).toBeVisible();
+    await expect(detainCard).toContainText('Coordinar la detención de Inés Valera con las autoridades');
     // El diálogo de confirmación explica el modo: 30 min de coordinación,
     // actúan las autoridades.
+    const detain = page.getByTestId('offer-detain:ines');
     await detain.click();
     const preview = page.getByTestId('preview-dialog');
     await expect(preview).toBeVisible();

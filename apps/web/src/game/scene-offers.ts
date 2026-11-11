@@ -1,4 +1,4 @@
-import type { PublicActionOffer } from '@meridiano/contracts';
+import type { LocaleKey, PlayerViewDto, PublicActionOffer } from '@meridiano/contracts';
 
 export interface TalkGroup {
   /** Personaje al que van dirigidas las ofertas del grupo. */
@@ -20,6 +20,40 @@ export function groupTalkOffers(offers: PublicActionOffer[]): TalkGroup[] {
     else groups.push({ npcId, offers: [offer] });
   }
   return groups;
+}
+
+/** Verbo corto del botón de una tarjeta de oferta (fase 4 del rediseño
+ * A2): la tarjeta ya enseña la etiqueta completa como título, así que el
+ * botón lleva solo el verbo («Inspeccionar →»). Hablar y cerrar el caso
+ * no usan verbo: el botón de hablar lleva el tema («Hablar con Lucía
+ * sobre su identidad», que distingue un tema de otro) y el de cerrar su
+ * etiqueta completa. Un tipo desconocido no tiene verbo: quien llama usa
+ * la etiqueta como texto del botón, para no ocultar la oferta. */
+export function offerVerbKey(actionType: string): LocaleKey | undefined {
+  switch (actionType) {
+    case 'inspect': return 'game.scene.actInspect';
+    case 'travel': return 'game.scene.actTravel';
+    case 'collect': return 'game.scene.actCollect';
+    case 'query': return 'game.scene.actQuery';
+    case 'request_warrant': return 'game.scene.actWarrant';
+    case 'detain': return 'game.scene.actDetain';
+    case 'irregular': return 'game.scene.actIrregular';
+    case 'wait': return 'game.scene.actWait';
+    case 'recover': return 'game.scene.actRecover';
+    default: return undefined;
+  }
+}
+
+/** Evidencias en poder encontradas en la escena actual (fase 4 del
+ * rediseño A2, «Dossier en escena»): la procedencia es el lugar actual o
+ * su ciudad. La procedencia es un lugar en casi todas las evidencias; una
+ * ciudad (p. ej. EV-10, origin `madrid`) también es de aquí: se encontró
+ * en esta ciudad, no en otra escena. La misma regla usa el motor para
+ * recoger (`evidence.origin === run.position.locationId`). */
+export function sceneEvidence(view: PlayerViewDto): PlayerViewDto['objects'] {
+  const locationId = view.position.location.id;
+  const cityId = view.position.city.id;
+  return view.objects.filter(item => item.origin === locationId || item.origin === cityId);
 }
 
 export interface GroupedOffers {

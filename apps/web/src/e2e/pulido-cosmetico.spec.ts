@@ -63,11 +63,13 @@ test.describe('E2E pulido cosmético', () => {
     await openGameScreen(page);
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await playOffer(page, 'offer-inspect:MAD-SALA:caja', 30);
-    const collect = page.getByTestId('offer-collect:EV-06');
+    // (Fase 4 del rediseño A2: el texto de la evidencia vive en la tarjeta
+    // de la oferta; el botón lleva solo el verbo «Recoger →».)
+    const collect = page.getByTestId('offer-card-collect:EV-06');
     await expect(collect).toBeVisible();
     await expect(collect).toContainText('La caja guarda una copia del manifiesto, con sello y firma verificables.');
     await expect(collect).not.toContainText('EV-06');
-    await collect.click();
+    await page.getByTestId('offer-collect:EV-06').click();
     await expect(page.getByTestId('clock')).toContainText('30 min');
     // Inventario de la escena: texto legible, sin el código crudo.
     const meta = page.locator('.game-scene-meta');
@@ -111,7 +113,9 @@ test.describe('E2E pulido cosmético', () => {
   test('forzar el acceso avisa de la alternativa legal (orden con una prueba de acceso)', async ({ page }) => {
     await openGameScreen(page);
     await travelTo(page, 'lisboa', 120);
-    const force = page.getByTestId('offer-irregular:force_entry:LIS-ALM');
+    // (Fase 4 del rediseño A2: el aviso vive en la tarjeta de la oferta,
+    // no en el botón, que lleva solo el verbo.)
+    const force = page.getByTestId('offer-card-irregular:force_entry:LIS-ALM');
     await expect(force).toBeVisible();
     await expect(force).toContainText('Forzar el acceso a Almacén de depósito');
     await expect(force).toContainText('o pide una orden con una prueba de acceso');

@@ -42,7 +42,9 @@ test.describe('E2E acciones irregulares (GDD §14)', () => {
   test('sobornar a Lucía avisa del riesgo, cuesta 30 min y queda registrado con advertencia', async ({ page }) => {
     await openGameScreen(page);
     // La oferta avisa en la propia escena: lo que diga no será admisible.
-    const bribe = page.getByTestId('offer-irregular:bribe:lucia');
+    // (Fase 4 del rediseño A2: el aviso vive en la tarjeta de la oferta,
+    // no en el botón, que lleva solo el verbo.)
+    const bribe = page.getByTestId('offer-card-irregular:bribe:lucia');
     await expect(bribe).toBeVisible();
     await expect(bribe).toContainText('no será admisible');
     // La confirmación nombra al testigo (Tomás) y la retirada a la tercera vez.
@@ -54,8 +56,9 @@ test.describe('E2E acciones irregulares (GDD §14)', () => {
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(await clockMinutes(page)).toBe(30);
     // El acto y la advertencia quedan en el dossier, en español.
-    await openWindow(page, 'Dossier');
-    const dossier = page.getByRole('dialog', { name: 'Dossier' });
+    // (La ventana se titula «Tablero de evidencias» desde la fase 2.)
+    await openWindow(page, 'Tablero de evidencias');
+    const dossier = page.getByRole('dialog', { name: 'Tablero de evidencias' });
     await expect(dossier).toContainText('Sobornaste a Lucía (min 30).');
     await expect(dossier).toContainText('Advertencia de A.C.M.E.');
     // Sobornar no es atajo: Lucía ya lo ha contado todo y la oferta desaparece.
@@ -88,8 +91,8 @@ test.describe('E2E acciones irregulares (GDD §14)', () => {
     await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     // En el dossier, el astrolabio recuperado figura como no admisible.
-    await openWindow(page, 'Dossier');
-    const dossier = page.getByRole('dialog', { name: 'Dossier' });
+    await openWindow(page, 'Tablero de evidencias');
+    const dossier = page.getByRole('dialog', { name: 'Tablero de evidencias' });
     await expect(dossier).toContainText('Forzaste el acceso a Almacén de depósito');
     await expect(dossier).toContainText('El astrolabio original está recuperado.');
     const row = dossier.locator('tr', { hasText: 'El astrolabio original está recuperado.' });
