@@ -24,14 +24,17 @@ async function expectPortraitsDistinct(locator: ReturnType<Page['locator']>) {
 }
 
 test.describe('E2E retratos de personajes (GDD §2)', () => {
-  test('la escena enseña el retrato de cada personaje presente, distintos entre sí', async ({ page }) => {
+  test('la escena enseña la foto de cada personaje presente, distintas entre sí', async ({ page }) => {
     await openGameScreen(page);
-    const scenePortraits = page.locator('.game-scene-npc [data-testid="portrait"]');
+    // Lucía y Tomás son del caso fijo: foto, no SVG procedural.
+    const scenePortraits = page.locator('.game-scene-npc [data-testid="portrait-photo"]');
     await expect(scenePortraits.first()).toBeVisible();
     await expect(scenePortraits).toHaveCount(2);
     await expect(page.getByRole('img', { name: 'Retrato de Lucía' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'Retrato de Tomás Ríos' })).toBeVisible();
-    await expectPortraitsDistinct(scenePortraits);
+    const srcs: string[] = [];
+    for (let i = 0; i < 2; i++) srcs.push(await scenePortraits.nth(i).getAttribute('src') ?? '');
+    expect(new Set(srcs).size).toBe(srcs.length);
   });
 
   test('la conversación enseña el retrato del personaje, en grande', async ({ page }) => {

@@ -1175,9 +1175,7 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
   }
   const role = sceneRole(view, npc.id, getNPC(npc.id)?.role);
   return <div className="game-chat">
-    <p className="game-chat-npc">{npc.id === 'ines'
-      ? <img className="game-portrait-photo" src="/images/ines-retrato.jpg" alt="" data-testid="portrait-photo" />
-      : <Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" />}<span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
+    <p className="game-chat-npc"><Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" /><span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
     <ol className="game-chat-turns" data-testid="chat-turns" aria-live="polite">
       {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
         <span className="game-chat-speaker">{turn.from === 'you' ? t('game.you') : npc.name}</span>

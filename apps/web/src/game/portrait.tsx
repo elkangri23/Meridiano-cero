@@ -1,8 +1,10 @@
 import type { ReactElement } from 'react';
-import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, portraitGrid, portraitTraitsFor } from './portraits';
+import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH, photoPortraitFor, portraitGrid, portraitTraitsFor } from './portraits';
 
-/** Retrato pixel-art de un personaje, dibujado como SVG a partir de su
- * rejilla determinista. No es clicable ni esconde pistas (GDD §2: sin pixel
+/** Retrato de un personaje: foto cuando el NPC del caso fijo la tiene
+ * (fase 3 del rediseño A2: `photoPortraitFor`) y retrato SVG procedural
+ * por semilla en el resto de casos (fallback, también para el equipo
+ * A.C.M.E.). No es clicable ni esconde pistas (GDD §2: sin pixel
  * hunting): es solo la cara del personaje, con `role="img"` y su nombre
  * como etiqueta accesible. */
 export function Portrait({ seed, name, size = 'small' }: {
@@ -10,9 +12,14 @@ export function Portrait({ seed, name, size = 'small' }: {
   name: string;
   size?: 'small' | 'medium';
 }): ReactElement {
-  const grid = portraitGrid(portraitTraitsFor(seed));
+  const photo = photoPortraitFor(seed);
   const width = size === 'medium' ? 48 : 32;
   const height = size === 'medium' ? 60 : 40;
+  if (photo) {
+    return <img className={`game-portrait-photo game-portrait-${size}`} src={photo} width={width} height={height}
+      role="img" aria-label={`Retrato de ${name}`} data-testid="portrait-photo" alt="" />;
+  }
+  const grid = portraitGrid(portraitTraitsFor(seed));
   return <svg className={`game-portrait game-portrait-${size}`} width={width} height={height}
     viewBox={`0 0 ${PORTRAIT_WIDTH} ${PORTRAIT_HEIGHT}`} shapeRendering="crispEdges"
     role="img" aria-label={`Retrato de ${name}`} data-testid="portrait" focusable="false">

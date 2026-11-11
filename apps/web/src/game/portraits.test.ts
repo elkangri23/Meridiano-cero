@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCESSORIES, CLOTHING_COLORS, CLOTHING_STYLES, EYE_COLORS, FACIAL_HAIRS,
-  FIXED_PORTRAITS, HAIR_COLORS, HAIR_STYLES, PORTRAIT_HEIGHT, PORTRAIT_WIDTH,
-  SKIN_TONES, portraitGrid, portraitGridKey, portraitHash, portraitPaletteColors,
+  FIXED_PHOTO_PORTRAITS, FIXED_PORTRAITS, HAIR_COLORS, HAIR_STYLES, PORTRAIT_HEIGHT, PORTRAIT_WIDTH,
+  SKIN_TONES, photoPortraitFor, portraitGrid, portraitGridKey, portraitHash, portraitPaletteColors,
   portraitSeed, portraitTraitsFor, teamPortraitSeed,
 } from './portraits';
 
@@ -121,5 +121,31 @@ describe('retratos pixel-art: deterministas y distintos', () => {
         expect((values[i] ?? 0) - (values[i - 1] ?? 0)).toBeGreaterThanOrEqual(0.02);
       }
     }
+  });
+});
+
+describe('fotos de los retratos del caso fijo (fase 3 del rediseño A2)', () => {
+  it('los 5 NPC del caso fijo tienen foto, con su fichero en /images/', () => {
+    expect(Object.keys(FIXED_PHOTO_PORTRAITS).sort()).toEqual([
+      'astrolabio-tres-ciudades:emile', 'astrolabio-tres-ciudades:ines', 'astrolabio-tres-ciudades:lucia',
+      'astrolabio-tres-ciudades:marta', 'astrolabio-tres-ciudades:tomas',
+    ]);
+    expect(photoPortraitFor('astrolabio-tres-ciudades:ines')).toBe('/images/ines-retrato.jpg');
+    expect(photoPortraitFor('astrolabio-tres-ciudades:tomas')).toBe('/images/retrato-tomas.webp');
+    expect(photoPortraitFor('astrolabio-tres-ciudades:lucia')).toBe('/images/retrato-lucia.webp');
+    expect(photoPortraitFor('astrolabio-tres-ciudades:emile')).toBe('/images/retrato-emile.webp');
+    expect(photoPortraitFor('astrolabio-tres-ciudades:marta')).toBe('/images/retrato-marta.webp');
+  });
+
+  it('sin foto fuera del caso fijo: casos generados y equipo usan el SVG procedural', () => {
+    for (const seed of ['generado-21d02570:marcos', 'generado-71f0f281:lucia', 'generado-99a81ebb:ines',
+      'team:margaret', 'team:richter', 'team:elena', 'team:david', 'team:clara']) {
+      expect(photoPortraitFor(seed)).toBeNull();
+    }
+  });
+
+  it('el mismo id en otro caso no hereda la foto del caso fijo', () => {
+    expect(photoPortraitFor('generado-71f0f281:lucia')).toBeNull();
+    expect(photoPortraitFor('generado-99a81ebb:ines')).toBeNull();
   });
 });

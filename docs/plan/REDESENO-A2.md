@@ -30,8 +30,43 @@ mismos tokens el archivo (ahora en `/archivo`), el acceso
 prototipo (solo tokens mínimos: sigue siendo la maqueta antigua con
 datos sintéticos) y las preferencias. Se crea una landing pública nueva
 en `/` (ver abajo). El arte pixel-art SVG de escenas y retratos se
-queda como está: no hay fotos ni arte nuevo salvo el retrato de Inés,
-ya usado en el interrogatorio.
+queda como está en esta fase: no hay fotos ni arte nuevo salvo el
+retrato de Inés, ya usado en el interrogatorio. (La fase 3 cambia esto
+solo para el caso fijo; ver abajo.)
+
+### Fase 3 (hecha): imágenes del caso fijo — escenas y retratos
+Estilo aprobado por Antonio 2026-11-11: foto para retratos,
+ilustración cinematográfica para escenas, tonos cálidos
+papel/dorado/azul oscuro, coherentes con la web A2 clara. Solo el caso
+fijo (`astrolabio-tres-ciudades`); el resto sigue con SVG procedural.
+
+- Escenas (`apps/web/src/game/scene-art.tsx`, `SCENE_ART_IMAGES`):
+  Madrid, sala de embalaje (`MAD-SALA` → `/images/madrid-sala.webp`,
+  1920×1280, 384 KB); París, archivo de conservación (`PAR-ARCH` →
+  `/images/paris-archivo.webp`, 1920×1280, 542 KB); Lisboa, almacén de
+  depósito (`LIS-ALM` → `/images/lisboa-almacen.webp`, 1920×1280,
+  640 KB). Localizaciones desconocidas siguen cayendo en Madrid, como
+  antes. El `<div>` mantiene `role="img"`, `aria-label` con la
+  descripción existente (`sceneArt.*`, sin spoilers) y `data-location`.
+- Retratos (`apps/web/src/game/portraits.ts`, `FIXED_PHOTO_PORTRAITS`;
+  `apps/web/src/game/portrait.tsx`): foto solo cuando la semilla es
+  `astrolabio-tres-ciudades:<npc>` — Inés Valera
+  (`/images/ines-retrato.jpg`, ya existía), Tomás Ríos
+  (`/images/retrato-tomas.webp`), Lucía (`/images/retrato-lucia.webp`),
+  Émile (`/images/retrato-emile.webp`) y Marta
+  (`/images/retrato-marta.webp`); todas 1280×1920, 260–386 KB. El
+  componente `Portrait` las muestra en escena, chat (antes solo Inés
+  tenía foto, y por id sin caso: ahora el mapeo es por semilla
+  `caso:npc`) y contactos. Los NPC de casos generados y el equipo
+  A.C.M.E. siguen con el retrato SVG procedural por semilla
+  (`photoPortraitFor` devuelve `null` → fallback).
+- Desviación menor anotada: la foto de Marta se parece bastante a
+  Lucía (moño oscuro, blusa azul), aunque la cara es distinta; no se
+  regeneró. Pendiente de decisión de Antonio si quiere distinguirla más.
+- Las descripciones accesibles `sceneArt.*` (es/en/fr) se mantienen
+  tal cual: siguen diciendo «pixel-art» aunque las imágenes ya no lo
+  son. Si Antonio lo quiere, el arreglo es cambiar ese adjetivo en los
+  tres idiomas, sin tocar nada más.
 
 ## Landing pública en `/`
 
@@ -84,8 +119,10 @@ ya usado en el interrogatorio.
 - Los tiempos de viaje no se fijan en la interfaz: los calcula el
   motor para cada viaje (ruta del caso entre sus ciudades; catálogo
   geográfico fuera de ellas).
-- El arte de escena y los retratos siguen siendo los SVG del juego:
-  no existen fotos para el resto de lugares y personajes.
+- El arte de escena y los retratos de los casos generados y del equipo
+  siguen siendo los SVG del juego: no existen fotos para el resto de
+  lugares y personajes. Solo el caso fijo tiene ilustraciones y fotos
+  (fase 3).
 
 ## Accesibilidad
 

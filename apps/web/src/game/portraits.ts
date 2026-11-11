@@ -84,6 +84,28 @@ export const FIXED_PORTRAITS: Readonly<Record<string, PortraitTraits>> = {
   'team:clara': { skin: '#f2c89b', hairStyle: 'long', hairColor: '#5a3a1a', eyeColor: '#2244aa', clothingColor: '#aa5500', clothingStyle: 'shirt', accessory: 'glasses', facialHair: 'none' },
 };
 
+/** Fotos de los 5 NPC del caso fijo (fase 3 del rediseño A2): retrato
+ * fotográfico con el estilo aprobado por Antonio. Clave: la semilla
+ * completa (`caso:npc`), como FIXED_PORTRAITS: la Lucía del caso fijo no
+ * es la Lucía de un generado, y una `ines` de otro caso no es Inés
+ * Valera. Los NPC de casos generados y el equipo A.C.M.E. NO tienen foto:
+ * siguen con el retrato SVG procedural por semilla (fallback). Inés ya
+ * tenía foto (`/images/ines-retrato.jpg`), usada solo en el
+ * interrogatorio; aquí queda unificada con las demás en el mismo mapa. */
+export const FIXED_PHOTO_PORTRAITS: Readonly<Record<string, string>> = {
+  'astrolabio-tres-ciudades:ines': '/images/ines-retrato.jpg',
+  'astrolabio-tres-ciudades:tomas': '/images/retrato-tomas.webp',
+  'astrolabio-tres-ciudades:lucia': '/images/retrato-lucia.webp',
+  'astrolabio-tres-ciudades:emile': '/images/retrato-emile.webp',
+  'astrolabio-tres-ciudades:marta': '/images/retrato-marta.webp',
+};
+
+/** Foto de un personaje cuando la tiene (solo los 5 NPC del caso fijo);
+ * `null` en el resto: el retrato SVG procedural es el fallback. */
+export function photoPortraitFor(seed: string): string | null {
+  return FIXED_PHOTO_PORTRAITS[seed] ?? null;
+}
+
 /** Semilla de un personaje de expediente: el caso forma parte de ella. */
 export function portraitSeed(caseId: string, npcId: string): string {
   return `${caseId}:${npcId}`;
