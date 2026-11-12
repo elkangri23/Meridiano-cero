@@ -37,6 +37,9 @@ export const FR_MESSAGES: Record<LocaleKey, string> = {
   'sceneArt.paris': 'Illustration cinématographique d\'un centre de conservation : des étagères pleines de boîtes et de dossiers, une fenêtre sur les toits et une table couverte de papiers et d\'une lampe.',
   'sceneArt.lisbon': 'Illustration cinématographique d\'un entrepôt de dépôt : une grille de casiers de garde, une lampe suspendue et une grande boîte au premier plan.',
   'sceneArt.madrid': 'Illustration cinématographique d\'une salle d\'emballage : une fenêtre avec vue sur la ville, une table avec une boîte et un tableau au mur.',
+  'sceneArt.office': 'Illustration cinématographique d\'un bureau : un tableau de photos reliées par des fils rouges, une machine à écrire, une lampe en laiton et des classeurs près de hautes fenêtres à la lumière du soir.',
+  'sceneArt.archive': 'Illustration cinématographique d\'un centre d\'archives : de hautes étagères avec des boîtes étiquetées, une échelle roulante et une table de consultation avec une lampe en laiton et des dossiers.',
+  'sceneArt.warehouse': 'Illustration cinématographique d\'un entrepôt : des étagères avec des caisses en bois, une grille de casiers numérotés, une lampe suspendue et la lumière entrant par une fenêtre haute.',
 
   // Archivo: generador de casos.
   'generation.overline': 'Générateur de dossiers',

@@ -34,6 +34,9 @@ export const EN_MESSAGES: Record<LocaleKey, string> = {
   'sceneArt.paris': 'Cinematic illustration of a conservation archive: shelves with boxes and files, a window with rooftops, and a desk with papers and a lamp.',
   'sceneArt.lisbon': 'Cinematic illustration of a deposit warehouse: a grid of custody lockers, a hanging lamp, and a large box in the foreground.',
   'sceneArt.madrid': 'Cinematic illustration of a packing room: a window overlooking the city, a desk with a box, and a picture on the wall.',
+  'sceneArt.office': 'Cinematic illustration of an office: a board with photos linked by red strings, a typewriter, a brass lamp, and filing cabinets beside tall windows in evening light.',
+  'sceneArt.archive': 'Cinematic illustration of an archive: tall shelves with labelled boxes, a rolling ladder, and a consultation desk with a brass lamp and folders.',
+  'sceneArt.warehouse': 'Cinematic illustration of a warehouse: shelves with wooden crates, a grid of numbered lockers, a hanging lamp, and light coming through a high window.',
 
   // Archive: case generator.
   'generation.overline': 'Case generator',

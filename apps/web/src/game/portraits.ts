@@ -88,10 +88,12 @@ export const FIXED_PORTRAITS: Readonly<Record<string, PortraitTraits>> = {
  * fotográfico con el estilo aprobado por Antonio. Clave: la semilla
  * completa (`caso:npc`), como FIXED_PORTRAITS: la Lucía del caso fijo no
  * es la Lucía de un generado, y una `ines` de otro caso no es Inés
- * Valera. Los NPC de casos generados y el equipo A.C.M.E. NO tienen foto:
- * siguen con el retrato SVG procedural por semilla (fallback). Inés ya
- * tenía foto (`/images/ines-retrato.jpg`), usada solo en el
- * interrogatorio; aquí queda unificada con las demás en el mismo mapa. */
+ * Valera. Los NPC de casos generados llevan una foto genérica del set
+ * (`GENERIC_PHOTO_PORTRAITS`, por semilla, distinta dentro del caso); el
+ * equipo A.C.M.E. NO tiene foto: sigue con el retrato SVG procedural por
+ * semilla (fallback). Inés ya tenía foto (`/images/ines-retrato.jpg`),
+ * usada solo en el interrogatorio; aquí queda unificada con las demás en
+ * el mismo mapa. */
 export const FIXED_PHOTO_PORTRAITS: Readonly<Record<string, string>> = {
   'astrolabio-tres-ciudades:ines': '/images/ines-retrato.jpg',
   'astrolabio-tres-ciudades:tomas': '/images/retrato-tomas.webp',
@@ -100,10 +102,53 @@ export const FIXED_PHOTO_PORTRAITS: Readonly<Record<string, string>> = {
   'astrolabio-tres-ciudades:marta': '/images/retrato-marta.webp',
 };
 
-/** Foto de un personaje cuando la tiene (solo los 5 NPC del caso fijo);
- * `null` en el resto: el retrato SVG procedural es el fallback. */
-export function photoPortraitFor(seed: string): string | null {
-  return FIXED_PHOTO_PORTRAITS[seed] ?? null;
+/** Retratos foto genéricos (set genérico: 8 fotos, 4 hombres / 4 mujeres,
+ * edades variadas, mismo estilo cálido que el caso fijo): solo para los NPC
+ * de casos generados. Los roles de un generado son texto libre del LLM (sin
+ * enum), así que el retrato NO se asigna por rol, sino por semilla: el índice
+ * del NPC en la lista del caso (orden de definición, estable toda la
+ * partida) rotado por el hash del caso. Dos NPC del mismo caso nunca
+ * comparten foto (hay 8 fotos y los casos generados tienen 4 NPC); la misma
+ * semilla da siempre la misma foto. La mujer-3 genérica se parece a Lucía
+ * (protagonista del caso fijo): queda así, es un retrato genérico, no la
+ * Lucía del astrolabio. */
+export const GENERIC_PHOTO_PORTRAITS: readonly string[] = [
+  '/images/generico-hombre-1.webp',
+  '/images/generico-hombre-2.webp',
+  '/images/generico-hombre-3.webp',
+  '/images/generico-hombre-4.webp',
+  '/images/generico-mujer-1.webp',
+  '/images/generico-mujer-2.webp',
+  '/images/generico-mujer-3.webp',
+  '/images/generico-mujer-4.webp',
+];
+
+/** Foto genérica de un NPC de un caso generado: `npcIds` es la lista de los
+ * NPC del caso en orden de definición (`view.npcChat`); sin ella, el puesto
+ * sale del hash de la semilla (determinista, pero sin la garantía de que dos
+ * NPC del mismo caso no compartan foto). El caso fijo y el equipo no pasan
+ * por aquí: el fijo tiene sus 5 fotos en FIXED_PHOTO_PORTRAITS y el equipo
+ * sigue con el SVG procedural. */
+export function genericPhotoPortraitFor(caseId: string, npcId: string, npcIds: readonly string[]): string | null {
+  if (caseId === 'astrolabio-tres-ciudades') return null;
+  const index = npcIds.indexOf(npcId);
+  const slot = index >= 0 ? index : portraitHash(`${caseId}:${npcId}`) % GENERIC_PHOTO_PORTRAITS.length;
+  const offset = portraitHash(caseId) % GENERIC_PHOTO_PORTRAITS.length;
+  return GENERIC_PHOTO_PORTRAITS[(offset + slot) % GENERIC_PHOTO_PORTRAITS.length] ?? null;
+}
+
+/** Foto de un personaje cuando la tiene: la fija del caso fijo, la genérica
+ * de un generado (por semilla, distinta dentro del caso), `null` en el
+ * resto: el retrato SVG procedural es el fallback (también para el equipo
+ * A.C.M.E.). `npcIds` es la lista de NPC del caso en orden de definición;
+ * sin ella, la genérica sale del hash de la semilla. */
+export function photoPortraitFor(seed: string, npcIds: readonly string[] = []): string | null {
+  const fixed = FIXED_PHOTO_PORTRAITS[seed];
+  if (fixed) return fixed;
+  if (seed.startsWith('team:')) return null;
+  const colon = seed.indexOf(':');
+  if (colon < 0) return null;
+  return genericPhotoPortraitFor(seed.slice(0, colon), seed.slice(colon + 1), npcIds);
 }
 
 /** Semilla de un personaje de expediente: el caso forma parte de ella. */

@@ -44,6 +44,9 @@ export const ES_MESSAGES = {
   'sceneArt.paris': 'Ilustración cinematográfica de un archivo de conservación: estanterías con cajas y legajos, ventana con tejados y mesa con papeles y lámpara.',
   'sceneArt.lisbon': 'Ilustración cinematográfica de un almacén de depósito: rejilla de taquillas de custodia, lámpara colgante y una caja grande en primer plano.',
   'sceneArt.madrid': 'Ilustración cinematográfica de una sala de embalaje: ventana con vistas a la ciudad, mesa con una caja y un cuadro en la pared.',
+  'sceneArt.office': 'Ilustración cinematográfica de una oficina: tablón con fotos unidas por hilos rojos, máquina de escribir, lámpara de latón y archivadores junto a ventanales con luz de tarde.',
+  'sceneArt.archive': 'Ilustración cinematográfica de un archivo: estanterías altas con cajas etiquetadas, escalera rodante y mesa de consulta con lámpara de latón y carpetas.',
+  'sceneArt.warehouse': 'Ilustración cinematográfica de un almacén: estanterías con cajas de madera, rejilla de taquillas numeradas, lámpara colgante y luz entrando por una ventana alta.',
 
   // Archivo: generador de casos.
   'generation.overline': 'Generador de casos',

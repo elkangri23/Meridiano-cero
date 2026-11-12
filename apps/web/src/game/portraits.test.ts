@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCESSORIES, CLOTHING_COLORS, CLOTHING_STYLES, EYE_COLORS, FACIAL_HAIRS,
-  FIXED_PHOTO_PORTRAITS, FIXED_PORTRAITS, HAIR_COLORS, HAIR_STYLES, PORTRAIT_HEIGHT, PORTRAIT_WIDTH,
-  SKIN_TONES, photoPortraitFor, portraitGrid, portraitGridKey, portraitHash, portraitPaletteColors,
+  FIXED_PHOTO_PORTRAITS, FIXED_PORTRAITS, GENERIC_PHOTO_PORTRAITS, HAIR_COLORS, HAIR_STYLES, PORTRAIT_HEIGHT, PORTRAIT_WIDTH,
+  SKIN_TONES, genericPhotoPortraitFor, photoPortraitFor, portraitGrid, portraitGridKey, portraitHash, portraitPaletteColors,
   portraitSeed, portraitTraitsFor, teamPortraitSeed,
 } from './portraits';
 
@@ -137,15 +137,64 @@ describe('fotos de los retratos del caso fijo (fase 3 del rediseño A2)', () => 
     expect(photoPortraitFor('astrolabio-tres-ciudades:marta')).toBe('/images/retrato-marta.webp');
   });
 
-  it('sin foto fuera del caso fijo: casos generados y equipo usan el SVG procedural', () => {
-    for (const seed of ['generado-21d02570:marcos', 'generado-71f0f281:lucia', 'generado-99a81ebb:ines',
-      'team:margaret', 'team:richter', 'team:elena', 'team:david', 'team:clara']) {
+  it('sin foto para el equipo: usa el SVG procedural', () => {
+    for (const seed of ['team:margaret', 'team:richter', 'team:elena', 'team:david', 'team:clara']) {
       expect(photoPortraitFor(seed)).toBeNull();
+    }
+  });
+});
+
+describe('fotos genéricas de los casos generados (set genérico)', () => {
+  it('las 8 fotos genéricas están en /images/ y son .webp', () => {
+    expect(GENERIC_PHOTO_PORTRAITS).toEqual([
+      '/images/generico-hombre-1.webp', '/images/generico-hombre-2.webp',
+      '/images/generico-hombre-3.webp', '/images/generico-hombre-4.webp',
+      '/images/generico-mujer-1.webp', '/images/generico-mujer-2.webp',
+      '/images/generico-mujer-3.webp', '/images/generico-mujer-4.webp',
+    ]);
+    for (const src of GENERIC_PHOTO_PORTRAITS) {
+      expect(src.startsWith('/images/')).toBe(true);
+      expect(src.endsWith('.webp')).toBe(true);
+    }
+  });
+
+  it('en cada caso generado, los cuatro NPC tienen fotos genéricas distintas', () => {
+    for (const seeds of PRODUCTION_CASES.slice(0, 11)) {
+      const npcIds = seeds.map(seed => seed.split(':')[1] as string);
+      const photos = seeds.map(seed => photoPortraitFor(seed, npcIds));
+      for (const photo of photos) {
+        expect(photo).not.toBeNull();
+        expect(GENERIC_PHOTO_PORTRAITS).toContain(photo);
+      }
+      expect(new Set(photos).size).toBe(photos.length);
+    }
+  });
+
+  it('la asignación es determinista: misma semilla y misma lista, misma foto', () => {
+    const npcIds = ['marcos', 'laura', 'jorge', 'ana'];
+    for (const npcId of npcIds) {
+      expect(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds))
+        .toBe(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds));
+      expect(genericPhotoPortraitFor('generado-21d02570', npcId, npcIds))
+        .toBe(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds));
+    }
+  });
+
+  it('el caso fijo no usa fotos genéricas: sus 5 NPC mantienen las suyas', () => {
+    const npcIds = ['lucia', 'tomas', 'marta', 'ines', 'emile'];
+    for (const npcId of npcIds) {
+      expect(photoPortraitFor(`astrolabio-tres-ciudades:${npcId}`, npcIds))
+        .toBe(FIXED_PHOTO_PORTRAITS[`astrolabio-tres-ciudades:${npcId}`]);
+      expect(genericPhotoPortraitFor('astrolabio-tres-ciudades', npcId, npcIds)).toBeNull();
     }
   });
 
   it('el mismo id en otro caso no hereda la foto del caso fijo', () => {
-    expect(photoPortraitFor('generado-71f0f281:lucia')).toBeNull();
-    expect(photoPortraitFor('generado-99a81ebb:ines')).toBeNull();
+    const photo = photoPortraitFor('generado-71f0f281:lucia', ['lucia', 'marcos', 'jorge', 'ana']);
+    expect(photo).not.toBeNull();
+    expect(GENERIC_PHOTO_PORTRAITS).toContain(photo);
+    expect(photo).not.toBe('/images/retrato-lucia.webp');
+    expect(photoPortraitFor('generado-99a81ebb:ines', ['ines', 'marcos', 'jorge', 'ana']))
+      .not.toBe('/images/ines-retrato.jpg');
   });
 });
