@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCESSORIES, CLOTHING_COLORS, CLOTHING_STYLES, EYE_COLORS, FACIAL_HAIRS,
-  FIXED_PHOTO_PORTRAITS, FIXED_PORTRAITS, GENERIC_PHOTO_PORTRAITS, HAIR_COLORS, HAIR_STYLES, PORTRAIT_HEIGHT, PORTRAIT_WIDTH,
-  SKIN_TONES, genericPhotoPortraitFor, photoPortraitFor, portraitGrid, portraitGridKey, portraitHash, portraitPaletteColors,
+  FIXED_PHOTO_PORTRAITS, FIXED_PORTRAITS, GENERIC_PHOTO_PORTRAITS,
+  GENERIC_PHOTO_PORTRAITS_MEN, GENERIC_PHOTO_PORTRAITS_WOMEN, HAIR_COLORS, HAIR_STYLES, PORTRAIT_HEIGHT, PORTRAIT_WIDTH,
+  SKIN_TONES, genericPhotoPortraitFor, inferNpcGender, photoPortraitFor, portraitGrid, portraitGridKey, portraitHash, portraitPaletteColors,
   portraitSeed, portraitTraitsFor, teamPortraitSeed,
 } from './portraits';
 
@@ -16,9 +17,11 @@ function luminance(hex: string): number {
   return 0.2126 * (channels[0] ?? 0) + 0.7152 * (channels[1] ?? 0) + 0.0722 * (channels[2] ?? 0);
 }
 
-/** NPC reales de los 11 casos generados de producción (de la BD, sin
+/** NPC reales de los 12 casos generados de producción (de la BD, sin
  * tocarlos) y del caso fijo: en cada caso, los cuatro retratos deben ser
- * distintos entre sí. */
+ * distintos entre sí. El caso generado-639534d3 faltaba en esta lista
+ * (se añadió con el arreglo por género, 2026-11-12): la BD tiene 12
+ * generados, no 11. */
 const PRODUCTION_CASES: ReadonlyArray<readonly string[]> = [
   ['generado-1589b7bf:marcos', 'generado-1589b7bf:laura', 'generado-1589b7bf:jorge', 'generado-1589b7bf:ana'],
   ['generado-1dfd99b9:carlos', 'generado-1dfd99b9:marcos', 'generado-1dfd99b9:laura', 'generado-1dfd99b9:sofia'],
@@ -27,11 +30,30 @@ const PRODUCTION_CASES: ReadonlyArray<readonly string[]> = [
   ['generado-4242ea44:marcos-vega', 'generado-4242ea44:laura-santos', 'generado-4242ea44:jorge-mendez', 'generado-4242ea44:ana-ruiz'],
   ['generado-48a17a5b:laura-vega', 'generado-48a17a5b:marcos-ruiz', 'generado-48a17a5b:ana-soto', 'generado-48a17a5b:diego-ramos'],
   ['generado-4b7a3c11:marcos-ibarra', 'generado-4b7a3c11:laura-ruiz', 'generado-4b7a3c11:elena-vargas', 'generado-4b7a3c11:jorge-mendez'],
+  ['generado-639534d3:alvaro', 'generado-639534d3:carmen', 'generado-639534d3:luis', 'generado-639534d3:marta'],
   ['generado-71f0f281:alvaro', 'generado-71f0f281:lucia', 'generado-71f0f281:carmen', 'generado-71f0f281:roberto'],
   ['generado-8621c8a9:marcos', 'generado-8621c8a9:laura', 'generado-8621c8a9:jorge', 'generado-8621c8a9:ana'],
   ['generado-9c165dae:marcos', 'generado-9c165dae:laura', 'generado-9c165dae:jorge', 'generado-9c165dae:sofia'],
   ['generado-f6559983:elena', 'generado-f6559983:marcos', 'generado-f6559983:lucia', 'generado-f6559983:diego'],
   ['astrolabio-tres-ciudades:lucia', 'astrolabio-tres-ciudades:tomas', 'astrolabio-tres-ciudades:marta', 'astrolabio-tres-ciudades:ines', 'astrolabio-tres-ciudades:emile'],
+];
+
+/** Nombres para mostrar de los NPC de PRODUCTION_CASES, en el mismo orden
+ * (de la BD, sin tocarlos): el género se infiere del nombre de pila. */
+const PRODUCTION_NPC_NAMES: ReadonlyArray<readonly string[]> = [
+  ['Marcos', 'Laura', 'Jorge', 'Ana'],
+  ['Carlos Mendieta', 'Marcos Urrutia', 'Laura Soto', 'Sofía Rivas'],
+  ['Elena', 'Marcos', 'Laura', 'Jorge'],
+  ['Elena Vargas', 'Marcos Rivas', 'Laura Soto', 'Jorge Nieto'],
+  ['Marcos Vega', 'Laura Santos', 'Jorge Méndez', 'Ana Ruiz'],
+  ['Laura Vega', 'Marcos Ruiz', 'Ana Soto', 'Diego Ramos'],
+  ['Marcos Ibarra', 'Laura Ruiz', 'Elena Vargas', 'Jorge Méndez'],
+  ['Álvaro Mendieta', 'Carmen Soler', 'Luis Ortega', 'Marta Ríos'],
+  ['Álvaro Méndez', 'Lucía Vargas', 'Carmen Ruiz', 'Roberto Gil'],
+  ['Marcos Aldana', 'Laura Soto', 'Jorge Etxeberria', 'Ana Ruiz'],
+  ['Marcos', 'Laura', 'Jorge', 'Sofía'],
+  ['Elena Vargas', 'Marcos Rivas', 'Lucía Ortega', 'Diego Soto'],
+  ['Lucía', 'Tomás', 'Marta', 'Inés', 'Émile'],
 ];
 
 describe('retratos pixel-art: deterministas y distintos', () => {
@@ -159,9 +181,11 @@ describe('fotos genéricas de los casos generados (set genérico)', () => {
   });
 
   it('en cada caso generado, los cuatro NPC tienen fotos genéricas distintas', () => {
-    for (const seeds of PRODUCTION_CASES.slice(0, 11)) {
+    for (let c = 0; c < 12; c++) {
+      const seeds = PRODUCTION_CASES[c] as readonly string[];
+      const names = PRODUCTION_NPC_NAMES[c] as readonly string[];
       const npcIds = seeds.map(seed => seed.split(':')[1] as string);
-      const photos = seeds.map(seed => photoPortraitFor(seed, npcIds));
+      const photos = seeds.map((seed, i) => photoPortraitFor(seed, npcIds, names[i], names));
       for (const photo of photos) {
         expect(photo).not.toBeNull();
         expect(GENERIC_PHOTO_PORTRAITS).toContain(photo);
@@ -172,11 +196,13 @@ describe('fotos genéricas de los casos generados (set genérico)', () => {
 
   it('la asignación es determinista: misma semilla y misma lista, misma foto', () => {
     const npcIds = ['marcos', 'laura', 'jorge', 'ana'];
-    for (const npcId of npcIds) {
-      expect(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds))
-        .toBe(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds));
-      expect(genericPhotoPortraitFor('generado-21d02570', npcId, npcIds))
-        .toBe(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds));
+    const names = ['Marcos', 'Laura', 'Jorge', 'Ana'];
+    for (let i = 0; i < npcIds.length; i++) {
+      const npcId = npcIds[i] as string;
+      expect(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds, names[i], names))
+        .toBe(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds, names[i], names));
+      expect(genericPhotoPortraitFor('generado-21d02570', npcId, npcIds, names[i], names))
+        .toBe(photoPortraitFor(`generado-21d02570:${npcId}`, npcIds, names[i], names));
     }
   });
 
@@ -196,5 +222,99 @@ describe('fotos genéricas de los casos generados (set genérico)', () => {
     expect(photo).not.toBe('/images/retrato-lucia.webp');
     expect(photoPortraitFor('generado-99a81ebb:ines', ['ines', 'marcos', 'jorge', 'ana']))
       .not.toBe('/images/ines-retrato.jpg');
+  });
+});
+
+describe('fotos genéricas por género (decisión de Antonio 2026-11-12: «sí me chirría») ', () => {
+  /** Género esperado de cada nombre de pila de producción, independiente
+   * de las listas del módulo: si una lista del módulo se equivoca, este
+   * test lo caza. */
+  const EXPECTED_GENDER: Readonly<Record<string, 'male' | 'female'>> = {
+    marcos: 'male', jorge: 'male', carlos: 'male', alvaro: 'male', luis: 'male',
+    roberto: 'male', diego: 'male',
+    laura: 'female', ana: 'female', sofia: 'female', elena: 'female',
+    carmen: 'female', marta: 'female', lucia: 'female',
+  };
+
+  it('los pools son 4 hombres + 4 mujeres y juntos son las 8 fotos', () => {
+    expect(GENERIC_PHOTO_PORTRAITS_MEN).toHaveLength(4);
+    expect(GENERIC_PHOTO_PORTRAITS_WOMEN).toHaveLength(4);
+    expect(GENERIC_PHOTO_PORTRAITS).toEqual([
+      ...GENERIC_PHOTO_PORTRAITS_MEN, ...GENERIC_PHOTO_PORTRAITS_WOMEN,
+    ]);
+    for (const src of GENERIC_PHOTO_PORTRAITS_MEN) expect(src).toMatch(/generico-hombre-\d\.webp$/);
+    for (const src of GENERIC_PHOTO_PORTRAITS_WOMEN) expect(src).toMatch(/generico-mujer-\d\.webp$/);
+  });
+
+  it('en los 12 casos generados, ningún NPC lleva foto del género contrario', () => {
+    for (let c = 0; c < 12; c++) {
+      const seeds = PRODUCTION_CASES[c] as readonly string[];
+      const names = PRODUCTION_NPC_NAMES[c] as readonly string[];
+      const npcIds = seeds.map(seed => seed.split(':')[1] as string);
+      for (let i = 0; i < seeds.length; i++) {
+        const photo = photoPortraitFor(seeds[i] as string, npcIds, names[i], names);
+        const first = (names[i] as string).split(' ')[0]?.normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '').toLowerCase() as string;
+        const pool = EXPECTED_GENDER[first] === 'male'
+          ? GENERIC_PHOTO_PORTRAITS_MEN : GENERIC_PHOTO_PORTRAITS_WOMEN;
+        expect(pool).toContain(photo);
+      }
+    }
+  });
+
+  it('los casos que motivaron el arreglo ya no cruzan el género', () => {
+    // Verificación 21/21 del set genérico: Marcos Ruiz llevaba mujer-2 y
+    // Diego Ramos llevaba mujer-4. Ahora llevan foto de hombre.
+    const ids48 = ['laura-vega', 'marcos-ruiz', 'ana-soto', 'diego-ramos'];
+    const names48 = ['Laura Vega', 'Marcos Ruiz', 'Ana Soto', 'Diego Ramos'];
+    expect(GENERIC_PHOTO_PORTRAITS_MEN).toContain(
+      photoPortraitFor('generado-48a17a5b:marcos-ruiz', ids48, 'Marcos Ruiz', names48));
+    expect(GENERIC_PHOTO_PORTRAITS_MEN).toContain(
+      photoPortraitFor('generado-48a17a5b:diego-ramos', ids48, 'Diego Ramos', names48));
+    expect(GENERIC_PHOTO_PORTRAITS_WOMEN).toContain(
+      photoPortraitFor('generado-48a17a5b:laura-vega', ids48, 'Laura Vega', names48));
+    expect(GENERIC_PHOTO_PORTRAITS_WOMEN).toContain(
+      photoPortraitFor('generado-48a17a5b:ana-soto', ids48, 'Ana Soto', names48));
+  });
+
+  it('inferNpcGender: listas, terminaciones y ambiguos', () => {
+    expect(inferNpcGender('Marcos Ruiz')).toBe('male');
+    expect(inferNpcGender('Lucía Vargas')).toBe('female');
+    expect(inferNpcGender('Álvaro Mendieta')).toBe('male');
+    expect(inferNpcGender('Sofía Rivas')).toBe('female');
+    // En España, Andrea es mayoritariamente masculino.
+    expect(inferNpcGender('Andrea')).toBe('male');
+    // Nombres fuera de las listas: la terminación habitual clasifica.
+    expect(inferNpcGender('Zoriondo')).toBe('male');
+    expect(inferNpcGender('Naiara')).toBe('female');
+    // Ambiguos o inclasificables: no se adivina.
+    expect(inferNpcGender('Alex')).toBe('unknown');
+    expect(inferNpcGender('Kim')).toBe('unknown');
+    expect(inferNpcGender('Xabi')).toBe('unknown');
+    expect(inferNpcGender('')).toBe('unknown');
+  });
+
+  it('sin nombre, el género se infiere del id (que deriva del nombre)', () => {
+    const ids = ['laura-vega', 'marcos-ruiz', 'ana-soto', 'diego-ramos'];
+    expect(GENERIC_PHOTO_PORTRAITS_MEN).toContain(
+      photoPortraitFor('generado-48a17a5b:marcos-ruiz', ids));
+    expect(GENERIC_PHOTO_PORTRAITS_MEN).toContain(
+      photoPortraitFor('generado-48a17a5b:diego-ramos', ids));
+    expect(GENERIC_PHOTO_PORTRAITS_WOMEN).toContain(
+      photoPortraitFor('generado-48a17a5b:laura-vega', ids));
+    expect(GENERIC_PHOTO_PORTRAITS_WOMEN).toContain(
+      photoPortraitFor('generado-48a17a5b:ana-soto', ids));
+  });
+
+  it('un nombre ambiguo usa el pool completo y es determinista', () => {
+    const ids = ['alex', 'marcos', 'laura', 'jorge'];
+    const names = ['Alex', 'Marcos', 'Laura', 'Jorge'];
+    const photo = photoPortraitFor('generado-21d02570:alex', ids, 'Alex', names);
+    expect(photo).not.toBeNull();
+    expect(GENERIC_PHOTO_PORTRAITS).toContain(photo);
+    expect(photoPortraitFor('generado-21d02570:alex', ids, 'Alex', names)).toBe(photo);
+    // Y los demás del caso siguen con su género y distintos entre sí.
+    const photos = ids.map((id, i) => photoPortraitFor(`generado-21d02570:${id}`, ids, names[i], names));
+    expect(new Set(photos).size).toBe(photos.length);
   });
 });

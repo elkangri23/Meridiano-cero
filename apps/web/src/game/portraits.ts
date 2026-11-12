@@ -105,50 +105,178 @@ export const FIXED_PHOTO_PORTRAITS: Readonly<Record<string, string>> = {
 /** Retratos foto genéricos (set genérico: 8 fotos, 4 hombres / 4 mujeres,
  * edades variadas, mismo estilo cálido que el caso fijo): solo para los NPC
  * de casos generados. Los roles de un generado son texto libre del LLM (sin
- * enum), así que el retrato NO se asigna por rol, sino por semilla: el índice
- * del NPC en la lista del caso (orden de definición, estable toda la
- * partida) rotado por el hash del caso. Dos NPC del mismo caso nunca
- * comparten foto (hay 8 fotos y los casos generados tienen 4 NPC); la misma
- * semilla da siempre la misma foto. La mujer-3 genérica se parece a Lucía
- * (protagonista del caso fijo): queda así, es un retrato genérico, no la
- * Lucía del astrolabio. */
-export const GENERIC_PHOTO_PORTRAITS: readonly string[] = [
+ * enum), así que el retrato NO se asigna por rol, sino por género del nombre
+ * de pila y por semilla: cada NPC lleva una foto de su género, distinta
+ * dentro del caso. El género no está en los datos del caso: se infiere del
+ * nombre (`inferNpcGender`); si no se puede clasificar, el NPC cae en el
+ * pool completo por semilla, como antes, nunca en un pool equivocado por
+ * adivinar. La mujer-3 genérica se parece a Lucía (protagonista del caso
+ * fijo): queda así, es un retrato genérico, no la Lucía del astrolabio. */
+export const GENERIC_PHOTO_PORTRAITS_MEN: readonly string[] = [
   '/images/generico-hombre-1.webp',
   '/images/generico-hombre-2.webp',
   '/images/generico-hombre-3.webp',
   '/images/generico-hombre-4.webp',
+];
+export const GENERIC_PHOTO_PORTRAITS_WOMEN: readonly string[] = [
   '/images/generico-mujer-1.webp',
   '/images/generico-mujer-2.webp',
   '/images/generico-mujer-3.webp',
   '/images/generico-mujer-4.webp',
 ];
+export const GENERIC_PHOTO_PORTRAITS: readonly string[] = [
+  ...GENERIC_PHOTO_PORTRAITS_MEN,
+  ...GENERIC_PHOTO_PORTRAITS_WOMEN,
+];
 
-/** Foto genérica de un NPC de un caso generado: `npcIds` es la lista de los
- * NPC del caso en orden de definición (`view.npcChat`); sin ella, el puesto
- * sale del hash de la semilla (determinista, pero sin la garantía de que dos
- * NPC del mismo caso no compartan foto). El caso fijo y el equipo no pasan
- * por aquí: el fijo tiene sus 5 fotos en FIXED_PHOTO_PORTRAITS y el equipo
- * sigue con el SVG procedural. */
-export function genericPhotoPortraitFor(caseId: string, npcId: string, npcIds: readonly string[]): string | null {
+/** Género inferido de un nombre de pila: 'unknown' cuando el nombre no
+ * está en las listas ni la terminación lo clasifica (Alex, Kim, nombres
+ * extranjeros…): esos NPC usan el pool completo, nunca un pool por
+ * adivinar. */
+export type NpcGender = 'male' | 'female' | 'unknown';
+
+/** Nombres de pila españoles habituales por género: cubren los 14 nombres
+ * de los 12 casos generados de producción (Marcos, Laura, Jorge, Ana,
+ * Carlos, Sofía, Elena, Álvaro, Carmen, Luis, Marta, Lucía, Roberto,
+ * Diego) más los comunes que puede traer un caso futuro, incluidos vascos,
+ * catalanes y gallegos. 'Andrea' está en hombres: en España es
+ * mayoritariamente masculino (documentado, no un descuido). */
+const MALE_FIRST_NAMES: ReadonlySet<string> = new Set([
+  'adrian', 'aitor', 'alberto', 'alejandro', 'alfonso', 'alfredo', 'alvaro', 'ander', 'andrea',
+  'andres', 'angel', 'antoni', 'antonio', 'arturo', 'asier', 'benito', 'breixo', 'carlos',
+  'cesar', 'cristian', 'daniel', 'david', 'diego', 'eduardo', 'emilio', 'enrique', 'ernesto',
+  'esteban', 'federico', 'felipe', 'fernando', 'francisco', 'gabriel', 'gonzalo', 'gorka',
+  'gregorio', 'guillermo', 'gustavo', 'hector', 'hugo', 'ignacio', 'iker', 'ivan', 'jaime',
+  'javier', 'jesus', 'joan', 'joaquin', 'jordi', 'jorge', 'jose', 'josep', 'juan', 'julen',
+  'julian', 'julio', 'leonardo', 'luis', 'manuel', 'marc', 'marcos', 'mario', 'martin',
+  'miguel', 'mikel', 'nicolas', 'nil', 'oriol', 'oscar', 'pablo', 'pau', 'pedro', 'pol',
+  'rafael', 'ramon', 'raul', 'ricardo', 'roberto', 'rodrigo', 'roi', 'ruben', 'salvador',
+  'samuel', 'santiago', 'sergio', 'tomas', 'unai', 'vicente', 'victor', 'xabier', 'xose',
+]);
+const FEMALE_FIRST_NAMES: ReadonlySet<string> = new Set([
+  'adriana', 'ainara', 'ainhoa', 'alba', 'alejandra', 'alicia', 'amaia', 'ana', 'ane',
+  'angela', 'antia', 'antonia', 'beatriz', 'blanca', 'candela', 'carmen', 'carolina',
+  'clara', 'claudia', 'concepcion', 'cristina', 'daniela', 'dolores', 'elena', 'elisa',
+  'elsa', 'emma', 'esperanza', 'esther', 'eva', 'fatima', 'francisca', 'gabriela',
+  'gloria', 'ines', 'irene', 'isabel', 'itziar', 'julia', 'laia', 'laura', 'leire',
+  'lucia', 'luisa', 'maite', 'margarita', 'maria', 'marta', 'mercedes', 'mireia',
+  'monica', 'natalia', 'nerea', 'noa', 'nuria', 'olga', 'paloma', 'patricia', 'pilar',
+  'raquel', 'rebeca', 'rocio', 'rosa', 'rosario', 'sabela', 'sara', 'silvia', 'sofia',
+  'sonia', 'susana', 'teresa', 'valentina', 'vanesa', 'veronica', 'victoria',
+  'virginia', 'yolanda', 'zaira',
+]);
+
+/** Primer token del nombre, sin acentos y en minúsculas: 'Marcos Ruiz' →
+ * 'marcos', 'marcos-ruiz' → 'marcos', 'María José' → 'maria'. */
+function firstNameToken(name: string): string {
+  const first = name.trim().split(/[\s-]+/)[0] ?? '';
+  return first.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+/** Género de un NPC por su nombre de pila: primero la lista, y si no está,
+ * la terminación habitual (-a → mujer, -o → hombre); si tampoco clasifica,
+ * 'unknown' y el NPC usa el pool completo. */
+export function inferNpcGender(name: string): NpcGender {
+  const first = firstNameToken(name);
+  if (!first) return 'unknown';
+  if (MALE_FIRST_NAMES.has(first)) return 'male';
+  if (FEMALE_FIRST_NAMES.has(first)) return 'female';
+  if (first.endsWith('a')) return 'female';
+  if (first.endsWith('o')) return 'male';
+  return 'unknown';
+}
+
+/** Pool de fotos de un género; 'unknown' usa el pool completo. */
+function genderPool(gender: NpcGender): readonly string[] {
+  if (gender === 'male') return GENERIC_PHOTO_PORTRAITS_MEN;
+  if (gender === 'female') return GENERIC_PHOTO_PORTRAITS_WOMEN;
+  return GENERIC_PHOTO_PORTRAITS;
+}
+
+/** Foto de un NPC con género conocido en su puesto dentro del caso: su
+ * rango entre los NPC de su mismo género, rotado por el hash del caso. */
+function genderedPhoto(caseId: string, index: number, gender: NpcGender, genderOf: (index: number) => NpcGender): string | null {
+  const pool = genderPool(gender);
+  let rank = 0;
+  for (let i = 0; i < index; i++) {
+    if (genderOf(i) === gender) rank++;
+  }
+  return pool[(portraitHash(caseId) + rank) % pool.length] ?? null;
+}
+
+/** Foto de un NPC de género desconocido: del pool completo, sin repetir
+ * ninguna foto ya usada en el caso. Las fotos de los NPC con género no
+ * dependen de los desconocidos, así que se calculan primero y se
+ * excluyen; los desconocidos anteriores a este ya han cogido su foto del
+ * mismo pool disponible, en orden, y se simula su elección (cada uno
+ * retira su foto del pool) para no repetirla. */
+function unknownPhoto(caseId: string, myIndex: number, genderOf: (index: number) => NpcGender, npcIds: readonly string[]): string | null {
+  const used = new Set<string>();
+  for (let i = 0; i < npcIds.length; i++) {
+    const gender = genderOf(i);
+    if (gender === 'unknown' || i === myIndex) continue;
+    const photo = genderedPhoto(caseId, i, gender, genderOf);
+    if (photo) used.add(photo);
+  }
+  let rankUnknown = 0;
+  for (let i = 0; i < myIndex; i++) {
+    if (genderOf(i) === 'unknown') rankUnknown++;
+  }
+  const remaining = GENERIC_PHOTO_PORTRAITS.filter(photo => !used.has(photo));
+  for (let k = 0; k < rankUnknown; k++) {
+    remaining.splice((portraitHash(caseId) + k) % remaining.length, 1);
+  }
+  return remaining[(portraitHash(caseId) + rankUnknown) % remaining.length] ?? null;
+}
+
+/** Foto genérica de un NPC de un caso generado: del pool de su género
+ * (`npcName` es el nombre para mostrar, p. ej. 'Marcos Ruiz'; sin él, el
+ * género se infiere del id, que en los casos generados deriva del nombre:
+ * 'marcos-ruiz' → 'marcos'). `npcIds` es la lista de los NPC del caso en
+ * orden de definición (`view.npcChat`) y `npcNames` sus nombres en el mismo
+ * orden: el puesto de cada NPC es su rango entre los NPC de su mismo pool
+ * en el caso, rotado por el hash del caso — dos NPC del mismo género en el
+ * mismo caso nunca comparten foto (4 fotos por género, 4 NPC por caso
+ * como máximo) y la misma semilla da siempre la misma foto. Sin lista, el
+ * puesto sale del hash de la semilla (determinista, pero sin la garantía
+ * de distinción). El caso fijo y el equipo no pasan por aquí: el fijo
+ * tiene sus 5 fotos en FIXED_PHOTO_PORTRAITS y el equipo sigue con el
+ * SVG procedural. */
+export function genericPhotoPortraitFor(
+  caseId: string, npcId: string, npcIds: readonly string[],
+  npcName?: string, npcNames: readonly string[] = [],
+): string | null {
   if (caseId === 'astrolabio-tres-ciudades') return null;
-  const index = npcIds.indexOf(npcId);
-  const slot = index >= 0 ? index : portraitHash(`${caseId}:${npcId}`) % GENERIC_PHOTO_PORTRAITS.length;
-  const offset = portraitHash(caseId) % GENERIC_PHOTO_PORTRAITS.length;
-  return GENERIC_PHOTO_PORTRAITS[(offset + slot) % GENERIC_PHOTO_PORTRAITS.length] ?? null;
+  const genderOf = (index: number): NpcGender => {
+    const name = npcNames[index] ?? npcIds[index] ?? '';
+    return inferNpcGender(name);
+  };
+  const myIndex = npcIds.indexOf(npcId);
+  const myGender = npcName !== undefined ? inferNpcGender(npcName) : genderOf(myIndex);
+  const pool = genderPool(myGender);
+  if (myIndex < 0) {
+    const slot = portraitHash(`${caseId}:${npcId}`) % pool.length;
+    const offset = portraitHash(caseId) % pool.length;
+    return pool[(offset + slot) % pool.length] ?? null;
+  }
+  if (myGender === 'unknown') return unknownPhoto(caseId, myIndex, genderOf, npcIds);
+  return genderedPhoto(caseId, myIndex, myGender, genderOf);
 }
 
 /** Foto de un personaje cuando la tiene: la fija del caso fijo, la genérica
- * de un generado (por semilla, distinta dentro del caso), `null` en el
- * resto: el retrato SVG procedural es el fallback (también para el equipo
- * A.C.M.E.). `npcIds` es la lista de NPC del caso en orden de definición;
- * sin ella, la genérica sale del hash de la semilla. */
-export function photoPortraitFor(seed: string, npcIds: readonly string[] = []): string | null {
+ * de un generado (de su género, por semilla, distinta dentro del caso),
+ * `null` en el resto: el retrato SVG procedural es el fallback (también
+ * para el equipo A.C.M.E.). `npcIds` es la lista de NPC del caso en orden
+ * de definición y `npcNames` sus nombres en el mismo orden; `npcName` es
+ * el nombre para mostrar de este NPC. Sin nombres, el género se infiere
+ * del id; sin lista, la genérica sale del hash de la semilla. */
+export function photoPortraitFor(seed: string, npcIds: readonly string[] = [], npcName?: string, npcNames: readonly string[] = []): string | null {
   const fixed = FIXED_PHOTO_PORTRAITS[seed];
   if (fixed) return fixed;
   if (seed.startsWith('team:')) return null;
   const colon = seed.indexOf(':');
   if (colon < 0) return null;
-  return genericPhotoPortraitFor(seed.slice(0, colon), seed.slice(colon + 1), npcIds);
+  return genericPhotoPortraitFor(seed.slice(0, colon), seed.slice(colon + 1), npcIds, npcName, npcNames);
 }
 
 /** Semilla de un personaje de expediente: el caso forma parte de ella. */

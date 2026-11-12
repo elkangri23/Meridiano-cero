@@ -448,7 +448,7 @@ function SceneNpcGroup({ group, view, disabled, onOffer }: { group: TalkGroup; v
   const role = sceneRole(view, npcId, getNPC(npcId)?.role);
   const refusal = chatRefusal(entry, npcRefusal(npcId, undefined, view.caseId, preferences.language));
   return <div className={`game-scene-npc${refusal ? ' game-scene-npc--suspect' : ''}`} data-testid={`npc-card-${npcId}`}>
-    <Portrait seed={portraitSeed(view.caseId, npcId)} name={name} size="small" npcIds={view.npcChat.map(entry => entry.id)} />
+    <Portrait seed={portraitSeed(view.caseId, npcId)} name={name} size="small" npcIds={view.npcChat.map(entry => entry.id)} npcNames={view.npcChat.map(entry => entry.name)} />
     <div className="game-scene-card-main">
       <h3><strong>{name}</strong>{role ? ` · ${role}` : ''}</h3>
       {refusal && <p className="game-scene-card-note"><b>{t('game.scene.conductNote')}:</b> {refusal}</p>}
@@ -1311,7 +1311,7 @@ function ChatContent({ npc, view, turns, draft, busy, error, onDraft, onSend, pl
   }
   const role = sceneRole(view, npc.id, getNPC(npc.id)?.role);
   return <div className="game-chat">
-    <p className="game-chat-npc"><Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" npcIds={view.npcChat.map(entry => entry.id)} /><span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
+    <p className="game-chat-npc"><Portrait seed={portraitSeed(view.caseId, npc.id)} name={npc.name} size="medium" npcIds={view.npcChat.map(entry => entry.id)} npcNames={view.npcChat.map(entry => entry.name)} /><span><strong>{npc.name}</strong>{role ? ` · ${role}` : ''}</span></p>
     <ol className="game-chat-turns" data-testid="chat-turns" aria-live="polite">
       {turns.map((turn, index) => <li key={index} className={turn.from === 'you' ? 'game-chat-you' : 'game-chat-npc-turn'}>
         <span className="game-chat-speaker">{turn.from === 'you' ? t('game.you') : npc.name}</span>
@@ -1414,11 +1414,11 @@ function LabContent({ view, labOffers, disabled, onAnalyze, onOpenIntel }: {
  * un documento solo se puede enviar si está en poder del jugador
  * (`view.objects` son las pruebas recogidas, nunca la solución ni pruebas
  * no halladas). */
-function CommsContactList({ contacts, caseId, npcIds }: { contacts: Contact[]; caseId: string; npcIds: readonly string[] }) {
+function CommsContactList({ contacts, caseId, npcIds, npcNames }: { contacts: Contact[]; caseId: string; npcIds: readonly string[]; npcNames: readonly string[] }) {
   const t = useTranslation();
   if (contacts.length === 0) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.commsEmpty')}</p></div>;
   return <ul className="game-destination-list">{contacts.map(contact => <li key={contact.id}>
-    <Portrait seed={portraitSeed(caseId, contact.id)} name={contact.name} size="small" npcIds={npcIds} />
+    <Portrait seed={portraitSeed(caseId, contact.id)} name={contact.name} size="small" npcIds={npcIds} npcNames={npcNames} />
     <span><strong>{contact.name}</strong><small>{contact.channels.length > 0
       ? contact.channels.map(item => channelLabel(item, t)).join(', ')
       : t('game.noRemoteChannels')}</small></span>
@@ -1478,7 +1478,7 @@ function CommsContent({ view, contacts, recipient, channel, documentId, text, bu
   const channels = selected?.channels ?? [];
   return <div>
     <h4>{t('game.contactsTitle')}</h4>
-    <CommsContactList contacts={contacts} caseId={view.caseId} npcIds={view.npcChat.map(entry => entry.id)} />
+    <CommsContactList contacts={contacts} caseId={view.caseId} npcIds={view.npcChat.map(entry => entry.id)} npcNames={view.npcChat.map(entry => entry.name)} />
     <h4>{t('game.sendTitle')}</h4>
     {contacts.length === 0 ? null : <CommsSendForm view={view} contacts={contacts} recipient={recipient} channel={channel}
       channels={channels} documentId={documentId} text={text} busy={busy} onRecipient={onRecipient} onChannel={onChannel}

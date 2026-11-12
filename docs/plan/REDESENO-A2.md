@@ -230,10 +230,10 @@ seguir la ORGANIZACIÓN de la maqueta A2, no solo sus colores
 - Los tiempos de viaje no se fijan en la interfaz: los calcula el
   motor para cada viaje (ruta del caso entre sus ciudades; catálogo
   geográfico fuera de ellas).
-- El arte de escena y los retratos de los casos generados y del equipo
-  siguen siendo los SVG del juego: no existen fotos para el resto de
-  lugares y personajes. Solo el caso fijo tiene ilustraciones y fotos
-  (fase 3).
+- El arte de escena y los retratos del equipo siguen siendo los SVG del
+  juego: no existen fotos para el equipo. Los casos generados sí tienen
+  fotos y escenas desde el set genérico (ver «Set genérico de imágenes»
+  abajo); solo el caso fijo tiene ilustraciones y fotos propias (fase 3).
 
 ## Accesibilidad
 
@@ -243,3 +243,43 @@ seguir la ORGANIZACIÓN de la maqueta A2, no solo sus colores
   claro (ya no son paneles azules oscuros).
 - Se mantienen foco visible, enlace de salto, movimiento reducido y
   los textos para lectores de pantalla.
+
+## Set genérico de imágenes (rama `imagenes-genericas-2026-11-12`)
+
+- 8 retratos foto genéricos (4 hombres / 4 mujeres, edades variadas,
+  mismo estilo cálido que el caso fijo) y 3 escenas genéricas
+  (oficina, archivo, almacén, neutras, sin skyline de ninguna ciudad)
+  para los casos generados. El caso fijo mantiene sus 5 fotos y sus
+  3 escenas; el equipo sigue con SVG procedural.
+- Retratos (`apps/web/src/game/portraits.ts`,
+  `GENERIC_PHOTO_PORTRAITS_MEN` / `_WOMEN`): se asignan por género del
+  nombre de pila y por semilla. El género no está en los datos del caso:
+  se infiere del nombre (`inferNpcGender`: listas de nombres españoles
+  habituales —los 14 de los 12 casos de producción más los comunes— y,
+  si no está en lista, la terminación habitual: -a → mujer, -o →
+  hombre). Si no se puede clasificar (Alex, Kim…), el NPC cae en el
+  pool completo por semilla, nunca en un pool equivocado por adivinar.
+  'Andrea' se clasifica como hombre (en España es mayoritariamente
+  masculino). Dentro de cada caso, dos NPC del mismo género nunca
+  comparten foto (4 fotos por género, 4 NPC por caso como máximo) y la
+  misma semilla da siempre la misma foto.
+- Escenas (`apps/web/src/game/scene-art.tsx`): por sufijo de tipo de
+  lugar — `-OFIC` oficina, `-ARCH` y `-ARCHIVO` archivo, `-ALMACEN`
+  almacén. Corrección encontrada al integrar: en producción no hay
+  ningún `-ALM` y sí hay `-ARCHIVO` y `-ALMACEN`; sin ampliar el mapa,
+  el arte de almacén no se habría visto jamás. Los demás sufijos
+  (`-BIBLIOTECA`, `-RECEP`, `-CONT`…) caen en el respaldo de Madrid,
+  como los tipos desconocidos.
+- La mujer-3 genérica se parece a Lucía (protagonista del caso fijo):
+  queda así, es un retrato genérico, no la Lucía del astrolabio.
+- Verificación en navegador (2026-11-12, con cuenta de prueba eliminada
+  después): 21/21 comprobaciones en Playwright — 2 casos generados y el
+  caso fijo, escritorio y móvil 390 px.
+- Arreglo por género (2026-11-12, decisión de Antonio: «sí me chirría,
+  asigna por género»): antes la asignación era solo por semilla y un
+  NPC con nombre masculino podía llevar foto de mujer (Marcos Ruiz →
+  mujer-2, Diego Ramos → mujer-4 en la verificación). Tests en
+  `apps/web/src/game/portraits.test.ts`: los 12 casos generados de
+  producción (la lista tenía 11: faltaba `generado-639534d3`, añadido
+  con este arreglo) sin cruzar el género, determinismo y distinción
+  por caso.
