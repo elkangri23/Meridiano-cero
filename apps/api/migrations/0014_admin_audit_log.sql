@@ -1,4 +1,6 @@
--- Tabla de auditoría para acciones de administración
+-- Tabla de auditoría para acciones de administración (Fase 1 del panel admin).
+-- Ya era idempotente en su versión original; se traslada tal cual al
+-- directorio de migraciones que lee el runner (apps/api/migrations/).
 CREATE TABLE IF NOT EXISTS admin_audit_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   admin_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
