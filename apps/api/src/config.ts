@@ -1,7 +1,7 @@
 export interface BootstrapConfig { host: '127.0.0.1' | '0.0.0.0'; port: number }
 export interface AppConfig extends BootstrapConfig {
   mode: 'development' | 'production';
-  origin: string; localAuth: boolean; registrationEnabled: boolean; databaseUrl: string;
+  origin: string; localAuth: boolean; registrationEnabled: boolean; adminEnabled?: boolean; databaseUrl: string;
   aiProvider: 'ollama' | 'mock' | 'none' | 'freellmapi' | 'openai' | 'anthropic' | 'google' | 'openai-compatible';
   aiBaseUrl?: string;
   aiModel?: string;
@@ -77,8 +77,10 @@ export function readAppConfig(env: NodeJS.ProcessEnv): AppConfig {
   if (http.mode === 'production' && env.LOCAL_DEV_AUTH_ENABLED !== 'false') throw new Error('CONFIG_LOCAL_DEV_AUTH_ENABLED');
   const aiProvider = env.AI_PROVIDER ?? 'mock';
   if (!['ollama', 'mock', 'none', 'freellmapi', 'openai', 'anthropic', 'google', 'openai-compatible'].includes(aiProvider)) throw new Error('CONFIG_AI_PROVIDER');
+  const adminEnabled = env.ADMIN_ENABLED !== undefined ? env.ADMIN_ENABLED === 'true' : true; // Default true for dev
   const cfg: AppConfig = {
     ...http, localAuth: env.LOCAL_DEV_AUTH_ENABLED === 'true',
+    adminEnabled,
     databaseUrl: readDatabaseUrl(env.DATABASE_URL),
     aiProvider: aiProvider as AppConfig['aiProvider'],
   };

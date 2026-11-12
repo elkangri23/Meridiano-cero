@@ -1,11 +1,15 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, text, timestamp, integer, jsonb, primaryKey, index, unique, foreignKey, check } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, integer, jsonb, primaryKey, index, unique, foreignKey, check, pgEnum } from 'drizzle-orm/pg-core';
 
+// ENUM de roles compartido
+export const roleEnum = pgEnum('role', ['player', 'admin', 'superadmin']);
+
+// Tabla de perfiles
 export const profiles = pgTable('profiles', {
   id: uuid('id').defaultRandom().primaryKey(),
   localKey: text('local_key').notNull().unique(),
   displayName: text('display_name').notNull(),
-  role: text('role').notNull().default('player'),
+  role: roleEnum('role').notNull().default('player'),
   passwordHash: text('password_hash'),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
 });
@@ -303,4 +307,21 @@ export const generatedCases = pgTable('generated_cases', {
   check('generated_cases_duration', sql`${table.duration} IN ('short', 'medium', 'long')`),
   check('generated_cases_hash', sql`${table.definitionHash} ~ '^[a-f0-9]{64}$'`),
   check('generated_cases_definition_object', sql`jsonb_typeof(${table.definition}) = 'object'`),
+]);
+
+// Registro de auditoría para acciones de administración (Fase 1)
+export const adminAuditLog = pgTable('admin_audit_log', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  adminId: uuid('admin_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  action: text('action').notNull(),
+  targetType: text('target_type').notNull(),
+  targetId: text('target_id').notNull(),
+  before: jsonb('before'),
+  after: jsonb('after'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index('admin_audit_log_admin_idx').on(table.adminId),
+  index('admin_audit_log_target_idx').on(table.targetType, table.targetId),
+  index('admin_audit_log_created_idx').on(table.createdAt),
+  index('admin_audit_log_action_idx').on(table.action, table.createdAt),
 ]);

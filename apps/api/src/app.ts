@@ -13,6 +13,7 @@ import type { Database } from './database/connection.ts';
 import { createReadiness } from './database/readiness.ts';
 import { registerLocalAuth } from './auth/routes.ts';
 import { registerDetectiveProfile } from './auth/profile-routes.ts';
+import { registerAdminRoutes } from './admin/routes.ts';
 import { registerPublicAuth } from './auth/public-auth.ts';
 import type { Mailer } from './auth/mailer.ts';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -73,6 +74,12 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
     }
     registerAiRoutes(app, options.config, options.database);
     registerAiConnectionRoutes(app, options.config, options.database);
+
+    // Rutas de administración (Fase 1). Se registran siempre; el acceso
+    // está protegido por createAdminAuthorizer (sesión + rol admin/superadmin).
+    if (options.config.adminEnabled ?? true) {
+      registerAdminRoutes(app, options.config, options.database);
+    }
   }
   app.setNotFoundHandler((request, reply) => {
     return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Recurso no disponible.', requestId: request.id } });
