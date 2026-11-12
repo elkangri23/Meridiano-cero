@@ -399,3 +399,64 @@ html.game-reduced-motion .game *, html.game-reduced-motion .game *::before, html
 .game-analysis-result-kind { display:block; font-size:13px; font-weight:700; color:var(--teal); overflow-wrap:anywhere; }
 .game-analysis-result p { margin:4px 0 0; overflow-wrap:anywhere; }
 .game-no-analysis { margin:0; font-size:13px; color:var(--ink-soft); font-style:italic; }
+
+/* Informe final como recorrido (rediseño Norte, fase 4): una sola columna
+ * en móvil y escritorio; cada tarjeta tiene su propio estado y ningún texto
+ * se sale de su caja (flex-wrap + min-width:0 + overflow-wrap). */
+.game-report-full section { margin:24px 0; }
+.game-report-full section > h2 { margin:0 0 8px; }
+.game-report-full section > p { margin:8px 0; }
+.game-score-hero { display:grid; grid-template-columns:170px 1fr; gap:16px; align-items:start; background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:16px; margin-top:12px; }
+.game-score-big { text-align:center; border:2px solid var(--gold-bright); background:var(--gold-bg); border-radius:12px; padding:12px 8px; }
+.game-score-number { font-family:var(--serif); font-size:2.6em; font-weight:800; line-height:1; }
+.game-score-of { font-size:.85em; font-weight:700; color:var(--gold); margin-top:4px; }
+.game-score-parts { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
+.game-score-part { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; text-align:left; border:1.5px solid var(--edge-strong); border-radius:10px; padding:10px 12px; background:#FFFFFF; }
+.game-score-part:hover { border-color:var(--ink); }
+.game-score-part[aria-pressed="true"] { border-color:var(--gold-bright); background:var(--gold-bg); }
+.game-score-part-label { font-size:.72em; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); overflow-wrap:anywhere; }
+.game-score-part-value { font-family:var(--mono); font-size:1.05em; overflow-wrap:anywhere; }
+.game-score-part-why { font-size:.75em; font-weight:700; color:var(--gold); }
+.game-score-detail { grid-column:1 / -1; border:1px solid var(--teal); background:var(--teal-bg); border-radius:10px; padding:10px 12px; margin:0; overflow-wrap:anywhere; }
+.game-timeline-nav { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 12px; }
+.game-timeline-pos { font-family:var(--mono); font-size:.85em; color:var(--muted); }
+.game-timeline-list { list-style:none; margin:0 0 12px; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:8px; }
+.game-timeline-item { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; min-width:0; text-align:left; border:1.5px solid var(--edge-strong); border-radius:10px; padding:8px 10px; background:#FFFFFF; }
+.game-timeline-item:hover { border-color:var(--ink); }
+.game-timeline-item[aria-pressed="true"] { border-color:var(--gold-bright); background:var(--gold-bg); }
+.game-timeline-minute { font-family:var(--mono); font-size:.75em; color:var(--gold); }
+.game-timeline-summary { font-weight:700; font-size:.9em; line-height:1.35; overflow-wrap:anywhere; min-width:0; }
+.game-timeline-evidence { font-size:.75em; font-weight:700; color:var(--teal-dark); overflow-wrap:anywhere; }
+.game-timeline-detail { border:2px solid var(--gold-bright); background:var(--gold-bg); border-radius:12px; padding:12px 14px; }
+.game-timeline-detail h3 { margin:4px 0 8px; }
+.game-timeline-detail p { margin:6px 0; overflow-wrap:anywhere; }
+.game-route-cities { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px; margin-top:8px; }
+.game-route-city { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; text-align:left; border:1.5px solid var(--edge-strong); border-radius:10px; padding:10px 12px; background:#FFFFFF; }
+.game-route-city:hover { border-color:var(--ink); }
+.game-route-city[aria-expanded="true"] { border-color:var(--teal); background:var(--teal-bg); }
+.game-route-city-name { font-weight:800; overflow-wrap:anywhere; }
+.game-route-city-sub { font-size:.8em; color:var(--muted); font-weight:600; overflow-wrap:anywhere; }
+.game-route-panel { border:1px solid var(--teal); background:#FFFFFF; border-radius:10px; padding:12px 14px; margin-top:10px; }
+.game-route-panel h3 { margin:0 0 6px; }
+.game-route-panel li { overflow-wrap:anywhere; }
+.game-evidence-gallery { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:10px; margin-top:8px; }
+.game-evidence-card { border:1px solid var(--edge); border-left:4px solid var(--gold-bright); border-radius:10px; background:#FFFFFF; padding:10px 12px; min-width:0; }
+.game-evidence-card--missed { border-left-color:var(--error, #B42318); background:var(--panel-soft); }
+.game-journey-evidence-title { margin:0; font-weight:700; line-height:1.35; overflow-wrap:anywhere; min-width:0; }
+.game-evidence-code { white-space:nowrap; }
+.game-evidence-text { font-weight:700; overflow-wrap:anywhere; }
+.game-evidence-toggle { margin-top:8px; }
+.game-evidence-detail { border-top:1px dashed var(--edge); margin-top:10px; padding-top:8px; }
+.game-evidence-detail p { margin:4px 0; font-size:.88em; overflow-wrap:anywhere; }
+.game-truth-details { border:1px solid var(--edge); border-radius:10px; background:#FFFFFF; margin:8px 0; overflow:hidden; }
+.game-truth-details summary { cursor:pointer; font-family:var(--serif); font-weight:700; font-size:1em; padding:10px 12px; min-height:44px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+.game-truth-details[open] summary { border-bottom:1px solid var(--edge); background:var(--panel-soft); }
+.game-truth-details p { margin:8px 12px; overflow-wrap:anywhere; }
+.game-truth-details .game-report-objectives { margin:8px 12px; }
+.game-chrono-full-list { margin:8px 0; padding-left:20px; }
+.game-chrono-full-list li { margin:6px 0; overflow-wrap:anywhere; }
+.game-report-closing { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--edge); }
+@media (max-width:560px) {
+  .game-score-hero { grid-template-columns:1fr; }
+  .game-score-big { text-align:left; padding:10px 12px; }
+}

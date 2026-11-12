@@ -23,14 +23,15 @@ import type { AnalysisLinks } from './dossier-analysis';
 import { loadInspected, recordInspected, reviewedInspectRecords, saveInspected } from './inspected';
 import type { InspectedRecord } from './inspected';
 import { buildIntelFacts, selectIntelFacts } from './intel-terminal';
-import { ELENA_ID, ELENA_NAME, elenaPersona, elenaRefusal, teamGreeting, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
+import { ELENA_ID, ELENA_NAME, elenaPersona, elenaRefusal, teamGreeting, TEAM_MEMBERS, TEAM_SERVICE_KEYS, teamRequestText, teamServiceAnswer } from './team';
 import { travelCityPoint, travelPointOnRoute, travelProgressAt, travelRemainingMinutes, travelRoutePath } from './travel-animation';
+import { ReportJourney } from './ReportJourney';
 import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { effectiveReducedMotion, objectiveStateText, trapTabKey, useSystemReducedMotion } from './accessibility';
 import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto, TranslateFn } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, GEOGRAPHIC_CATALOG, getNPC, getRoute, IRREGULAR_KIND_KEYS, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, searchCities, SUPPORTED_LANGUAGES, touristInfoFor, travelText } from '@meridiano/contracts';
+import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, GEOGRAPHIC_CATALOG, getNPC, getRoute, npcGreeting, npcKnowledgeFacts, npcRefusal, searchCities, SUPPORTED_LANGUAGES, touristInfoFor, travelText } from '@meridiano/contracts';
 import type { CaseTexts, DiscoveryLookup, Language, LocaleKey, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/contracts';
 import { useTranslation } from '../i18n';
 import './game.css';
@@ -2080,96 +2081,6 @@ function SettingsContent({ identity, language, onLanguage, textScale, highContra
   </div>;
 }
 
-// El informe final completo (GDD §12, REQ-G12-05/T2-05): resultado y motivo
-// en español, verdad completa, cronología, pruebas halladas y omitidas,
-// detenciones y puntuación con su desglose. El motor y la API ya resuelven
-// los identificadores a frases; la pantalla solo los enseña. Los objetivos
-// se resuelven con la descripción que trae la vista (en los casos generados
-// el catálogo fijo no los conoce y enseñaría el ID crudo).
-function ReportList({ items, empty }: { items: string[]; empty: string }) {
-  return items.length === 0
-    ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{empty}</p></div>
-    : <ul className="game-report-objectives">{items.map((item, index) => <li key={index}>{item}</li>)}</ul>;
-}
-
-/** Delta con signo para el informe: +3, 0, −2. */
-function signedDelta(delta: number): string {
-  return delta > 0 ? `+${delta}` : String(delta);
-}
-
-/** Sufijo de medalla para una línea de resultado oficial, o vacío. */
-function medalSuffix(medal: string | null | undefined, t: TranslateFn): string {
-  return medal ? ` · ${medalLabel(medal, t)}` : '';
-}
-
-/** Consecuencias de carrera del cierre (GDD §13, DEC-020): el cierre
- * oficial fija el resultado y enseña puntos/medalla/rango antes→después;
- * el de práctica recuerda el oficial existente; una partida cerrada antes
- * de la carrera no tiene resultado oficial. */
-function CareerConsequences({ officialResult }: { officialResult: PlayerViewDto['officialResult'] }) {
-  const t = useTranslation();
-  return <>
-    <h4>{t('game.careerConsequences')}</h4>
-    {!officialResult && <p>{t('game.careerNoResult')}</p>}
-    {officialResult?.isThisRun && <>
-      <p>{t('game.careerOfficialResult')}: <strong>{reportResultText(officialResult.result, t)}</strong> · {officialResult.points} {t('game.careerPoints')}{medalSuffix(officialResult.medal, t)} · {t('game.careerRank')}: {officialResult.rankBefore} → {officialResult.rankAfter}</p>
-      <p>{t('game.careerDeltas', { prestige: signedDelta(officialResult.prestigeDelta), integrity: signedDelta(officialResult.integrityDelta), trust: signedDelta(officialResult.trustDelta) })}</p>
-      <p>{t('game.careerOfficialNote')}</p>
-    </>}
-    {officialResult && !officialResult.isThisRun && <>
-      <p>{t('game.careerPracticeLine', {
-        caseTitle: officialResult.caseTitle, result: reportResultText(officialResult.result, t), points: officialResult.points,
-        medal: officialResult.medal ? `, ${medalLabel(officialResult.medal, t)}` : '',
-      })}</p>
-    </>}
-  </>;
-}
-
-function ReportContent({ view }: { view: PlayerViewDto }) {
-  const t = useTranslation();
-  const { preferences } = usePreferences();
-  if (!view.finalReport) return <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.reportNotAvailable')}</p></div>;
-  const report = view.finalReport;
-  const objectiveDescription = (id: string) =>
-    view.objectives.find(objective => objective.id === id)?.description ?? objectiveText(id, view.caseId, preferences.language);
-  return <div>
-    <p className="game-report-result">{t('game.reportResult')}: <strong>{reportResultText(report.result, t)}</strong> · {t('game.reportReason')}: {reportReasonText(report.reason, t)} · {t('game.reportMinute')}: {report.minute}</p>
-    <h4>{t('game.reportTruth')}</h4>
-    <p>{t('game.reportCulprit')}: <strong>{report.truth.culpritName}</strong></p>
-    {report.truth.objectLabel && <p>{t('game.reportStolenObject', { label: report.truth.objectLabel })}</p>}
-    <h4>{t('game.reportKeyEvidence')}</h4>
-    <ReportList items={report.truth.keyEvidence.map(entry => entry.text)} empty={t('game.reportNoKeyEvidence')} />
-    {report.timeline.length > 0 && <>
-      <h4>{t('game.reportTimeline')}</h4>
-      <ul className="game-report-objectives">{report.timeline.map(entry =>
-        <li key={entry.sequence}>[min {entry.minute}] {entry.summary}</li>)}</ul>
-    </>}
-    <h4>{t('game.reportEvidenceFound')}</h4>
-    <ReportList items={report.evidenceFound.map(entry => entry.text)} empty={t('game.reportNoEvidenceFound')} />
-    <h4>{t('game.reportEvidenceMissed')}</h4>
-    <ReportList items={report.evidenceMissed.map(entry => entry.text)} empty={t('game.reportNoEvidenceMissed')} />
-    <h4>{t('game.reportDetentions')}</h4>
-    <ReportList
-      items={report.detentions.map(detention =>
-        `${detention.suspectName} — ${detention.correct ? t('game.reportDetentionCorrect') : t('game.reportDetentionWrong')}${detention.withWarrant ? t('game.reportDetentionWithWarrant') : t('game.reportDetentionWithoutWarrant')}`)}
-      empty={t('game.reportNoDetentions')} />
-    <h4>{t('game.reportIrregular')}</h4>
-    <ReportList
-      items={(report.irregularActs ?? []).map(act => {
-        const kindKey = IRREGULAR_KIND_KEYS[act.kind];
-        return `${kindKey ? t(kindKey) : act.kind} — ${act.targetName} · min ${act.minute}${act.seen ? t('game.reportIrregularSeen') : t('game.reportIrregularUnseen')}`;
-      })}
-      empty={t('game.reportNoIrregular')} />
-    <h4>{t('game.reportScore')}</h4>
-    <ul className="game-report-objectives">{report.score.breakdown.map(entry =>
-      <li key={entry.label}>{entry.label}: {entry.points > 0 ? `+${entry.points}` : entry.points}</li>)}</ul>
-    <p>{t('game.reportTotal')}: <strong>{report.score.total} / {report.score.max}</strong></p>
-    <CareerConsequences officialResult={view.officialResult} />
-    <h4>{t('game.reportObjectives')}</h4>
-    <ReportList items={report.objectivesAchieved.map(objectiveDescription)} empty={t('game.reportNoObjectives')} />
-  </div>;
-}
-
 /** Pestaña Informe del dock (rediseño Norte, fase 1): el estado de la
  * partida como en la maqueta — tiempo usado y restante, evidencias, ciudad
  * y objetivos — con la nota de solicitudes pendientes tal como las trae el
@@ -2219,29 +2130,6 @@ function ReportTab({ view, finishOffer, disabled, onCloseConfirm, onCancelClose,
         </>}
     </section>
   </div>;
-}
-
-/** Informe final a pantalla entera (rediseño Norte, fase 1): el cierre
- * es su propio momento, así que el informe ocupa toda la pantalla en vez
- * de abrirse en una ventana. El «recorrido» interactivo es la fase 4; en
- * esta fase se enseña la vista de informe actual. «Ver la partida» vuelve
- * al layout en modo solo lectura. */
-function ReportFullScreen({ view, caseTitle, onViewRun }: { view: PlayerViewDto; caseTitle: string | null; onViewRun: () => void }) {
-  const t = useTranslation();
-  return <main className="game game-report-full" data-testid="report-full">
-    <header className="game-report-full-head">
-      <div>
-        <p className="game-overline">{t('game.dock.report')}</p>
-        <h1>{caseTitle ?? view.caseId}</h1>
-      </div>
-      <span className="game-state-pill game-state-pill--closed" data-testid="run-state">{t('game.header.stateClosed')}</span>
-      <div className="game-report-full-actions">
-        <button type="button" className="game-primary-button" data-testid="report-view-run" onClick={onViewRun}>{t('game.reportFull.viewRun')}</button>
-        <Link to="/archivo">{t('glossary.backArchive')}</Link>
-      </div>
-    </header>
-    <ReportContent view={view} />
-  </main>;
 }
 
 function UnavailableScreen({ phase, notice }: { phase: ScreenPhase; notice: string }) {
@@ -3159,7 +3047,8 @@ export function GameScreen() {
   // reabrirlo desde la pestaña Informe); «Ver la partida» vuelve al
   // layout en modo solo lectura.
   if (reportFull && closed) {
-    return <ReportFullScreen view={view} caseTitle={caseTitle} onViewRun={() => setReportFull(false)} />;
+    return <ReportJourney view={view} caseTitle={caseTitle} onViewRun={() => setReportFull(false)}
+      onRepeat={() => navigate('/archivo', { state: { repeatCaseId: view.caseId, difficulty: view.difficulty } })} />;
   }
 
   /** Panel de chat en línea en la escena, o nada si no hay conversación

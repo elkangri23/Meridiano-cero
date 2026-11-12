@@ -206,6 +206,9 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(report).not.toContainText('complete ·');
     await expect(report).not.toContainText('finished');
     await expect(report).toContainText('La verdad del caso');
+    // Fase 4: la verdad vive en secciones desplegables; «Quién fue» se
+    // abre antes de afirmar su contenido.
+    await page.getByTestId('truth-who').locator('summary').click();
     await expect(report).toContainText('Responsable: Inés Valera');
     await expect(report).toContainText('Inés Valera — correcta · con orden');
     // «Ver la partida» vuelve al layout en modo solo lectura.
