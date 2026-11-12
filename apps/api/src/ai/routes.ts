@@ -69,15 +69,37 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
     };
   }
 
+  /** Partida de una petición de IA: null si no hay sesión, si la partida
+   * no existe o si no es del usuario. Sin partida legible el endpoint se
+   * comporta como antes (la memoria sintética de los tests no tiene
+   * partida real y el prototipo no la necesita). */
+  async function loadRunForAi(database: Database, request: FastifyRequest, runId: string) {
+    try {
+      const token = cookieToken(request.headers.cookie);
+      if (!token) return null;
+      return await readFullRun(database, tokenDigest(token), runId);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Rechaza hablar con una partida cerrada (409 RUN_CLOSED, como
+   * POST /runs/:runId/action): la conversación fantasma no llega al
+   * modelo, no consume cuota ni deja registro. Solo bloquea cuando la
+   * partida existe y está cerrada; sin partida legible, no bloquea. */
+  async function assertRunOpen(database: Database, request: FastifyRequest, runId: string): Promise<void> {
+    const run = await loadRunForAi(database, request, runId);
+    if (run?.status === 'closed') throw new RunStoreError('RUN_CLOSED');
+  }
+
   /** Acciones de orden/detención bloqueadas en esta partida, para que el
    * intérprete explique qué falta en vez de inventar otra acción. Sin
    * partida (prototipo) o si la carga falla, no hay bloqueos: el
    * comportamiento es el de siempre. */
   async function lockedActionsForRun(database: Database, request: FastifyRequest, runId: string): Promise<LockedAction[]> {
     try {
-      const token = cookieToken(request.headers.cookie);
-      if (!token) return [];
-      const run = await readFullRun(database, tokenDigest(token), runId);
+      const run = await loadRunForAi(database, request, runId);
+      if (!run) return [];
       const definition = await definitionForRun(database.orm, run.definitionId, run.difficulty, run.deadlineMinutes, run.explorationMode);
       return describeLockedActions(definition, run);
     } catch {
@@ -160,8 +182,13 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
   // POST /api/v1/ai/interpret
   app.post('/api/v1/ai/interpret', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
     const ownerId = await authorize(request);
-    const { provider: aiProvider, director } = await resolveFor(ownerId);
     const { request: aiRequest, runId } = toInterpretRequest(request.body);
+    // Partida cerrada: sin órdenes que interpretar y sin llamada al
+    // modelo (mismo 409 que /runs/:runId/action). Antes de resolver el
+    // proveedor y de la cuota, para no gastar nada en una petición que
+    // se va a rechazar.
+    if (runId) await assertRunOpen(database, request, runId);
+    const { provider: aiProvider, director } = await resolveFor(ownerId);
     const locked = runId ? await lockedActionsForRun(database, request, runId) : [];
 
     // Estimar tokens
@@ -284,8 +311,13 @@ export function registerAiRoutes(app: FastifyInstance, config: AppConfig, databa
   // POST /api/v1/ai/converse
   app.post('/api/v1/ai/converse', { onRequest: async (request) => { await authorize(request); } }, async (request, reply) => {
     const ownerId = await authorize(request);
-    const { provider: aiProvider, director } = await resolveFor(ownerId);
     const aiRequest = toConverseRequest(request.body);
+    // Agujero del north review (P12): este endpoint nunca leía la
+    // partida y el chat seguía vivo tras el cierre. Antes de resolver el
+    // proveedor o comprobar la cuota: la llamada rechazada no cuesta nada
+    // ni deja registro de uso ni de operación.
+    await assertRunOpen(database, request, aiRequest.context.runId as string);
+    const { provider: aiProvider, director } = await resolveFor(ownerId);
     const facts = aiRequest.context.facts as PublicFact[];
     const memory = aiRequest.context.memory as ConversationMemory;
 

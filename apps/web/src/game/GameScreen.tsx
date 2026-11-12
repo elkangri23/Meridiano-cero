@@ -96,6 +96,13 @@ function detectiveAvatarName(profile: DetectiveProfileDto | null, t: TranslateFn
 }
 
 /** Si la partida admite el resumen al retomar (en curso y ya empezada). */
+/** ¿Se puede pedir este servicio del equipo? Elena es conversación: su
+ * consejo no se pide en partida cerrada (fase 5). Los demás servicios
+ * deterministas se quedan como estaban tras el cierre (fase 1). */
+function teamServiceAllowed(view: PlayerViewDto | null, memberId: TeamMemberId): view is PlayerViewDto {
+  return !!view && !(view.status === 'closed' && memberId === 'elena');
+}
+
 function resumeAvailable(view: PlayerViewDto): boolean {
   return view.status === 'active' && view.clock.minute > 0;
 }
@@ -1592,10 +1599,11 @@ function TeamContent({ view, turns, replies, draft, busy, elenaBusy, error, anal
   // desde la vista y el perfil de carrera, sin cambiar la partida — la
   // evaluación de Margaret tras cerrar es comportamiento existente
   // (career.spec.ts) y el motor rechaza registrar la petición (409). Lo
-  // que sí se bloquea en partida cerrada es la conversación con Elena y
-  // la coordinación de detenciones (ofertas reales del motor). Las
-  // respuestas de Elena y Margaret se ven además en su sitio, bajo su
-  // tarjeta (rediseño Norte, fase 3), además de su línea en la consola.
+  // que sí se bloquea en partida cerrada es todo lo de Elena —su consulta
+  // y su consejo (fase 5)— y la coordinación de detenciones (ofertas
+  // reales del motor). Las respuestas de Elena y Margaret se ven además
+  // en su sitio, bajo su tarjeta (rediseño Norte, fase 3), además de su
+  // línea en la consola.
   return <div>
     <h4>{t('game.teamMembers')}</h4>
     <ul className="game-destination-list">{TEAM_MEMBERS.map(member => <Fragment key={member.id}>
@@ -1607,7 +1615,7 @@ function TeamContent({ view, turns, replies, draft, busy, elenaBusy, error, anal
             onClick={event => onService('margaret', 'briefing', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.briefing)}</button>}
           {member.id === 'margaret' && <button type="button" data-testid="team-evaluate" disabled={busy}
             onClick={event => onService('margaret', 'evaluate', undefined, event.currentTarget)}>{t('game.teamEvaluateButton')}</button>}
-          {member.id === 'elena' && <button type="button" data-testid="team-advice" disabled={busy}
+          {member.id === 'elena' && <button type="button" data-testid="team-advice" disabled={busy || closed}
             onClick={event => onService('elena', 'advice', undefined, event.currentTarget)}>{t('game.teamAdviceButton')}</button>}
           {member.id === 'clara' && <button type="button" data-testid="team-organize" disabled={busy}
             onClick={event => onService('clara', 'organize', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.organize)}</button>}
@@ -2729,7 +2737,7 @@ export function GameScreen() {
    * registrada en el motor con una acción `team` gratuita. La evaluación
    * de carrera carga además el perfil oficial antes de responder. */
   async function requestTeamService(memberId: TeamMemberId, serviceId: TeamServiceId, targetId: string | undefined, trigger: HTMLElement | null) {
-    if (!runId || !view) return;
+    if (!runId || !teamServiceAllowed(view, memberId)) return;
     let answer: string | null;
     if (serviceId === 'evaluate') {
       const profile = await ensureCareer();
