@@ -50,8 +50,8 @@ test.describe('E2E retratos de personajes (GDD §2)', () => {
 
   test('el equipo enseña los cinco retratos, distintos entre sí', async ({ page }) => {
     await openGameScreen(page);
-    await page.click('button:has-text("Equipo A.C.M.E.")');
-    const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
+    await page.getByTestId('toolbar-team').click();
+    const team = page.getByTestId('dock-panel-equipo');
     await expect(team).toBeVisible();
     const portraits = team.locator('[data-testid="portrait"]');
     await expect(portraits).toHaveCount(5);
@@ -66,8 +66,8 @@ test.describe('E2E retratos de personajes (GDD §2)', () => {
     await page.getByTestId('offer-talk:lucia:identidad').click();
     await expect(page.getByTestId('scene-chat')).toBeVisible();
     await page.keyboard.press('Escape');
-    await page.click('button:has-text("Central de comunicaciones")');
-    const comms = page.getByRole('dialog', { name: 'Central de comunicaciones' });
+    await page.getByTestId('toolbar-comms').click();
+    const comms = page.getByTestId('dock-panel-central');
     await expect(comms).toBeVisible();
     await expect(comms.getByRole('img', { name: 'Retrato de Lucía' })).toBeVisible();
     await expect(comms).toContainText('Lucía');
@@ -79,8 +79,8 @@ test.describe('E2E retratos de personajes (GDD §2)', () => {
         window.localStorage.setItem('meridiano-cero-preferences-v1', JSON.stringify({ palette: value }));
       }, palette);
       await openGameScreen(page);
-      await page.click('button:has-text("Equipo A.C.M.E.")');
-      const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
+      await page.getByTestId('toolbar-team').click();
+      const team = page.getByTestId('dock-panel-equipo');
       await expect(team).toBeVisible();
       const portraits = team.locator('[data-testid="portrait"]');
       await expect(portraits).toHaveCount(5);

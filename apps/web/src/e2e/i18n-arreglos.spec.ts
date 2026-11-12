@@ -26,7 +26,7 @@ async function openGameScreen(page: Page) {
  * irreversibles enseñan el diálogo de confirmación; las baratas se ejecutan
  * en el mismo clic. */
 async function playOffer(page: Page, testId: string, minute: number) {
-  const needsDialog = /offer-(travel|detain|recover|request_warrant|finish)/.test(testId);
+  const needsDialog = /offer-(travel|detain|recover|request_warrant)/.test(testId);
   await page.getByTestId(testId).click();
   if (needsDialog) {
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
@@ -37,7 +37,7 @@ async function playOffer(page: Page, testId: string, minute: number) {
   if (!needsDialog) await expect(page.getByTestId('preview-dialog')).toBeHidden();
 }
 
-/** Viaja desde la ventana del mapa: abre Mapa, pulsa Viajar, confirma y cierra la ventana. */
+/** Viaja desde la pestaña Mapa del dock: abre Mapa, pulsa Viajar y confirma. */
 async function travelTo(page: Page, cityId: string, minute: number) {
   await page.click('button:has-text("Mapa")');
   await page.getByTestId(`travel-${cityId}`).click();
@@ -48,7 +48,6 @@ async function travelTo(page: Page, cityId: string, minute: number) {
   // El aviso de viaje no se cierra solo: hay que pulsar «Seguir».
   await page.getByTestId('travel-animation').getByRole('button', { name: 'Seguir' }).click();
   await expect(page.getByTestId('travel-animation')).toBeHidden();
-  await page.keyboard.press('Escape');
   await expect(page.getByTestId(`travel-${cityId}`)).toBeHidden();
 }
 
@@ -99,7 +98,6 @@ async function chooseLanguage(page: Page, lang: 'es' | 'en' | 'fr') {
   await expect(selector).toBeVisible();
   await selector.selectOption(lang);
   await expect(selector).toHaveValue(lang);
-  await page.keyboard.press('Escape');
 }
 
 /** Ninguna tarjeta de hallazgo del dossier está vacía: cada una lleva
@@ -113,13 +111,12 @@ async function expectAllCardsWithText(page: Page) {
     const body = text.replace(/^(Hallazgo|Finding|Découverte)\s*/u, '').replace(/\s*(Leer|Read|Lire)\s*$/u, '').trim();
     expect(body.length, `tarjeta ${index}: «${text}»`).toBeGreaterThan(10);
   }
-  await page.keyboard.press('Escape');
 }
 
-/** Abre el dossier y devuelve sus tarjetas de hallazgo. */
+/** Abre la pestaña Dossier del dock y devuelve sus tarjetas de hallazgo. */
 async function dossierCards(page: Page) {
   await page.getByTestId('toolbar-dossier').click();
-  const dossier = page.getByRole('dialog', { name: 'Dossier' });
+  const dossier = page.getByTestId('dock-panel-dossier');
   await expect(dossier).toBeVisible();
   return dossier.locator('.game-evidence-card');
 }
@@ -139,7 +136,6 @@ test.describe('E2E arreglos i18n', () => {
       expect(text.trim().length).toBeGreaterThan('Hallazgo'.length);
     }
     await expect(cards.nth(3)).toContainText('La caja guarda una copia del manifiesto, con sello y firma verificables.');
-    await page.keyboard.press('Escape');
   });
 
   test('flujo completo con cambios de idioma: ninguna tarjeta del dossier queda vacía en ES, EN ni FR', async ({ page }) => {
@@ -158,7 +154,6 @@ test.describe('E2E arreglos i18n', () => {
     // Dossier en español: 7 hallazgos, todos con texto.
     let cards = await dossierCards(page);
     await expect(cards).toHaveCount(7);
-    await page.keyboard.press('Escape');
     // En inglés y en francés, tras cambiar el idioma, tampoco hay tarjetas vacías.
     await chooseLanguage(page, 'en');
     await expectAllCardsWithText(page);
@@ -168,16 +163,15 @@ test.describe('E2E arreglos i18n', () => {
     await chooseLanguage(page, 'es');
     cards = await dossierCards(page);
     await expect(cards.nth(3)).toContainText('La caja guarda una copia del manifiesto, con sello y firma verificables.');
-    await page.keyboard.press('Escape');
   });
 
   test('la nota de idioma es correcta y Ajustes no deja residuos en español en EN ni FR', async ({ page }) => {
     await openGameScreen(page);
     await page.getByTestId('toolbar-settings').click();
-    // La ventana de Ajustes se localiza por su contenido, no por su nombre
-    // accesible: al cambiar de idioma el nombre pasa de «Ajustes» a
+    // El panel de Ajustes del dock se localiza por su contenido, no por su
+    // nombre accesible: al cambiar de idioma el nombre pasa de «Ajustes» a
     // «Settings» / «Réglages» y un localizador por nombre quedaría obsoleto.
-    const settings = page.locator('.game-window:has([data-testid="settings-language"])');
+    const settings = page.getByTestId('dock-panel-settings');
     await expect(settings).toBeVisible();
     const selector = page.getByTestId('settings-language');
     const palette = page.locator('select:has(option[value="protanopia"])');
@@ -212,18 +206,16 @@ test.describe('E2E arreglos i18n', () => {
     await page.getByTestId('ai-connection-adapter').selectOption('ollama');
     await expect(providerForm).toContainText('Fonctionne uniquement sur une installation à domicile avec Ollama sur cet ordinateur.');
     await expect(providerForm).not.toContainText('Solo funciona en una instalación');
-    await page.keyboard.press('Escape');
   });
 
   test('la evaluación de carrera en francés dice «clôture un dossier», no «clos un dossier»', async ({ page }) => {
     const password = await registerAndStartRun(page);
     await chooseLanguage(page, 'fr');
     await page.getByTestId('toolbar-team').click();
-    await expect(page.getByRole('dialog', { name: 'Équipe A.C.M.E.' })).toBeVisible();
+    await expect(page.getByRole('tabpanel', { name: 'Équipe' })).toBeVisible();
     await page.getByTestId('team-evaluate').click();
     await expect(page.getByTestId('team-turns')).toContainText('clôture un dossier');
     await expect(page.getByTestId('team-turns')).not.toContainText('clos un dossier');
-    await page.keyboard.press('Escape');
     await cleanupAccount(page, password);
   });
 
@@ -236,15 +228,13 @@ test.describe('E2E arreglos i18n', () => {
     await expect(screen).not.toContainText('the Paris archive');
     await expect(screen).toContainText('Known city: París.');
     await dossierCards(page);
-    const dossierEn = page.getByRole('dialog', { name: 'Dossier' });
+    const dossierEn = page.getByTestId('dock-panel-dossier');
     await expect(dossierEn).toContainText('París and Lisboa');
     await expect(dossierEn).not.toContainText('Paris and Lisbon');
-    await page.keyboard.press('Escape');
     await chooseLanguage(page, 'fr');
     await dossierCards(page);
-    const dossierFr = page.getByRole('dialog', { name: 'Dossier' });
+    const dossierFr = page.getByTestId('dock-panel-dossier');
     await expect(dossierFr).toContainText('à París et à Lisboa');
     await expect(dossierFr).not.toContainText('Lisbonne');
-    await page.keyboard.press('Escape');
   });
 });

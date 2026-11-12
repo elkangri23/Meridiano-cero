@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SessionDto } from '@meridiano/contracts';
-import { createRunCoordinator, CreationBlocked } from './creation';
+import type { CaseSummary, SessionDto } from '@meridiano/contracts';
+import { createRunCoordinator, CreationBlocked, repeatPreselect } from './creation';
 import type { IntentStorage } from './creation';
 import type { ArchiveApi } from './client';
 import { ArchiveError } from './client';
@@ -148,5 +148,29 @@ describe('T3: creación durable en pestaña sin otra intención', () => {
     transport.create.mockRejectedValue(new ArchiveError('unavailable', 'dificultad no admitida'));
     const coordinator = createRunCoordinator(transport, memory);
     expect(await coordinator.start('synthetic-case', identity, signal(), 'easy')).toEqual({ phase: 'uncertain', reason: 'dificultad no admitida' });
+  });
+});
+
+describe('repetir expediente desde el informe final', () => {
+  const cases: CaseSummary[] = [
+    { caseId: 'fijo', title: 'El astrolabio', contentMode: 'fixed', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: true, hasMultipleRoutes: true, ownedByMe: false },
+    { caseId: 'generado-1', title: 'Generado', contentMode: 'generated', crimeType: 'robo', contentRating: 'general', difficulty: 'hard', explorationMode: 'guided', deadlineMinutes: 2880, contentVersion: 1, canStart: false, hasMultipleRoutes: false, ownedByMe: true },
+  ];
+  it('preselecciona el expediente con su delito, contenido y dificultad', () => {
+    expect(repeatPreselect(cases, 'fijo', 'hard')).toEqual({ caseId: 'fijo', crimeType: 'robo', contentRating: 'familiar', difficulty: 'hard' });
+  });
+  it('ignora un expediente que ya no está en el catálogo', () => {
+    expect(repeatPreselect(cases, 'desaparecido', 'normal')).toBeNull();
+  });
+  it('ignora un expediente que ya no se puede iniciar', () => {
+    expect(repeatPreselect(cases, 'generado-1', 'normal')).toBeNull();
+  });
+  it('la dificultad no válida equivale a normal', () => {
+    expect(repeatPreselect(cases, 'fijo', 'imposible')).toEqual({ caseId: 'fijo', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal' });
+    expect(repeatPreselect(cases, 'fijo', undefined)).toEqual({ caseId: 'fijo', crimeType: 'robo', contentRating: 'familiar', difficulty: 'normal' });
+  });
+  it('un id que no es texto no preselecciona', () => {
+    expect(repeatPreselect(cases, 42, 'normal')).toBeNull();
+    expect(repeatPreselect(cases, null, 'normal')).toBeNull();
   });
 });

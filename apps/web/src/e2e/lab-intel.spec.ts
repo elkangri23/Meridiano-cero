@@ -1,6 +1,16 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+/** Rediseño Norte, fase 2: la pestaña y el botón de laboratorio siguen
+ * sin existir — el análisis forense vive ahora en la ficha de cada
+ * evidencia del Dossier — y la terminal de inteligencia no tiene entrada
+ * propia. Este archivo afirma esa realidad: no hay pestaña ni botón de
+ * laboratorio, ni entrada a la terminal, y el análisis de EV-02 está en
+ * su ficha del Dossier. La lógica del intérprete y de la terminal sigue
+ * cubierta por los unitarios (`interpret-clarification.test.ts`,
+ * `intel-terminal`) y la consulta determinista sin registro vive ahora en
+ * Elena (team.spec.ts). */
+
 /** Crea una partida desde la UI del archivo; la creación confirmada navega sola a su pantalla de juego. */
 async function openGameScreen(page: Page) {
   await page.goto('/archivo');
@@ -24,68 +34,33 @@ async function collectLockEvidence(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('30 min');
 }
 
-/** Abre el laboratorio desde la pista de la escena. */
-async function openLab(page: Page) {
-  await page.getByTestId('open-lab').click();
-  await expect(page.getByRole('dialog', { name: 'Laboratorio' })).toBeVisible();
-}
-
-/** Pregunta en la terminal y espera su respuesta. */
-async function askIntel(page: Page, question: string) {
-  await page.click('button:has-text("Terminal de inteligencia")');
-  await expect(page.getByRole('dialog', { name: 'Terminal de inteligencia' })).toBeVisible();
-  await page.getByTestId('chat-input').fill(question);
-  await page.getByTestId('chat-send').click();
-  await expect(page.getByTestId('chat-turns')).toContainText(question, { timeout: 15000 });
-}
-
-test.describe('E2E laboratorio forense + terminal de inteligencia', () => {
-  test('el análisis es de huellas, cuesta 90 min y su resultado es el del tipo', async ({ page }) => {
+test.describe('E2E laboratorio forense + terminal de inteligencia (fase 2: el análisis vive en el Dossier)', () => {
+  test('sin pestaña de laboratorio: el análisis de EV-02 está en su ficha del Dossier', async ({ page }) => {
     await openGameScreen(page);
     await collectLockEvidence(page);
-    // La escena anuncia el análisis disponible y ya no lo lista entre sus acciones.
-    await expect(page.getByTestId('open-lab')).toBeVisible();
-    await expect(page.getByTestId('open-lab')).toContainText('un análisis disponible en el Laboratorio');
-    await expect(page.getByTestId('offer-analyze:EV-02')).toBeHidden();
-    await openLab(page);
-    // El laboratorio enseña el tipo, la prueba con su frase y la nota de procedimiento.
-    const lab = page.getByRole('dialog', { name: 'Laboratorio' });
-    await expect(lab).toContainText('Huellas y marcas');
-    await expect(lab).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
-    await expect(lab).toContainText('la ausencia de registro no demuestra inocencia');
-    // Pedir el análisis no avanza el reloj (los 90 min son la espera del
-    // resultado, no el coste de la acción): va con un clic, sin diálogo.
-    await page.getByTestId('offer-analyze:EV-02').click();
-    await expect(page.getByTestId('preview-dialog')).toBeHidden();
-    await expect(page.getByTestId('clock')).toContainText('30 min');
-    await expect(lab).toContainText('En curso: responde en el minuto 120');
-    await page.keyboard.press('Escape');
-    // Tres esperas de 30 min maduran el análisis en el minuto 120. Al
-    // descubrirse el resultado, la oferta desaparece de la escena y el
-    // laboratorio se abre desde la barra de herramientas.
-    for (const minute of [60, 90, 120]) {
-      await page.getByTestId('offer-wait:30').click();
-      await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
-    }
-    await page.click('button:has-text("Laboratorio")');
-    await expect(page.getByRole('dialog', { name: 'Laboratorio' })).toBeVisible();
-    await expect(lab).toContainText('Resultado: La huella técnica es compatible con una herramienta de la serie HV-17. No acusa a nadie por sí sola.');
-    await page.keyboard.press('Escape');
-    // El dossier enseña el resultado con su frase, no con el ID crudo.
-    await page.click('button:has-text("Dossier")');
-    await expect(page.getByRole('dialog', { name: 'Dossier' })).toContainText('La huella técnica es compatible con una herramienta de la serie HV-17.');
-    await expect(page.getByRole('dialog', { name: 'Dossier' })).toContainText('la ausencia de registro no demuestra inocencia');
+    // Ni en la escena ni en el dock hay laboratorio.
+    await expect(page.getByTestId('open-lab')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Laboratorio', exact: true })).toHaveCount(0);
+    // Ni entrada a la terminal de inteligencia.
+    await expect(page.getByRole('button', { name: 'Terminal de inteligencia', exact: true })).toHaveCount(0);
+    // El Dossier muestra EV-02 recogida, con su texto y su análisis en la
+    // propia ficha; el distintivo cuenta las dos evidencias (EV-01 y EV-02).
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('2');
+    await page.getByTestId('toolbar-dossier').click();
+    const dossier = page.getByTestId('dock-panel-dossier');
+    await expect(dossier).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(page.getByTestId('offer-analyze:EV-02')).toBeVisible();
+    await expect(page.getByTestId('offer-analyze:EV-02')).toContainText('Analizar huellas y marcas · 90 min');
   });
 
-  test('la terminal responde solo con hechos autorizados y dice que no hay registro sin inventar', async ({ page }) => {
+  test('el dock tiene exactamente 5 pestañas y ninguna es el laboratorio', async ({ page }) => {
     await openGameScreen(page);
-    await collectLockEvidence(page);
-    // Con hecho: la cerradura, con su frase del expediente.
-    await askIntel(page, '¿Qué se sabe de la cerradura de la vitrina?');
-    await expect(page.getByTestId('chat-turns')).toContainText('La cerradura de la vitrina tiene residuo de herramienta.', { timeout: 15000 });
-    await page.keyboard.press('Escape');
-    // Sin hecho: respuesta determinista de no registro, sin inventar.
-    await askIntel(page, '¿Qué se sabe del submarino amarillo?');
-    await expect(page.getByTestId('chat-turns')).toContainText('Sin registro en los archivos consultados.', { timeout: 15000 });
+    const tabs = page.getByRole('tab');
+    await expect(tabs).toHaveCount(5);
+    await expect(tabs.nth(0)).toContainText('Dossier');
+    await expect(tabs.nth(1)).toContainText('Mapa');
+    await expect(tabs.nth(2)).toContainText('Central');
+    await expect(tabs.nth(3)).toContainText('Equipo');
+    await expect(tabs.nth(4)).toContainText('Informe');
   });
 });

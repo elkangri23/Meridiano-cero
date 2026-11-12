@@ -16,10 +16,10 @@ async function openGameScreen(page: Page, mode: 'guided' | 'free') {
   await expect(page.getByTestId('clock')).toContainText('0 min');
 }
 
-/** Abre la ventana del mapa (Atlas A.C.M.E.). */
+/** Abre la pestaña Mapa del dock. */
 async function openMap(page: Page) {
-  await page.click('button:has-text("Mapa")');
-  await expect(page.getByRole('dialog', { name: 'Mapa' })).toBeVisible();
+  await page.getByTestId('toolbar-map').click();
+  await expect(page.getByRole('tabpanel', { name: 'Mapa' })).toBeVisible();
 }
 
 test.describe('E2E exploración libre y mapa mundial (GDD §5)', () => {
@@ -27,7 +27,7 @@ test.describe('E2E exploración libre y mapa mundial (GDD §5)', () => {
     await openGameScreen(page, 'free');
     await expect(page.getByTestId('exploration-mode')).toContainText('Libre');
     await openMap(page);
-    const map = page.getByRole('dialog', { name: 'Mapa' });
+    const map = page.getByTestId('dock-panel-mapa');
     // París y Lisboa, ciudades del expediente, no se listan sin descubrir.
     await expect(page.getByTestId('travel-paris')).toHaveCount(0);
     await expect(page.getByTestId('travel-lisboa')).toHaveCount(0);
@@ -45,9 +45,10 @@ test.describe('E2E exploración libre y mapa mundial (GDD §5)', () => {
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(page.getByTestId('clock')).toContainText('300 min');
     // Destino turístico: información determinista, sin pruebas nuevas.
+    // El mapa se queda en su pestaña; la escena de Barcelona no tiene
+    // ofertas de investigar, hablar ni recoger.
     await expect(map).toContainText('Lugares de interés');
     await expect(map).toContainText('Sagrada Familia');
-    await page.keyboard.press('Escape');
     await expect(page.locator('[data-testid^="offer-inspect"], [data-testid^="offer-talk"], [data-testid^="offer-collect"]')).toHaveCount(0);
   });
 

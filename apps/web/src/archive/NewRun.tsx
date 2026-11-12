@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { CaseSummary, LocaleKey } from '@meridiano/contracts';
 import { deadlineMinutesForDifficulty, GDD_CRIME_TYPES, CRIME_TYPE_KEYS, CONTENT_RATING_KEYS, caseLabel } from '@meridiano/contracts';
 import type { ContentRating, CrimeType } from '@meridiano/contracts';
 import type { ArchiveState, createArchiveModel } from './model';
 import type { Difficulty } from './creation';
+import { repeatPreselect } from './creation';
 import type { ExplorationMode } from './client';
 import { displayCaseTitle, shortCaseRef } from './case-title';
 import { useTranslation } from '../i18n';
@@ -94,6 +95,10 @@ function CreationContent({ state, model }: Props) {
   const playableCrimes = GDD_CRIME_TYPES.filter(item => item !== 'aleatorio' && state.cases.some(entry => entry.canStart && entry.crimeType === item));
   const choice = useCrimeChoice(playableCrimes);
   const { crime, resolvedCrime, surprised } = choice;
+  const location = useLocation();
+  const repeatApplied = useRef(false);
+  const chooseCrimeRef = useRef(choice.chooseCrime);
+  chooseCrimeRef.current = choice.chooseCrime;
   // Expedientes del delito y contenido elegidos; si hay varios, se elige.
   const matchingCases = state.cases.filter(item => item.canStart && item.crimeType === resolvedCrime && item.contentRating === content);
   const selectedCase = matchingCases.find(item => item.caseId === caseId) ?? matchingCases[0];
@@ -126,6 +131,21 @@ function CreationContent({ state, model }: Props) {
     previousPhase.current = state.creation.phase;
     openCreatedRun(previous, state.creation.phase, state.creation.runId, navigate);
   }, [state.creation.phase, state.creation.runId, navigate]);
+  // «Repetir este expediente» (informe final, fase 4): el estado de
+  // navegación trae el expediente y la dificultad; se aplica una sola vez
+  // cuando el catálogo ya trae el expediente (puede llegar vacío al
+  // montar). Un expediente que ya no está no preselecciona nada.
+  useEffect(() => {
+    if (repeatApplied.current) return;
+    const navigationState = location.state as { repeatCaseId?: unknown; difficulty?: unknown } | null;
+    const repeat = repeatPreselect(state.cases, navigationState?.repeatCaseId, navigationState?.difficulty);
+    if (!repeat) return;
+    repeatApplied.current = true;
+    chooseCrimeRef.current(repeat.crimeType);
+    setContent(repeat.contentRating);
+    setDifficulty(repeat.difficulty);
+    setCaseId(repeat.caseId);
+  }, [location.state, state.cases]);
   function submit(event: FormEvent) { event.preventDefault(); if (selectedCase) void model.createCase(selectedCase.caseId, difficulty, { crimeType: resolvedCrime, contentRating: content, explorationMode: exploration }); }
   if (state.creation.phase !== 'idle') return <CreationPhaseView state={state} model={model} busy={busy} onPrepareAnother={() => { choice.resetChoice(); setContent('familiar'); setDifficulty('normal'); setExploration('guided'); setCaseId(null); model.prepareCreation(); }} />;
   return <form onSubmit={submit}>
