@@ -23,47 +23,36 @@ async function openGameScreen(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('0 min');
 }
 
-/** Pulsa una oferta y espera el reloj en `minute`. Cerrar enseña el
- * diálogo de confirmación (acción irreversible). */
-async function playOffer(page: Page, testId: string, minute: number) {
-  const needsDialog = /offer-(travel|detain|recover|request_warrant|finish)/.test(testId);
-  await page.getByTestId(testId).click();
-  if (needsDialog) {
-    await expect(page.getByTestId('preview-dialog')).toBeVisible();
-    await page.getByTestId('preview-confirm').click();
-    await expect(page.getByTestId('preview-dialog')).toBeHidden();
-  }
-  await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
-}
-
-/** Cierra la partida sin actuar y espera el reloj «Cerrada». */
+/** Cierra la partida sin actuar: cabecera, pestaña Informe, confirmación
+ * en línea y el informe final a pantalla entera. */
 async function closeCase(page: Page) {
-  await playOffer(page, 'offer-finish', 0);
-  await expect(page.getByTestId('clock')).toContainText('Cerrada');
+  await page.getByTestId('close-case-header').click();
+  await expect(page.getByRole('tabpanel', { name: 'Informe' })).toBeVisible();
+  await page.getByTestId('dock-close-start').click();
+  await page.getByTestId('dock-close-yes').click();
+  await expect(page.getByTestId('report-full')).toBeVisible();
+  await expect(page.getByTestId('run-state')).toContainText('Cerrada');
 }
 
-/** Abre la ventana del informe final y devuelve su cuerpo. */
+/** El informe final ya está a pantalla entera tras cerrar; devuelve su cuerpo. */
 async function openReport(page: Page) {
-  await page.click('button:has-text("Informe final")');
-  const report = page.getByRole('dialog', { name: 'Informe final' }).locator('.game-window-body');
+  const report = page.getByTestId('report-full');
   await expect(report).toContainText('Resultado:');
   return report;
 }
 
-/** Abre el equipo y devuelve su ventana. */
+/** Vuelve a la partida en solo lectura y abre la pestaña Equipo. */
 async function openTeam(page: Page) {
-  await page.click('button:has-text("Equipo A.C.M.E.")');
-  const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
+  await page.getByTestId('report-view-run').click();
+  await page.getByTestId('toolbar-team').click();
+  const team = page.getByTestId('dock-panel-equipo');
   await expect(team).toBeVisible();
   return team;
 }
 
 /** Vuelve al archivo desde la pantalla de juego (enlace «Archivo» de la
- * cabecera) y lee el conteo de casos de la sección de carrera. La ventana
- * del informe flota sobre la pantalla y cubre la cabecera, así que se
- * cierra antes con Escape. */
+ * cabecera) y lee el conteo de casos de la sección de carrera. */
 async function careerCasesFromArchive(page: Page): Promise<number> {
-  await page.keyboard.press('Escape');
   await page.getByRole('link', { name: 'Archivo' }).click();
   const section = page.getByTestId('career-section');
   await expect(section).toBeVisible();

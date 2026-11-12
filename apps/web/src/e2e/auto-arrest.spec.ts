@@ -18,7 +18,7 @@ async function openGameScreen(page: Page) {
  * irreversibles (viajar, detener, recuperar, pedir orden, cerrar) enseñan
  * el diálogo de confirmación; las baratas se ejecutan en el mismo clic. */
 async function playOffer(page: Page, testId: string, minute: number) {
-  const needsDialog = /offer-(travel|detain|recover|request_warrant|finish)/.test(testId);
+  const needsDialog = /offer-(travel|detain|recover|request_warrant)/.test(testId);
   await page.getByTestId(testId).click();
   if (needsDialog) {
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
@@ -29,7 +29,7 @@ async function playOffer(page: Page, testId: string, minute: number) {
   if (!needsDialog) await expect(page.getByTestId('preview-dialog')).toBeHidden();
 }
 
-/** Viaja desde la ventana del mapa: abre Mapa, pulsa Viajar, confirma y cierra la ventana. */
+/** Viaja desde la pestaña Mapa del dock: abre Mapa, pulsa Viajar y confirma. */
 async function travelTo(page: Page, cityId: string, minute: number) {
   await page.click('button:has-text("Mapa")');
   await page.getByTestId(`travel-${cityId}`).click();
@@ -40,12 +40,16 @@ async function travelTo(page: Page, cityId: string, minute: number) {
   // El aviso de viaje no se cierra solo: hay que pulsar «Seguir».
   await page.getByTestId('travel-animation').getByRole('button', { name: 'Seguir' }).click();
   await expect(page.getByTestId('travel-animation')).toBeHidden();
-  await page.keyboard.press('Escape');
   await expect(page.getByTestId(`travel-${cityId}`)).toBeHidden();
 }
 
 test.describe('E2E - Detenciones automáticas (GDD §12)', () => {
-  test('coordinar la detención desde París sin viajar a Lisboa: aviso, objetivo e informe', async ({ page }) => {
+  // Rediseño Norte, fase 1: este test depende de la vía EV-03 (el
+  // análisis de EV-02 en el laboratorio) y no es reproducible sin ella —
+  // el laboratorio no existe aún (el análisis por evidencia en el Dossier
+  // es la fase 2). Vuelve en la fase 2 con el cierre nuevo (el informe a
+  // pantalla entera sustituye al diálogo «Informe final»).
+  test.skip('coordinar la detención desde París sin viajar a Lisboa: aviso, objetivo e informe', async ({ page }) => {
     await openGameScreen(page);
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);

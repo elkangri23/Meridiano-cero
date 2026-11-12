@@ -32,10 +32,21 @@ async function openPreview(page: Page, testId: string) {
   return preview;
 }
 
-/** Abre una ventana de la barra de herramientas por su título. */
-async function openWindow(page: Page, title: string) {
-  await page.click(`button:has-text("${title}")`);
-  await expect(page.getByRole('dialog', { name: title })).toBeVisible();
+/** Abre la pestaña Dossier del dock. */
+async function openDossier(page: Page) {
+  await page.getByTestId('toolbar-dossier').click();
+  await expect(page.getByRole('tabpanel', { name: 'Dossier' })).toBeVisible();
+}
+
+/** Cierra el caso desde la cabecera (rediseño Norte): pestaña Informe,
+ * confirmación en línea y el informe final a pantalla entera. */
+async function closeCase(page: Page) {
+  await page.getByTestId('close-case-header').click();
+  await expect(page.getByRole('tabpanel', { name: 'Informe' })).toBeVisible();
+  await page.getByTestId('dock-close-start').click();
+  await page.getByTestId('dock-close-yes').click();
+  await expect(page.getByTestId('report-full')).toBeVisible();
+  await expect(page.getByTestId('run-state')).toContainText('Cerrada');
 }
 
 test.describe('E2E acciones irregulares (GDD §14)', () => {
@@ -56,13 +67,11 @@ test.describe('E2E acciones irregulares (GDD §14)', () => {
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(await clockMinutes(page)).toBe(30);
     // El acto y la advertencia quedan en el dossier, en español.
-    // (La ventana se titula «Tablero de evidencias» desde la fase 2.)
-    await openWindow(page, 'Tablero de evidencias');
-    const dossier = page.getByRole('dialog', { name: 'Tablero de evidencias' });
+    await openDossier(page);
+    const dossier = page.getByTestId('dock-panel-dossier');
     await expect(dossier).toContainText('Sobornaste a Lucía (min 30).');
     await expect(dossier).toContainText('Advertencia de A.C.M.E.');
     // Sobornar no es atajo: Lucía ya lo ha contado todo y la oferta desaparece.
-    await page.keyboard.press('Escape');
     await expect(page.getByTestId('offer-irregular:bribe:lucia')).toBeHidden();
   });
 
@@ -91,19 +100,15 @@ test.describe('E2E acciones irregulares (GDD §14)', () => {
     await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     // En el dossier, el astrolabio recuperado figura como no admisible.
-    await openWindow(page, 'Tablero de evidencias');
-    const dossier = page.getByRole('dialog', { name: 'Tablero de evidencias' });
+    await openDossier(page);
+    const dossier = page.getByTestId('dock-panel-dossier');
     await expect(dossier).toContainText('Forzaste el acceso a Almacén de depósito');
     await expect(dossier).toContainText('El astrolabio original está recuperado.');
     const row = dossier.locator('tr', { hasText: 'El astrolabio original está recuperado.' });
     await expect(row).toContainText('No');
-    await page.keyboard.press('Escape');
     // Cerrar el caso: el informe final refleja el acto y descuenta 10 puntos.
-    await openPreview(page, 'offer-finish');
-    await page.getByTestId('preview-confirm').click();
-    await expect(page.getByTestId('preview-dialog')).toBeHidden();
-    await openWindow(page, 'Informe final');
-    const report = page.getByRole('dialog', { name: 'Informe final' });
+    await closeCase(page);
+    const report = page.getByTestId('report-full');
     await expect(report).toContainText('Conducta irregular');
     await expect(report).toContainText('Acceso forzado');
     await expect(report).toContainText('Almacén de depósito');

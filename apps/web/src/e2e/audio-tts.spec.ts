@@ -92,7 +92,7 @@ async function openGameScreen(page: Page) {
 
 async function openSettings(page: Page) {
   await page.click('button:has-text("Ajustes")');
-  const settings = page.getByRole('dialog', { name: 'Ajustes' });
+  const settings = page.getByTestId('dock-panel-settings');
   await expect(settings).toBeVisible();
   return settings;
 }
@@ -101,7 +101,6 @@ async function enableTts(page: Page, autoRead = false) {
   const settings = await openSettings(page);
   await settings.getByTestId('tts-enabled').check();
   if (autoRead) await settings.getByTestId('tts-autoread').check();
-  await page.keyboard.press('Escape');
 }
 
 test.describe('E2E audio y TTS (GDD §15)', () => {
@@ -113,7 +112,7 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     await openGameScreen(page);
     expect(await audioContextCount(page)).toBe(0);
     await page.click('button:has-text("Ajustes")');
-    await expect(page.getByRole('dialog', { name: 'Ajustes' })).toBeVisible();
+    await expect(page.getByTestId('dock-panel-settings')).toBeVisible();
     expect(await audioContextCount(page)).toBeGreaterThan(0);
   });
 
@@ -175,12 +174,10 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     await expect(selector).toBeVisible();
     await selector.selectOption('en');
     await expect(selector).toHaveValue('en');
-    await page.keyboard.press('Escape');
     await page.getByTestId('toolbar-settings').click();
-    const settings = page.getByRole('dialog', { name: 'Settings' });
+    const settings = page.getByTestId('dock-panel-settings');
     await expect(settings).toBeVisible();
     await settings.getByTestId('tts-enabled').check();
-    await page.keyboard.press('Escape');
     await page.getByTestId('offer-inspect:MAD-SALA').click();
     await expect(page.getByTestId('clock')).toContainText('10 min');
     await page.getByTestId('tts-read').click();
@@ -209,7 +206,6 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     expect(state.spoken.length).toBe(1);
     const settings = await openSettings(page);
     await settings.getByTestId('audio-muted').check();
-    await page.keyboard.press('Escape');
     state = await ttsState(page);
     expect(state.cancelled).toBeGreaterThan(0);
     await expect(page.getByTestId('tts-read')).toBeDisabled();
@@ -234,7 +230,7 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     await page.getByTestId('offer-inspect:MAD-SALA').click();
     await expect(page.getByTestId('clock')).toContainText('10 min');
     await page.click('button:has-text("Dossier")');
-    const dossier = page.getByRole('dialog', { name: 'Dossier' });
+    const dossier = page.getByTestId('dock-panel-dossier');
     await expect(dossier).toBeVisible();
     await expect(dossier.getByTestId('dossier-read-0')).toBeVisible();
     await dossier.getByTestId('dossier-read-0').click();
@@ -250,7 +246,6 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     await expect(settings.getByTestId('tts-unsupported')).toBeVisible();
     await expect(settings.getByTestId('tts-unsupported')).toContainText('no ofrece síntesis de voz');
     await expect(settings.getByTestId('tts-enabled')).toHaveCount(0);
-    await page.keyboard.press('Escape');
     await page.getByTestId('offer-inspect:MAD-SALA').click();
     await expect(page.getByTestId('clock')).toContainText('10 min');
     await expect(page.getByTestId('tts-read')).toBeDisabled();
@@ -275,7 +270,7 @@ test.describe('E2E audio y TTS (GDD §15)', () => {
     await chat.getByTestId('chat-read-0').click();
     await expect(chat.getByTestId('tts-no-voices-chat')).toBeVisible();
     await page.click('button:has-text("Dossier")');
-    const dossier = page.getByRole('dialog', { name: 'Dossier' });
+    const dossier = page.getByTestId('dock-panel-dossier');
     await expect(dossier).toBeVisible();
     await dossier.getByTestId('dossier-read-0').click();
     await expect(dossier.getByTestId('tts-no-voices-dossier')).toBeVisible();

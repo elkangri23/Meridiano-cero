@@ -14,10 +14,10 @@ async function openGameScreen(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('0 min');
 }
 
-/** Abre el equipo desde la barra de herramientas. */
+/** Abre la pestaña Equipo del dock. */
 async function openTeam(page: Page) {
-  await page.click('button:has-text("Equipo A.C.M.E.")');
-  await expect(page.getByRole('dialog', { name: 'Equipo A.C.M.E.' })).toBeVisible();
+  await page.getByTestId('toolbar-team').click();
+  await expect(page.getByRole('tabpanel', { name: 'Equipo' })).toBeVisible();
 }
 
 /** Recoge EV-02 (la cerradura de la vitrina): inspeccionar la sala y la cerradura, recoger. */
@@ -30,25 +30,11 @@ async function collectLockEvidence(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('30 min');
 }
 
-/** Pide el análisis de huellas de EV-02 y espera a que madure (min 120). */
-async function completeAnalysis(page: Page) {
-  await collectLockEvidence(page);
-  await page.getByTestId('open-lab').click();
-  await expect(page.getByRole('dialog', { name: 'Laboratorio' })).toBeVisible();
-  await page.getByTestId('offer-analyze:EV-02').click();
-  await expect(page.getByTestId('preview-dialog')).toBeHidden();
-  await page.keyboard.press('Escape');
-  for (const minute of [60, 90, 120]) {
-    await page.getByTestId('offer-wait:30').click();
-    await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
-  }
-}
-
 test.describe('E2E equipo A.C.M.E.', () => {
   test('pedir ayuda a Margaret y a Clara es gratis, queda registrado y no revela la solución', async ({ page }) => {
     await openGameScreen(page);
     await openTeam(page);
-    const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
+    const team = page.getByTestId('dock-panel-equipo');
     // Los cinco miembros del GDD §8, con su función y el límite escrito.
     for (const name of ['Margaret Sullivan', 'Dr. Samuel Richter', 'Elena Vázquez', 'David Nakamura', 'Clara Beaumont']) {
       await expect(team).toContainText(name);
@@ -73,11 +59,24 @@ test.describe('E2E equipo A.C.M.E.', () => {
     await expect(page.getByTestId('team-turns')).not.toContainText('culpable');
   });
 
-  test('Richter explica un análisis completado y David muestra las rutas desde Madrid', async ({ page }) => {
+  // Rediseño Norte, fase 1: Richter necesita EV-03, que solo sale del
+  // análisis de EV-02 en el laboratorio — y el laboratorio no existe aún
+  // (el análisis por evidencia en el Dossier es la fase 2). El test
+  // vuelve en la fase 2 con la ruta del análisis.
+  test.skip('Richter explica un análisis completado y David muestra las rutas desde Madrid', async ({ page }) => {
     await openGameScreen(page);
-    await completeAnalysis(page);
+    await collectLockEvidence(page);
+    await page.getByTestId('open-lab').click();
+    await expect(page.getByRole('dialog', { name: 'Laboratorio' })).toBeVisible();
+    await page.getByTestId('offer-analyze:EV-02').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await page.keyboard.press('Escape');
+    for (const minute of [60, 90, 120]) {
+      await page.getByTestId('offer-wait:30').click();
+      await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
+    }
     await openTeam(page);
-    const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
+    const team = page.getByTestId('dock-panel-equipo');
     // Richter: el selector trae el análisis completado y su explicación es el texto del resultado.
     await expect(page.getByTestId('team-analysis')).toHaveValue('EV-03');
     await page.getByTestId('team-explain').click();

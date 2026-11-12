@@ -19,13 +19,12 @@ async function openGameScreen(page: Page) {
 }
 
 /** Pulsa una oferta y espera el reloj en `minute`. Las acciones costosas o
- * irreversibles (viajar, detener, recuperar, pedir orden, cerrar) enseñan
- * el diálogo de confirmación; las baratas (inspeccionar, hablar, recoger,
- * consultar, esperar) se ejecutan en el mismo clic (lote 2). El análisis
- * vive en la ventana del laboratorio y pedirlo tampoco avanza el reloj
- * (los 90 min son la espera del resultado): se pulsa aparte. */
+ * irreversibles (viajar, detener, recuperar, pedir orden) enseñan el
+ * diálogo de confirmación; las baratas (inspeccionar, hablar, recoger,
+ * consultar, esperar) se ejecutan en el mismo clic (lote 2). El cierre ya
+ * no es una oferta de escena: se hace desde la cabecera con `closeCase`. */
 async function playOffer(page: Page, testId: string, minute: number) {
-  const needsDialog = /offer-(travel|detain|recover|request_warrant|finish)/.test(testId);
+  const needsDialog = /offer-(travel|detain|recover|request_warrant)/.test(testId);
   await page.getByTestId(testId).click();
   if (needsDialog) {
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
@@ -37,7 +36,20 @@ async function playOffer(page: Page, testId: string, minute: number) {
   if (!needsDialog) await expect(page.getByTestId('preview-dialog')).toBeHidden();
 }
 
-/** Viaja desde la ventana del mapa: abre Mapa, pulsa Viajar, confirma y cierra la ventana. */
+/** Cierra el caso desde la cabecera (rediseño Norte): botón «Cerrar el
+ * caso», pestaña Informe, «Iniciar el cierre del caso», confirmación en
+ * línea y el informe final a pantalla entera. */
+async function closeCase(page: Page) {
+  await page.getByTestId('close-case-header').click();
+  await expect(page.getByRole('tabpanel', { name: 'Informe' })).toBeVisible();
+  await page.getByTestId('dock-close-start').click();
+  await page.getByTestId('dock-close-yes').click();
+  await expect(page.getByTestId('report-full')).toBeVisible();
+  await expect(page.getByTestId('run-state')).toContainText('Cerrada');
+}
+
+/** Viaja desde la pestaña Mapa del dock: abre Mapa, pulsa Viajar y
+ * confirma. La ciudad de destino deja de listarse como destino. */
 async function travelTo(page: Page, cityId: string, minute: number) {
   await page.click('button:has-text("Mapa")');
   await page.getByTestId(`travel-${cityId}`).click();
@@ -45,12 +57,16 @@ async function travelTo(page: Page, cityId: string, minute: number) {
   await page.getByTestId('preview-confirm').click();
   await expect(page.getByTestId('preview-dialog')).toBeHidden();
   await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
-  await page.keyboard.press('Escape');
   await expect(page.getByTestId(`travel-${cityId}`)).toBeHidden();
 }
 
 test.describe('E2E T3-05 - Pantalla de juego', () => {
-  test('Ruta A completa (470 min): inspeccionar, recoger, analizar, viajar, consultar, orden, detener, recuperar y cerrar', async ({ page }) => {
+  // Rediseño Norte, fase 1: la ruta A queda TRUNCADA en el laboratorio —
+  // el análisis por evidencia en el Dossier es la fase 2 — así que este
+  // test solo llega hasta recoger EV-02 y afirma que no hay laboratorio.
+  // La ruta A completa (análisis, consulta HV-17, orden, detención,
+  // recuperación y cierre) vuelve en la fase 2.
+  test('Ruta A truncada (fase 1): inspeccionar y recoger EV-02, sin laboratorio', async ({ page }) => {
     await openGameScreen(page);
     // Objetivos siempre visibles (lote 2): los dos pendientes al empezar.
     const objectives = page.getByTestId('objectives-panel');
@@ -62,83 +78,15 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);
     await playOffer(page, 'offer-collect:EV-02', 30);
-    // El análisis vive en el laboratorio y madura en el minuto 120,
-    // durante el viaje posterior. Pedirlo no avanza el reloj (los 90 min
-    // son la espera del resultado, no el coste de la acción).
-    await page.getByTestId('open-lab').click();
-    await page.getByTestId('offer-analyze:EV-02').click();
+    // No hay laboratorio en el dock ni en la escena: ni botón, ni pestaña,
+    // ni oferta de análisis, aunque EV-02 ya está recogida.
+    await expect(page.getByTestId('open-lab')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Laboratorio', exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('offer-analyze:EV-02')).toHaveCount(0);
     await expect(page.getByTestId('clock')).toContainText('30 min');
-    await page.keyboard.press('Escape');
-    await travelTo(page, 'paris', 210);
-    await playOffer(page, 'offer-query:herramienta-hv17', 210);
-    await playOffer(page, 'offer-query:traslado-ines', 210);
-    await playOffer(page, 'offer-wait:30', 240);
-    await playOffer(page, 'offer-request_warrant:ines', 240);
-    await playOffer(page, 'offer-wait:30', 270);
-    await travelTo(page, 'lisboa', 420);
-    await playOffer(page, 'offer-talk:ines:identidad', 420);
-    // La detención es automática (GDD §12): 30 min de coordinación con las
-    // autoridades, en vez de 15 min deteniendo en persona.
-    await playOffer(page, 'offer-detain:ines', 450);
-    await playOffer(page, 'offer-recover:astrolabio-original', 470);
-    // Al detener y recuperar, el panel marca los dos objetivos como logrados.
-    await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'true');
-    await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'true');
-    await playOffer(page, 'offer-finish', 470);
-    await expect(page.getByTestId('clock')).toContainText('Cerrada');
-    // Partida cerrada: Guardados explica por qué no se puede guardar ni cargar.
-    await page.click('button:has-text("Guardados")');
-    await expect(page.getByTestId('save-closed-notice')).toBeVisible();
-    await expect(page.getByTestId('save-closed-notice')).toContainText('No se pueden crear guardados nuevos ni cargar uno anterior');
-    await expect(page.getByTestId('save-create')).toBeDisabled();
-    await expect(page.locator('text=Manuales: 0 / 10')).toBeVisible();
-    await page.keyboard.press('Escape');
-    // Informe final disponible en la ventana correspondiente.
-    await page.click('button:has-text("Informe final")');
-    await expect(page.locator('text=Resultado:')).toBeVisible();
-    // Informe final en español: resultado y motivo traducidos, objetivos
-    // como frases (antes: `complete`, `finished`, `obj-detener`…).
-    const report = page.getByRole('dialog', { name: 'Informe final' }).locator('.game-window-body');
-    await expect(report).toContainText('Resultado: completado');
-    await expect(report).toContainText('Motivo: finalizado');
-    await expect(report).toContainText('Detener a Inés con orden válida');
-    await expect(report).toContainText('Recuperar el astrolabio original');
-    await expect(report).not.toContainText('obj-detener');
-    await expect(report).not.toContainText('obj-recuperar');
-    await expect(report).not.toContainText('complete ·');
-    await expect(report).not.toContainText('finished');
-    // Informe final completo (GDD §12): verdad, cronología, pruebas,
-    // detenciones y puntuación con su desglose.
-    await expect(report).toContainText('La verdad del caso');
-    await expect(report).toContainText('Responsable: Inés Valera');
-    await expect(report).toContainText('Objeto sustraído: el astrolabio original');
-    await expect(report).toContainText('El registro firmado asigna la herramienta HV-17 a Inés Valera.');
-    await expect(report).toContainText('Cronología');
-    await expect(report).toContainText('[min 10] Inspección en Sala de embalaje.');
-    await expect(report).toContainText('[min 470] La investigación ha concluido.');
-    await expect(report).toContainText('Pruebas halladas');
-    await expect(report).toContainText('La caja está a la vista. Su etiqueta remite al archivo de París.');
-    await expect(report).toContainText('Pruebas omitidas');
-    await expect(report).toContainText('La caja guarda una copia del manifiesto, con sello y firma verificables.');
-    await expect(report).toContainText('Detenciones');
-    await expect(report).toContainText('Inés Valera — correcta · con orden');
-    await expect(report).toContainText('Puntuación');
-    await expect(report).toContainText('Objetivos logrados: +50');
-    await expect(report).toContainText('Pruebas halladas: +14');
-    await expect(report).toContainText('Detención correcta: +15');
-    await expect(report).toContainText('Tiempo restante: +8');
-    await expect(report).toContainText('Total: 87 / 100');
-    // La consola narró cada acción: recoger con su hallazgo (no el ID),
-    // consultas y orden con su vencimiento, orden concedida, detención y cierre.
-    const console = page.locator('.game-console');
-    await expect(console).toContainText('Recogido: La cerradura de la vitrina tiene residuo de herramienta.');
-    await expect(console).not.toContainText('Objeto EV-02 recogido.');
-    await expect(console).toContainText('El resultado llegará sobre el minuto 120.');
-    await expect(console).toContainText('Has solicitado una orden contra Inés Valera.');
-    await expect(console).toContainText('Orden contra Inés Valera concedida.');
-    await expect(console).toContainText('Las autoridades han detenido a Inés Valera por orden de A.C.M.E. El caso sigue abierto.');
-    await expect(console).toContainText('El informe final está disponible en la ventana «Informe final».');
-    await expect(console).not.toContainText('La investigación avanza.');
+    // El dossier sigue mostrando EV-02 recogida, con su texto.
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('dock-panel-dossier')).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
   });
 
   test('Ruta B completa (500 min) con guardar y reanudar a mitad de ruta', async ({ page }) => {
@@ -179,19 +127,36 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await playOffer(page, 'offer-talk:ines:identidad', 450);
     await playOffer(page, 'offer-detain:ines', 480);
     await playOffer(page, 'offer-recover:astrolabio-original', 500);
-    await playOffer(page, 'offer-finish', 500);
-    await expect(page.getByTestId('clock')).toContainText('Cerrada');
+    await closeCase(page);
+    // Informe final a pantalla entera, en español: resultado y motivo
+    // traducidos, objetivos como frases (antes: `complete`, `finished`,
+    // `obj-detener`…).
+    const report = page.getByTestId('report-full');
+    await expect(report).toContainText('Resultado: completado');
+    await expect(report).toContainText('Motivo: finalizado');
+    await expect(report).toContainText('Detener a Inés con orden válida');
+    await expect(report).toContainText('Recuperar el astrolabio original');
+    await expect(report).not.toContainText('obj-detener');
+    await expect(report).not.toContainText('obj-recuperar');
+    await expect(report).not.toContainText('complete ·');
+    await expect(report).not.toContainText('finished');
+    await expect(report).toContainText('La verdad del caso');
+    await expect(report).toContainText('Responsable: Inés Valera');
+    await expect(report).toContainText('Inés Valera — correcta · con orden');
+    // «Ver la partida» vuelve al layout en modo solo lectura.
+    await page.getByTestId('report-view-run').click();
+    await expect(page.getByTestId('game-screen')).toBeVisible();
+    await expect(page.getByTestId('run-state')).toContainText('Cerrada');
   });
 
-  test('Teclado: Enter en una oferta ejecuta en un clic, Escape cierra el diálogo y Ctrl+Enter envía la orden en texto libre', async ({ page }) => {
+  test('Teclado: Enter en una oferta ejecuta en un clic y Escape cierra el diálogo', async ({ page }) => {
     await openGameScreen(page);
-    // Ctrl+Enter en la orden en texto libre: el mock interpreta la primera oferta.
-    // Inspeccionar es barato (lote 2): se ejecuta en el mismo clic, sin diálogo.
-    await page.getByTestId('order-input').fill('inspecciona la sala con cuidado');
-    await page.keyboard.press('Control+Enter');
+    // Tab/Enter: enfocar una oferta barata y ejecutar con Enter, sin diálogo.
+    await page.getByTestId('offer-inspect:MAD-SALA').focus();
+    await expect(page.getByTestId('offer-inspect:MAD-SALA')).toBeFocused();
+    await page.keyboard.press('Enter');
     await expect(page.getByTestId('clock')).toContainText('10 min');
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
-    // Tab/Enter: enfocar una oferta barata y ejecutar con Enter, sin diálogo.
     await page.getByTestId('offer-inspect:MAD-SALA:cerradura').focus();
     await expect(page.getByTestId('offer-inspect:MAD-SALA:cerradura')).toBeFocused();
     await page.keyboard.press('Enter');
@@ -209,8 +174,8 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
 
   test('Feedback visible: hablar abre el chat con respuesta e inspeccionar muestra el hallazgo', async ({ page }) => {
     await openGameScreen(page);
-    // La pista de cómo se juega está visible al empezar.
-    await expect(page.locator('text=Tras cada acción el resultado aparece en la consola.')).toBeVisible();
+    // La pista de cómo se juega está visible al empezar, en la consola.
+    await expect(page.locator('.game-console')).toContainText('La investigación comienza. Inspecciona la escena o elige una acción.');
     // Hablar con Tomás: la conversación se abre sola con su saludo.
     await playOffer(page, 'offer-talk:tomas:identidad', 0);
     const chat = page.getByTestId('chat-turns');
@@ -231,7 +196,7 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.locator('.game-console')).not.toContainText('Objeto EV-02 recogido.');
     // El dossier muestra los hallazgos con texto legible, no IDs crudos.
     await page.click('button:has-text("Dossier")');
-    const dossier = page.locator('.game-window-body');
+    const dossier = page.getByTestId('dock-panel-dossier');
     await expect(dossier).toContainText('La caja está a la vista');
     await expect(dossier).not.toContainText('EV-01');
     await expect(dossier).toContainText('Hablaste con Tomás Ríos (min 0).');
