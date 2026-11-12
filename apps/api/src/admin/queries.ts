@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { Database } from '../database/connection.ts';
 
 // Consultas para métricas de IA
 export function getIAMetricsQuery() {
@@ -62,7 +63,7 @@ export function getAIQuotasQuery() {
 // Consultas para auditoría
 export function getAdminAuditQuery(filters: { startDate?: string; endDate?: string; action?: string }) {
   const conditions: string[] = [];
-  const params: any[] = [];
+  const params: string[] = [];
 
   if (filters.startDate) {
     conditions.push(`createdAt >= $${params.length + 1}`);
@@ -94,13 +95,13 @@ export function getAdminAuditQuery(filters: { startDate?: string; endDate?: stri
 }
 
 // Función para registrar acción administrativa
-export async function logAdminAction(_database: any, data: {
+export async function logAdminAction(_database: Database, data: {
   adminId: string;
   action: string;
   targetType: string;
   targetId: string;
-  before?: any;
-  after?: any;
+  before?: unknown;
+  after?: unknown;
 }) {
   await sql`
     INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, before, after, created_at)

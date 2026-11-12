@@ -29,6 +29,17 @@ function runStoreErrorMessage(error: RunStoreError): string {
     : 'No se pudo completar la solicitud.';
 }
 
+/**
+ * Rutas de administración (Fase 1). Se registran siempre que el admin esté
+ * activado (por defecto sí); el acceso está protegido por
+ * createAdminAuthorizer (sesión + rol admin/superadmin).
+ */
+function registerAdminRoutesIfEnabled(app: FastifyInstance, config: AppConfig, database: Database): void {
+  if (config.adminEnabled ?? true) {
+    registerAdminRoutes(app, config, database);
+  }
+}
+
 export function createApp(options?: { config: AppConfig; database: Database; state?: RuntimeState; telemetry?: Telemetry; mailer?: Mailer | null; generationWorker?: boolean }) {
   const app: FastifyInstance = Fastify({ logger: false, requestTimeout: 65_000, connectionTimeout: 65_000,
     // Plazos alineados de fuera a dentro con la IA: el proveedor admite
@@ -74,12 +85,7 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
     }
     registerAiRoutes(app, options.config, options.database);
     registerAiConnectionRoutes(app, options.config, options.database);
-
-    // Rutas de administración (Fase 1). Se registran siempre; el acceso
-    // está protegido por createAdminAuthorizer (sesión + rol admin/superadmin).
-    if (options.config.adminEnabled ?? true) {
-      registerAdminRoutes(app, options.config, options.database);
-    }
+    registerAdminRoutesIfEnabled(app, options.config, options.database);
   }
   app.setNotFoundHandler((request, reply) => {
     return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Recurso no disponible.', requestId: request.id } });

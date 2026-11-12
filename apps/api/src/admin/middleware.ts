@@ -3,8 +3,18 @@ import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
 import { createAuthorizer } from '../ai/authorize.ts';
 import { RunStoreError } from '../game/runs.ts';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, type InferSelectModel } from 'drizzle-orm';
 import { profiles } from '../database/schema.ts';
+
+/** Perfil con rol de administración, tal como lo deja el autorizador. */
+export type AdminProfile = Omit<InferSelectModel<typeof profiles>, 'role'> & { role: 'admin' | 'superadmin' };
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    adminProfile?: AdminProfile;
+    isSuperadmin?: boolean;
+  }
+}
 
 /**
  * Middleware de autorización para endpoints de administración.
@@ -16,13 +26,7 @@ export function createAdminAuthorizer(config: AppConfig, database: Database) {
 
   return async (request: FastifyRequest, reply: FastifyReply) => {
     // Ejecutar autorización base (sesión + origen + CSRF)
-    let profileId: string;
-    try {
-      profileId = await baseAuthorizer(request);
-    } catch (error) {
-      // Re-lanzar errores de autorización base
-      throw error;
-    }
+    const profileId = await baseAuthorizer(request);
 
     // Verificar rol admin/superadmin en profiles
     const rows = await database.orm.select()
@@ -47,9 +51,9 @@ export function createAdminAuthorizer(config: AppConfig, database: Database) {
     }
 
     // Adjuntar perfil a request para uso en handlers
-    const normalizedProfile = { ...profile, role: profile.role as 'admin' | 'superadmin' };
-    (request as any).adminProfile = normalizedProfile;
-    (request as any).isSuperadmin = profile.role === 'superadmin';
+    const normalizedProfile: AdminProfile = { ...profile, role: profile.role as 'admin' | 'superadmin' };
+    request.adminProfile = normalizedProfile;
+    request.isSuperadmin = profile.role === 'superadmin';
   };
 }
 
@@ -57,8 +61,8 @@ export function createAdminAuthorizer(config: AppConfig, database: Database) {
  * Helper para verificar superadmin en handlers que lo necesiten.
  * Lanza RunStoreError si no es superadmin.
  */
-export function requireSuperadmin(_request: FastifyRequest): void {
-  const isAdmin = (_request as any).isSuperadmin;
+export function requireSuperadmin(request: FastifyRequest): void {
+  const isAdmin = request.isSuperadmin;
   if (!isAdmin) {
     throw new RunStoreError('FORBIDDEN');
   }
@@ -67,6 +71,6 @@ export function requireSuperadmin(_request: FastifyRequest): void {
 /**
  * Helper para obtener el perfil admin desde la request.
  */
-export function getAdminProfile(request: FastifyRequest): { id: string; role: 'admin' | 'superadmin'; [key: string]: any } | null {
-  return (request as any).adminProfile ?? null;
+export function getAdminProfile(request: FastifyRequest): AdminProfile | null {
+  return request.adminProfile ?? null;
 }
