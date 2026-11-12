@@ -103,4 +103,46 @@ test.describe('E2E equipo A.C.M.E.', () => {
     await expect(page.getByTestId('team-history')).toContainText('Elena Vázquez · Consulta de inteligencia');
     await expect(page.getByTestId('clock')).toContainText('0 min');
   });
+
+  // Rediseño Norte, fase 3: Elena aconseja y Margaret valora en el sitio,
+  // gratis (0 min), y Central y Laboratorio se presentan sin pestaña.
+  test('Elena aconseja y Margaret valora en el sitio, gratis, sin pestaña de laboratorio', async ({ page }) => {
+    await openGameScreen(page);
+    await openTeam(page);
+    const team = page.getByTestId('dock-panel-equipo');
+    // El dock tiene cinco pestañas y ninguna es Laboratorio.
+    await expect(page.getByTestId('game-dock').getByRole('tab')).toHaveCount(5);
+    await expect(page.getByRole('tab', { name: 'Laboratorio' })).toHaveCount(0);
+    await expect(team.getByTestId('team-central-row')).toContainText('Central operativa');
+    await expect(team.getByTestId('team-lab-row')).toContainText('Sin pestaña propia');
+    // Elena: consejo en el sitio, gratis, sin diálogo y sin avanzar el reloj.
+    await page.getByTestId('team-advice').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('clock')).toContainText('0 min');
+    const elenaReply = page.getByTestId('team-reply-elena');
+    await expect(elenaReply).toBeVisible();
+    await expect(elenaReply).toContainText('Elena · consejo · sin coste (0 min)');
+    await expect(elenaReply).toContainText('Estás en Madrid: Sala de embalaje.');
+    await expect(elenaReply).toContainText('Objetivos pendientes (2):');
+    await expect(elenaReply).toContainText('Detener a Inés con orden válida');
+    await expect(elenaReply).not.toContainText('culpable');
+    await expect(page.getByTestId('team-turns')).toContainText('¿Qué me aconsejas como siguiente paso?');
+    await expect(page.getByTestId('team-history')).toContainText('Elena Vázquez · Pedir consejo');
+    await expect(page.locator('.game-console')).toContainText('que te aconsejara sobre el siguiente paso');
+    // Margaret: valoración en el sitio, también gratis.
+    await page.getByTestId('team-evaluate').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('clock')).toContainText('0 min');
+    const margaretReply = page.getByTestId('team-reply-margaret');
+    await expect(margaretReply).toBeVisible();
+    await expect(margaretReply).toContainText('Margaret Sullivan · valoración de carrera · sin coste (0 min)');
+    // El perfil de carrera es el del usuario de desarrollo local,
+    // compartido por todos los specs: ya puede traer casos cerrados
+    // de corridas anteriores, así que no se afirma un número concreto.
+    await expect(margaretReply).toContainText('Tu carrera:');
+    await expect(margaretReply).toContainText('puntos');
+    await expect(margaretReply).not.toContainText('culpable');
+    await expect(page.getByTestId('team-turns')).toContainText('¿Cómo va mi carrera?');
+    await expect(page.getByTestId('team-history')).toContainText('Margaret Sullivan · Evaluar mi carrera');
+  });
 });

@@ -90,6 +90,8 @@ describe('textos legibles del caso fijo', () => {
       .toBe('Pediste a Clara Beaumont que organizara el expediente (min 90).');
     expect(conversationRecordText('team:margaret:evaluate@10', lookup.npcName))
       .toBe('Pediste a Margaret Sullivan que evaluara tu carrera (min 10).');
+    expect(conversationRecordText('team:elena:advice@45', lookup.npcName))
+      .toBe('Pediste a Elena Vázquez consejo sobre el siguiente paso (min 45).');
     expect(conversationRecordText('team:desconocido:briefing@0', lookup.npcName))
       .toBe('team:desconocido:briefing@0');
   });

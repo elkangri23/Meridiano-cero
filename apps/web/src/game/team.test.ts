@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { initialView } from '../archive/initial-fixture';
-import { briefingAnswer, elenaRefusal, evaluateAnswer, explainAnswer, medalLabel, organizeAnswer, routesAnswer, TEAM_MEMBERS, TEAM_SERVICE_KEYS, teamRequestText, teamServiceAnswer } from './team';
+import { adviceAnswer, briefingAnswer, elenaRefusal, evaluateAnswer, explainAnswer, medalLabel, organizeAnswer, routesAnswer, TEAM_MEMBERS, TEAM_SERVICE_KEYS, teamRequestText, teamServiceAnswer } from './team';
 import type { CareerProfileDto, PlayerViewDto } from '@meridiano/contracts';
 import { createTranslator } from '@meridiano/contracts';
 
@@ -131,5 +131,49 @@ describe('equipo A.C.M.E.: respuestas desde la vista, sin inventar', () => {
         severity: 'suspension', imposedAt: 90, resolvedAt: 300, active: false }],
     }), t);
     expect(resolved).toContain('ya la resolviste con casos limpios');
+  });
+
+  it('Elena aconseja desde la vista: dónde estás, qué queda y qué está en curso, sin pistas', () => {
+    const view = viewWith({
+      position: { city: { id: 'madrid', name: 'Madrid', country: 'ES' },
+        location: { id: 'MAD-SALA', name: 'Sala de embalaje', description: 'La sala.' } },
+      objectives: [{ id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: true },
+        { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: false }],
+      pendingRequests: [{ id: 'req-1', type: 'analysis', dueMinute: 120 }],
+      objects: [{ id: 'EV-02', type: 'object', origin: 'scene', minute: 10, admissible: true }],
+    });
+    const answer = adviceAnswer(view, t);
+    expect(answer).toContain('Estás en Madrid: Sala de embalaje.');
+    expect(answer).toContain('Objetivos pendientes (1): Recuperar el astrolabio original.');
+    expect(answer).not.toContain('Detener a Inés con orden válida');
+    expect(answer).toContain('Solicitudes en curso (1): Análisis (responde en el minuto 120).');
+    expect(answer).toContain('Evidencias en el dossier: 1.');
+    expect(answer).not.toMatch(/culpable|vas bien|buen camino/i);
+    // teamServiceAnswer resuelve el consejo sin perfil de carrera.
+    expect(teamServiceAnswer('advice', view, undefined, undefined, t)).toBe(answer);
+    expect(teamServiceAnswer('advice', view, undefined, null, t)).toBe(answer);
+    expect(teamRequestText('advice', undefined, t)).toBe('¿Qué me aconsejas como siguiente paso?');
+    expect(t(TEAM_SERVICE_KEYS.advice)).toBe('Pedir consejo');
+  });
+
+  it('con todo logrado, Elena dice que se puede cerrar; sin pendientes, lo dice', () => {
+    const view = viewWith({
+      objectives: [{ id: 'obj-detener', description: 'Detener a Inés con orden válida', achieved: true },
+        { id: 'obj-recuperar', description: 'Recuperar el astrolabio original', achieved: true }],
+      pendingRequests: [], objects: [],
+    });
+    const answer = adviceAnswer(view, t);
+    expect(answer).toContain('Todos los objetivos están logrados: puedes cerrar el caso cuando quieras.');
+    expect(answer).toContain('Sin solicitudes en curso.');
+    expect(answer).toContain('Evidencias en el dossier: 0.');
+  });
+
+  it('en francés, el consejo sale en francés', () => {
+    const view = viewWith({
+      objectives: [{ id: 'obj-recuperar', description: "Récupérer l'astrolabe original", achieved: false }],
+      pendingRequests: [], objects: [],
+    });
+    expect(adviceAnswer(view, tFr)).toContain("Objectifs en attente (1) : Récupérer l'astrolabe original.");
+    expect(teamRequestText('advice', undefined, tFr)).toBe('Que me conseilles-tu comme prochaine étape ?');
   });
 });

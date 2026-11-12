@@ -286,14 +286,26 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('hourglass')).toContainText('+10 min');
     await expect(page.getByTestId('hourglass-scene')).toBeVisible();
     await expect(page.getByTestId('hourglass-scene')).toContainText('El reloj avanza 10 min');
-    // Viajar desde la escena: animación de viaje, fondo de París y reloj de arena.
+    // Viajar desde la escena (rediseño Norte, fase 3): la transición
+    // precede al cambio de escena — primero se ve «Viajando a París» con
+    // la ruta y los minutos descontando, y la escena sigue en Madrid
+    // hasta que termina.
     await page.getByTestId('offer-travel:paris').click();
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
     await expect(page.getByTestId('preview-dialog')).toContainText('Viaje a París');
     await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(page.getByTestId('travel-animation')).toBeVisible();
-    await expect(page.getByTestId('travel-animation')).toContainText('De Madrid a París');
+    await expect(page.getByTestId('travel-animation')).toContainText('Viajando a París');
+    await expect(page.getByTestId('travel-animation')).toContainText('Madrid → París · 180 min');
+    // Sin botones: la transición es solo visual y se cierra sola.
+    await expect(page.getByTestId('travel-animation').getByRole('button')).toHaveCount(0);
+    // La ruta se dibuja también en el mapa del dock.
+    await page.click('button:has-text("Mapa")');
+    await expect(page.locator('.game-atlas-route-live')).toBeVisible();
+    await expect(page.locator('.game-atlas-travel-dot')).toBeVisible();
+    // Al terminar, la escena ya es París y el reloj descontó el viaje.
+    await expect(page.getByTestId('travel-animation')).toBeHidden();
     await expect(page.getByTestId('hourglass')).toBeVisible();
     await expect(page.getByTestId('hourglass')).toContainText('+180 min');
     await expect(page.getByTestId('scene-art')).toHaveAttribute('data-location', 'PAR-ARCH');
@@ -302,11 +314,6 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     // clave cruda del motor (arreglo: antes enseñaba `travel:paris`).
     await expect(page.locator('.game-console')).toContainText('Sales de Madrid y llegas a París.');
     await expect(page.locator('.game-console')).not.toContainText('travel:paris');
-    // El aviso de viaje NO se cierra solo: se queda hasta pulsar «Seguir».
-    await page.waitForTimeout(4000);
-    await expect(page.getByTestId('travel-animation')).toBeVisible();
-    await page.getByTestId('travel-animation').getByRole('button', { name: 'Seguir' }).click();
-    await expect(page.getByTestId('travel-animation')).toBeHidden();
     // En París, la escena muestra a Émile y el archivo.
     await expect(page.locator('.game-scene')).toContainText('Émile · Archivo de conservación');
     await expect(page.getByTestId('offer-inspect:PAR-ARCH')).toBeVisible();

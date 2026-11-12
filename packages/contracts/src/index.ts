@@ -7,6 +7,8 @@ import type { LocaleKey, TranslateFn } from './i18n.js';
  * solo la re-exporta, sin una segunda definición local. */
 import { REMOTE_CHANNELS } from './npc-catalog.js';
 import type { RemoteChannel } from './npc-catalog.js';
+import { isTeamServiceId } from './team.js';
+import type { TeamMemberId } from './team.js';
 
 /** Solo estado público de proceso; no acredita DB, sesión ni juego operativo. */
 export interface HealthResponse { status: 'ok' }
@@ -1179,8 +1181,9 @@ function publicTeamRecord(value: unknown): value is TeamRecordDto {
   if (keys !== 'id,memberId,minute,serviceId' && keys !== 'id,memberId,minute,serviceId,targetId') return false;
   if (!boundedString(value.id, 128)) return false;
   if (value.targetId !== undefined && !boundedString(value.targetId, 128)) return false;
-  if (!['margaret', 'richter', 'elena', 'david', 'clara'].includes(value.memberId as string)) return false;
-  if (!['briefing', 'evaluate', 'explain', 'lookup', 'routes', 'organize'].includes(value.serviceId as string)) return false;
+  // Fuente única de verdad (team.ts): una lista a mano aquí dejó fuera
+  // el servicio 'advice' y el cliente rechazaba la respuesta del commit.
+  if (!isTeamServiceId(value.memberId as TeamMemberId, value.serviceId)) return false;
   return nonNegativeInteger(value.minute);
 }
 function publicTeam(value: unknown): value is TeamRecordDto[] {

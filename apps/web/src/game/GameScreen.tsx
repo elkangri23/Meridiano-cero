@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, RefObject } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { archiveApi } from '../archive/client';
@@ -24,6 +24,7 @@ import { loadInspected, recordInspected, reviewedInspectRecords, saveInspected }
 import type { InspectedRecord } from './inspected';
 import { buildIntelFacts, selectIntelFacts } from './intel-terminal';
 import { ELENA_ID, ELENA_NAME, elenaPersona, elenaRefusal, teamGreeting, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
+import { travelCityPoint, travelPointOnRoute, travelProgressAt, travelRemainingMinutes, travelRoutePath } from './travel-animation';
 import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
 import { effectiveReducedMotion, objectiveStateText, trapTabKey, useSystemReducedMotion } from './accessibility';
@@ -1038,38 +1039,89 @@ function OrderStatus({ orderPhase, onCancel, onRecover }: {
   </div>;
 }
 
-/** Animación de viaje estilo Carmen Sandiego (lote 1 de jugabilidad): al
- * confirmar un viaje, una ruta con el avión cruzando el mapa aparece sobre
- * la pantalla mientras el reloj ya avanzó y la escena ya es la de destino.
- * No bloquea nada: los clics pasan por debajo salvo el botón «Seguir», y
- * solo se cierra al pulsarlo — antes se cerraba sola a los 2,8 s y el
- * botón dejaba de responder si el jugador tardaba en leerla. */
-function TravelOverlay({ travel, onDismiss }: { travel: { from: string; to: string; detail: string }; onDismiss: () => void }) {
+/** Estado de la transición de viaje en curso: de dónde a dónde, con
+ * cuántos minutos cobra el motor y cuánto lleva dibujado (0–1). */
+interface TravelTransitionState {
+  fromId: string;
+  toId: string;
+  fromName: string;
+  toName: string;
+  minutes: number;
+  progress: number;
+}
+
+/** Ruta en vivo en el mapa del dock (rediseño Norte, fase 3): la línea se
+ * traza de origen a destino y un punto avanza con el progreso. Las
+ * coordenadas salen del catálogo; sin coordenadas no se dibuja nada. El
+ * punto va como <span> (porcentajes): un círculo SVG se deformaría con
+ * preserveAspectRatio="none". */
+function TravelRouteOverlay({ fromId, toId, fromName, toName, progress }: {
+  fromId: string; toId: string; fromName: string; toName: string; progress: number;
+}) {
   const t = useTranslation();
-  return <div className="game-travel" data-testid="travel-animation" role="status">
+  const from = travelCityPoint(fromId);
+  const to = travelCityPoint(toId);
+  if (!from || !to) return null;
+  const point = travelPointOnRoute(from, to, progress);
+  return <>
+    <svg className="game-atlas-route" viewBox="0 0 100 100" preserveAspectRatio="none" role="img"
+      aria-label={t('game.mapLiveRoute', { from: fromName, to: toName })}>
+      <path className="game-atlas-route-base" d={travelRoutePath(from, to)} vectorEffect="non-scaling-stroke" />
+      <path className="game-atlas-route-live" d={travelRoutePath(from, to)} pathLength={100}
+        strokeDasharray={100} strokeDashoffset={100 * (1 - progress)} vectorEffect="non-scaling-stroke" />
+    </svg>
+    <span className="game-atlas-travel-dot" style={{ left: point.x + '%', top: point.y + '%' }} aria-hidden="true" />
+  </>;
+}
+
+/** Mini-mapa de la transición: la misma ruta, con sus dos ciudades y el
+ * punto que avanza, en un SVG de aspecto uniforme. */
+function TravelRouteSvg({ fromId, toId, fromName, toName, progress }: {
+  fromId: string; toId: string; fromName: string; toName: string; progress: number;
+}) {
+  const t = useTranslation();
+  const from = travelCityPoint(fromId);
+  const to = travelCityPoint(toId);
+  if (!from || !to) return null;
+  const point = travelPointOnRoute(from, to, progress);
+  return <svg className="game-travel-svg" viewBox="0 0 100 100" role="img"
+    aria-label={t('game.mapLiveRoute', { from: fromName, to: toName })}>
+    <path className="game-travel-svg-base" d={travelRoutePath(from, to)} />
+    <path className="game-travel-svg-live" d={travelRoutePath(from, to)} pathLength={100}
+      strokeDasharray={100} strokeDashoffset={100 * (1 - progress)} />
+    <circle className="game-travel-svg-dot" r="3.5" cx={from.x} cy={from.y} />
+    <circle className="game-travel-svg-dot" r="3.5" cx={to.x} cy={to.y} />
+    <text className="game-travel-svg-label" x={from.x} y={from.y + 9} textAnchor="middle">{fromName}</text>
+    <text className="game-travel-svg-label" x={to.x} y={to.y + 9} textAnchor="middle">{toName}</text>
+    <circle className="game-travel-svg-traveler" r="4" cx={point.x} cy={point.y} />
+  </svg>;
+}
+
+/** Transición de viaje (rediseño Norte, fase 3): precede al cambio de
+ * escena — la escena, la ciudad y el reloj cambian al terminar, no antes.
+ * Solo visual y no interactiva: sin botones, se cierra sola al completar
+ * el progreso; con reducción de movimiento no se monta (el cambio es
+ * directo). Los minutos son los que cobra el motor (la respuesta ya los
+ * trae), descontando de N a 0 con su barra. */
+function TravelTransition({ travel }: { travel: TravelTransitionState }) {
+  const t = useTranslation();
+  const remaining = travelRemainingMinutes(travel.minutes, travel.progress);
+  return <div className="game-travel" data-testid="travel-animation" role="status"
+    aria-label={t('game.travelProgressAria', { from: travel.fromName, to: travel.toName, minutes: remaining })}>
     <div className="game-travel-panel">
-      <p className="game-overline">{t('game.travel')}</p>
-      <p><strong>{t('game.travelFromTo', { from: travel.from, to: travel.to })}</strong>{travel.detail ? ` · ${travel.detail}` : ''}</p>
-      <div className="game-travel-route" aria-hidden="true">
-        <span className="game-travel-line" />
-        <svg className="game-travel-plane" viewBox="0 0 24 16" shapeRendering="crispEdges" focusable="false">
-          <rect x="4" y="7" width="16" height="2" fill="#ffff55" />
-          <rect x="10" y="3" width="3" height="10" fill="#ffff55" />
-          <rect x="2" y="5" width="3" height="6" fill="#ffff55" />
-          <rect x="18" y="6" width="4" height="4" fill="#ffff55" />
-        </svg>
-        <span className="game-travel-city game-travel-from">{travel.from}</span>
-        <span className="game-travel-city game-travel-to">{travel.to}</span>
-      </div>
-      <p className="game-panel-note">{t('game.travelNote', { to: travel.to })}</p>
-      <button type="button" onClick={onDismiss}>{t('game.continue')}</button>
+      <p className="game-overline">{t('game.travelEnRoute')}</p>
+      <p><strong>{t('game.travelingTo', { to: travel.toName })}</strong>{` · ${t('game.travelRoute', { from: travel.fromName, to: travel.toName, minutes: travel.minutes })}`}</p>
+      <TravelRouteSvg fromId={travel.fromId} toId={travel.toId} progress={travel.progress} fromName={travel.fromName} toName={travel.toName} />
+      <p className="game-travel-count" aria-hidden="true">{remaining} min</p>
+      <div className="game-travel-bar" aria-hidden="true"><i style={{ width: `${Math.round(travel.progress * 100)}%` }} /></div>
+      <p className="game-panel-note">{t('game.travelTransitionNote')}</p>
     </div>
   </div>;
 }
 
-function TravelOverlaySlot({ travel, onDismiss }: { travel: { from: string; to: string; detail: string; key: number } | null; onDismiss: () => void }) {
+function TravelTransitionSlot({ travel }: { travel: TravelTransitionState | null }) {
   if (!travel) return null;
-  return <TravelOverlay travel={travel} onDismiss={onDismiss} />;
+  return <TravelTransition travel={travel} />;
 }
 
 /** Minutos que avanzó el reloj al confirmar una acción. */
@@ -1078,33 +1130,22 @@ function clockDelta(previous: PlayerViewDto | null, response: ActionResponseDto)
   return response.clock.minute - before;
 }
 
-/** Datos de la animación de viaje: de dónde a dónde y con qué duración. */
-function travelPayload(previous: PlayerViewDto | null, response: ActionResponseDto, offer: PublicActionOffer): { from: string; to: string; detail: string; key: number } {
-  return { from: previous?.position.city.name ?? '', to: response.position.city.name, detail: offer.detail ?? '', key: Date.now() };
-}
-
-/** Reloj de arena y animación de viaje (lote 1 de jugabilidad): efectos
- * cosméticos que se disparan al confirmar una acción, según cuánto avanzó
- * el reloj y si la acción fue un viaje. Viven en un hook para no engordar
- * applyResponse con ramas. */
+/** Reloj de arena (lote 1 de jugabilidad): efecto cosmético que se
+ * dispara al confirmar una acción, según cuánto avanzó el reloj. La
+ * animación de viaje vive aparte (rediseño Norte, fase 3): precede al
+ * cambio de escena y retiene la respuesta hasta terminar. */
 function useTimeFeedback() {
   const [clockPulse, setClockPulse] = useState<{ key: number; delta: number } | null>(null);
-  const [travel, setTravel] = useState<{ from: string; to: string; detail: string; key: number } | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
-  const apply = useCallback((previous: PlayerViewDto | null, response: ActionResponseDto, offer?: PublicActionOffer) => {
+  const apply = useCallback((previous: PlayerViewDto | null, response: ActionResponseDto) => {
     const delta = clockDelta(previous, response);
     if (delta > 0) {
       if (pulseTimerRef.current !== null) window.clearTimeout(pulseTimerRef.current);
       setClockPulse({ key: Date.now(), delta });
       pulseTimerRef.current = window.setTimeout(() => setClockPulse(null), 2600);
     }
-    // El aviso de viaje NO se cierra solo: se queda hasta pulsar «Seguir».
-    if (offer?.action.type === 'travel') setTravel(travelPayload(previous, response, offer));
   }, []);
-  const dismissTravel = useCallback(() => {
-    setTravel(null);
-  }, []);
-  return { clockPulse, travel, apply, dismissTravel };
+  return { clockPulse, apply };
 }
 
 function PreviewDialog({ phase, confirmRef, onConfirm, onCancel }: {
@@ -1132,7 +1173,7 @@ function PreviewDialog({ phase, confirmRef, onConfirm, onCancel }: {
 
 // ── Contenidos de ventanas ──────────────────────────────────────────────────────
 
-function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+function MapContent({ view, busy, activeTravel, onOffer }: { view: PlayerViewDto; busy: boolean; activeTravel: TravelTransitionState | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const t = useTranslation();
   const [query, setQuery] = useState('');
   const travelOffers = view.offers.filter(offer => offer.action.type === 'travel');
@@ -1163,7 +1204,7 @@ function MapContent({ view, busy, onOffer }: { view: PlayerViewDto; busy: boolea
   return <div>
     <p className="game-overline">{t('game.atlasOverline')}</p>
     <h4>{t('game.atlasTitle')}</h4>
-    <div className="game-atlas" role="img" aria-label={t('game.atlasAria', { cities: visibleAtlas.map(city => city.name).join(', ') })}><div className="game-atlas-land" />{visibleAtlas.map(city => {
+    <div className="game-atlas" role="img" aria-label={t('game.atlasAria', { cities: visibleAtlas.map(city => city.name).join(', ') })}><div className="game-atlas-land" />{activeTravel && <TravelRouteOverlay fromId={activeTravel.fromId} toId={activeTravel.toId} fromName={activeTravel.fromName} toName={activeTravel.toName} progress={activeTravel.progress} />}{visibleAtlas.map(city => {
       const position = byId.get(city.id)?.coordinates;
       if (!position) return null;
       return <span key={city.id} className={`game-atlas-city game-atlas-city--${city.kind}`} style={{ left: position.x + '%', top: position.y + '%' }}>{city.name}</span>;
@@ -1531,8 +1572,8 @@ function TeamDetainList({ offers, busy, closed, onOffer }: {
   </>;
 }
 
-function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, detainOffers, closed, onAnalysis, onService, onOffer, onDraft, onSendElena }: {
-  view: PlayerViewDto; turns: TeamTurn[]; draft: string; busy: boolean; elenaBusy: boolean; error: string; analysisId: string;
+function TeamContent({ view, turns, replies, draft, busy, elenaBusy, error, analysisId, detainOffers, closed, onAnalysis, onService, onOffer, onDraft, onSendElena }: {
+  view: PlayerViewDto; turns: TeamTurn[]; replies: Partial<Record<TeamMemberId, string>>; draft: string; busy: boolean; elenaBusy: boolean; error: string; analysisId: string;
   detainOffers: PublicActionOffer[]; closed: boolean;
   onAnalysis: (value: string) => void;
   onService: (memberId: TeamMemberId, serviceId: TeamServiceId, targetId: string | undefined, trigger: HTMLElement | null) => void;
@@ -1551,23 +1592,44 @@ function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, d
   // evaluación de Margaret tras cerrar es comportamiento existente
   // (career.spec.ts) y el motor rechaza registrar la petición (409). Lo
   // que sí se bloquea en partida cerrada es la conversación con Elena y
-  // la coordinación de detenciones (ofertas reales del motor).
+  // la coordinación de detenciones (ofertas reales del motor). Las
+  // respuestas de Elena y Margaret se ven además en su sitio, bajo su
+  // tarjeta (rediseño Norte, fase 3), además de su línea en la consola.
   return <div>
     <h4>{t('game.teamMembers')}</h4>
-    <ul className="game-destination-list">{TEAM_MEMBERS.map(member => <li key={member.id}>
-      <Portrait seed={teamPortraitSeed(member.id)} name={member.name} size="small" />
-      <span><strong>{member.name}</strong><small>{t(member.role)} · {t(member.blurb)}</small></span>
-      <span>
-        {member.id === 'margaret' && <button type="button" data-testid="team-briefing" disabled={busy}
-          onClick={event => onService('margaret', 'briefing', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.briefing)}</button>}
-        {member.id === 'margaret' && <button type="button" data-testid="team-evaluate" disabled={busy}
-          onClick={event => onService('margaret', 'evaluate', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.evaluate)}</button>}
-        {member.id === 'clara' && <button type="button" data-testid="team-organize" disabled={busy}
-          onClick={event => onService('clara', 'organize', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.organize)}</button>}
-        {member.id === 'david' && <button type="button" data-testid="team-routes" disabled={busy}
-          onClick={event => onService('david', 'routes', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.routes)}</button>}
-      </span>
-    </li>)}</ul>
+    <ul className="game-destination-list">{TEAM_MEMBERS.map(member => <Fragment key={member.id}>
+      <li>
+        <Portrait seed={teamPortraitSeed(member.id)} name={member.name} size="small" />
+        <span><strong>{member.name}</strong><small>{t(member.role)} · {t(member.blurb)}</small></span>
+        <span>
+          {member.id === 'margaret' && <button type="button" data-testid="team-briefing" disabled={busy}
+            onClick={event => onService('margaret', 'briefing', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.briefing)}</button>}
+          {member.id === 'margaret' && <button type="button" data-testid="team-evaluate" disabled={busy}
+            onClick={event => onService('margaret', 'evaluate', undefined, event.currentTarget)}>{t('game.teamEvaluateButton')}</button>}
+          {member.id === 'elena' && <button type="button" data-testid="team-advice" disabled={busy}
+            onClick={event => onService('elena', 'advice', undefined, event.currentTarget)}>{t('game.teamAdviceButton')}</button>}
+          {member.id === 'clara' && <button type="button" data-testid="team-organize" disabled={busy}
+            onClick={event => onService('clara', 'organize', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.organize)}</button>}
+          {member.id === 'david' && <button type="button" data-testid="team-routes" disabled={busy}
+            onClick={event => onService('david', 'routes', undefined, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.routes)}</button>}
+        </span>
+      </li>
+      {replies[member.id] && <li className={member.id === 'margaret' ? 'game-team-reply game-team-reply--gold' : 'game-team-reply'}
+        data-testid={`team-reply-${member.id}`} aria-live="polite">
+        <span className="game-chat-speaker">{t(member.id === 'margaret' ? 'game.teamEvaluateReply' : 'game.teamAdviceReply')}</span>
+        <span>{replies[member.id]}</span>
+      </li>}
+    </Fragment>)}</ul>
+    <ul className="game-destination-list">
+      <li data-testid="team-central-row">
+        <span className="game-team-avatar" aria-hidden="true">C</span>
+        <span className="game-team-row-text"><strong>{t('game.teamCentralTitle')}</strong><small>{t('game.teamCentralText')}</small></span>
+      </li>
+      <li data-testid="team-lab-row">
+        <span className="game-team-avatar" aria-hidden="true">L</span>
+        <span className="game-team-row-text"><strong>{t('game.teamLabTitle')}</strong><small>{t('game.teamLabText')}</small></span>
+      </li>
+    </ul>
     <h4>{t('game.richterExplain')}</h4>
     {view.analysisResults.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noAnalysisResults')}</p></div>
@@ -2346,6 +2408,9 @@ export function GameScreen() {
   const [teamDraft, setTeamDraft] = useState('');
   const [teamElenaBusy, setTeamElenaBusy] = useState(false);
   const [teamError, setTeamError] = useState('');
+  // Respuestas del equipo visibles en su sitio (rediseño Norte, fase 3):
+  // el consejo de Elena y la valoración de Margaret, bajo su tarjeta.
+  const [teamReplies, setTeamReplies] = useState<Partial<Record<TeamMemberId, string>>>({});
   const [teamAnalysisId, setTeamAnalysisId] = useState('');
   // Carrera (GDD §13): el perfil se carga bajo demanda al pedir la
   // evaluación a Margaret y se guarda en la pestaña para no pedirlo dos
@@ -2354,6 +2419,16 @@ export function GameScreen() {
   const [careerLoaded, setCareerLoaded] = useState(false);
   // Lote 1 de jugabilidad: reloj de arena y animación de viaje (ver hook).
   const timeFeedback = useTimeFeedback();
+  /** Transición de viaje en curso (rediseño Norte, fase 3): la respuesta
+   * confirmada espera a que termine la animación para aplicarse. */
+  const [travelTransition, setTravelTransition] = useState<(TravelTransitionState & { response: ActionResponseDto; offerLabel: string; offer: PublicActionOffer }) | null>(null);
+  const travelTimerRef = useRef<number | null>(null);
+  // Si se sale de la pantalla a mitad de viaje, el temporizador muere con
+  // ella: la acción ya está confirmada en el servidor y la vista se
+  // recarga desde él al volver.
+  useEffect(() => () => {
+    if (travelTimerRef.current !== null) window.clearInterval(travelTimerRef.current);
+  }, []);
 
   // Rediseño Norte, fase 2: último hallazgo anunciado en la escena (por
   // partida, en esta pestaña; se muestra solo si la evidencia sigue en el
@@ -2509,6 +2584,7 @@ export function GameScreen() {
     if (stored) {
       setTeamTurns(stored.turns);
       setTeamElenaMemory(stored.memory ?? null);
+      setTeamReplies(stored.replies ?? {});
     } else {
       const turns: TeamTurn[] = [{ memberId: 'margaret', from: 'team', text: teamGreeting(t) }];
       const memory = { schemaVersion: 1, runId, npcId: ELENA_ID, treatment: 'neutral', turns: [] };
@@ -2587,7 +2663,7 @@ export function GameScreen() {
     else if (detail) entries.push({ minute: response.clock.minute, summary: offerLabel, detail });
     setLog(current => [...current, ...entries]);
     setNotice(noticeForOutcome(response, offerLabel, t));
-    timeFeedback.apply(previous, response, offer);
+    timeFeedback.apply(previous, response);
     trackPhase2Outcome({ offer, previous, response, runId, inspected, analysisLinks, setInspected, setFinding, setAnalysisLinks });
     // Efecto de interfaz (GDD §15): el viaje suena con arpegio y el resto
     // de acciones con una confirmación; con efectos apagados o silenciados
@@ -2731,15 +2807,15 @@ export function GameScreen() {
 
   /** Turnos del equipo en esta pestaña por partida, con la memoria de
    * conversación de Elena (misma forma que `saveChat`, con el miembro). */
-  function loadStoredTeam(key: string): { turns: TeamTurn[]; memory: unknown } | null {
+  function loadStoredTeam(key: string): { turns: TeamTurn[]; memory: unknown; replies: Partial<Record<TeamMemberId, string>> } | null {
     try {
-      const stored = JSON.parse(sessionStorage.getItem(key) ?? 'null') as { turns: TeamTurn[]; memory: unknown } | null;
-      return stored && Array.isArray(stored.turns) ? stored : null;
+      const stored = JSON.parse(sessionStorage.getItem(key) ?? 'null') as { turns: TeamTurn[]; memory: unknown; replies?: Partial<Record<TeamMemberId, string>> } | null;
+      return stored && Array.isArray(stored.turns) ? { turns: stored.turns, memory: stored.memory, replies: stored.replies ?? {} } : null;
     } catch { return null; }
   }
 
-  function saveTeam(key: string, turns: TeamTurn[], memory: unknown) {
-    try { sessionStorage.setItem(key, JSON.stringify({ turns, memory })); } catch { /* sin almacenamiento */ }
+  function saveTeam(key: string, turns: TeamTurn[], memory: unknown, replies: Partial<Record<TeamMemberId, string>> = {}) {
+    try { sessionStorage.setItem(key, JSON.stringify({ turns, memory, replies })); } catch { /* sin almacenamiento */ }
   }
 
 
@@ -2784,7 +2860,11 @@ export function GameScreen() {
       { memberId, from: 'you', text: teamRequestText(serviceId, targetId, t) },
       { memberId, from: 'team', text: answer }];
     setTeamTurns(turns);
-    saveTeam(key, turns, teamElenaMemory);
+    // La respuesta se ve además en su sitio, bajo la tarjeta del miembro
+    // (rediseño Norte, fase 3), además de su línea en la consola.
+    const nextReplies: Partial<Record<TeamMemberId, string>> = { ...teamReplies, [memberId]: answer };
+    setTeamReplies(nextReplies);
+    saveTeam(key, turns, teamElenaMemory, nextReplies);
     void startPreview(offer, trigger);
   }
 
@@ -2828,7 +2908,7 @@ export function GameScreen() {
       const next: TeamTurn[] = [...turns, { memberId: 'elena', from: 'team', text: elenaRefusal(t) }];
       setTeamTurns(next);
       setTeamElenaMemory(memory);
-      saveTeam(key, next, memory);
+      saveTeam(key, next, memory, teamReplies);
       setTeamElenaBusy(false);
       return;
     }
@@ -2842,12 +2922,43 @@ export function GameScreen() {
       const next: TeamTurn[] = [...turns, { memberId: 'elena', from: 'team', text: result.narrative.text }];
       setTeamTurns(next);
       setTeamElenaMemory(result.memory);
-      saveTeam(key, next, result.memory);
+      saveTeam(key, next, result.memory, teamReplies);
     } catch {
       setTeamError(t('game.notice.elenaDown'));
     } finally {
       setTeamElenaBusy(false);
     }
+  }
+
+  /** Aplica una respuesta confirmada: un viaje, con movimiento
+   * completo, pasa por la transición antes de cambiar de escena — la
+   * respuesta se retiene hasta que la animación termina y solo entonces
+   * cambian la escena, la ciudad y el reloj. Con reducción de movimiento
+   * el cambio es directo, sin animación. Sin ruta no hay transición: el
+   * motivo llega como hoy por el diálogo de error de la vista previa. */
+  function applyCommittedResponse(response: ActionResponseDto, offerLabel: string, offer?: PublicActionOffer) {
+    if (offer?.action.type === 'travel' && response.outcome === 'applied' && !reducedMotion) {
+      const previous = view;
+      const delta = previous ? response.clock.minute - previous.clock.minute : 0;
+      if (delta > 0 && previous) {
+        if (travelTimerRef.current !== null) window.clearInterval(travelTimerRef.current);
+        const startedAt = Date.now();
+        setTravelTransition({ response, offerLabel, offer, fromId: previous.position.city.id, toId: response.position.city.id,
+          fromName: previous.position.city.name, toName: response.position.city.name, minutes: delta, progress: 0 });
+        travelTimerRef.current = window.setInterval(() => {
+          const progress = travelProgressAt(Date.now() - startedAt);
+          if (progress >= 1) {
+            if (travelTimerRef.current !== null) { window.clearInterval(travelTimerRef.current); travelTimerRef.current = null; }
+            setTravelTransition(null);
+            applyResponse(response, offerLabel, offer);
+            return;
+          }
+          setTravelTransition(current => current ? { ...current, progress } : current);
+        }, 50);
+        return;
+      }
+    }
+    applyResponse(response, offerLabel, offer);
   }
 
   /** Confirma una acción con su clave de idempotencia y su revisión
@@ -2859,8 +2970,8 @@ export function GameScreen() {
     const controller = new AbortController();
     try {
       const response = await gameApi.commit(runId, offer.action, view.version, key, identity, controller.signal);
-      applyResponse(response, offer.label, offer);
       setOrderPhase({ kind: 'idle' });
+      applyCommittedResponse(response, offer.label, offer);
       // El foco vuelve al botón que lanzó la oferta (la caja de texto
       // libre ya no existe).
       lastTriggerRef.current?.focus();
@@ -2910,7 +3021,7 @@ export function GameScreen() {
     const controller = new AbortController();
     try {
       const response = await gameApi.commit(runId, offer.action, view.version, key, identity, controller.signal);
-      applyResponse(response, offer.label, offer);
+      applyCommittedResponse(response, offer.label, offer);
       setOrderPhase({ kind: 'idle' });
     } catch (error) {
       setOrderPhase({ kind: 'error', message: errorMessage(error, t) });
@@ -3037,7 +3148,7 @@ export function GameScreen() {
   }
 
   const closed = view.status === 'closed';
-  const busy = busyOffer !== null || orderPhase.kind !== 'idle';
+  const busy = busyOffer !== null || orderPhase.kind !== 'idle' || travelTransition !== null;
   const grouped = groupOffers(view.offers);
   const finishOffer = grouped.finish;
 
@@ -3077,7 +3188,7 @@ export function GameScreen() {
     </div>;
     if (dockView === 'mapa') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-mapa" aria-labelledby="dock-tab-mapa" data-testid="dock-panel-mapa">
       <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.map')}</h2>
-      <MapContent view={view} busy={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
+      <MapContent view={view} busy={busy} activeTravel={travelTransition} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
     </div>;
     if (dockView === 'central') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-central" aria-labelledby="dock-tab-central" data-testid="dock-panel-central">
       <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.central')}</h2>
@@ -3087,7 +3198,7 @@ export function GameScreen() {
     </div>;
     if (dockView === 'equipo') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-equipo" aria-labelledby="dock-tab-equipo" data-testid="dock-panel-equipo">
       <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.team')}</h2>
-      <TeamContent view={view} turns={teamTurns} draft={teamDraft} busy={busy} elenaBusy={teamElenaBusy} error={teamError}
+      <TeamContent view={view} turns={teamTurns} replies={teamReplies} draft={teamDraft} busy={busy} elenaBusy={teamElenaBusy} error={teamError}
         analysisId={teamAnalysisId} detainOffers={view.offers.filter(offer => offer.action.type === 'detain')} closed={closed}
         onAnalysis={setTeamAnalysisId} onService={(memberId, serviceId, targetId, trigger) => requestTeamService(memberId, serviceId, targetId, trigger)}
         onOffer={(offer, trigger) => void startPreview(offer, trigger)} onDraft={setTeamDraft} onSendElena={event => void sendElenaMessage(event)} />
@@ -3176,7 +3287,7 @@ export function GameScreen() {
       speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} noVoices={audioTts.noVoices} onRead={() => void audioTts.speak(lastLogText)}
       onRepeat={() => void audioTts.speak(audioTts.lastText)} onPauseResume={audioTts.pauseOrResume} onStop={audioTts.stop} />} />
 
-    <TravelOverlaySlot travel={timeFeedback.travel} onDismiss={timeFeedback.dismissTravel} />
+    <TravelTransitionSlot travel={travelTransition} />
 
     {orderPhase.kind === 'preview' && <PreviewDialog phase={orderPhase} confirmRef={confirmButtonRef}
       onConfirm={() => void confirmPreview()} onCancel={cancelOrder} />}

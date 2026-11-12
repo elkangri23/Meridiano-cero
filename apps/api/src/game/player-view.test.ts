@@ -182,6 +182,17 @@ describe('objetivos en vivo de la vista del jugador', () => {
     expect(playerViewDto(astrolabioDefinition, fullRun(), 0).misconduct).toEqual([]);
   });
 
+  it('un consejo de Elena (servicio advice) viaja en la vista y valida el contrato', () => {
+    // Regresión 2026-11-12: publicTeamRecord tenía la lista de servicios
+    // a mano sin 'advice' y el cliente rechazaba la respuesta del commit
+    // («La respuesta del servidor no es válida»), así que el historial
+    // del equipo nunca se actualizaba.
+    const teamRequests = [{ id: 'tr-1', memberId: 'elena', minute: 0, serviceId: 'advice' }];
+    const view = playerViewDto(astrolabioDefinition, fullRun({ teamRequests }), 0);
+    expect(view.team).toEqual(teamRequests);
+    expect(isPlayerViewDto(view)).toBe(true);
+  });
+
   it('la vista lleva los datos de charla de cada personaje y valida el contrato', () => {
     const view = playerViewDto(astrolabioDefinition, fullRun(), 0);
     const ines = view.npcChat.find(entry => entry.id === 'ines');

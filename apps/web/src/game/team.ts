@@ -10,7 +10,7 @@ import type { LocaleKey, TranslateFn } from '@meridiano/contracts';
  * sugiere la siguiente pista. */
 
 export type TeamMemberId = 'margaret' | 'richter' | 'elena' | 'david' | 'clara';
-export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'coordinate' | 'routes' | 'organize' | 'evaluate';
+export type TeamServiceId = 'briefing' | 'explain' | 'lookup' | 'coordinate' | 'routes' | 'organize' | 'evaluate' | 'advice';
 
 export interface TeamMemberDisplay {
   id: TeamMemberId;
@@ -42,6 +42,7 @@ export const TEAM_SERVICE_KEYS: Record<TeamServiceId, LocaleKey> = {
   routes: 'labels.teamService.routes',
   organize: 'labels.teamService.organize',
   evaluate: 'labels.teamService.evaluate',
+  advice: 'labels.teamService.advice',
 };
 
 /** Elena Vázquez como interlocutora: la misma consulta determinista que la
@@ -70,6 +71,7 @@ export function teamServiceAnswer(serviceId: TeamServiceId, view: PlayerViewDto,
     case 'routes': return routesAnswer(view, t);
     case 'organize': return organizeAnswer(view, t);
     case 'evaluate': return career ? evaluateAnswer(career, t) : null;
+    case 'advice': return adviceAnswer(view, t);
     default: return null;
   }
 }
@@ -83,6 +85,7 @@ export function teamRequestText(serviceId: TeamServiceId, targetId: string | und
     case 'routes': return t('team.request.routes');
     case 'organize': return t('team.request.organize');
     case 'evaluate': return t('team.request.evaluate');
+    case 'advice': return t('team.request.advice');
     case 'coordinate': return t('team.request.coordinate');
     case 'lookup': return t('team.request.lookup');
   }
@@ -123,6 +126,27 @@ export function evaluateAnswer(career: CareerProfileDto, t: TranslateFn): string
   } else if (career.sanctions.length > 0) {
     parts.push(t('engine.team.evaluateSanctionResolved'));
   }
+  return parts.join(' ');
+}
+
+/** Elena aconseja el siguiente paso (rediseño Norte, fase 3): un
+ * resumen determinista de lo que consta en la vista — dónde estás,
+ * qué objetivos quedan pendientes, qué solicitudes están en curso y
+ * cuántas evidencias llevas. No nombra pistas ni culpables ni dice
+ * si se va bien: solo ordena lo pendiente, como hacen
+ * `briefingAnswer` y `organizeAnswer`. */
+export function adviceAnswer(view: PlayerViewDto, t: TranslateFn): string {
+  const parts: string[] = [];
+  parts.push(t('engine.team.adviceCity', { city: view.position.city.name, location: view.position.location.name }));
+  const pending = view.objectives.filter(objective => !objective.achieved);
+  parts.push(pending.length === 0
+    ? t('engine.team.adviceObjectivesDone')
+    : t('engine.team.adviceObjectives', { count: pending.length, list: pending.map(objective => objective.description).join('; ') }));
+  parts.push(view.pendingRequests.length === 0
+    ? t('engine.team.advicePendingEmpty')
+    : t('engine.team.advicePending', { count: view.pendingRequests.length, list: view.pendingRequests.map(item =>
+      t('engine.team.pendingItem', { type: requestTypeLabel(item.type, t), due: item.dueMinute })).join('; ') }));
+  parts.push(t('engine.team.adviceEvidence', { count: view.objects.length }));
   return parts.join(' ');
 }
 

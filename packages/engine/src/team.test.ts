@@ -87,6 +87,17 @@ describe('Equipo A.C.M.E. (GDD §8)', () => {
     expect(isTeamParams({ memberId: 'margaret', serviceId: 'briefing' })).toBe(true);
     expect(isTeamParams({ memberId: 'david', serviceId: 'coordinate' })).toBe(false);
   });
+  it('Elena aconseja gratis: registra la petición sin avanzar el reloj', () => {
+    const run = initial();
+    const result = resolveAction(source, run, team('elena', 'advice'));
+    expect(result.status).toBe('applied');
+    expect(result.run.minute).toBe(0);
+    expect(result.run.version).toBe(run.version + 1);
+    expect(result.run.teamRequests).toEqual([{ id: 'team-1', memberId: 'elena', serviceId: 'advice', minute: 0 }]);
+    expect(result.run.conversationRecords).toEqual(['team:elena:advice@0']);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]).toMatchObject({ type: 'team', minute: 0 });
+  });
   it('funciona en un expediente generado: el equipo no depende del caso fijo', () => {
     const run = initial(generadoFraudeDefinition);
     const result = resolveAction(generadoFraudeDefinition, run, team('margaret', 'briefing'));
