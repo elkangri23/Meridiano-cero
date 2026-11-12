@@ -25,6 +25,11 @@ export function createAdminAuthorizer(config: AppConfig, database: Database) {
   const baseAuthorizer = createAuthorizer(config, database);
 
   return async (request: FastifyRequest, reply: FastifyReply) => {
+    // El hook se registra en la app raíz y Fastify lo ejecuta en TODAS las
+    // peticiones, incluidas las públicas (/health, /ready, /auth/*, juego).
+    // Solo actúa sobre las rutas de administración; el resto pasa sin tocarlo.
+    if (!request.url.startsWith('/api/v1/admin/') && request.url !== '/api/v1/admin') return;
+
     // Ejecutar autorización base (sesión + origen + CSRF)
     const profileId = await baseAuthorizer(request);
 
