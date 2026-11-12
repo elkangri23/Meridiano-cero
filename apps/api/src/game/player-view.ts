@@ -11,6 +11,44 @@ import { npcChatForDefinition } from './npc-chat.ts';
 
 type FullRun = StoredRun & CaseRun;
 
+// Método con el que se reveló una prueba → tipo de hito de la cronología
+// que la produjo. Un análisis o una consulta maduran como
+// `request_matured`; recoger solo anota el minuto de recogida de una
+// prueba ya revelada, así que no atribuye nada.
+const EVIDENCE_METHOD_TO_EVENT: Record<string, string> = {
+  inspect: 'inspect',
+  talk: 'talk',
+  query: 'request_matured',
+  analyze: 'request_matured',
+  recover: 'recover',
+};
+
+// Pruebas de cada hito: cada prueba hallada se atribuye al primer hito
+// compatible con su registro (mismo minuto de revelación y tipo según el
+// método con que se reveló). En el caso común —un hito por minuto— la
+// atribución es exacta; si varios hitos comparten minuto y tipo, la
+// prueba va al primero en orden de secuencia (los registros guardados no
+// distinguen cuál de ellos la reveló).
+function evidenceByTimelineSequence(report: FinalReport, run: CaseRun, timeline: PublicEvent[]): Map<number, string[]> {
+  const foundIds = new Set(report.evidenceFound.map(entry => entry.id));
+  const evidenceBySequence = new Map<number, string[]>();
+  const revealed = Object.entries(run.evidenceRecords ?? {})
+    .filter(([id]) => foundIds.has(id))
+    .sort(([, a], [, b]) => a.revealedMinute - b.revealedMinute);
+  for (const [id, record] of revealed) {
+    const type = EVIDENCE_METHOD_TO_EVENT[record.method];
+    if (!type) continue;
+    const milestone = timeline
+      .filter(entry => entry.minute === record.revealedMinute && entry.type === type)
+      .sort((a, b) => a.sequence - b.sequence)[0];
+    if (!milestone) continue;
+    const list = evidenceBySequence.get(milestone.sequence) ?? [];
+    list.push(id);
+    evidenceBySequence.set(milestone.sequence, list);
+  }
+  return evidenceBySequence;
+}
+
 export function publicFinalReport(definition: CaseDefinition, run: CaseRun, timeline: PublicEvent[] = [], language: Language = 'es'): FinalReport | null {
   const report = completeFinalReport(definition, run, language);
   if (!report) return null;
@@ -20,7 +58,22 @@ export function publicFinalReport(definition: CaseDefinition, run: CaseRun, time
   // del evento público): si se colara el id, el validador del cliente
   // (isActionResponseDto) rechazaría la respuesta y la vista no se
   // actualizaría al cerrar.
-  return { ...report, timeline: timeline.map(entry => ({ sequence: entry.sequence, minute: entry.minute, type: entry.type, summary: entry.summary })) };
+  const evidenceBySequence = evidenceByTimelineSequence(report, run, timeline);
+  const enrichedTimeline = timeline.map(entry => {
+    const evidenceIds = evidenceBySequence.get(entry.sequence);
+    return evidenceIds
+      ? { sequence: entry.sequence, minute: entry.minute, type: entry.type, summary: entry.summary, evidenceIds }
+      : { sequence: entry.sequence, minute: entry.minute, type: entry.type, summary: entry.summary };
+  });
+  // Minuto de llegada por ciudad: los viajes de la cronología, en orden,
+  // corresponden a las ciudades de la ruta tras la inicial (la primera es
+  // la ciudad de salida). Si las cuentas no cuadran —viaje interrumpido
+  // por el plazo—, se rellena lo que alinea y el resto queda en null.
+  const travelMinutes = timeline.filter(entry => entry.type === 'travel').map(entry => entry.minute);
+  const route = report.route?.map((city, index) => index === 0
+    ? city
+    : { ...city, arrivedMinute: travelMinutes[index - 1] ?? city.arrivedMinute });
+  return { ...report, ...(route ? { route } : {}), timeline: enrichedTimeline };
 }
 
 type PublicBatchStep = NonNullable<PlayerViewDto['batch']>['steps'][number];

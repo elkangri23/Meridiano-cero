@@ -3,11 +3,11 @@
 // se sabe qué pasó.
 import { describe, expect, it } from 'vitest';
 import { hashDefinition } from '@meridiano/case-schema/server';
-import { isPlayerViewDto } from '@meridiano/contracts';
-import { astrolabioDefinition, createInitialRun, ENGINE_VERSION } from '@meridiano/engine';
+import { isPlayerViewDto, type PublicEvent } from '@meridiano/contracts';
+import { astrolabioDefinition, buildFinalReport, createInitialRun, ENGINE_VERSION } from '@meridiano/engine';
 import type { EngineEvent } from '@meridiano/engine';
 import type { StoredRun } from './runs.ts';
-import { playerViewDto, projectEvents } from './player-view.ts';
+import { playerViewDto, projectEvents, publicFinalReport } from './player-view.ts';
 
 function fullRun(overrides: Record<string, unknown> = {}) {
   const base = createInitialRun(astrolabioDefinition, 'owner-1', '22222222-2222-4222-8222-222222222222',
@@ -279,5 +279,89 @@ describe('objetivos en vivo de la vista del jugador', () => {
     expect(view.analysisResults).toEqual(['EV-03']);
     expect(view.dossier).toEqual(['EV-03', 'EV-04']);
     expect(isPlayerViewDto(view)).toBe(true);
+  });
+});
+
+describe('informe final proyectado (rediseño Norte, fase 4)', () => {
+  /** Partida cerrada con su informe construido desde el mismo estado. */
+  function closedRun(overrides: Record<string, unknown> = {}) {
+    const state = fullRun({ status: 'closed', ...overrides });
+    const report = buildFinalReport(astrolabioDefinition, state, 'finished');
+    return fullRun({ status: 'closed', ...overrides, finalReport: report });
+  }
+
+  const timeline: PublicEvent[] = [
+    { id: 'evt-1', sequence: 1, minute: 10, type: 'inspect', summary: 'Inspección en Sala de embalaje.' },
+    { id: 'evt-2', sequence: 2, minute: 30, type: 'inspect', summary: 'Inspección de cerradura en Sala de embalaje.' },
+    { id: 'evt-3', sequence: 3, minute: 90, type: 'request_submitted', summary: 'Solicitud enviada; el resultado llegará a su hora.' },
+    { id: 'evt-4', sequence: 4, minute: 120, type: 'request_matured', summary: 'Una solicitud ha dado resultado.' },
+    { id: 'evt-5', sequence: 5, minute: 300, type: 'travel', summary: 'Viaje a París.' },
+    { id: 'evt-6', sequence: 6, minute: 470, type: 'finish', summary: 'La investigación ha concluido.' },
+  ];
+
+  it('cada hito lleva las pruebas reveladas en él, por minuto y método', () => {
+    const run = closedRun({
+      minute: 470,
+      discoveries: ['EV-01', 'EV-02', 'EV-03', 'travel:paris'],
+      evidenceRecords: {
+        'EV-01': { revealedMinute: 10, origin: 'MAD-SALA', method: 'inspect' },
+        'EV-02': { revealedMinute: 30, origin: 'MAD-SALA', method: 'inspect' },
+        'EV-03': { revealedMinute: 120, origin: 'MAD-SALA', method: 'analyze' },
+      },
+      detentions: ['ines'],
+      recoveredObjects: ['astrolabio-original'],
+      position: { cityId: 'paris', locationId: 'PAR-ARCH' },
+    });
+    const report = publicFinalReport(astrolabioDefinition, run, timeline);
+    expect(report?.timeline.map(entry => entry.evidenceIds ?? null)).toEqual([
+      ['EV-01'], ['EV-02'], null, ['EV-03'], null, null,
+    ]);
+    // Sin pruebas en el hito no se inventa la clave.
+    expect('evidenceIds' in (report?.timeline[2] ?? {})).toBe(false);
+  });
+
+  it('la ruta lleva el minuto de llegada de cada ciudad tras la inicial', () => {
+    const run = closedRun({
+      minute: 470,
+      discoveries: ['EV-01', 'EV-02', 'EV-03', 'travel:paris'],
+      evidenceRecords: {
+        'EV-01': { revealedMinute: 10, origin: 'MAD-SALA', method: 'inspect' },
+        'EV-02': { revealedMinute: 30, origin: 'MAD-SALA', method: 'inspect' },
+        'EV-03': { revealedMinute: 120, origin: 'MAD-SALA', method: 'analyze' },
+      },
+      detentions: ['ines'],
+      recoveredObjects: ['astrolabio-original'],
+      position: { cityId: 'paris', locationId: 'PAR-ARCH' },
+    });
+    const report = publicFinalReport(astrolabioDefinition, run, timeline);
+    expect(report?.route).toEqual([
+      { cityId: 'madrid', cityName: 'Madrid', arrivedMinute: null, inspected: [], talkedTo: [], evidenceIds: ['EV-01', 'EV-02', 'EV-03'] },
+      { cityId: 'paris', cityName: 'París', arrivedMinute: 300, inspected: [], talkedTo: [], evidenceIds: [] },
+    ]);
+  });
+
+  it('el informe enriquecido pasa el validador del cliente', () => {
+    const run = closedRun({
+      minute: 470,
+      discoveries: ['EV-01', 'EV-02', 'EV-03', 'travel:paris'],
+      evidenceRecords: {
+        'EV-01': { revealedMinute: 10, origin: 'MAD-SALA', method: 'inspect' },
+        'EV-02': { revealedMinute: 30, origin: 'MAD-SALA', method: 'inspect' },
+        'EV-03': { revealedMinute: 120, origin: 'MAD-SALA', method: 'analyze' },
+      },
+      detentions: ['ines'],
+      recoveredObjects: ['astrolabio-original'],
+      position: { cityId: 'paris', locationId: 'PAR-ARCH' },
+    });
+    const view = playerViewDto(astrolabioDefinition, run, 0, timeline);
+    expect(isPlayerViewDto(view)).toBe(true);
+    expect(view.finalReport?.score.breakdown[0]).toEqual(
+      { id: 'objectives', label: 'Objetivos logrados', points: 50, max: 50 });
+    expect(view.finalReport?.evidenceFound[0]).toEqual({
+      id: 'EV-01',
+      text: 'La caja está a la vista. Su etiqueta remite al archivo de París.',
+      origin: 'MAD-SALA',
+      minute: 10,
+    });
   });
 });

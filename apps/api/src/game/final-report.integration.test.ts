@@ -121,13 +121,15 @@ describe('informe final completo por HTTP (GDD §12)', () => {
     ]);
     expect(report.score).toEqual({
       total: 87, max: 100,
+      // Fase 4: cada componente lleva su id y su máximo para el desglose
+      // pulsable del recorrido (las etiquetas y los puntos no cambian).
       breakdown: [
-        { label: 'Objetivos logrados', points: 50 },
-        { label: 'Pruebas halladas', points: 14 },
-        { label: 'Detención correcta', points: 15 },
-        { label: 'Detenciones erróneas', points: 0 },
-        { label: 'Conducta irregular', points: 0 },
-        { label: 'Tiempo restante', points: 8 },
+        { label: 'Objetivos logrados', points: 50, id: 'objectives', max: 50 },
+        { label: 'Pruebas halladas', points: 14, id: 'evidence', max: 25 },
+        { label: 'Detención correcta', points: 15, id: 'detention', max: 15 },
+        { label: 'Detenciones erróneas', points: 0, id: 'wrongDetentions', max: 0 },
+        { label: 'Conducta irregular', points: 0, id: 'irregular', max: 0 },
+        { label: 'Tiempo restante', points: 8, id: 'time', max: 10 },
       ],
     });
     // La respuesta de cierre trae el mismo informe que la vista.
@@ -137,8 +139,10 @@ describe('informe final completo por HTTP (GDD §12)', () => {
     expect(timeline.length).toBeGreaterThan(10);
     // La entrada del informe es FinalReportTimelineEntry: sin el id opaco
     // del evento público (el validador del cliente lo rechazaría).
-    expect(Object.keys(timeline[0] as Record<string, unknown>).sort()).toEqual(['minute', 'sequence', 'summary', 'type']);
-    expect(timeline[0]).toMatchObject({ sequence: 1, minute: 10, type: 'inspect', summary: 'Inspección en Sala de embalaje.' });
+    // Fase 4: cada hito trae las pruebas que salieron de ahí (la
+    // inspección del minuto 10 revela EV-01).
+    expect(Object.keys(timeline[0] as Record<string, unknown>).sort()).toEqual(['evidenceIds', 'minute', 'sequence', 'summary', 'type']);
+    expect(timeline[0]).toMatchObject({ sequence: 1, minute: 10, type: 'inspect', summary: 'Inspección en Sala de embalaje.', evidenceIds: ['EV-01'] });
     expect(timeline[timeline.length - 1]).toMatchObject({ minute: 470, type: 'finish', summary: 'La investigación ha concluido.' });
     expect(timeline.map(entry => entry.sequence as number))
       .toEqual([...timeline.map(entry => entry.sequence as number)].sort((a, b) => a - b));
