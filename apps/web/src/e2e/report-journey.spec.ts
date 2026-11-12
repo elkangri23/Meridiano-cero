@@ -84,11 +84,13 @@ test.describe('Informe final como recorrido (rediseño Norte, fase 4)', () => {
   test('desglose de puntos pulsable con su explicación', async ({ page }) => {
     await playRouteA(page);
     const report = page.getByTestId('report-full');
-    // El primer componente (objetivos) está abierto por defecto.
-    await expect(page.getByTestId('report-score-detail')).toContainText('Objetivos logrados: 2 de 2.');
+    // El primer componente (objetivos) está abierto por defecto. Las cifras
+    // son las reales de la ruta A (50/25/15/10), no las del ejemplo de la
+    // maqueta: 2 de 2 objetivos, 50 de 50 puntos; 6 de 9 pruebas, 14 de 25.
+    await expect(page.getByTestId('report-score-detail')).toContainText('2 de 2 objetivos cumplidos: 50 de 50 puntos.');
     await page.getByTestId('report-score-evidence').click();
-    await expect(page.getByTestId('report-score-detail')).toContainText('Pruebas halladas: 6 de 9.');
-    await expect(page.getByTestId('report-score-detail')).not.toContainText('Objetivos logrados');
+    await expect(page.getByTestId('report-score-detail')).toContainText('6 de 9 pruebas recogidas: 14 de 25 puntos.');
+    await expect(page.getByTestId('report-score-detail')).not.toContainText('objetivos cumplidos');
     await expect(report).toContainText('Total: 87 / 100');
   });
 
@@ -146,9 +148,9 @@ test.describe('Informe final como recorrido (rediseño Norte, fase 4)', () => {
     await page.getByTestId('truth-who').locator('summary').click();
     await expect(page.getByTestId('report-full')).toContainText('Responsable: Inés Valera');
     await page.getByTestId('truth-how').locator('summary').click();
-    await expect(page.getByTestId('report-full')).toContainText('Estas son las pruebas que señalan');
+    await expect(page.getByTestId('report-full')).toContainText('Las pruebas decisivas que lo demuestran');
     await page.getByTestId('truth-timeline').locator('summary').click();
-    await expect(page.getByTestId('report-full')).toContainText('no registra ninguna cronología del delito');
+    await expect(page.getByTestId('report-full')).toContainText('El expediente no registra una cronología del delito');
   });
 
   test('cierre: cronología completa y repetir expediente', async ({ page }) => {

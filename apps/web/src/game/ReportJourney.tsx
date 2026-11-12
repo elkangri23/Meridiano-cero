@@ -183,7 +183,7 @@ function JourneyTimeline({ report }: { report: FinalReport }) {
 function RouteMap({ cities }: { cities: FinalReportRouteCity[] }) {
   const t = useTranslation();
   const points = cities.map(city => ({ city, point: travelCityPoint(city.cityId) }));
-  return <svg className="game-travel-svg" viewBox="0 0 100 100" role="img" aria-label={t('game.reportJourney.routeMapLabel')}>
+  return <svg className="game-travel-svg" viewBox="0 0 100 100" role="img" aria-label={t('game.reportJourney.routeMapLabel')} data-testid="route-map">
     {points.map((item, i) => {
       if (i === 0) return null;
       const from = points[i - 1]?.point;
