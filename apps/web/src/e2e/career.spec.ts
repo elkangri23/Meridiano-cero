@@ -31,7 +31,7 @@ async function closeCase(page: Page) {
   await page.getByTestId('dock-close-start').click();
   await page.getByTestId('dock-close-yes').click();
   await expect(page.getByTestId('report-full')).toBeVisible();
-  await expect(page.getByTestId('run-state')).toContainText('Cerrada');
+  await expect(page.getByTestId('run-state')).toContainText('Partida cerrada');
 }
 
 /** El informe final ya está a pantalla entera tras cerrar; devuelve su cuerpo. */

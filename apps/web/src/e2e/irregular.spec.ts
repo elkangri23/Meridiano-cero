@@ -46,7 +46,7 @@ async function closeCase(page: Page) {
   await page.getByTestId('dock-close-start').click();
   await page.getByTestId('dock-close-yes').click();
   await expect(page.getByTestId('report-full')).toBeVisible();
-  await expect(page.getByTestId('run-state')).toContainText('Cerrada');
+  await expect(page.getByTestId('run-state')).toContainText('Partida cerrada');
 }
 
 test.describe('E2E acciones irregulares (GDD §14)', () => {
@@ -100,12 +100,14 @@ test.describe('E2E acciones irregulares (GDD §14)', () => {
     await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     // En el dossier, el astrolabio recuperado figura como no admisible.
+    // Rediseño Norte, fase 2: el maletín ya no es una tabla, son fichas
+    // por evidencia con su admisibilidad en la meta.
     await openDossier(page);
     const dossier = page.getByTestId('dock-panel-dossier');
     await expect(dossier).toContainText('Forzaste el acceso a Almacén de depósito');
     await expect(dossier).toContainText('El astrolabio original está recuperado.');
-    const row = dossier.locator('tr', { hasText: 'El astrolabio original está recuperado.' });
-    await expect(row).toContainText('No');
+    const card = dossier.locator('[data-testid^="evidence-"]', { hasText: 'El astrolabio original está recuperado.' });
+    await expect(card).toContainText('Admisible: No');
     // Cerrar el caso: el informe final refleja el acto y descuenta 10 puntos.
     await closeCase(page);
     const report = page.getByTestId('report-full');

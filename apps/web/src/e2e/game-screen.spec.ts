@@ -45,7 +45,7 @@ async function closeCase(page: Page) {
   await page.getByTestId('dock-close-start').click();
   await page.getByTestId('dock-close-yes').click();
   await expect(page.getByTestId('report-full')).toBeVisible();
-  await expect(page.getByTestId('run-state')).toContainText('Cerrada');
+  await expect(page.getByTestId('run-state')).toContainText('Partida cerrada');
 }
 
 /** Viaja desde la pestaña Mapa del dock: abre Mapa, pulsa Viajar y
@@ -61,12 +61,10 @@ async function travelTo(page: Page, cityId: string, minute: number) {
 }
 
 test.describe('E2E T3-05 - Pantalla de juego', () => {
-  // Rediseño Norte, fase 1: la ruta A queda TRUNCADA en el laboratorio —
-  // el análisis por evidencia en el Dossier es la fase 2 — así que este
-  // test solo llega hasta recoger EV-02 y afirma que no hay laboratorio.
-  // La ruta A completa (análisis, consulta HV-17, orden, detención,
-  // recuperación y cierre) vuelve en la fase 2.
-  test('Ruta A truncada (fase 1): inspeccionar y recoger EV-02, sin laboratorio', async ({ page }) => {
+  // Rediseño Norte, fase 2: la ruta A vuelve a ser jugable — el análisis
+  // de EV-02 vive ahora en su propia ficha del Dossier, y el hallazgo se
+  // anuncia en la escena con su distintivo en la pestaña Dossier.
+  test('Ruta A completa (470 min): hallazgo en escena, re-inspección sin coste, análisis en el Dossier, orden, detención y cierre', async ({ page }) => {
     await openGameScreen(page);
     // Objetivos siempre visibles (lote 2): los dos pendientes al empezar.
     const objectives = page.getByTestId('objectives-panel');
@@ -75,18 +73,85 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(objectives).toContainText('Recuperar el astrolabio original');
     await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'false');
     await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'false');
+    // Inspeccionar el lugar: hallazgo anunciado en la escena y distintivo
+    // del Dossier en 1; el lugar queda marcado «Revisado ✓».
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
+    const finding = page.getByTestId('finding-card');
+    await expect(finding).toBeVisible();
+    await expect(finding).toContainText('Has descubierto:');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('1');
+    await expect(page.getByTestId('offer-card-inspect:MAD-SALA')).toContainText('Revisado ✓');
+    // Re-inspeccionar el lugar: sin coste y sin duplicar — solo la nota.
+    await page.getByTestId('offer-inspect:MAD-SALA').click();
+    await expect(page.getByTestId('revisit-note-inspect:MAD-SALA')).toBeVisible();
+    await expect(page.getByTestId('revisit-note-inspect:MAD-SALA')).toContainText('Ya revisaste esto: no hay nada nuevo. Sin coste.');
+    await expect(page.getByTestId('clock')).toContainText('10 min');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('1');
+    // Inspeccionar la cerradura: el hallazgo pasa a ser EV-02, distintivo
+    // en 2, y la cerradura queda marcada «Revisado ✓».
     await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);
+    await expect(finding).toContainText('Has descubierto: La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('2');
+    await expect(page.getByTestId('offer-card-inspect:MAD-SALA:cerradura')).toContainText('Revisado ✓');
+    // Re-inspeccionar la cerradura: sin coste y sin duplicar.
+    await page.getByTestId('offer-inspect:MAD-SALA:cerradura').click();
+    await expect(page.getByTestId('revisit-note-inspect:MAD-SALA:cerradura')).toBeVisible();
+    await expect(page.getByTestId('clock')).toContainText('30 min');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('2');
     await playOffer(page, 'offer-collect:EV-02', 30);
-    // No hay laboratorio en el dock ni en la escena: ni botón, ni pestaña,
-    // ni oferta de análisis, aunque EV-02 ya está recogida.
+    // Sin laboratorio en el dock ni en la escena, pero el análisis de
+    // EV-02 vive en su ficha del Dossier, con su demora visible.
     await expect(page.getByTestId('open-lab')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Laboratorio', exact: true })).toHaveCount(0);
-    await expect(page.getByTestId('offer-analyze:EV-02')).toHaveCount(0);
-    await expect(page.getByTestId('clock')).toContainText('30 min');
-    // El dossier sigue mostrando EV-02 recogida, con su texto.
     await page.click('button:has-text("Dossier")');
-    await expect(page.getByTestId('dock-panel-dossier')).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
+    const dossier = page.getByTestId('dock-panel-dossier');
+    await expect(dossier).toContainText('Solicitudes en curso');
+    await expect(dossier).toContainText('Sin solicitudes pendientes.');
+    const evidence = page.getByTestId('evidence-EV-02');
+    await expect(evidence).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
+    const analyze = page.getByTestId('offer-analyze:EV-02');
+    await expect(analyze).toBeVisible();
+    await expect(analyze).toContainText('Analizar huellas y marcas · 90 min');
+    // Pedir el análisis: cuesta 0, queda en curso con su cuenta atrás y
+    // en el bloque de solicitudes; el Informe ya refleja el pendiente.
+    await analyze.click();
+    await expect(page.getByTestId('clock')).toContainText('30 min');
+    await expect(evidence).toContainText('En análisis · listo en 90 min (minuto 120)');
+    await expect(page.getByTestId('dossier-pending')).toContainText('Análisis · La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(page.getByTestId('dossier-pending')).toContainText('Responde en el minuto 120 (ahora 30)');
+    await page.click('button:has-text("Informe")');
+    await expect(page.getByTestId('dock-panel-informe')).toContainText('Solicitudes pendientes al cerrar: Análisis · Responde en el minuto 120 (ahora 30).');
+    // Viajar a París madura el análisis: EV-03 vuelve vinculada a EV-02,
+    // con su texto, sin salir del Dossier; el distintivo sube a 3.
+    await travelTo(page, 'paris', 210);
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('3');
+    await expect(evidence).toContainText('Resultado del análisis · EV-03 vinculada a esta evidencia');
+    await expect(evidence).toContainText('La huella técnica es compatible con una herramienta de la serie HV-17.');
+    await expect(dossier).toContainText('Sin solicitudes pendientes.');
+    // Con EV-03 + EV-04 se pide la orden contra Inés: consultas en París,
+    // espera a que maduren, orden y detención coordinada sin moverse.
+    await playOffer(page, 'offer-query:herramienta-hv17', 210);
+    await playOffer(page, 'offer-query:traslado-ines', 210);
+    await playOffer(page, 'offer-wait:30', 240);
+    await playOffer(page, 'offer-request_warrant:ines', 240);
+    await playOffer(page, 'offer-wait:30', 270);
+    const detainCard = page.getByTestId('offer-card-detain:ines');
+    await expect(detainCard).toBeVisible();
+    await expect(detainCard).toContainText('Coordinar la detención de Inés Valera con las autoridades');
+    await playOffer(page, 'offer-detain:ines', 300);
+    const console = page.locator('.game-console');
+    await expect(console).toContainText('Las autoridades han detenido a Inés Valera por orden de A.C.M.E. El caso sigue abierto.');
+    // Los objetivos viven en la pestaña Dossier del dock.
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'true');
+    // Viajar a Lisboa a recuperar el astrolabio y cerrar: 470 min.
+    await travelTo(page, 'lisboa', 450);
+    await playOffer(page, 'offer-recover:astrolabio-original', 470);
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'true');
+    await closeCase(page);
+    await expect(page.getByTestId('report-full')).toContainText('Total: 87 / 100');
   });
 
   test('Ruta B completa (500 min) con guardar y reanudar a mitad de ruta', async ({ page }) => {
@@ -146,7 +211,7 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     // «Ver la partida» vuelve al layout en modo solo lectura.
     await page.getByTestId('report-view-run').click();
     await expect(page.getByTestId('game-screen')).toBeVisible();
-    await expect(page.getByTestId('run-state')).toContainText('Cerrada');
+    await expect(page.getByTestId('run-state')).toContainText('Partida cerrada');
   });
 
   test('Teclado: Enter en una oferta ejecuta en un clic y Escape cierra el diálogo', async ({ page }) => {

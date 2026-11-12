@@ -59,18 +59,18 @@ test.describe('E2E equipo A.C.M.E.', () => {
     await expect(page.getByTestId('team-turns')).not.toContainText('culpable');
   });
 
-  // Rediseño Norte, fase 1: Richter necesita EV-03, que solo sale del
-  // análisis de EV-02 en el laboratorio — y el laboratorio no existe aún
-  // (el análisis por evidencia en el Dossier es la fase 2). El test
-  // vuelve en la fase 2 con la ruta del análisis.
-  test.skip('Richter explica un análisis completado y David muestra las rutas desde Madrid', async ({ page }) => {
+  // Rediseño Norte, fase 2: Richter necesita EV-03, que sale del análisis
+  // de EV-02 en su ficha del Dossier.
+  test('Richter explica un análisis completado y David muestra las rutas desde Madrid', async ({ page }) => {
     await openGameScreen(page);
     await collectLockEvidence(page);
-    await page.getByTestId('open-lab').click();
-    await expect(page.getByRole('dialog', { name: 'Laboratorio' })).toBeVisible();
+    // El análisis de EV-02 vive en su ficha del Dossier: cuesta 0 y
+    // madura a los 90 min de juego.
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('offer-analyze:EV-02')).toContainText('Analizar huellas y marcas · 90 min');
     await page.getByTestId('offer-analyze:EV-02').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
-    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('clock')).toContainText('30 min');
     for (const minute of [60, 90, 120]) {
       await page.getByTestId('offer-wait:30').click();
       await expect(page.getByTestId('clock')).toContainText(`${minute} min`);

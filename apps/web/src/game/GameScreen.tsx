@@ -18,6 +18,10 @@ import { portraitSeed, teamPortraitSeed } from './portraits';
 import { createMusicEngine, type EffectKind } from './music';
 import { groupOffers, groupTalkOffers, offerVerbKey } from './scene-offers';
 import type { TalkGroup } from './scene-offers';
+import { analysisTypeLabel, describePendingRequest, evidenceAnalysisState, evidenceCount, loadAnalysisLinks, reconcileAnalysisLinks, saveAnalysisLinks } from './dossier-analysis';
+import type { AnalysisLinks } from './dossier-analysis';
+import { loadInspected, recordInspected, reviewedInspectRecords, saveInspected } from './inspected';
+import type { InspectedRecord } from './inspected';
 import { buildIntelFacts, selectIntelFacts } from './intel-terminal';
 import { ELENA_ID, ELENA_NAME, elenaPersona, elenaRefusal, teamGreeting, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
@@ -559,14 +563,43 @@ function SceneMeta({ view }: { view: PlayerViewDto }) {
  * cierre ya no es una tarjeta del grupo E (rediseño Norte, fase 1): es
  * su propio momento en la cabecera y en la pestaña Informe del dock, así
  * que la oferta `finish` del motor no se enseña aquí. */
-function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
+/** Tarjeta de inspeccionar ya revisada (rediseño Norte, fase 2): el
+ * elemento queda marcado «Revisado ✓» y volver a pulsarlo no cuesta nada
+ * ni duplica evidencia — solo enseña la nota, sin llamar al servidor (el
+ * motor, además, cobra 0 por re-inspeccionar sin novedad). */
+function ReviewedInspectCard({ record, showNote, onRevisit }: { record: InspectedRecord; showNote: boolean; onRevisit: (record: InspectedRecord, trigger: HTMLElement | null) => void }) {
+  const t = useTranslation();
+  return <div className="game-scene-card game-scene-card--reviewed" data-testid={`offer-card-${record.id}`}>
+    <div className="game-scene-card-icon" aria-hidden="true"><InspectIcon /></div>
+    <div className="game-scene-card-main">
+      <div className="game-scene-card-top">
+        <span className="game-scene-card-cost">{t('game.reviewedNoCost')}</span>
+        <span className="game-scene-card-state game-scene-card-state--reviewed">● {t('game.reviewed')}</span>
+      </div>
+      <h3>{record.label}</h3>
+      {showNote && <p className="game-scene-card-note" data-testid={`revisit-note-${record.id}`}>{t('game.revisitNote')}</p>}
+    </div>
+    <button type="button" data-testid={`offer-${record.id}`}
+      onClick={event => onRevisit(record, event.currentTarget)}>{t('game.scene.actInspect')}</button>
+  </div>;
+}
+
+function SceneActions({ view, grouped, disabled, onOffer, inspected, revisitId, onRevisitInspect }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; inspected: InspectedRecord[]; revisitId: string | null; onRevisitInspect: (record: InspectedRecord, trigger: HTMLElement | null) => void }) {
   const t = useTranslation();
   if (view.status === 'closed') return <p className="game-scene-closed">{t('game.closedNote')}</p>;
+  // Lo ya revisado no se ofrece de nuevo: su tarjeta queda marcada y la
+  // oferta viva del lugar entero se retira si ya se revisó.
+  const reviewed = reviewedInspectRecords(view, inspected);
+  const reviewedIds = new Set(reviewed.map(record => record.id));
+  const liveInspect = grouped.inspect.filter(offer => !reviewedIds.has(offer.id));
   return <>
-    {grouped.inspect.length > 0 && <section className="game-scene-group" aria-labelledby="scene-inspect-heading">
-      <div className="game-scene-group-head"><h2 id="scene-inspect-heading">{t('game.scene.inspectTitle')}</h2><span>{sceneCount(t, 'game.scene.countOfferOne', 'game.scene.countOffersMany', grouped.inspect.length)}</span></div>
-      {grouped.inspect.map(offer => (
+    {(liveInspect.length > 0 || reviewed.length > 0) && <section className="game-scene-group" aria-labelledby="scene-inspect-heading">
+      <div className="game-scene-group-head"><h2 id="scene-inspect-heading">{t('game.scene.inspectTitle')}</h2><span>{sceneCount(t, 'game.scene.countOfferOne', 'game.scene.countOffersMany', liveInspect.length + reviewed.length)}</span></div>
+      {liveInspect.map(offer => (
         <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<InspectIcon />} />
+      ))}
+      {reviewed.map(record => (
+        <ReviewedInspectCard key={record.id} record={record} showNote={revisitId === record.id} onRevisit={onRevisitInspect} />
       ))}
     </section>}
     {grouped.talk.length > 0 && <section className="game-scene-group" aria-labelledby="scene-talk-heading">
@@ -624,7 +657,26 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
  * acciones. El arte sigue siendo el de cada localización (ver
  * scene-art.tsx). La consola narrativa va debajo de la retícula, a todo
  * lo ancho, y la caja de texto libre de órdenes ya no existe. */
-function SceneSection({ view, disabled, clockPulse, onOffer, chatPanel }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; chatPanel?: ReactNode }) {
+/** Hallazgo anunciado en la propia escena (rediseño Norte, fase 2): al
+ * inspeccionar con éxito aparece esta tarjeta dorada con el último
+ * hallazgo y un botón que abre el Dossier. Persiste hasta el siguiente
+ * descubrimiento; la consola y el dossier siguen registrando el hallazgo
+ * como antes (esto es el anuncio donde se está, no un tercer registro). */
+function FindingCard({ finding, view, onViewDossier }: { finding: { evidenceId: string; minute: number }; view: PlayerViewDto; onViewDossier: () => void }) {
+  const t = useTranslation();
+  const text = view.evidenceTexts[finding.evidenceId] ?? finding.evidenceId;
+  return <section className="game-finding-card" data-testid="finding-card" aria-label={t('game.findingKicker')} aria-live="polite">
+    <span className="game-finding-kicker">{t('game.findingKicker')}</span>
+    <h3>{t('game.findingTitle', { text })}</h3>
+    <p className="game-finding-meta">{t('game.findingMinute', { minute: finding.minute })}</p>
+    <div className="game-finding-row">
+      <button type="button" className="game-primary-button" data-testid="finding-view-dossier" onClick={onViewDossier}>{t('game.findingViewDossier')}</button>
+      <span className="game-finding-note">{t('game.findingNote')}</span>
+    </div>
+  </section>;
+}
+
+function SceneSection({ view, disabled, clockPulse, onOffer, chatPanel, finding, onViewDossier, inspected, revisitId, onRevisitInspect }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; chatPanel?: ReactNode; finding: { evidenceId: string; minute: number } | null; onViewDossier: () => void; inspected: InspectedRecord[]; revisitId: string | null; onRevisitInspect: (record: InspectedRecord, trigger: HTMLElement | null) => void }) {
   const t = useTranslation();
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   const grouped = groupOffers(view.offers);
@@ -640,7 +692,8 @@ function SceneSection({ view, disabled, clockPulse, onOffer, chatPanel }: { view
       </div>
     </div>
     <p className="game-scene-description">{view.position.location.description}</p>
-    <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} />
+    {finding && <FindingCard finding={finding} view={view} onViewDossier={onViewDossier} />}
+    <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} inspected={inspected} revisitId={revisitId} onRevisitInspect={onRevisitInspect} />
     {chatPanel}
   </section>;
 }
@@ -1202,7 +1255,74 @@ function ResumePanel({ view, open, onDismiss }: { view: PlayerViewDto; open: boo
   </section>;
 }
 
-function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewDto; onRead?: (text: string) => void; canRead?: boolean; noVoices?: boolean }) {
+/** Solicitudes en curso (rediseño Norte, fase 2): análisis y consultas
+ * pendientes, con su hora prevista, en el Dossier — y en el panel Informe,
+ * que ya las lista. Ya no dependen de ninguna pestaña de laboratorio. */
+function PendingRequestsList({ view, labOffers, links }: { view: PlayerViewDto; labOffers: PublicActionOffer[]; links: AnalysisLinks }) {
+  const t = useTranslation();
+  if (view.pendingRequests.length === 0) return <p className="game-panel-note">{t('game.noPendingRequests')}</p>;
+  return <ul className="game-destination-list" data-testid="dossier-pending">
+    {view.pendingRequests.map(item => {
+      const { title, detail } = describePendingRequest(view, item, labOffers, links, t);
+      return <li key={item.id}><span><strong>{title}</strong><small>{detail}</small></span></li>;
+    })}
+  </ul>;
+}
+
+/** Ficha de una evidencia del maletín (rediseño Norte, fase 2): su texto,
+ * procedencia, minuto y admisibilidad, y su propio análisis forense — el
+ * botón con su demora, el estado en curso con su cuenta atrás, o el
+ * resultado vinculado a esta misma evidencia. Sin análisis posible, lo
+ * dice en su sitio. La tarjeta ajusta su contenido (nada se sale de su
+ * caja); el motor no expone grado de corroboración, así que no se inventa
+ * ningún distintivo de corroboración. */
+/** Bloque de análisis de una evidencia (rediseño Norte, fase 2): el botón
+ * con su demora, el estado en curso con su cuenta atrás, o el resultado
+ * vinculado a esta misma evidencia. Sin análisis posible, lo dice. */
+function EvidenceAnalysisBlock({ state, view, disabled, onAnalyze }: {
+  state: ReturnType<typeof evidenceAnalysisState>; view: PlayerViewDto; disabled: boolean;
+  onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
+}) {
+  const t = useTranslation();
+  if (state.kind === 'available') return <>
+    <button type="button" className="game-primary-button" data-testid={`offer-${state.offer.id}`} disabled={disabled}
+      onClick={event => onAnalyze(state.offer, event.currentTarget)}>
+      {state.minutes !== null
+        ? t('game.analyzeButton', { type: analysisTypeLabel(state.offer, t), minutes: state.minutes })
+        : t('game.labRequestAnalysis')}
+    </button>
+    {state.minutes === null && <p className="game-evidence-analysis-hint">{state.offer.detail}</p>}
+  </>;
+  if (state.kind === 'running') return <p className="game-analysis-status">{t('game.analysisInProgress', { minutes: state.minutesLeft, due: state.dueMinute })}</p>;
+  if (state.kind === 'done') return <div className="game-analysis-result">
+    <span className="game-analysis-result-kind">{t('game.analysisResultLinked', { result: state.resultId })}</span>
+    <p>{view.evidenceTexts[state.resultId] ?? state.resultId}</p>
+  </div>;
+  return <p className="game-no-analysis">{t('game.noAnalysis')}</p>;
+}
+
+function EvidenceCard({ item, view, labOffers, links, disabled, onAnalyze }: {
+  item: PlayerViewDto['objects'][number]; view: PlayerViewDto; labOffers: PublicActionOffer[]; links: AnalysisLinks;
+  disabled: boolean; onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
+}) {
+  const t = useTranslation();
+  const lookup = lookupFromView(view);
+  const title = view.evidenceTexts[item.id] ?? item.id;
+  const origin = lookup.locationName(item.origin) ?? lookup.cityName(item.origin) ?? item.origin;
+  const state = evidenceAnalysisState(view, labOffers, links, item.id);
+  return <article className="game-evidence-card" data-testid={`evidence-${item.id}`}>
+    <div className="game-evidence-row">
+      <span className="game-evidence-title">{title}</span>
+      <span className="game-evidence-kind">{evidenceTypeLabel(item.type, t)}</span>
+    </div>
+    <p className="game-evidence-meta">{t('game.col.origin')}: {origin} · {t('game.col.minute')}: {item.minute} · {t('game.col.admissible')}: {item.admissible ? t('common.yes') : t('common.no')}</p>
+    <div className="game-evidence-analysis" data-testid={`evidence-analysis-${item.id}`}>
+      <EvidenceAnalysisBlock state={state} view={view} disabled={disabled} onAnalyze={onAnalyze} />
+    </div>
+  </article>;
+}
+
+function DossierContent({ view, onRead, canRead, noVoices, labOffers, analysisLinks, disabled, onAnalyze }: { view: PlayerViewDto; onRead?: (text: string) => void; canRead?: boolean; noVoices?: boolean; labOffers: PublicActionOffer[]; analysisLinks: AnalysisLinks; disabled: boolean; onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const t = useTranslation();
   const { preferences } = usePreferences();
   const lookup = lookupFromView(view);
@@ -1210,11 +1330,12 @@ function DossierContent({ view, onRead, canRead, noVoices }: { view: PlayerViewD
   return <div>
     <div><h4>{t('game.dossierSheet')}</h4><p>{t('game.dossierCrime', { label: caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating, t) })}</p></div>
     {view.briefing && <div><h4>{t('initialRun.briefingTitle')}</h4><BriefingText briefing={view.briefing} /></div>}
+    <h4>{t('game.pendingRequestsTitle')}</h4>
+    <PendingRequestsList view={view} labOffers={labOffers} links={analysisLinks} />
     <h4>{t('game.evidenceOwned')}</h4>
     {view.objects.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noEvidence')}</p></div>
-      : <table><thead><tr><th>{t('game.col.evidence')}</th><th>{t('game.col.type')}</th><th>{t('game.col.origin')}</th><th>{t('game.col.minute')}</th><th>{t('game.col.admissible')}</th></tr></thead>
-        <tbody>{view.objects.map(item => <tr key={item.id}><td>{view.evidenceTexts[item.id] ?? item.id}</td><td>{evidenceTypeLabel(item.type, t)}</td><td>{lookup.locationName(item.origin) ?? lookup.cityName(item.origin) ?? item.origin}</td><td>{item.minute}</td><td>{item.admissible ? t('common.yes') : t('common.no')}</td></tr>)}</tbody></table>}
+      : view.objects.map(item => <EvidenceCard key={item.id} item={item} view={view} labOffers={labOffers} links={analysisLinks} disabled={disabled} onAnalyze={onAnalyze} />)}
     <h4>{t('game.findings')}</h4>
     {view.dossier.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noFindings')}</p></div>
@@ -2091,6 +2212,53 @@ const DOCK_TABS: Array<{ id: Extract<DockView, 'dossier' | 'mapa' | 'central' | 
   { id: 'informe', label: 'game.dock.report', testId: 'toolbar-report' },
 ];
 
+/** Último hallazgo visible (rediseño Norte, fase 2): solo si su evidencia
+ * sigue en el dossier de la vista actual. */
+function visibleFinding(finding: { evidenceId: string; minute: number } | null, view: PlayerViewDto): { evidenceId: string; minute: number } | null {
+  return finding && view.dossier.includes(finding.evidenceId) ? finding : null;
+}
+
+/** Evidencia de entrada de una oferta de análisis, si la trae. */
+function analysisInputId(offer: PublicActionOffer): string | null {
+  const value = offer.action.params.evidenceId;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/** Libro de fase 2 tras cada acción (rediseño Norte): inspeccionar anota
+ * el elemento como revisado y, si trajo evidencia nueva, fija el último
+ * hallazgo; el análisis anota su entrada para que el resultado vuelva a
+ * ella. Vive fuera del componente para no engordar `applyResponse`. */
+function trackPhase2Outcome(args: {
+  offer: PublicActionOffer | undefined; previous: PlayerViewDto | null; response: ActionResponseDto;
+  runId: string | null | undefined; inspected: InspectedRecord[]; analysisLinks: AnalysisLinks;
+  setInspected: (records: InspectedRecord[]) => void;
+  setFinding: (finding: { evidenceId: string; minute: number } | null) => void;
+  setAnalysisLinks: (links: AnalysisLinks) => void;
+}): void {
+  const { offer, previous, response, runId } = args;
+  if (!offer || !runId) return;
+  if (offer.action.type === 'inspect') {
+    const updated = recordInspected(args.inspected, offer);
+    if (updated !== args.inspected) { args.setInspected(updated); saveInspected(sessionStorage, runId, updated); }
+    if (previous) {
+      const gained = response.dossier.filter(entry => entry in response.evidenceTexts && !previous.dossier.includes(entry));
+      const lastEvidence = gained[gained.length - 1];
+      if (lastEvidence) {
+        const nextFinding = { evidenceId: lastEvidence, minute: response.clock.minute };
+        args.setFinding(nextFinding);
+        try { sessionStorage.setItem(`meridiano:finding:${runId}`, JSON.stringify(nextFinding)); } catch { /* sin almacenamiento */ }
+      }
+    }
+  } else if (offer.action.type === 'analyze') {
+    const inputId = analysisInputId(offer);
+    if (inputId) {
+      const links: AnalysisLinks = { ...args.analysisLinks, [inputId]: { inputId } };
+      args.setAnalysisLinks(links);
+      saveAnalysisLinks(sessionStorage, runId, links);
+    }
+  }
+}
+
 /** Pantalla de juego (rediseño Norte, fase 1): una sola pantalla sin
  * ventanas, con la escena central, el dock fijo de cinco pestañas a la
  * derecha y la consola narrativa sola abajo. La UI no calcula resultados:
@@ -2186,6 +2354,22 @@ export function GameScreen() {
   const [careerLoaded, setCareerLoaded] = useState(false);
   // Lote 1 de jugabilidad: reloj de arena y animación de viaje (ver hook).
   const timeFeedback = useTimeFeedback();
+
+  // Rediseño Norte, fase 2: último hallazgo anunciado en la escena (por
+  // partida, en esta pestaña; se muestra solo si la evidencia sigue en el
+  // dossier) y elementos ya inspeccionados (tarjeta «Revisado ✓»). El
+  // vínculo entrada → resultado del análisis, anotado al pedirlo, también
+  // se guarda por partida en esta pestaña (ver dossier-analysis.ts).
+  const [finding, setFinding] = useState<{ evidenceId: string; minute: number } | null>(null);
+  const [inspected, setInspected] = useState<InspectedRecord[]>([]);
+  const [revisitId, setRevisitId] = useState<string | null>(null);
+  const [analysisLinks, setAnalysisLinks] = useState<AnalysisLinks>({});
+  useEffect(() => {
+    if (!runId) return;
+    setInspected(loadInspected(sessionStorage, runId));
+    setAnalysisLinks(loadAnalysisLinks(sessionStorage, runId));
+    try { setFinding(JSON.parse(sessionStorage.getItem(`meridiano:finding:${runId}`) ?? 'null') as { evidenceId: string; minute: number } | null); } catch { setFinding(null); }
+  }, [runId]);
 
   // Lectura automática (GDD §15): narración nueva y respuestas de los
   // personajes, solo con TTS activado, autoRead y sin silenciar.
@@ -2306,6 +2490,15 @@ export function GameScreen() {
     try { sessionStorage.setItem('meridiano-log:' + runId, JSON.stringify(log.slice(-100))); } catch { /* sin almacenamiento */ }
   }, [log, runId]);
 
+  // Rediseño Norte, fase 2: cuando un análisis madura, su resultado
+  // vuelve a la evidencia que lo pidió (también si maduró por otra acción,
+  // o al recargar la partida).
+  useEffect(() => {
+    if (!view || !runId) return;
+    const { links, changed } = reconcileAnalysisLinks(view, analysisLinks);
+    if (changed) { setAnalysisLinks(links); saveAnalysisLinks(sessionStorage, runId, links); }
+  }, [view, runId, analysisLinks]);
+
   // Los turnos del equipo se cargan al montar (antes se cargaban al abrir
   // su ventana): el dock enseña la pestaña Equipo sin abrir nada, así que
   // el saludo de Margaret o los turnos guardados ya tienen que estar.
@@ -2395,6 +2588,7 @@ export function GameScreen() {
     setLog(current => [...current, ...entries]);
     setNotice(noticeForOutcome(response, offerLabel, t));
     timeFeedback.apply(previous, response, offer);
+    trackPhase2Outcome({ offer, previous, response, runId, inspected, analysisLinks, setInspected, setFinding, setAnalysisLinks });
     // Efecto de interfaz (GDD §15): el viaje suena con arpegio y el resto
     // de acciones con una confirmación; con efectos apagados o silenciados
     // no suena nada.
@@ -2877,7 +3071,9 @@ export function GameScreen() {
       <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.dossier')}</h2>
       <ObjectivesSection view={view} />
       <SceneMeta view={view} />
-      <DossierContent view={view} onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} />
+      <DossierContent view={view} onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices}
+        labOffers={groupOffers(view.offers).lab} analysisLinks={analysisLinks} disabled={busy}
+        onAnalyze={(offer, trigger) => void startPreview(offer, trigger)} />
     </div>;
     if (dockView === 'mapa') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-mapa" aria-labelledby="dock-tab-mapa" data-testid="dock-panel-mapa">
       <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.map')}</h2>
@@ -2951,16 +3147,24 @@ export function GameScreen() {
 
     <div className="game-layout">
       <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)}
-        chatPanel={renderChatPanel()} />
+        chatPanel={renderChatPanel()}
+        finding={visibleFinding(finding, view)}
+        onViewDossier={() => openDockTab('dossier')}
+        inspected={inspected} revisitId={revisitId}
+        onRevisitInspect={(record) => { setRevisitId(record.id); }} />
 
       <aside className="game-dock" data-testid="game-dock">
         <div className="game-dock-tabs" role="tablist">
-          {DOCK_TABS.map(tab => (
-            <button key={tab.id} type="button" role="tab" id={`dock-tab-${tab.id}`} aria-selected={dockView === tab.id}
+          {DOCK_TABS.map(tab => {
+            // Rediseño Norte, fase 2: el distintivo del Dossier cuenta
+            // las evidencias en poder y sube al inspeccionar.
+            const badge = tab.id === 'dossier' ? evidenceCount(view) : 0;
+            return <button key={tab.id} type="button" role="tab" id={`dock-tab-${tab.id}`} aria-selected={dockView === tab.id}
               aria-controls={`dock-panel-${tab.id}`} data-testid={tab.testId} onClick={() => openDockTab(tab.id)}>
               {t(tab.label)}
-            </button>
-          ))}
+              {badge > 0 && <span className="game-dock-badge" data-testid="dossier-evidence-count">{badge}</span>}
+            </button>;
+          })}
         </div>
         <div className="game-dock-body">
           {renderDockPanel()}

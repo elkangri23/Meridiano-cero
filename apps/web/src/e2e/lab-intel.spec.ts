@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-/** Rediseño Norte, fase 1: el laboratorio y la terminal de inteligencia no
- * existen aún — el análisis por evidencia en el Dossier es la fase 2 y la
- * terminal no tiene entrada propia. Este archivo afirma esa ausencia: no
- * hay pestaña ni botón de laboratorio, ni entrada a la terminal, y el
- * dossier sigue mostrando EV-02 recogida. La lógica del intérprete y de
- * la terminal sigue cubierta por los unitarios
- * (`interpret-clarification.test.ts`, `intel-terminal`) y la consulta
- * determinista sin registro vive ahora en Elena (team.spec.ts). */
+/** Rediseño Norte, fase 2: la pestaña y el botón de laboratorio siguen
+ * sin existir — el análisis forense vive ahora en la ficha de cada
+ * evidencia del Dossier — y la terminal de inteligencia no tiene entrada
+ * propia. Este archivo afirma esa realidad: no hay pestaña ni botón de
+ * laboratorio, ni entrada a la terminal, y el análisis de EV-02 está en
+ * su ficha del Dossier. La lógica del intérprete y de la terminal sigue
+ * cubierta por los unitarios (`interpret-clarification.test.ts`,
+ * `intel-terminal`) y la consulta determinista sin registro vive ahora en
+ * Elena (team.spec.ts). */
 
 /** Crea una partida desde la UI del archivo; la creación confirmada navega sola a su pantalla de juego. */
 async function openGameScreen(page: Page) {
@@ -33,20 +34,23 @@ async function collectLockEvidence(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('30 min');
 }
 
-test.describe('E2E laboratorio forense + terminal de inteligencia (fase 1: ausentes)', () => {
-  test('sin laboratorio: no hay botón, pestaña ni oferta de análisis, pero el dossier muestra EV-02', async ({ page }) => {
+test.describe('E2E laboratorio forense + terminal de inteligencia (fase 2: el análisis vive en el Dossier)', () => {
+  test('sin pestaña de laboratorio: el análisis de EV-02 está en su ficha del Dossier', async ({ page }) => {
     await openGameScreen(page);
     await collectLockEvidence(page);
     // Ni en la escena ni en el dock hay laboratorio.
     await expect(page.getByTestId('open-lab')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Laboratorio', exact: true })).toHaveCount(0);
-    await expect(page.getByTestId('offer-analyze:EV-02')).toHaveCount(0);
     // Ni entrada a la terminal de inteligencia.
     await expect(page.getByRole('button', { name: 'Terminal de inteligencia', exact: true })).toHaveCount(0);
-    // El dossier sigue mostrando EV-02 recogida, con su texto.
+    // El Dossier muestra EV-02 recogida, con su texto y su análisis en la
+    // propia ficha; el distintivo cuenta las dos evidencias (EV-01 y EV-02).
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('2');
     await page.getByTestId('toolbar-dossier').click();
     const dossier = page.getByTestId('dock-panel-dossier');
     await expect(dossier).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(page.getByTestId('offer-analyze:EV-02')).toBeVisible();
+    await expect(page.getByTestId('offer-analyze:EV-02')).toContainText('Analizar huellas y marcas · 90 min');
   });
 
   test('el dock tiene exactamente 5 pestañas y ninguna es el laboratorio', async ({ page }) => {
