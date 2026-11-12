@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent, ReactNode, RefObject } from 'react';
+import type { FormEvent, ReactNode, RefObject } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { archiveApi } from '../archive/client';
 import { profileApi } from '../auth/client';
@@ -7,7 +7,6 @@ import { avatarLabel, ProfileSection } from '../auth/ProfileSection';
 import { paletteLabelKeys, usePreferences } from '../preferences';
 import { resumeSummary } from './resume-summary';
 import { aiApi, AiError } from '../ai/client';
-import type { AiInterpretation } from '../ai/client';
 import { aiConnectionsApi, ConnectionsError } from '../ai/connections';
 import type { AiConnection, ConnectionsResponse, ConnectionTestResult, ProviderCatalogEntry } from '../ai/connections';
 import { gameApi, GameError } from './client';
@@ -17,20 +16,17 @@ import { SceneArt } from './scene-art';
 import { Portrait } from './portrait';
 import { portraitSeed, teamPortraitSeed } from './portraits';
 import { createMusicEngine, type EffectKind } from './music';
-import { groupOffers, groupTalkOffers, offerVerbKey, sceneEvidence } from './scene-offers';
+import { groupOffers, groupTalkOffers, offerVerbKey } from './scene-offers';
 import type { TalkGroup } from './scene-offers';
-import { interpretClarificationText } from './interpret-clarification';
-import { buildIntelFacts, INTEL_ID, INTEL_NAME, intelGreeting, intelNoRecord, intelPersona, intelRefusal, selectIntelFacts } from './intel-terminal';
+import { buildIntelFacts, selectIntelFacts } from './intel-terminal';
 import { ELENA_ID, ELENA_NAME, elenaPersona, elenaRefusal, teamGreeting, TEAM_MEMBERS, TEAM_SERVICE_KEYS, medalLabel, teamRequestText, teamServiceAnswer } from './team';
 import type { TeamMemberId, TeamServiceId } from './team';
 import type { GameErrorKind, SaveListDto, SaveListItem } from './client';
-import { GameWindow, MinimizedBar, WINDOW_KEYS, useWindows } from './windows';
-import type { WindowId } from './windows';
 import { effectiveReducedMotion, objectiveStateText, trapTabKey, useSystemReducedMotion } from './accessibility';
 import type { ActionResponseDto, CareerProfileDto, PlayerViewDto, PublicActionOffer, SessionDto, TranslateFn } from '@meridiano/contracts';
 import type { DetectiveProfileDto } from '@meridiano/contracts';
-import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, FORENSIC_TYPE_KEYS, GEOGRAPHIC_CATALOG, getNPC, getRoute, IRREGULAR_KIND_KEYS, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, searchCities, SUPPORTED_LANGUAGES, touristInfoFor, travelText } from '@meridiano/contracts';
-import type { CaseTexts, DiscoveryLookup, ForensicType, Language, LocaleKey, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/contracts';
+import { caseLabel, conversationRecordText, createNoopTTSController, createTTSController, discoveryText, GEOGRAPHIC_CATALOG, getNPC, getRoute, IRREGULAR_KIND_KEYS, npcGreeting, npcKnowledgeFacts, npcRefusal, objectiveText, reportReasonText, reportResultText, searchCities, SUPPORTED_LANGUAGES, touristInfoFor, travelText } from '@meridiano/contracts';
+import type { CaseTexts, DiscoveryLookup, Language, LocaleKey, PaletteMode, PresentationPreferences, TTSController, TTSOptions, TTSVoice } from '@meridiano/contracts';
 import { useTranslation } from '../i18n';
 import './game.css';
 
@@ -65,16 +61,6 @@ function requestTypeLabel(type: string, t: TranslateFn): string {
 function channelLabel(channel: string, t: TranslateFn): string {
   const key = channelKeys[channel];
   return key ? t(key) : channel;
-}
-
-/** Pregunta de la aclaración tras una orden libre: si el texto pide una
- * orden o una detención bloqueada, dice qué falta en el idioma del
- * jugador; si no, el motivo del servidor se resuelve en el idioma del
- * jugador (`game.notice.interpretClarification.*`), y solo si el motivo
- * es desconocido se enseña el mensaje del servidor o la ambigua
- * genérica. */
-function clarificationQuestion(t: TranslateFn, result: AiInterpretation): string {
-  return interpretClarificationText(t, result);
 }
 
 /** Dificultad de la partida, tal como se enseña en la cabecera junto al
@@ -398,33 +384,78 @@ function SceneHourglass({ delta, animKey }: { delta: number; animKey: number }) 
   </span>;
 }
 
-function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, onLogout }: { view: PlayerViewDto; caseTitle: string | null; detective: string; avatar: string; clockPulse: { key: number; delta: number } | null; onLogout: (() => void) | null }) {
+/** Minutos como «47 h 50 m» (maqueta Norte): el reloj de la cabecera
+ * enseña lo que queda, no lo transcurrido. */
+function formatRemaining(minutes: number): string {
+  const clamped = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(clamped / 60);
+  const rest = clamped % 60;
+  return `${hours} h ${String(rest).padStart(2, '0')} m`;
+}
+
+/** Cabecera fija (maqueta Norte): detective, caso, ciudad, dificultad,
+ * reloj con lo que queda y barra de plazo, estado de la partida y las
+ * acciones propias del momento — cerrar el caso, resumen, guardados,
+ * ajustes, archivo y salida. Sin ventanas: Guardados y Ajustes abren su
+ * panel en el dock, y «Cerrar el caso» lleva a la pestaña Informe. El
+ * tiempo transcurrido se enseña en minutos como siempre, para que el
+ * reloj siga leyéndose igual en toda la partida. */
+function HeaderSection({ view, caseTitle, detective, avatar, clockPulse, closed, canResume, onCloseCase, onOpenResume, onOpenSaves, onOpenSettings, onLogout }: {
+  view: PlayerViewDto; caseTitle: string | null; detective: string; avatar: string;
+  clockPulse: { key: number; delta: number } | null; closed: boolean; canResume: boolean;
+  onCloseCase: () => void; onOpenResume: () => void; onOpenSaves: () => void; onOpenSettings: () => void;
+  onLogout: (() => void) | null;
+}) {
   const t = useTranslation();
+  const remaining = Math.max(0, view.clock.deadlineMinutes - view.clock.minute);
+  const percent = view.clock.deadlineMinutes === 0 ? 0 : Math.round((view.clock.minute / view.clock.deadlineMinutes) * 100);
   return <header className="game-header">
     <div className="game-agency">
       <div className="game-brand">
         <span className="game-mark" aria-hidden="true">M<span>0</span></span>
         <div><p className="game-overline">{t('game.agency')}</p><h1>Meridiano cero</h1></div>
       </div>
-      <div className="game-detective">
-        <span className="game-avatar" title={`${t('profile.avatar')}: ${avatar} · ${detective}`} aria-hidden="true">{avatar.slice(0, 1).toUpperCase()}</span>
+      <div className="game-head-facts">
+        <div className="game-fact">
+          <span className="game-overline">{t('game.header.detective')}</span>
+          <strong><span className="game-avatar" title={`${t('profile.avatar')}: ${avatar} · ${detective}`} aria-hidden="true">{avatar.slice(0, 1).toUpperCase()}</span> {detective}</strong>
+        </div>
+        <div className="game-fact">
+          <span className="game-overline">{t('game.header.case')}</span>
+          <strong>{caseTitle ?? view.caseId}</strong>
+        </div>
+        <div className="game-fact">
+          <span className="game-overline">{t('game.header.city')}</span>
+          <strong>{view.position.city.name}, {view.position.city.country}</strong>
+        </div>
+        <div className="game-fact">
+          <span className="game-overline">{t('game.header.difficulty')}</span>
+          <strong data-testid="difficulty">{t('game.difficultyLine', { label: difficultyLabel(view.difficulty, t), hours: Math.round(view.clock.deadlineMinutes / 60) })}</strong>
+          <small data-testid="exploration-mode">{explorationModeLabel(view.explorationMode, t)}</small>
+        </div>
+        <div className="game-clockbox" data-testid="clockbox">
+          <div className="game-clockbox-row">
+            <span className="game-overline">{t('game.header.remaining')}</span>
+            <strong className="game-clock-remaining" data-testid="clock-remaining">{formatRemaining(remaining)}</strong>
+          </div>
+          <div className="game-deadline" role="img" aria-label={t('game.header.clockAria', { remaining: formatRemaining(remaining), deadline: formatRemaining(view.clock.deadlineMinutes) })}>
+            <i style={{ width: `${percent}%` }} />
+          </div>
+          <div className="game-clockbox-row">
+            <span data-testid="clock">{t('game.header.elapsed', { minute: view.clock.minute })}</span>
+            <span>{t('game.header.ofDeadline', { hours: Math.round(view.clock.deadlineMinutes / 60) })}</span>
+          </div>
+          {clockPulse && <Hourglass delta={clockPulse.delta} animKey={clockPulse.key} />}
+        </div>
+        <span className={`game-state-pill${closed ? ' game-state-pill--closed' : ''}`} data-testid="run-state">{closed ? t('game.header.stateClosed') : t('game.header.stateActive')}</span>
       </div>
       <div className="game-header-actions">
+        {!closed && <button type="button" className="game-primary-button" data-testid="close-case-header" onClick={onCloseCase}>{t('game.header.closeCase')}</button>}
+        {canResume && <button type="button" onClick={onOpenResume}>{t('game.toolbarResume')}</button>}
+        <button type="button" data-testid="toolbar-saves" onClick={onOpenSaves}>{t('windows.saves')}</button>
+        <button type="button" data-testid="toolbar-settings" onClick={onOpenSettings}>{t('windows.settings')}</button>
         <Link to="/archivo">{t('archive.title')}</Link>
         {onLogout && <button type="button" onClick={onLogout}>{t('archive.logout')}</button>}
-      </div>
-    </div>
-    <div className="game-case-strip">
-      <div><p className="game-overline">{t('archive.col.case')}</p><strong>{caseTitle ?? view.caseId}</strong></div>
-      <div><p className="game-overline">{t('archive.col.crime')}</p><strong>{caseLabel(view.caseMeta.crimeType, view.caseMeta.contentRating, t)}</strong></div>
-      <div><p className="game-overline">{t('game.currentCity')}</p><strong>{view.position.city.name}, {view.position.city.country}</strong></div>
-      <div><p className="game-overline">{t('archive.col.difficulty')}</p><strong data-testid="difficulty">{t('game.difficultyLine', { label: difficultyLabel(view.difficulty, t), hours: Math.round(view.clock.deadlineMinutes / 60) })}</strong></div>
-      <div><p className="game-overline">{t('game.explorationModeLabel')}</p><strong data-testid="exploration-mode">{explorationModeLabel(view.explorationMode, t)}</strong></div>
-      <div className={`game-clock${clockPulse ? ' game-clock-pulse' : ''}`} data-testid="clock" aria-label={t('game.clockAria', { minute: view.clock.minute, deadline: view.clock.deadlineMinutes })}>
-        <p className="game-overline">{t('game.clockLabel')}</p>
-        <strong>{view.clock.minute} min<span> / {view.clock.deadlineMinutes} min</span></strong>
-        {clockPulse && <Hourglass delta={clockPulse.delta} animKey={clockPulse.key} />}
-        <small>{view.status === 'closed' ? t('common.closed') : t('common.active')}{t('game.clockNote')}</small>
       </div>
     </div>
   </header>;
@@ -525,11 +556,11 @@ function SceneMeta({ view }: { view: PlayerViewDto }) {
  * y con el orden del motor dentro de cada grupo. El grupo C de la maqueta
  * (acciones bloqueadas) no existe aquí: el motor solo expone ofertas
  * disponibles, sin motivo de bloqueo, así que no se inventa ninguna. El
- * laboratorio no es una acción de escena: su ventana vive en Operaciones
- * globales, con el recuento de análisis cuando los hay. */
+ * cierre ya no es una tarjeta del grupo E (rediseño Norte, fase 1): es
+ * su propio momento en la cabecera y en la pestaña Informe del dock, así
+ * que la oferta `finish` del motor no se enseña aquí. */
 function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDto; grouped: ReturnType<typeof groupOffers>; disabled: boolean; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void }) {
   const t = useTranslation();
-  const finishOffer = grouped.finish;
   if (view.status === 'closed') return <p className="game-scene-closed">{t('game.closedNote')}</p>;
   return <>
     {grouped.inspect.length > 0 && <section className="game-scene-group" aria-labelledby="scene-inspect-heading">
@@ -550,12 +581,11 @@ function SceneActions({ view, grouped, disabled, onOffer }: { view: PlayerViewDt
         <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<TravelIcon />} />
       ))}
     </section>}
-    {(grouped.other.length > 0 || finishOffer) && <section className="game-scene-group" aria-labelledby="scene-other-heading">
-      <div className="game-scene-group-head"><h2 id="scene-other-heading">{t('game.scene.otherTitle')}</h2><span>{sceneCount(t, 'game.scene.countOfferOne', 'game.scene.countOffersMany', grouped.other.length + (finishOffer ? 1 : 0))}</span></div>
+    {grouped.other.length > 0 && <section className="game-scene-group" aria-labelledby="scene-other-heading">
+      <div className="game-scene-group-head"><h2 id="scene-other-heading">{t('game.scene.otherTitle')}</h2><span>{sceneCount(t, 'game.scene.countOfferOne', 'game.scene.countOffersMany', grouped.other.length)}</span></div>
       {grouped.other.map(offer => (
         <OfferCard key={offer.id} offer={offer} disabled={disabled} onOffer={onOffer} icon={<OtherIcon />} />
       ))}
-      {finishOffer && <OfferCard offer={finishOffer} disabled={disabled} onOffer={onOffer} icon={<OtherIcon />} primary />}
     </section>}
   </>;
 }
@@ -573,7 +603,7 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
   const total = view.objectives.length;
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
   return <section className="game-objectives" aria-labelledby="objectives-heading" data-testid="objectives-panel">
-    <div className="game-scene-side-head"><h2 id="objectives-heading">{t('game.scene.stateTitle')}</h2></div>
+    <div className="game-panel-head"><h2 id="objectives-heading">{t('game.scene.stateTitle')}</h2></div>
     <p className="game-scene-progress-line"><b>{t('game.scene.stateSummary', { done, total })}</b><b>{percent}%</b></p>
     <div className="game-scene-progress" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label={t('game.scene.stateSummary', { done, total })}><i style={{ width: `${percent}%` }} /></div>
     <ul>{view.objectives.map(objective =>
@@ -585,80 +615,16 @@ function ObjectivesSection({ view }: { view: PlayerViewDto }) {
   </section>;
 }
 
-/** Dossier en escena (fase 4, columna derecha de la maqueta): las
- * evidencias en poder encontradas en esta escena, en mini-tarjetas con su
- * tipo, su minuto y su procedencia real. El botón abre el tablero completo
- * (la ventana del dossier). */
-function SceneDossier({ view, onOpenDossier }: { view: PlayerViewDto; onOpenDossier: () => void }) {
-  const t = useTranslation();
-  const lookup = lookupFromView(view);
-  const items = sceneEvidence(view);
-  return <section className="game-scene-side-card" aria-labelledby="scene-dossier-heading">
-    <div className="game-scene-side-head"><h2 id="scene-dossier-heading">{t('game.scene.dossierTitle')}</h2><span>{sceneCount(t, 'game.scene.countClueOne', 'game.scene.countCluesMany', items.length)}</span></div>
-    {items.length === 0
-      ? <p className="game-scene-side-empty">{t('game.scene.dossierEmpty')}</p>
-      : items.map(item => <div key={item.id} className="game-scene-evidence">
-        <div className="game-scene-evidence-top"><span className="game-scene-evidence-type">{evidenceTypeLabel(item.type, t)}</span><span className="game-scene-evidence-minute">{item.minute} min</span></div>
-        <h4>{view.evidenceTexts[item.id] ?? item.id}</h4>
-        <p>{lookup.locationName(item.origin) ?? lookup.cityName(item.origin) ?? item.origin}</p>
-      </div>)}
-    <button type="button" className="game-scene-side-full" data-testid="scene-dossier-full" onClick={onOpenDossier}>{t('game.scene.dossierFull')}</button>
-  </section>;
-}
-
-/** Operaciones globales (fase 4, columna derecha de la maqueta): las
- * ventanas que antes eran la tira de pestañas, en el orden de la maqueta
- * (Mapa, Tablero, Equipo, Guardados, Ajustes, Informe final, Terminal,
- * Laboratorio, Central) y después Introducción, Resumen, Restablecer y
- * Actualizar. Los testid `toolbar-<ventana>` se mantienen para no romper
- * los e2e; el laboratorio conserva `open-lab` (su botón de escena, con el
- * recuento de análisis cuando los hay) y `toolbar-lab` desaparece con la
- * barra: ningún test lo usaba. */
-const SCENE_OPS_ORDER: WindowId[] = ['map', 'dossier', 'team', 'saves', 'settings', 'report', 'intel', 'lab', 'comms'];
-
-function GlobalOps({ view, labCount, openWindows, onOpenWindow, onOpenIntro, canResume, onOpenResume, onResetLayout, onRefresh }: {
-  view: PlayerViewDto; labCount: number; openWindows: Record<WindowId, { open: boolean }>;
-  onOpenWindow: (id: WindowId, trigger: HTMLElement | null) => void;
-  onOpenIntro: () => void; canResume: boolean; onOpenResume: () => void; onResetLayout: () => void; onRefresh: () => void;
-}) {
-  const t = useTranslation();
-  return <section className="game-scene-side-card" aria-labelledby="scene-ops-heading">
-    <div className="game-scene-side-head"><h2 id="scene-ops-heading">{t('game.scene.opsTitle')}</h2></div>
-    <div className="game-scene-ops">
-      {SCENE_OPS_ORDER.map(id => (
-        <button key={id} type="button" data-testid={id === 'lab' ? 'open-lab' : `toolbar-${id}`} aria-pressed={openWindows[id].open}
-          className={id === 'map' ? 'game-scene-ops-primary' : undefined}
-          onClick={event => onOpenWindow(id, event.currentTarget)}>
-          {id === 'lab' && labCount > 0 ? (labCount === 1 ? t('game.labOne') : t('game.labMany', { count: labCount })) : t(WINDOW_KEYS[id])}
-        </button>
-      ))}
-      {view.briefing && <button type="button" onClick={onOpenIntro}>{t('game.introButton')}</button>}
-      {canResume && <button type="button" onClick={onOpenResume}>{t('game.toolbarResume')}</button>}
-      <button type="button" onClick={onResetLayout}>{t('game.toolbarResetLayout')}</button>
-      <button type="button" onClick={onRefresh}>{t('game.toolbarRefresh')}</button>
-    </div>
-  </section>;
-}
-
-/** Acciones globales que la escena necesita en su columna derecha. */
-interface SceneOps {
-  openWindows: Record<WindowId, { open: boolean }>;
-  onOpenWindow: (id: WindowId, trigger: HTMLElement | null) => void;
-  onOpenIntro: () => void;
-  canResume: boolean;
-  onOpenResume: () => void;
-  onResetLayout: () => void;
-  onRefresh: () => void;
-}
-
-/** Escena reorganizada (fase 4 del rediseño A2): héroe con la ilustración
- * a todo lo ancho y el nombre del lugar encima, y debajo dos columnas —
- * a la izquierda los grupos A/B/D/E de acciones, a la derecha el dossier
- * en escena, el estado y las operaciones globales — como en la maqueta.
- * El arte sigue siendo el de cada localización (ver scene-art.tsx). La
- * caja de texto libre y la consola no están en la maqueta y se quedan
- * fuera de la sección, debajo de las columnas. */
-function SceneSection({ view, disabled, clockPulse, onOffer, ops, chatPanel }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; ops: SceneOps; chatPanel?: ReactNode }) {
+/** Escena (rediseño Norte, fase 1): héroe con la ilustración a todo lo
+ * ancho y el nombre del lugar encima, y debajo una sola columna con los
+ * grupos A/B/D/E de acciones — sin columna derecha. El dossier en escena,
+ * los objetivos y las operaciones globales viven ahora en el dock fijo de
+ * la derecha (pestaña Dossier y cabecera), y el chat con el NPC sigue
+ * en línea dentro de la columna de la escena, justo debajo de las
+ * acciones. El arte sigue siendo el de cada localización (ver
+ * scene-art.tsx). La consola narrativa va debajo de la retícula, a todo
+ * lo ancho, y la caja de texto libre de órdenes ya no existe. */
+function SceneSection({ view, disabled, clockPulse, onOffer, chatPanel }: { view: PlayerViewDto; disabled: boolean; clockPulse: { key: number; delta: number } | null; onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; chatPanel?: ReactNode }) {
   const t = useTranslation();
   const locationIndex = view.locations.findIndex(location => location.id === view.position.location.id) + 1;
   const grouped = groupOffers(view.offers);
@@ -674,19 +640,7 @@ function SceneSection({ view, disabled, clockPulse, onOffer, ops, chatPanel }: {
       </div>
     </div>
     <p className="game-scene-description">{view.position.location.description}</p>
-    <SceneMeta view={view} />
-    <div className="game-scene-grid">
-      <div className="game-scene-main">
-        <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} />
-      </div>
-      <div className="game-scene-side">
-        <SceneDossier view={view} onOpenDossier={() => ops.onOpenWindow('dossier', null)} />
-        <ObjectivesSection view={view} />
-        <GlobalOps view={view} labCount={grouped.lab.length} openWindows={ops.openWindows} onOpenWindow={ops.onOpenWindow}
-          onOpenIntro={ops.onOpenIntro} canResume={ops.canResume} onOpenResume={ops.onOpenResume}
-          onResetLayout={ops.onResetLayout} onRefresh={ops.onRefresh} />
-      </div>
-    </div>
+    <SceneActions view={view} grouped={grouped} disabled={disabled} onOffer={onOffer} />
     {chatPanel}
   </section>;
 }
@@ -742,7 +696,7 @@ function narrationAnnounceText(last: LogEntry | undefined, typing: boolean, enab
   return last.detail ? `${last.summary} ${last.detail}` : last.summary;
 }
 
-function ConsoleSection({ log, orderHistory, readBar, reducedMotion, announceNarration }: { log: LogEntry[]; orderHistory: string[]; readBar?: ReactNode; reducedMotion: boolean; announceNarration: boolean }) {
+function ConsoleSection({ log, readBar, reducedMotion, announceNarration }: { log: LogEntry[]; readBar?: ReactNode; reducedMotion: boolean; announceNarration: boolean }) {
   const t = useTranslation();
   const listRef = useRef<HTMLOListElement>(null);
   const last = log[log.length - 1];
@@ -771,7 +725,6 @@ function ConsoleSection({ log, orderHistory, readBar, reducedMotion, announceNar
     </ol>
     <p className="game-sr-only" aria-live="polite" data-testid="narration-announcer">{announceText}</p>
     <span className="game-narrative-cursor" aria-hidden="true">_</span>
-    {orderHistory.length > 0 && <details><summary>{t('game.orderHistory')}</summary><ol>{orderHistory.map((item, index) => <li key={index}>{item}</li>)}</ol></details>}
   </section>;
 }
 
@@ -1007,29 +960,18 @@ function useGameAudio(preferences: PresentationPreferences): GameAudio {
   };
 }
 
-function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSubmit, onKeyDown, onCancel, onRecover }: {
-  draft: string; closed: boolean; busy: boolean; orderPhase: OrderPhase; inputRef: RefObject<HTMLTextAreaElement | null>;
-  onDraft: (value: string) => void; onSubmit: (event: FormEvent) => void; onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
-  onCancel: () => void; onRecover: () => void;
+/** Estado del flujo de ofertas en línea (rediseño Norte, fase 1): el
+ * campo de órdenes en texto libre ya no existe, así que este bloque solo
+ * enseña lo que queda del flujo — la aclaración tras una oferta, un error
+ * o la recuperación del resultado tras un fallo de red — encima de la
+ * consola, sin diálogo ni ventana. */
+function OrderStatus({ orderPhase, onCancel, onRecover }: {
+  orderPhase: OrderPhase; onCancel: () => void; onRecover: () => void;
 }) {
   const t = useTranslation();
-  return <section className="game-order" aria-labelledby="order-heading">
-    <div className="game-order-label">
-      <label id="order-heading" htmlFor="order-input">{t('game.orderTitle')}</label>
-      <span>{t('game.orderHint')}</span>
-    </div>
-    <form onSubmit={onSubmit}>
-      <span className="game-prompt-symbol" aria-hidden="true">&gt;</span>
-      <textarea id="order-input" data-testid="order-input" ref={inputRef} rows={3} value={draft}
-        onChange={event => onDraft(event.target.value)} onKeyDown={onKeyDown}
-        disabled={closed || busy} placeholder={t('game.orderPlaceholder')} />
-      <button type="submit" className="game-primary-button" data-testid="order-submit" disabled={closed || !draft.trim() || busy}>
-        {orderPhase.kind === 'interpreting' ? t('game.interpreting') : t('game.interpretOrder')}
-      </button>
-    </form>
-    <div className="game-order-bottom"><p>{t('game.orderKeys')}</p></div>
-    <p className="game-order-hint">{t('game.orderHelp')}<Link to="/glosario">{t('game.viewGlossary')}</Link></p>
-    {orderPhase.kind === 'clarification' && <div className="game-clarification" role="dialog" aria-label={t('game.clarification')}>
+  if (orderPhase.kind === 'idle' || orderPhase.kind === 'preview' || orderPhase.kind === 'committing' || orderPhase.kind === 'interpreting') return null;
+  return <div className="game-order-status">
+    {orderPhase.kind === 'clarification' && <div className="game-clarification">
       <p><strong>{t('game.beforeActing')}</strong> {orderPhase.question}</p>
       <p>{t('game.originalOrder', { original: orderPhase.original })}</p>
       <button type="button" onClick={onCancel}>{t('game.understood')}</button>
@@ -1040,7 +982,7 @@ function OrderSection({ draft, closed, busy, orderPhase, inputRef, onDraft, onSu
       <button type="button" onClick={onRecover}>{t('game.recoverResult')}</button>
       <button type="button" onClick={onCancel}>{t('game.discard')}</button>
     </div>}
-  </section>;
+  </div>;
 }
 
 /** Animación de viaje estilo Carmen Sandiego (lote 1 de jugabilidad): al
@@ -1358,56 +1300,6 @@ function SceneChatPanel({ npc, view, turns, draft, busy, error, onDraft, onSend,
   </section>;
 }
 
-/** Un análisis del laboratorio: su método forense, la prueba con su frase
- * del expediente y su estado (disponible, en curso o con resultado). */
-function LabAnalysisItem({ offer, view, pendingAnalysis, disabled, onAnalyze }: {
-  offer: PublicActionOffer; view: PlayerViewDto; pendingAnalysis: PlayerViewDto['pendingRequests'][number] | undefined;
-  disabled: boolean; onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
-}) {
-  const t = useTranslation();
-  const inputId = typeof offer.action.params.evidenceId === 'string' ? offer.action.params.evidenceId : '';
-  const typeLabel = offer.forensicType && offer.forensicType in FORENSIC_TYPE_KEYS
-    ? t(FORENSIC_TYPE_KEYS[offer.forensicType as ForensicType])
-    : t('game.analysisLabel');
-  const evidence = view.evidenceTexts[inputId] ?? inputId;
-  return <li><span><strong>{typeLabel}</strong><small>{evidence}{offer.detail ? ` · ${offer.detail}` : ''}</small></span>
-    {pendingAnalysis
-      ? <span><small>{t('game.labInProgress', { due: pendingAnalysis.dueMinute, now: view.clock.minute })}</small></span>
-      : <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={disabled}
-        onClick={event => onAnalyze(offer, event.currentTarget)}>{t('game.labRequestAnalysis')}</button></span>}
-  </li>;
-}
-
-function LabContent({ view, labOffers, disabled, onAnalyze, onOpenIntel }: {
-  view: PlayerViewDto;
-  labOffers: PublicActionOffer[]; disabled: boolean;
-  onAnalyze: (offer: PublicActionOffer, trigger: HTMLElement | null) => void; onOpenIntel: () => void;
-}) {
-  const t = useTranslation();
-  // Un solo análisis por expediente: una solicitud de tipo análisis en
-  // curso es la de la oferta que se enseña, y su resultado es la primera
-  // evidencia revelada por un análisis (la vista la trae en
-  // `analysisResults`, desde `evidenceRecords` del motor).
-  const pendingAnalysis = view.pendingRequests.find(item => item.type === 'analysis');
-  const analysisResult = view.analysisResults[0];
-  return <div>
-    <h4>{t('game.labTitle')}</h4>
-    {labOffers.length === 0 && !analysisResult
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.labEmpty')}</p></div>
-      : <ul className="game-destination-list">{labOffers.map(offer => (
-        <LabAnalysisItem key={offer.id} offer={offer} view={view} pendingAnalysis={pendingAnalysis} disabled={disabled} onAnalyze={onAnalyze} />
-      ))}</ul>}
-    {analysisResult && <p>{t('game.labResult', { result: view.evidenceTexts[analysisResult] ?? analysisResult })}</p>}
-    <p className="game-panel-note">{t('game.labNote')}</p>
-    <p><button type="button" onClick={onOpenIntel}>{t('game.openIntelTerminal')}</button></p>
-    <h4>{t('game.pendingRequestsTitle')}</h4>
-    {view.pendingRequests.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noPendingRequests')}</p></div>
-      : <ul className="game-destination-list">{view.pendingRequests.map(item => <li key={item.id}><span><strong>{requestTypeLabel(item.type, t)}</strong><small>{t('game.requestDue', { due: item.dueMinute, now: view.clock.minute })}</small></span></li>)}</ul>}
-    <p className="game-panel-note">{t('game.consultNote')}</p>
-  </div>;
-}
-
 /** Central de comunicaciones (GDD §10): contactos con sus canales, envío
  * de mensajes y documentos del dossier, e historial de lo comunicado. Solo
  * se ofrece lo que el contacto tiene: un canal que no tiene no aparece, y
@@ -1425,8 +1317,8 @@ function CommsContactList({ contacts, caseId, npcIds, npcNames }: { contacts: Co
   </li>)}</ul>;
 }
 
-function CommsSendForm({ view, contacts, recipient, channel, channels, documentId, text, busy, onRecipient, onChannel, onDocument, onText, onSend }: {
-  view: PlayerViewDto; contacts: Contact[]; recipient: string; channel: string; channels: string[]; documentId: string; text: string; busy: boolean;
+function CommsSendForm({ view, contacts, recipient, channel, channels, documentId, text, busy, closed, onRecipient, onChannel, onDocument, onText, onSend }: {
+  view: PlayerViewDto; contacts: Contact[]; recipient: string; channel: string; channels: string[]; documentId: string; text: string; busy: boolean; closed: boolean;
   onRecipient: (value: string) => void; onChannel: (value: string) => void; onDocument: (value: string) => void; onText: (value: string) => void;
   onSend: (event: FormEvent) => void;
 }) {
@@ -1444,7 +1336,7 @@ function CommsSendForm({ view, contacts, recipient, channel, channels, documentI
       <option value="">{t('game.noDocument')}</option>
       {view.objects.map(item => <option key={item.id} value={item.id}>{view.evidenceTexts[item.id] ?? item.id}</option>)}
     </select></label>
-    <button type="submit" data-testid="comms-send" disabled={!recipient || channels.length === 0 || !text.trim() || busy}>
+    <button type="submit" data-testid="comms-send" disabled={!recipient || channels.length === 0 || !text.trim() || busy || closed}>
       {documentId ? t('game.sendDocument') : t('game.sendMessage')}</button>
   </form>;
 }
@@ -1467,8 +1359,8 @@ function CommsHistoryItem({ view, contacts, record, onAskReply }: {
   </li>;
 }
 
-function CommsContent({ view, contacts, recipient, channel, documentId, text, busy, onRecipient, onChannel, onDocument, onText, onSend, onAskReply }: {
-  view: PlayerViewDto; contacts: Contact[]; recipient: string; channel: string; documentId: string; text: string; busy: boolean;
+function CommsContent({ view, contacts, recipient, channel, documentId, text, busy, closed, onRecipient, onChannel, onDocument, onText, onSend, onAskReply }: {
+  view: PlayerViewDto; contacts: Contact[]; recipient: string; channel: string; documentId: string; text: string; busy: boolean; closed: boolean;
   onRecipient: (value: string) => void; onChannel: (value: string) => void; onDocument: (value: string) => void; onText: (value: string) => void;
   onSend: (event: FormEvent) => void;
   onAskReply: (record: PlayerViewDto['communications'][number], trigger: HTMLElement | null) => void;
@@ -1481,7 +1373,7 @@ function CommsContent({ view, contacts, recipient, channel, documentId, text, bu
     <CommsContactList contacts={contacts} caseId={view.caseId} npcIds={view.npcChat.map(entry => entry.id)} npcNames={view.npcChat.map(entry => entry.name)} />
     <h4>{t('game.sendTitle')}</h4>
     {contacts.length === 0 ? null : <CommsSendForm view={view} contacts={contacts} recipient={recipient} channel={channel}
-      channels={channels} documentId={documentId} text={text} busy={busy} onRecipient={onRecipient} onChannel={onChannel}
+      channels={channels} documentId={documentId} text={text} busy={busy} closed={closed} onRecipient={onRecipient} onChannel={onChannel}
       onDocument={onDocument} onText={onText} onSend={onSend} />}
     {documentId && <p className="game-panel-note">{t('game.documentCostNote')}</p>}
     <h4>{t('game.commsHistory')}</h4>
@@ -1498,9 +1390,29 @@ function CommsContent({ view, contacts, recipient, channel, documentId, text, bu
  * ni señala al culpable ni sugiere la siguiente pista. */
 export type TeamTurn = { memberId: TeamMemberId; from: 'you' | 'team'; text: string };
 
-function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, detainOffers, onAnalysis, onService, onOffer, onDraft, onSendElena }: {
+/** Coordinación de detenciones del equipo (David): las ofertas de
+ * detención del motor, con su botón por oferta. En partida cerrada se
+ * bloquean: son ofertas reales del motor, no un servicio local. */
+function TeamDetainList({ offers, busy, closed, onOffer }: {
+  offers: PublicActionOffer[]; busy: boolean; closed: boolean;
+  onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
+}) {
+  const t = useTranslation();
+  return <>
+    <h4>{t('game.davidDetain')}</h4>
+    {offers.length === 0
+      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noDetentions')}</p></div>
+      : <ul className="game-destination-list">{offers.map(offer => <li key={offer.id}>
+        <span><strong>{offer.label}</strong><small>{offer.detail}</small></span>
+        <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={busy || closed}
+          onClick={event => onOffer(offer, event.currentTarget)}>{t('game.coordinate')}</button></span>
+      </li>)}</ul>}
+  </>;
+}
+
+function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, detainOffers, closed, onAnalysis, onService, onOffer, onDraft, onSendElena }: {
   view: PlayerViewDto; turns: TeamTurn[]; draft: string; busy: boolean; elenaBusy: boolean; error: string; analysisId: string;
-  detainOffers: PublicActionOffer[];
+  detainOffers: PublicActionOffer[]; closed: boolean;
   onAnalysis: (value: string) => void;
   onService: (memberId: TeamMemberId, serviceId: TeamServiceId, targetId: string | undefined, trigger: HTMLElement | null) => void;
   onOffer: (offer: PublicActionOffer, trigger: HTMLElement | null) => void;
@@ -1512,6 +1424,13 @@ function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, d
     const key = (TEAM_SERVICE_KEYS as Record<string, LocaleKey>)[id];
     return key ? t(key) : id;
   };
+  // Los servicios deterministas (Margaret, Clara, David, Richter) se
+  // quedan como estaban tras el cierre: su respuesta se calcula en local
+  // desde la vista y el perfil de carrera, sin cambiar la partida — la
+  // evaluación de Margaret tras cerrar es comportamiento existente
+  // (career.spec.ts) y el motor rechaza registrar la petición (409). Lo
+  // que sí se bloquea en partida cerrada es la conversación con Elena y
+  // la coordinación de detenciones (ofertas reales del motor).
   return <div>
     <h4>{t('game.teamMembers')}</h4>
     <ul className="game-destination-list">{TEAM_MEMBERS.map(member => <li key={member.id}>
@@ -1539,20 +1458,13 @@ function TeamContent({ view, turns, draft, busy, elenaBusy, error, analysisId, d
         onClick={event => onService('richter', 'explain', analysisId, event.currentTarget)}>{t(TEAM_SERVICE_KEYS.explain)}</button></span></p>}
     <h4>{t('game.elenaQuery')}</h4>
     <form onSubmit={onSendElena} className="game-chat-form">
-      <input type="text" data-testid="team-elena-input" value={draft} disabled={elenaBusy} maxLength={4000}
+      <input type="text" data-testid="team-elena-input" value={draft} disabled={elenaBusy || closed} maxLength={4000}
         placeholder={t('game.elenaPlaceholder')} aria-label={t('game.elenaAria')}
         onChange={event => onDraft(event.target.value)} />
-      <button type="submit" data-testid="team-elena-send" disabled={!draft.trim() || elenaBusy}>{elenaBusy ? t('game.consulting') : t('game.ask')}</button>
+      <button type="submit" data-testid="team-elena-send" disabled={!draft.trim() || elenaBusy || closed}>{elenaBusy ? t('game.consulting') : t('game.ask')}</button>
     </form>
     {error && <p className="game-error" role="alert">{error}</p>}
-    <h4>{t('game.davidDetain')}</h4>
-    {detainOffers.length === 0
-      ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.noDetentions')}</p></div>
-      : <ul className="game-destination-list">{detainOffers.map(offer => <li key={offer.id}>
-        <span><strong>{offer.label}</strong><small>{offer.detail}</small></span>
-        <span> <button type="button" data-testid={`offer-${offer.id}`} disabled={busy}
-          onClick={event => onOffer(offer, event.currentTarget)}>{t('game.coordinate')}</button></span>
-      </li>)}</ul>}
+    <TeamDetainList offers={detainOffers} busy={busy} closed={closed} onOffer={onOffer} />
     <h4>{t('game.teamConversation')}</h4>
     {turns.length === 0
       ? <div className="game-empty-state"><span className="game-empty-glyph" aria-hidden="true">⌁</span><p>{t('game.teamEmpty')}</p></div>
@@ -2075,6 +1987,80 @@ function ReportContent({ view }: { view: PlayerViewDto }) {
   </div>;
 }
 
+/** Pestaña Informe del dock (rediseño Norte, fase 1): el estado de la
+ * partida como en la maqueta — tiempo usado y restante, evidencias, ciudad
+ * y objetivos — con la nota de solicitudes pendientes tal como las trae el
+ * motor (sin afirmar que queden en el informe: el motor no lo hace) y la
+ * zona de cierre. Si la partida está cerrada, la zona de cierre se
+ * sustituye por el botón que reabre el informe a pantalla entera. */
+function ReportTab({ view, finishOffer, disabled, onCloseConfirm, onCancelClose, onOpenReportFull }: {
+  view: PlayerViewDto; finishOffer: PublicActionOffer | undefined; disabled: boolean;
+  onCloseConfirm: (trigger: HTMLElement | null) => void; onCancelClose: () => void; onOpenReportFull: () => void;
+}) {
+  const t = useTranslation();
+  const [confirming, setConfirming] = useState(false);
+  const closed = view.status === 'closed';
+  const remaining = Math.max(0, view.clock.deadlineMinutes - view.clock.minute);
+  const pending = view.pendingRequests.map(item =>
+    `${requestTypeLabel(item.type, t)} · ${t('game.requestDue', { due: item.dueMinute, now: view.clock.minute })}`).join(' · ');
+  return <div className="game-report-tab">
+    <div className="game-report-stats" role="group" aria-label={t('game.dock.report')}>
+      <div><span className="game-overline">{t('game.reportTab.timeUsed')}</span><strong>{view.clock.minute} min</strong></div>
+      <div><span className="game-overline">{t('game.reportTab.timeLeft')}</span><strong>{formatRemaining(remaining)}</strong></div>
+      <div><span className="game-overline">{t('game.reportTab.evidence')}</span><strong>{view.objects.length}</strong></div>
+      <div><span className="game-overline">{t('game.reportTab.city')}</span><strong>{view.position.city.name}</strong></div>
+    </div>
+    <ObjectivesSection view={view} />
+    <p className="game-panel-note">{view.pendingRequests.length === 0 ? t('game.reportTab.pendingNone') : t('game.reportTab.pendingSome', { items: pending })}</p>
+    <section className="game-close-zone" aria-labelledby="close-zone-heading">
+      <h3 id="close-zone-heading" tabIndex={-1}>{t('game.close.title')}</h3>
+      {closed
+        ? <>
+          <p>{t('game.reportTab.closedNote')}</p>
+          <button type="button" className="game-primary-button" data-testid="report-open-full" onClick={onOpenReportFull}>{t('game.reportTab.viewReport')}</button>
+        </>
+        : <>
+          <p>{t('game.close.text')}</p>
+          {confirming
+            ? <div className="game-close-confirm" role="group" aria-label={t('game.close.confirm')}>
+              <p><strong>{t('game.close.confirm')}</strong> {t('game.close.confirmText')}</p>
+              <div className="game-close-confirm-actions">
+                <button type="button" className="game-primary-button" data-testid="dock-close-yes" disabled={!finishOffer || disabled}
+                  onClick={event => { setConfirming(false); onCloseConfirm(event.currentTarget); }}>{t('game.close.yes')}</button>
+                <button type="button" data-testid="dock-close-no" onClick={() => { setConfirming(false); onCancelClose(); }}>{t('game.close.no')}</button>
+              </div>
+            </div>
+            : <button type="button" className="game-primary-button" data-testid="dock-close-start" disabled={!finishOffer || disabled}
+              onClick={() => setConfirming(true)}>{t('game.close.start')}</button>}
+          {!finishOffer && <p className="game-panel-note">{t('game.notice.actionUnavailable')}</p>}
+        </>}
+    </section>
+  </div>;
+}
+
+/** Informe final a pantalla entera (rediseño Norte, fase 1): el cierre
+ * es su propio momento, así que el informe ocupa toda la pantalla en vez
+ * de abrirse en una ventana. El «recorrido» interactivo es la fase 4; en
+ * esta fase se enseña la vista de informe actual. «Ver la partida» vuelve
+ * al layout en modo solo lectura. */
+function ReportFullScreen({ view, caseTitle, onViewRun }: { view: PlayerViewDto; caseTitle: string | null; onViewRun: () => void }) {
+  const t = useTranslation();
+  return <main className="game game-report-full" data-testid="report-full">
+    <header className="game-report-full-head">
+      <div>
+        <p className="game-overline">{t('game.dock.report')}</p>
+        <h1>{caseTitle ?? view.caseId}</h1>
+      </div>
+      <span className="game-state-pill game-state-pill--closed" data-testid="run-state">{t('game.header.stateClosed')}</span>
+      <div className="game-report-full-actions">
+        <button type="button" className="game-primary-button" data-testid="report-view-run" onClick={onViewRun}>{t('game.reportFull.viewRun')}</button>
+        <Link to="/archivo">{t('glossary.backArchive')}</Link>
+      </div>
+    </header>
+    <ReportContent view={view} />
+  </main>;
+}
+
 function UnavailableScreen({ phase, notice }: { phase: ScreenPhase; notice: string }) {
   const t = useTranslation();
   return <main className="game" data-testid="game-screen">
@@ -2089,14 +2075,30 @@ function UnavailableScreen({ phase, notice }: { phase: ScreenPhase; notice: stri
 
 // ── Pantalla ────────────────────────────────────────────────────────────────────
 
-/** Pantalla de juego (Fase A): vista del jugador, órdenes en texto libre con
- * interpretación, ofertas del motor, guardados manuales y ventanas de
- * herramientas. La UI no calcula resultados: recibe PlayerView y eventos. */
+/** Vista del dock (rediseño Norte, fase 1): las cinco pestañas — Dossier,
+ * Mapa, Central, Equipo e Informe — más las dos vistas fuera del tablist
+ * (Guardados y Ajustes, desde la cabecera). */
+type DockView = 'dossier' | 'mapa' | 'central' | 'equipo' | 'informe' | 'guardados' | 'ajustes';
+
+/** Las cinco pestañas del dock, en orden, con su testid (los de Dossier,
+ * Central y Equipo se mantienen: los e2e los usaban para abrir las
+ * ventanas). */
+const DOCK_TABS: Array<{ id: Extract<DockView, 'dossier' | 'mapa' | 'central' | 'equipo' | 'informe'>; label: LocaleKey; testId: string }> = [
+  { id: 'dossier', label: 'game.dock.dossier', testId: 'toolbar-dossier' },
+  { id: 'mapa', label: 'game.dock.map', testId: 'toolbar-map' },
+  { id: 'central', label: 'game.dock.central', testId: 'toolbar-comms' },
+  { id: 'equipo', label: 'game.dock.team', testId: 'toolbar-team' },
+  { id: 'informe', label: 'game.dock.report', testId: 'toolbar-report' },
+];
+
+/** Pantalla de juego (rediseño Norte, fase 1): una sola pantalla sin
+ * ventanas, con la escena central, el dock fijo de cinco pestañas a la
+ * derecha y la consola narrativa sola abajo. La UI no calcula resultados:
+ * recibe PlayerView y eventos. */
 export function GameScreen() {
   const { runId } = useParams();
   const navigate = useNavigate();
   const t = useTranslation();
-  const windows = useWindows();
   const generation = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
@@ -2116,7 +2118,6 @@ export function GameScreen() {
     if (opener && opener.isConnected) opener.focus();
     else document.getElementById('game-scene')?.focus();
   }, []);
-  const orderInputRef = useRef<HTMLTextAreaElement>(null);
 
   const [identity, setIdentity] = useState<SessionDto | null>(null);
   const [view, setView] = useState<PlayerViewDto | null>(null);
@@ -2127,9 +2128,12 @@ export function GameScreen() {
   // borrador y la memoria de chat): sin esto, al recargar se perdía y la
   // consola volvía al texto genérico «La investigación comienza…».
   const [log, setLog] = useState<LogEntry[]>(() => loadStoredLog(runId));
-  const [draft, setDraft] = useState(() => (runId ? sessionStorage.getItem('meridiano-draft:' + runId) ?? '' : ''));
-  const [orderHistory, setOrderHistory] = useState<string[]>([]);
   const [orderPhase, setOrderPhase] = useState<OrderPhase>({ kind: 'idle' });
+  // Dock fijo (rediseño Norte, fase 1): qué panel enseña el dock; el
+  // informe a pantalla entera es una vista aparte que se abre al cerrar
+  // y se puede dejar para volver a la partida en solo lectura.
+  const [dockView, setDockView] = useState<DockView>('dossier');
+  const [reportFull, setReportFull] = useState(false);
   const [busyOffer, setBusyOffer] = useState<string | null>(null);
   const [saves, setSaves] = useState<SaveListDto | null>(null);
   const [savePhase, setSavePhase] = useState<SavePhase>('idle');
@@ -2166,14 +2170,6 @@ export function GameScreen() {
   const [chatDraft, setChatDraft] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState('');
-  // Terminal de inteligencia (GDD §11): misma forma que la conversación
-  // con un personaje, pero con la terminal como interlocutora y sus hechos
-  // autorizados (lo descubierto, los objetivos, el resumen y lo oído).
-  const [intelTurns, setIntelTurns] = useState<ChatTurn[]>([]);
-  const [intelMemory, setIntelMemory] = useState<unknown>(null);
-  const [intelDraft, setIntelDraft] = useState('');
-  const [intelBusy, setIntelBusy] = useState(false);
-  const [intelError, setIntelError] = useState('');
   // Equipo A.C.M.E. (GDD §8): misma forma que la terminal (turnos en esta
   // pestaña por partida), con su propia memoria de conversación para Elena.
   // Pedir ayuda no cuesta tiempo; la petición queda registrada en el motor.
@@ -2195,7 +2191,6 @@ export function GameScreen() {
   // personajes, solo con TTS activado, autoRead y sin silenciar.
   useAutoReadLog(log, audioTts.autoReadOn, audioTts.speak);
   useAutoReadTurns(chatTurns, audioTts.autoReadOn, audioTts.speak);
-  useAutoReadTurns(intelTurns, audioTts.autoReadOn, audioTts.speak);
 
   // La intro se abre sola al entrar en una partida nueva (versión 1, minuto
   // 0, activa) salvo que ya se haya descartado en esta pestaña. Queda
@@ -2307,13 +2302,54 @@ export function GameScreen() {
   }, [runId, loadInitial, handleLoadError]);
 
   useEffect(() => {
-    if (runId) sessionStorage.setItem('meridiano-draft:' + runId, draft);
-  }, [draft, runId]);
-
-  useEffect(() => {
     if (!runId) return;
     try { sessionStorage.setItem('meridiano-log:' + runId, JSON.stringify(log.slice(-100))); } catch { /* sin almacenamiento */ }
   }, [log, runId]);
+
+  // Los turnos del equipo se cargan al montar (antes se cargaban al abrir
+  // su ventana): el dock enseña la pestaña Equipo sin abrir nada, así que
+  // el saludo de Margaret o los turnos guardados ya tienen que estar.
+  useEffect(() => {
+    if (!runId) return;
+    const key = `meridiano:team:${runId}`;
+    const stored = loadStoredTeam(key);
+    if (stored) {
+      setTeamTurns(stored.turns);
+      setTeamElenaMemory(stored.memory ?? null);
+    } else {
+      const turns: TeamTurn[] = [{ memberId: 'margaret', from: 'team', text: teamGreeting(t) }];
+      const memory = { schemaVersion: 1, runId, npcId: ELENA_ID, treatment: 'neutral', turns: [] };
+      setTeamTurns(turns);
+      setTeamElenaMemory(memory);
+      saveTeam(key, turns, memory);
+    }
+  }, [runId, t]);
+
+  // El análisis seleccionado de Richter: el primero disponible, como antes
+  // se hacía al abrir el equipo.
+  useEffect(() => {
+    const first = view?.analysisResults[0];
+    if (first && !teamAnalysisId) setTeamAnalysisId(first);
+  }, [view, teamAnalysisId]);
+
+  // Encabezado del panel activo del dock: al cambiar de pestaña por
+  // acción del jugador, el foco va a él (como antes iba a la ventana).
+  // Solo cuando lo pide un clic: al montar no se roba el foco.
+  const dockHeadingRef = useRef<HTMLHeadingElement>(null);
+  const dockFocusRequested = useRef(false);
+  useEffect(() => {
+    if (!dockFocusRequested.current) return;
+    dockFocusRequested.current = false;
+    dockHeadingRef.current?.focus();
+  }, [dockView]);
+
+  /** Cambia de panel del dock (o abre Guardados/Ajustes desde la
+   * cabecera) y deja de enseñar el informe a pantalla entera. */
+  function openDockTab(next: DockView) {
+    dockFocusRequested.current = true;
+    setDockView(next);
+    setReportFull(false);
+  }
 
   useEffect(() => {
     if (orderPhase.kind === 'preview') confirmButtonRef.current?.focus();
@@ -2330,7 +2366,7 @@ export function GameScreen() {
 
   useEffect(() => {
     function onKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key !== 'Escape' || windows.moving) return;
+      if (event.key !== 'Escape') return;
       if (orderPhase.kind === 'preview' || orderPhase.kind === 'clarification' || orderPhase.kind === 'error' || orderPhase.kind === 'recovering') {
         // Cancelar con Escape es lo mismo que pulsar «Cancelar»: sin el
         // aviso, «Preparando: Cerrar el caso…» se quedaba pegado.
@@ -2339,16 +2375,14 @@ export function GameScreen() {
         setNotice(t('game.notice.cancelled'));
         return;
       }
-      // La charla en escena se cierra con Escape antes que las ventanas:
-      // es lo último que se abrió y su cierre devuelve el foco a la escena.
+      // La charla en escena se cierra con Escape: es lo último que se
+      // abrió y su cierre devuelve el foco a la escena. Sin ventanas ya
+      // no hay nada más que cerrar.
       if (chatNpc) { closeChat(); return; }
-      const open = (Object.keys(windows.windows) as WindowId[]).filter(id => windows.windows[id].open);
-      const last = open[open.length - 1];
-      if (last) windows.close(last);
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [orderPhase, windows.windows, windows.moving, windows.close, chatNpc, closeChat, t]);
+  }, [orderPhase, chatNpc, closeChat, t]);
 
   function applyResponse(response: ActionResponseDto, offerLabel: string, offer?: PublicActionOffer) {
     const previous = view;
@@ -2367,6 +2401,12 @@ export function GameScreen() {
     audioTts.playEffect(offer?.action.type === 'travel' ? 'travel' : 'confirm');
     const target = talkTarget(offer, lookupFromView(previous ?? response));
     if (target) openChat(target.id, target.name);
+    if (response.status === 'closed') {
+      // Agujero del north review (P1 web): al cerrar, la charla en escena
+      // se cierra y el informe final se muestra a pantalla entera.
+      closeChat();
+      setReportFull(true);
+    }
   }
 
   /** Consola narrativa guardada en esta pestaña por partida: al recargar,
@@ -2399,7 +2439,7 @@ export function GameScreen() {
    * ventana aparte): recupera sus turnos y su memoria de esta pestaña o
    * la inicia con su saludo. El foco lo mueve el panel al montarse. */
   function openChat(npcId: string, npcName: string, opener: HTMLElement | null = null) {
-    if (!runId || !view) return;
+    if (!runId || !view || view.status === 'closed') return;
     const key = `meridiano:chat:${runId}:${npcId}`;
     const stored = loadStoredChat(key);
     if (stored) {
@@ -2438,6 +2478,7 @@ export function GameScreen() {
 
   async function sendChatMessage(event: FormEvent) {
     event.preventDefault();
+    if (view?.status === 'closed') return;
     const question = chatQuestion();
     if (!question || !view) return;
     // Los hechos extra solo valen para esta pregunta.
@@ -2494,76 +2535,6 @@ export function GameScreen() {
     return heard;
   }
 
-  /** Abre la terminal de inteligencia: recupera sus turnos y su memoria
-   * de esta pestaña o la inicia con su saludo. */
-  function openIntel() {
-    if (!runId) return;
-    const key = `meridiano:intel:${runId}`;
-    const stored = loadStoredChat(key);
-    if (stored) {
-      setIntelTurns(stored.turns);
-      setIntelMemory(stored.memory ?? null);
-    } else {
-      const turns: ChatTurn[] = [{ from: 'npc', text: intelGreeting(t) }];
-      const memory = { schemaVersion: 1, runId, npcId: INTEL_ID, treatment: 'neutral', turns: [] };
-      setIntelTurns(turns);
-      setIntelMemory(memory);
-      saveChat(key, turns, memory);
-    }
-    setIntelError('');
-    windows.open('intel', null);
-  }
-
-  /** Pregunta a la terminal: recupera los hechos autorizados que responden
-   * (determinista, sin modelo) y solo entonces llama al modelo para
-   * redactar lo recuperado. Sin hecho que respalde la respuesta, la
-   * terminal lo dice sin llamar al modelo y sin inventar nada. */
-  async function sendIntelMessage(event: FormEvent) {
-    event.preventDefault();
-    const text = intelDraft.trim();
-    if (!text || !runId || !identity || !view || intelBusy) return;
-    const turns: ChatTurn[] = [...intelTurns, { from: 'you', text }];
-    setIntelTurns(turns);
-    setIntelDraft('');
-    setIntelBusy(true);
-    setIntelError('');
-    const key = `meridiano:intel:${runId}`;
-    const memory = intelMemory ?? { schemaVersion: 1, runId, npcId: INTEL_ID, treatment: 'neutral', turns: [] };
-    const facts = buildIntelFacts({
-      dossier: view.dossier,
-      objectives: view.objectives,
-      briefing: view.briefing,
-      heard: heardIntelFacts(),
-      textForDiscovery: id => discoveryText(id, lookupFromView(view), textsFromView(view), view.caseId, preferences.language),
-      t,
-    });
-    const selected = selectIntelFacts(text, facts);
-    if (selected.length === 0) {
-      const next: ChatTurn[] = [...turns, { from: 'npc', text: intelNoRecord(t) }];
-      setIntelTurns(next);
-      setIntelMemory(memory);
-      saveChat(key, next, memory);
-      setIntelBusy(false);
-      return;
-    }
-    const controller = new AbortController();
-    try {
-      const factIds = selected.map(fact => fact.id);
-      const result = await aiApi.converse({ runId, text,
-        npc: { id: INTEL_ID, name: INTEL_NAME, persona: intelPersona(t), knownFactIds: factIds, revealableFactIds: factIds, refusal: intelRefusal(t) },
-        facts: selected, memory, allowedActs: ['state', 'acknowledge', 'decline', 'silence'] },
-      controller.signal, { csrfToken: identity.csrfToken });
-      const next: ChatTurn[] = [...turns, { from: 'npc', text: result.narrative.text }];
-      setIntelTurns(next);
-      setIntelMemory(result.memory);
-      saveChat(key, next, result.memory);
-    } catch {
-      setIntelError(t('game.notice.intelDown'));
-    } finally {
-      setIntelBusy(false);
-    }
-  }
-
   /** Turnos del equipo en esta pestaña por partida, con la memoria de
    * conversación de Elena (misma forma que `saveChat`, con el miembro). */
   function loadStoredTeam(key: string): { turns: TeamTurn[]; memory: unknown } | null {
@@ -2577,27 +2548,6 @@ export function GameScreen() {
     try { sessionStorage.setItem(key, JSON.stringify({ turns, memory })); } catch { /* sin almacenamiento */ }
   }
 
-  /** Abre el equipo: recupera sus turnos de esta pestaña o lo inicia con
-   * el saludo de Margaret. */
-  function openTeam(opener: HTMLElement | null) {
-    if (!runId) return;
-    const key = `meridiano:team:${runId}`;
-    const stored = loadStoredTeam(key);
-    if (stored) {
-      setTeamTurns(stored.turns);
-      setTeamElenaMemory(stored.memory ?? null);
-    } else {
-      const turns: TeamTurn[] = [{ memberId: 'margaret', from: 'team', text: teamGreeting(t) }];
-      const memory = { schemaVersion: 1, runId, npcId: ELENA_ID, treatment: 'neutral', turns: [] };
-      setTeamTurns(turns);
-      setTeamElenaMemory(memory);
-      saveTeam(key, turns, memory);
-    }
-    const firstAnalysis = view?.analysisResults[0];
-    if (firstAnalysis) setTeamAnalysisId(firstAnalysis);
-    setTeamError('');
-    windows.open('team', opener);
-  }
 
   /** Carga el perfil de carrera para la evaluación de Margaret (GDD §13):
    * null si la carga falla (el error queda en la ventana del equipo y la
@@ -2644,14 +2594,23 @@ export function GameScreen() {
     void startPreview(offer, trigger);
   }
 
+  /** ¿Se puede preguntar a Elena ahora? Partida abierta, texto, sesión,
+   * vista y sin otra pregunta en curso. */
+  function elenaBlocked(): boolean {
+    return view?.status === 'closed' || !teamDraft.trim() || !runId || !identity || !view || teamElenaBusy;
+  }
+
   /** Pregunta a Elena: la misma consulta determinista que la terminal,
    * con su persona; la consulta queda registrada en el motor (sin el
    * texto libre). Sin hecho que respalde la respuesta, lo dice sin
    * llamar al modelo. */
   async function sendElenaMessage(event: FormEvent) {
     event.preventDefault();
+    if (elenaBlocked()) return;
     const text = teamDraft.trim();
-    if (!text || !runId || !identity || !view || teamElenaBusy) return;
+    // El predicado no estrecha para TS: este guarda repite la parte que
+    // el resto de la función necesita como no nula.
+    if (!runId || !identity || !view) return;
     const turns: TeamTurn[] = [...teamTurns, { memberId: 'elena', from: 'you', text }];
     setTeamTurns(turns);
     setTeamDraft('');
@@ -2708,7 +2667,9 @@ export function GameScreen() {
       const response = await gameApi.commit(runId, offer.action, view.version, key, identity, controller.signal);
       applyResponse(response, offer.label, offer);
       setOrderPhase({ kind: 'idle' });
-      orderInputRef.current?.focus();
+      // El foco vuelve al botón que lanzó la oferta (la caja de texto
+      // libre ya no existe).
+      lastTriggerRef.current?.focus();
     } catch (error) {
       if (error instanceof GameError && error.kind === 'unavailable') {
         setOrderPhase({ kind: 'recovering', offer, key, message: t('game.notice.recoverLost') });
@@ -2769,43 +2730,6 @@ export function GameScreen() {
     // Sin esto, el aviso «Preparando: Cerrar el caso…» se quedaba pegado
     // tras cancelar el diálogo de confirmación.
     setNotice(t('game.notice.cancelled'));
-  }
-
-  async function interpretOrder(event: FormEvent) {
-    event.preventDefault();
-    const text = draft.trim();
-    if (!text || !runId || !identity || !view || orderPhase.kind !== 'idle') return;
-    setOrderHistory(current => [text, ...current].slice(0, 20));
-    setOrderPhase({ kind: 'interpreting' });
-    setNotice(t('game.notice.interpreting'));
-    const controller = new AbortController();
-    try {
-      const result = await aiApi.interpret(text, { location: view.position.location.id, description: view.position.location.description },
-        view.offers.map(offer => ({ id: offer.id, label: offer.label })), controller.signal, { csrfToken: identity.csrfToken }, { runId });
-      if (result.kind === 'clarification') {
-        setOrderPhase({ kind: 'clarification', question: clarificationQuestion(t, result), original: text });
-        setNotice(t('game.notice.clarificationNeededOrder'));
-        return;
-      }
-      const offer = view.offers.find(item => item.id === result.actionIds?.[0]);
-      if (!offer) {
-        setOrderPhase({ kind: 'error', message: t('game.notice.interpretNoMatchDetail') });
-        setNotice(t('game.notice.interpretNoMatch'));
-        return;
-      }
-      setNotice(t('game.notice.interpretedAs', { label: offer.label }));
-      await startPreview(offer, orderInputRef.current);
-    } catch (error) {
-      setOrderPhase({ kind: 'error', message: errorMessage(error, t) });
-      setNotice(errorMessage(error, t));
-    }
-  }
-
-  function onOrderKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-      event.preventDefault();
-      event.currentTarget.form?.requestSubmit();
-    }
   }
 
   async function reloadSaves() {
@@ -2890,7 +2814,7 @@ export function GameScreen() {
    * respuesta sigue las reglas de la conversación: solo hechos autorizados,
    * sin inventar; el turno queda en la memoria de chat del personaje. */
   function askAboutCommunication(record: PlayerViewDto['communications'][number], trigger: HTMLElement | null = null) {
-    if (!view) return;
+    if (!view || view.status === 'closed') return;
     const name = communicationContactName(record);
     const documentText = record.documentId ? view.evidenceTexts[record.documentId] : undefined;
     setChatExtraFacts({ npcId: record.recipientId,
@@ -2903,7 +2827,7 @@ export function GameScreen() {
 
   async function sendCommunication(event: FormEvent) {
     event.preventDefault();
-    if (!runId || !identity || !view || !commRecipient || !commText.trim()) return;
+    if (!runId || !identity || !view || view.status === 'closed' || !commRecipient || !commText.trim()) return;
     const name = contacts.find(contact => contact.id === commRecipient)?.name ?? commRecipient;
     const offer: PublicActionOffer = { id: `communicate:${commRecipient}:${commChannel}`,
       label: t('game.contactVia', { name, channel: channelLabel(commChannel, t) }),
@@ -2920,80 +2844,75 @@ export function GameScreen() {
 
   const closed = view.status === 'closed';
   const busy = busyOffer !== null || orderPhase.kind !== 'idle';
-  const windowProps = {
-    moving: windows.moving, focusSeqs: windows.focusSeq, onMoveStart: windows.setMoving, onMoveEnd: () => windows.setMoving(null),
-    onMoveBy: windows.moveBy, onMinimize: windows.minimize, onRestore: windows.restore, onClose: windows.close,
-  };
+  const grouped = groupOffers(view.offers);
+  const finishOffer = grouped.finish;
 
   // Texto de la última entrada de la consola, para la barra de lectura.
   const lastLogText = lastLogTextOf(log);
 
-  return <main className="game" data-testid="game-screen" style={{ fontSize: `${16 * preferences.textScale / 100}px` }}>
-    {preferences.accessibility.skipNav && <a className="game-skip-link" href="#game-scene">{t('game.skipToScene')}</a>}
-    <HeaderSection view={view} caseTitle={caseTitle} detective={detectiveDisplayName(detectiveProfile, identity)}
-      avatar={detectiveAvatarName(detectiveProfile, t)} clockPulse={timeFeedback.clockPulse} onLogout={identity ? () => {
-      void archiveApi.logout(identity.csrfToken, new AbortController().signal).finally(() => navigate('/'));
-    } : null} />
+  // El informe a pantalla entera sustituye al layout al cerrar (y al
+  // reabrirlo desde la pestaña Informe); «Ver la partida» vuelve al
+  // layout en modo solo lectura.
+  if (reportFull && closed) {
+    return <ReportFullScreen view={view} caseTitle={caseTitle} onViewRun={() => setReportFull(false)} />;
+  }
 
-    <p className="game-notice" role="status">{notice}</p>
+  /** Panel de chat en línea en la escena, o nada si no hay conversación
+   * abierta o la partida está cerrada. (Flecha, no declaración: la
+   * declaración se eleva y no ve el estrechamiento de `view`.) */
+  const renderChatPanel = () => {
+    if (!chatNpc || closed) return null;
+    return <SceneChatPanel npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
+      onDraft={setChatDraft} onSend={event => void sendChatMessage(event)}
+      onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} onClose={closeChat} />;
+  };
 
-    <IntroPanel view={view} open={introOpen} onDismiss={dismissIntro} />
-    <ResumePanel view={view} open={resumeOpen} onDismiss={dismissResume} />
-
-    <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)}
-      ops={{
-        openWindows: windows.windows,
-        onOpenWindow: (id, trigger) => { if (id === 'team') openTeam(trigger); else windows.open(id, trigger); },
-        onOpenIntro: () => setIntroOpen(true),
-        canResume: resumeAvailable(view),
-        onOpenResume: () => setResumeOpen(true),
-        onResetLayout: windows.resetLayout,
-        onRefresh: () => void refresh(),
-      }}
-      chatPanel={chatNpc ? <SceneChatPanel npc={chatNpc} view={view} turns={chatTurns} draft={chatDraft} busy={chatBusy} error={chatError}
-        onDraft={setChatDraft} onSend={event => void sendChatMessage(event)}
-        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} onClose={closeChat} /> : null} />
-    <OrderSection draft={draft} closed={closed} busy={orderPhase.kind !== 'idle'} orderPhase={orderPhase} inputRef={orderInputRef}
-      onDraft={setDraft} onSubmit={interpretOrder} onKeyDown={onOrderKeyDown} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
-    <ConsoleSection log={log} orderHistory={orderHistory} reducedMotion={reducedMotion} announceNarration={preferences.accessibility.announceNarration} readBar={<ReadAloudBar text={lastLogText} canRead={audioTts.canRead}
-      speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} noVoices={audioTts.noVoices} onRead={() => void audioTts.speak(lastLogText)}
-      onRepeat={() => void audioTts.speak(audioTts.lastText)} onPauseResume={audioTts.pauseOrResume} onStop={audioTts.stop} />} />
-
-    <TravelOverlaySlot travel={timeFeedback.travel} onDismiss={timeFeedback.dismissTravel} />
-
-    {orderPhase.kind === 'preview' && <PreviewDialog phase={orderPhase} confirmRef={confirmButtonRef}
-      onConfirm={() => void confirmPreview()} onCancel={cancelOrder} />}
-    {orderPhase.kind === 'committing' && <p className="game-notice" role="status">{t('game.notice.committing')}</p>}
-
-    <MinimizedBar windows={windows.windows} lastMinimized={windows.lastMinimized} onRestore={windows.restore} />
-
-    <GameWindow id="map" title={t(WINDOW_KEYS['map'])} state={windows.windows.map} {...windowProps}>
-      <MapContent view={view} busy={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
-    </GameWindow>
-    <GameWindow id="dossier" title={t(WINDOW_KEYS['dossier'])} state={windows.windows.dossier} {...windowProps}>
+  /** Panel activo del dock (rediseño Norte, fase 1): el conmutador de
+   * las siete vistas — las cinco pestañas más Guardados y Ajustes — en
+   * una sola función, para que el cuerpo de la pantalla no cargue con
+   * siete condicionales. (Flecha, no declaración: la declaración se
+   * eleva y no ve el estrechamiento de `view`.) */
+  const renderDockPanel = () => {
+    if (dockView === 'dossier') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-dossier" aria-labelledby="dock-tab-dossier" data-testid="dock-panel-dossier">
+      <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.dossier')}</h2>
+      <ObjectivesSection view={view} />
+      <SceneMeta view={view} />
       <DossierContent view={view} onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices} />
-    </GameWindow>
-    <GameWindow id="lab" title={t(WINDOW_KEYS['lab'])} state={windows.windows.lab} {...windowProps}>
-      <LabContent view={view} labOffers={groupOffers(view.offers).lab} disabled={busy}
-        onAnalyze={(offer, trigger) => void startPreview(offer, trigger)} onOpenIntel={openIntel} />
-    </GameWindow>
-    <GameWindow id="comms" title={t(WINDOW_KEYS['comms'])} state={windows.windows.comms} {...windowProps}>
+    </div>;
+    if (dockView === 'mapa') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-mapa" aria-labelledby="dock-tab-mapa" data-testid="dock-panel-mapa">
+      <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.map')}</h2>
+      <MapContent view={view} busy={busy} onOffer={(offer, trigger) => void startPreview(offer, trigger)} />
+    </div>;
+    if (dockView === 'central') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-central" aria-labelledby="dock-tab-central" data-testid="dock-panel-central">
+      <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.central')}</h2>
       <CommsContent view={view} contacts={contacts} recipient={commRecipient} channel={commChannel} documentId={commDocument}
-        text={commText} busy={busy} onRecipient={handleCommRecipient} onChannel={setCommChannel} onDocument={setCommDocument}
+        text={commText} busy={busy} closed={closed} onRecipient={handleCommRecipient} onChannel={setCommChannel} onDocument={setCommDocument}
         onText={setCommText} onSend={sendCommunication} onAskReply={askAboutCommunication} />
-    </GameWindow>
-    <GameWindow id="team" title={t(WINDOW_KEYS['team'])} state={windows.windows.team} {...windowProps}>
+    </div>;
+    if (dockView === 'equipo') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-equipo" aria-labelledby="dock-tab-equipo" data-testid="dock-panel-equipo">
+      <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.team')}</h2>
       <TeamContent view={view} turns={teamTurns} draft={teamDraft} busy={busy} elenaBusy={teamElenaBusy} error={teamError}
-        analysisId={teamAnalysisId} detainOffers={view.offers.filter(offer => offer.action.type === 'detain')}
+        analysisId={teamAnalysisId} detainOffers={view.offers.filter(offer => offer.action.type === 'detain')} closed={closed}
         onAnalysis={setTeamAnalysisId} onService={(memberId, serviceId, targetId, trigger) => requestTeamService(memberId, serviceId, targetId, trigger)}
         onOffer={(offer, trigger) => void startPreview(offer, trigger)} onDraft={setTeamDraft} onSendElena={event => void sendElenaMessage(event)} />
-    </GameWindow>
-    <GameWindow id="saves" title={t(WINDOW_KEYS['saves'])} state={windows.windows.saves} {...windowProps}>
+    </div>;
+    if (dockView === 'informe') return <div className="game-dock-panel" role="tabpanel" id="dock-panel-informe" aria-labelledby="dock-tab-informe" data-testid="dock-panel-informe">
+      <h2 ref={dockHeadingRef} tabIndex={-1}>{t('game.dock.report')}</h2>
+      <ReportTab view={view} finishOffer={finishOffer} disabled={busy}
+        onCloseConfirm={trigger => { if (finishOffer) { lastTriggerRef.current = trigger; void commitOffer(finishOffer, crypto.randomUUID()); } }}
+        onCancelClose={() => setNotice(t('game.notice.cancelled'))}
+        onOpenReportFull={() => setReportFull(true)} />
+    </div>;
+    if (dockView === 'guardados') return <div className="game-dock-panel" data-testid="dock-panel-saves">
+      <h2 ref={dockHeadingRef} tabIndex={-1}>{t('windows.saves')}</h2>
+      <p><button type="button" onClick={() => openDockTab('dossier')}>{t('game.dock.backToDossier')}</button></p>
       <SavesContent view={view} saves={saves} savePhase={savePhase} saveName={saveName} replaceTarget={replaceTarget} loadTarget={loadTarget}
         onSaveName={setSaveName} onCreate={() => void createSave()} onLoad={setLoadTarget} onDelete={save => void removeSave(save)}
         onReplace={setReplaceTarget} onConfirmLoad={() => void confirmLoad()} onCancelLoad={() => setLoadTarget(null)} />
-    </GameWindow>
-    <GameWindow id="settings" title={t(WINDOW_KEYS['settings'])} state={windows.windows.settings} {...windowProps}>
+    </div>;
+    if (dockView === 'ajustes') return <div className="game-dock-panel" data-testid="dock-panel-settings">
+      <h2 ref={dockHeadingRef} tabIndex={-1}>{t('windows.settings')}</h2>
+      <p><button type="button" onClick={() => openDockTab('dossier')}>{t('game.dock.backToDossier')}</button></p>
       <SettingsContent identity={identity} language={preferences.language} onLanguage={value => updatePreferences({ language: value })}
         textScale={preferences.textScale} highContrast={preferences.highContrast}
         palette={preferences.palette} accessibility={preferences.accessibility} fontMode={preferences.fontMode}
@@ -3006,16 +2925,57 @@ export function GameScreen() {
         ttsSupported={audioTts.ttsSupported}
         onAudio={patch => updatePreferences({ audio: { ...preferences.audio, ...patch } })}
         onTTS={patch => updatePreferences({ tts: { ...preferences.tts, ...patch } })} />
-    </GameWindow>
-    <GameWindow id="report" title={t(WINDOW_KEYS['report'])} state={windows.windows.report} {...windowProps}>
-      <ReportContent view={view} />
-    </GameWindow>
-    <GameWindow id="intel" title={t(WINDOW_KEYS['intel'])} state={windows.windows.intel} {...windowProps}>
-      <ChatContent npc={{ id: INTEL_ID, name: INTEL_NAME }} view={view} turns={intelTurns} draft={intelDraft} busy={intelBusy} error={intelError}
-        onDraft={setIntelDraft} onSend={event => void sendIntelMessage(event)}
-        onRead={text => void audioTts.speak(text)} canRead={audioTts.canRead} noVoices={audioTts.noVoices}
-        placeholder={t('game.intelPlaceholder')}
-        note={t('game.intelNote')} />
-    </GameWindow>
+    </div>;
+    return null;
+  };
+
+  /** Cerrar sesión desde la cabecera: sin sesión no hay nada que cerrar.
+   * En la vista lista la sesión siempre existe (sin ella la pantalla es
+   * la de «no disponible»), así que el botón se enseña siempre. */
+  const handleLogout = () => {
+    if (!identity) return;
+    void archiveApi.logout(identity.csrfToken, new AbortController().signal).finally(() => navigate('/'));
+  };
+
+  return <main className="game" data-testid="game-screen" style={{ fontSize: `${16 * preferences.textScale / 100}px` }}>
+    {preferences.accessibility.skipNav && <a className="game-skip-link" href="#game-scene">{t('game.skipToScene')}</a>}
+    <HeaderSection view={view} caseTitle={caseTitle} detective={detectiveDisplayName(detectiveProfile, identity)}
+      avatar={detectiveAvatarName(detectiveProfile, t)} clockPulse={timeFeedback.clockPulse} closed={closed}
+      canResume={resumeAvailable(view)} onCloseCase={() => openDockTab('informe')} onOpenResume={() => setResumeOpen(true)}
+      onOpenSaves={() => openDockTab('guardados')} onOpenSettings={() => openDockTab('ajustes')} onLogout={handleLogout} />
+
+    <p className="game-notice" role="status">{notice}</p>
+
+    <IntroPanel view={view} open={introOpen} onDismiss={dismissIntro} />
+    <ResumePanel view={view} open={resumeOpen} onDismiss={dismissResume} />
+
+    <div className="game-layout">
+      <SceneSection view={view} disabled={busy} clockPulse={timeFeedback.clockPulse} onOffer={(offer, trigger) => void startPreview(offer, trigger)}
+        chatPanel={renderChatPanel()} />
+
+      <aside className="game-dock" data-testid="game-dock">
+        <div className="game-dock-tabs" role="tablist">
+          {DOCK_TABS.map(tab => (
+            <button key={tab.id} type="button" role="tab" id={`dock-tab-${tab.id}`} aria-selected={dockView === tab.id}
+              aria-controls={`dock-panel-${tab.id}`} data-testid={tab.testId} onClick={() => openDockTab(tab.id)}>
+              {t(tab.label)}
+            </button>
+          ))}
+        </div>
+        <div className="game-dock-body">
+          {renderDockPanel()}
+        </div>
+      </aside>
+    </div>
+    <OrderStatus orderPhase={orderPhase} onCancel={cancelOrder} onRecover={() => void recoverCommit()} />
+    <ConsoleSection log={log} reducedMotion={reducedMotion} announceNarration={preferences.accessibility.announceNarration} readBar={<ReadAloudBar text={lastLogText} canRead={audioTts.canRead}
+      speaking={audioTts.speaking} paused={audioTts.paused} hasLast={audioTts.lastText !== ''} noVoices={audioTts.noVoices} onRead={() => void audioTts.speak(lastLogText)}
+      onRepeat={() => void audioTts.speak(audioTts.lastText)} onPauseResume={audioTts.pauseOrResume} onStop={audioTts.stop} />} />
+
+    <TravelOverlaySlot travel={timeFeedback.travel} onDismiss={timeFeedback.dismissTravel} />
+
+    {orderPhase.kind === 'preview' && <PreviewDialog phase={orderPhase} confirmRef={confirmButtonRef}
+      onConfirm={() => void confirmPreview()} onCancel={cancelOrder} />}
+    {orderPhase.kind === 'committing' && <p className="game-notice" role="status">{t('game.notice.committing')}</p>}
   </main>;
 }
