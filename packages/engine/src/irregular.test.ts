@@ -148,7 +148,7 @@ describe('GDD §14: acciones irregulares', () => {
     expect(result.run.discoveries).not.toContain('warning');
     expect(witnessedCount(result.run)).toBe(0);
     expect(scoreForReport(source, result.run, [], 'finished').breakdown
-      .find(entry => entry.label === 'Conducta irregular')).toEqual({ label: 'Conducta irregular', points: -10 });
+      .find(entry => entry.label === 'Conducta irregular')).toEqual({ label: 'Conducta irregular', points: -10, id: 'irregular', max: 0 });
   });
 
   it('a la tercera vez que te ven, A.C.M.E. retira el caso y el informe lo refleja', () => {
@@ -167,9 +167,9 @@ describe('GDD §14: acciones irregulares', () => {
     expect(third.report.irregularActs).toHaveLength(3);
     expect(third.report.irregularActs.every(act => act.seen)).toBe(true);
     expect(third.report.score.breakdown.find(entry => entry.label === 'Conducta irregular'))
-      .toEqual({ label: 'Conducta irregular', points: -30 });
+      .toEqual({ label: 'Conducta irregular', points: -30, id: 'irregular', max: 0 });
     expect(third.report.score.breakdown.find(entry => entry.label === 'Tiempo restante'))
-      .toEqual({ label: 'Tiempo restante', points: 0 });
+      .toEqual({ label: 'Tiempo restante', points: 0, id: 'time', max: 10 });
     expect(third.events.some(event => event.type === 'case_withdrawn')).toBe(true);
     // La partida cerrada ya no admite acciones.
     expect(resolveAction(source, third.run, talk('lucia')).status).toBe('impossible');
@@ -183,7 +183,7 @@ describe('GDD §14: acciones irregulares', () => {
     const report = buildFinalReport(source, initial(), 'finished');
     expect(report.irregularActs).toEqual([]);
     expect(report.score.breakdown.find(entry => entry.label === 'Conducta irregular'))
-      .toEqual({ label: 'Conducta irregular', points: 0 });
+      .toEqual({ label: 'Conducta irregular', points: 0, id: 'irregular', max: 0 });
   });
 
   it('parámetros inválidos y objetivos imposibles se rechazan sin escribir', () => {

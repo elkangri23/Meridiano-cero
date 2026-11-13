@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { hashDefinition } from '@meridiano/case-schema/server';
 import { astrolabioDefinition } from './fixtures/case-astrolabio.js';
 import { createInitialRun, generadoFraudeDefinition, knownSuspect, liveObjectives } from './index.js';
-import { buildFinalReport, completeFinalReport } from './final-report.js';
+import { buildFinalReport, completeFinalReport, routeForReport } from './final-report.js';
 
 function freshRun() {
   return createInitialRun(astrolabioDefinition, 'owner-1', 'run-1', hashDefinition(astrolabioDefinition));
@@ -121,12 +121,12 @@ describe('informe final completo (GDD §12)', () => {
       total: 98,
       max: 100,
       breakdown: [
-        { label: 'Objetivos logrados', points: 50 },
-        { label: 'Pruebas halladas', points: 25 },
-        { label: 'Detención correcta', points: 15 },
-        { label: 'Detenciones erróneas', points: 0 },
-        { label: 'Conducta irregular', points: 0 },
-        { label: 'Tiempo restante', points: 8 },
+        { id: 'objectives', label: 'Objetivos logrados', points: 50, max: 50 },
+        { id: 'evidence', label: 'Pruebas halladas', points: 25, max: 25 },
+        { id: 'detention', label: 'Detención correcta', points: 15, max: 15 },
+        { id: 'wrongDetentions', label: 'Detenciones erróneas', points: 0, max: 0 },
+        { id: 'irregular', label: 'Conducta irregular', points: 0, max: 0 },
+        { id: 'time', label: 'Tiempo restante', points: 8, max: 10 },
       ],
     });
   });
@@ -136,17 +136,17 @@ describe('informe final completo (GDD §12)', () => {
       { ...freshRun(), minute: 2880, detentions: ['tomas'] }, 'deadline');
     expect(wrong.result).toBe('incorrect');
     expect(wrong.score.total).toBe(0);
-    expect(wrong.score.breakdown.find(entry => entry.label === 'Detenciones erróneas')).toEqual({ label: 'Detenciones erróneas', points: -20 });
+    expect(wrong.score.breakdown.find(entry => entry.label === 'Detenciones erróneas')).toEqual({ id: 'wrongDetentions', label: 'Detenciones erróneas', points: -20, max: 0 });
     const unresolved = buildFinalReport(astrolabioDefinition, { ...freshRun(), minute: 2880 }, 'deadline');
     expect(unresolved.result).toBe('unresolved');
     expect(unresolved.score.total).toBe(0);
     expect(unresolved.score.breakdown).toEqual([
-      { label: 'Objetivos logrados', points: 0 },
-      { label: 'Pruebas halladas', points: 0 },
-      { label: 'Detención correcta', points: 0 },
-      { label: 'Detenciones erróneas', points: 0 },
-      { label: 'Conducta irregular', points: 0 },
-      { label: 'Tiempo restante', points: 0 },
+      { id: 'objectives', label: 'Objetivos logrados', points: 0, max: 50 },
+      { id: 'evidence', label: 'Pruebas halladas', points: 0, max: 25 },
+      { id: 'detention', label: 'Detención correcta', points: 0, max: 15 },
+      { id: 'wrongDetentions', label: 'Detenciones erróneas', points: 0, max: 0 },
+      { id: 'irregular', label: 'Conducta irregular', points: 0, max: 0 },
+      { id: 'time', label: 'Tiempo restante', points: 0, max: 10 },
     ]);
   });
 
@@ -168,6 +168,105 @@ describe('informe final completo (GDD §12)', () => {
     expect(report?.evidenceFound).toHaveLength(11);
     expect(report?.evidenceMissed).toEqual([]);
     expect(report?.detentions[0]?.correct).toBe(true);
+  });
+
+  it('las pruebas halladas llevan procedencia y minuto; las omitidas, procedencia sin minuto', () => {
+    const run = {
+      ...freshRun(),
+      discoveries: ['EV-01', 'EV-02'],
+      evidenceRecords: {
+        'EV-01': { revealedMinute: 10, origin: 'MAD-SALA', method: 'inspect' },
+        'EV-02': { revealedMinute: 30, origin: 'MAD-SALA', method: 'inspect' },
+      },
+    };
+    const report = buildFinalReport(astrolabioDefinition, run, 'finished');
+    expect(report.evidenceFound).toEqual([
+      { id: 'EV-01', text: 'La caja está a la vista. Su etiqueta remite al archivo de París.', origin: 'MAD-SALA', minute: 10 },
+      { id: 'EV-02', text: 'La cerradura de la vitrina tiene residuo de herramienta.', origin: 'MAD-SALA', minute: 30 },
+    ]);
+    // Omitida: procedencia de la definición (dónde habría estado), sin
+    // minuto — nunca se reveló y el minuto de la definición no es un hecho
+    // de la partida.
+    expect(report.evidenceMissed[0]).toEqual({
+      id: 'EV-03',
+      text: 'La huella técnica es compatible con una herramienta de la serie HV-17. No acusa a nadie por sí sola.',
+      origin: 'MAD-SALA',
+    });
+  });
+
+  it('la ruta recorre las ciudades visitadas con lo hecho en cada una', () => {
+    const routed = {
+      ...freshRun(),
+      discoveries: ['MAD-SALA', 'travel:paris', 'PAR-ARCH', 'travel:lisboa', 'EV-01'],
+      conversationRecords: ['talk:lucia@10', 'talk:emile@200', 'talk:lucia@15'],
+      evidenceRecords: {
+        'EV-01': { revealedMinute: 10, origin: 'MAD-SALA', method: 'inspect' },
+        'EV-04': { revealedMinute: 200, origin: 'PAR-ARCH', method: 'inspect' },
+      },
+      position: { cityId: 'lisboa', locationId: 'LIS-ALM' },
+    };
+    expect(routeForReport(astrolabioDefinition, routed)).toEqual([
+      { cityId: 'madrid', cityName: 'Madrid', arrivedMinute: null, inspected: ['Sala de embalaje'], talkedTo: ['Lucía'], evidenceIds: ['EV-01'] },
+      { cityId: 'paris', cityName: 'París', arrivedMinute: null, inspected: ['Archivo de conservación'], talkedTo: ['Émile'], evidenceIds: ['EV-04'] },
+      // Lisboa es ciudad de paso en este estado: se visitó (viaje + posición
+      // final) aunque no se hiciera nada en ella; sus listas van vacías.
+      { cityId: 'lisboa', cityName: 'Lisboa', arrivedMinute: null, inspected: [], talkedTo: [], evidenceIds: [] },
+    ]);
+    // La ruta también vive en el informe construido.
+    expect(buildFinalReport(astrolabioDefinition, routed, 'finished').route).toHaveLength(3);
+  });
+
+  it('la ruta resuelve ciudades fuera del expediente con el catálogo geográfico', () => {
+    const routed = {
+      ...freshRun(),
+      discoveries: ['travel:malaga'],
+      conversationRecords: [],
+      position: { cityId: 'malaga', locationId: 'MAL-SEGURIDAD' },
+    };
+    expect(routeForReport(astrolabioDefinition, routed)).toEqual([
+      { cityId: 'madrid', cityName: 'Madrid', arrivedMinute: null, inspected: [], talkedTo: [], evidenceIds: [] },
+      { cityId: 'malaga', cityName: 'Málaga', arrivedMinute: null, inspected: [], talkedTo: [], evidenceIds: [] },
+    ]);
+  });
+
+  it('completeFinalReport reconstruye un informe guardado antes de la fase 4', () => {
+    const solved = {
+      ...freshRun(),
+      minute: 455,
+      status: 'closed' as const,
+      discoveries: ['EV-01', 'EV-02', 'EV-03', 'EV-04', 'EV-05', 'EV-06', 'EV-07', 'EV-08', 'EV-09', 'EV-10', 'EV-11'],
+      detentions: ['ines'],
+      recoveredObjects: ['astrolabio-original'],
+      evidenceRecords: {
+        'EV-01': { revealedMinute: 10, origin: 'MAD-SALA', method: 'inspect' },
+      },
+    };
+    // Informe con la forma anterior a la fase 4: desglose sin id/máximo y
+    // sin ruta, pero completo por lo demás (como el guardado de una partida
+    // cerrada el 2026-11-11).
+    const oldStored = buildFinalReport(astrolabioDefinition, solved, 'finished');
+    const legacy = {
+      ...oldStored,
+      route: undefined,
+      score: {
+        ...oldStored.score,
+        breakdown: oldStored.score.breakdown.map(entry => ({ label: entry.label, points: entry.points })),
+      },
+      evidenceFound: oldStored.evidenceFound.map(entry => ({ id: entry.id, text: entry.text })),
+    };
+    const closed = { ...solved, finalReport: legacy as unknown as ReturnType<typeof buildFinalReport> };
+    const report = completeFinalReport(astrolabioDefinition, closed);
+    expect(report?.score.total).toBe(98);
+    expect(report?.score.breakdown[0]).toEqual({ id: 'objectives', label: 'Objetivos logrados', points: 50, max: 50 });
+    expect(report?.route?.map(city => city.cityId)).toEqual(['madrid']);
+    expect(report?.evidenceFound[0]).toEqual({
+      id: 'EV-01',
+      text: 'La caja está a la vista. Su etiqueta remite al archivo de París.',
+      origin: 'MAD-SALA',
+      minute: 10,
+    });
+    // El resultado no cambia al reconstruir.
+    expect(report?.result).toBe('complete');
   });
 
   it('completeFinalReport no muestra informe en partida activa y no deja modificar el guardado', () => {

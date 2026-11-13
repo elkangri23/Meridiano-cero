@@ -26,7 +26,7 @@ async function openGameScreen(page: Page, mode: 'guided' | 'free' = 'guided') {
  * irreversibles enseñan el diálogo de confirmación; las baratas se ejecutan
  * en el mismo clic. */
 async function playOffer(page: Page, testId: string, minute: number) {
-  const needsDialog = /offer-(travel|detain|recover|request_warrant|finish)/.test(testId);
+  const needsDialog = /offer-(travel|detain|recover|request_warrant)/.test(testId);
   await page.getByTestId(testId).click();
   if (needsDialog) {
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
@@ -37,7 +37,7 @@ async function playOffer(page: Page, testId: string, minute: number) {
   if (!needsDialog) await expect(page.getByTestId('preview-dialog')).toBeHidden();
 }
 
-/** Viaja desde la ventana del mapa: abre Mapa, pulsa Viajar, confirma y cierra la ventana. */
+/** Viaja desde la pestaña Mapa del dock: abre Mapa, pulsa Viajar y confirma. */
 async function travelTo(page: Page, cityId: string, minute: number) {
   await page.click('button:has-text("Mapa")');
   await page.getByTestId(`travel-${cityId}`).click();
@@ -48,14 +48,13 @@ async function travelTo(page: Page, cityId: string, minute: number) {
   // El aviso de viaje no se cierra solo: hay que pulsar «Seguir».
   await page.getByTestId('travel-animation').getByRole('button', { name: 'Seguir' }).click();
   await expect(page.getByTestId('travel-animation')).toBeHidden();
-  await page.keyboard.press('Escape');
   await expect(page.getByTestId(`travel-${cityId}`)).toBeHidden();
 }
 
-/** Abre la ventana del mapa (Atlas A.C.M.E.). */
+/** Abre la pestaña Mapa del dock. */
 async function openMap(page: Page) {
-  await page.click('button:has-text("Mapa")');
-  await expect(page.getByRole('dialog', { name: 'Mapa' })).toBeVisible();
+  await page.getByTestId('toolbar-map').click();
+  await expect(page.getByRole('tabpanel', { name: 'Mapa' })).toBeVisible();
 }
 
 test.describe('E2E pulido cosmético', () => {
@@ -71,41 +70,43 @@ test.describe('E2E pulido cosmético', () => {
     await expect(collect).not.toContainText('EV-06');
     await page.getByTestId('offer-collect:EV-06').click();
     await expect(page.getByTestId('clock')).toContainText('30 min');
-    // Inventario de la escena: texto legible, sin el código crudo.
-    const meta = page.locator('.game-scene-meta');
+    // Inventario de la escena, ahora en la pestaña Dossier: texto legible,
+    // sin el código crudo.
+    await page.getByTestId('toolbar-dossier').click();
+    const dossier = page.getByTestId('dock-panel-dossier');
+    await expect(dossier).toBeVisible();
+    const meta = dossier.locator('.game-scene-meta');
     await expect(meta).toContainText('La caja guarda una copia del manifiesto, con sello y firma verificables.');
     await expect(meta).not.toContainText('EV-06');
     // Dossier: la tabla de evidencias enseña el texto y su cabecera ya no es «ID».
-    await page.getByTestId('toolbar-dossier').click();
-    const dossier = page.getByRole('dialog', { name: 'Dossier' });
-    await expect(dossier).toBeVisible();
     await expect(dossier.locator('table')).toContainText('La caja guarda una copia del manifiesto, con sello y firma verificables.');
     await expect(dossier.locator('table')).not.toContainText('EV-06');
     await expect(dossier.locator('table thead')).toContainText('Evidencia');
     await expect(dossier.locator('table thead')).not.toContainText('ID');
   });
 
+  // Rediseño Norte, fase 1: la ruta A (análisis de EV-02 en el
+  // laboratorio) no es jugable aún, así que este test hace la ruta B:
+  // firma-sello en París, custodia-envío en Lisboa, orden y detención.
   test('con la orden concedida no se ofrece «Solicitar orden» y la detenida no sigue en Lisboa', async ({ page }) => {
     await openGameScreen(page);
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
-    await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);
-    await playOffer(page, 'offer-collect:EV-02', 30);
-    await page.getByTestId('open-lab').click();
-    await page.getByTestId('offer-analyze:EV-02').click();
-    await expect(page.getByTestId('clock')).toContainText('30 min');
-    await page.keyboard.press('Escape');
+    await playOffer(page, 'offer-inspect:MAD-SALA:caja', 30);
+    await playOffer(page, 'offer-collect:EV-06', 30);
     await travelTo(page, 'paris', 210);
-    await playOffer(page, 'offer-query:herramienta-hv17', 210);
-    await playOffer(page, 'offer-query:traslado-ines', 210);
+    await playOffer(page, 'offer-query:firma-sello', 210);
     await playOffer(page, 'offer-wait:30', 240);
-    await playOffer(page, 'offer-request_warrant:ines', 240);
-    await playOffer(page, 'offer-wait:30', 270);
+    await travelTo(page, 'lisboa', 390);
+    await playOffer(page, 'offer-query:custodia-envio', 390);
+    await playOffer(page, 'offer-wait:30', 420);
+    await playOffer(page, 'offer-request_warrant:ines', 420);
+    await playOffer(page, 'offer-wait:30', 450);
     // La orden ha madurado: la oferta de pedirla ya no aparece, pero la de detener sí.
     await expect(page.getByTestId('offer-request_warrant:ines')).toHaveCount(0);
     await expect(page.getByTestId('offer-detain:ines')).toBeVisible();
-    await playOffer(page, 'offer-detain:ines', 300);
-    await travelTo(page, 'lisboa', 450);
-    // Inés fue detenida en París: ya no está en la escena de Lisboa.
+    await playOffer(page, 'offer-talk:ines:identidad', 450);
+    await playOffer(page, 'offer-detain:ines', 480);
+    // Inés fue detenida en Lisboa: ya no está en la escena.
     await expect(page.getByTestId('offer-talk:ines:identidad')).toHaveCount(0);
     await expect(page.locator('.game-scene-npc')).not.toContainText('Inés Valera');
   });
@@ -124,7 +125,7 @@ test.describe('E2E pulido cosmético', () => {
   test('el buscador del atlas filtra la lista y muestra el coste antes de pulsar', async ({ page }) => {
     await openGameScreen(page);
     await openMap(page);
-    const map = page.getByRole('dialog', { name: 'Mapa' });
+    const map = page.getByTestId('dock-panel-mapa');
     await map.getByTestId('map-search').fill('Barcelona');
     // La lista completa sin filtrar desaparece; el resultado enseña el coste.
     await expect(page.getByTestId('travel-paris')).toHaveCount(0);
@@ -138,19 +139,23 @@ test.describe('E2E pulido cosmético', () => {
     await expect(page.getByTestId('travel-paris')).toBeVisible();
   });
 
-  test('cancelar el diálogo limpia el aviso y la consola persiste tras recargar', async ({ page }) => {
+  test('cancelar el cierre en línea limpia el aviso y la consola persiste tras recargar', async ({ page }) => {
     await openGameScreen(page);
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await expect(page.locator('.game-console')).toContainText('Inspección en Sala de embalaje.');
-    // Cancelar «Cerrar el caso» no deja el «Preparando:…» pegado.
-    await page.getByTestId('offer-finish').click();
-    await expect(page.getByTestId('preview-dialog')).toBeVisible();
-    await page.getByTestId('preview-cancel').click();
-    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    // Cancelar «Cerrar el caso» en línea no deja el «Preparando:…» pegado.
+    await page.getByTestId('close-case-header').click();
+    await page.getByTestId('dock-close-start').click();
+    await expect(page.getByTestId('dock-close-yes')).toBeVisible();
+    await page.getByTestId('dock-close-no').click();
+    await expect(page.getByTestId('dock-close-yes')).toBeHidden();
     // El aviso es un `role="status"` (región en vivo): Chromium no le
     // calcula nombre accesible desde el contenido, así que `getByRole`
     // con `name` no lo encuentra nunca; se comprueba por su texto.
     await expect(page.locator('.game-notice')).toContainText('Acción cancelada.');
+    // La partida sigue en curso y el informe no se ha abierto.
+    await expect(page.getByTestId('run-state')).toContainText('Partida en curso');
+    await expect(page.getByTestId('report-full')).toHaveCount(0);
     // Al recargar, la consola sigue donde se quedó, no en el texto genérico.
     await page.reload();
     await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
@@ -163,8 +168,7 @@ test.describe('E2E pulido cosmético', () => {
     const atlas = page.locator('.game-atlas');
     // En libre, París aún no se conoce: el texto alternativo no la nombra.
     await expect.poll(async () => atlas.getAttribute('aria-label')).not.toContain('París');
-    await page.keyboard.press('Escape');
-    // Inspeccionar la sala descubre París.
+    // Inspeccionar la sala descubre París (el mapa se queda en su pestaña).
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
     await openMap(page);
     await expect.poll(async () => atlas.getAttribute('aria-label')).toContain('París');
@@ -186,20 +190,5 @@ test.describe('E2E pulido cosmético', () => {
         expect(overlaps).toBe(false);
       }
     }
-    // La ventana del equipo conserva su posición tras recargar.
-    await page.keyboard.press('Escape');
-    await page.getByTestId('toolbar-team').click();
-    const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
-    await expect(team).toBeVisible();
-    await team.getByRole('button', { name: 'Mover' }).click();
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
-    const before = await team.boundingBox();
-    await page.reload();
-    await page.waitForSelector('[data-testid="game-screen"]', { timeout: 10000 });
-    await page.getByTestId('toolbar-team').click();
-    const after = await page.getByRole('dialog', { name: 'Equipo A.C.M.E.' }).boundingBox();
-    expect(after).toEqual(before);
   });
 });

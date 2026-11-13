@@ -7,6 +7,8 @@ import type { LocaleKey, TranslateFn } from './i18n.js';
  * solo la re-exporta, sin una segunda definición local. */
 import { REMOTE_CHANNELS } from './npc-catalog.js';
 import type { RemoteChannel } from './npc-catalog.js';
+import { isTeamServiceId } from './team.js';
+import type { TeamMemberId } from './team.js';
 
 /** Solo estado público de proceso; no acredita DB, sesión ni juego operativo. */
 export interface HealthResponse { status: 'ok' }
@@ -23,16 +25,55 @@ export interface PublicPendingRequest {
 }
 
 /** Prueba del informe final con su texto ya resuelto por el motor (desde el
- * catálogo del expediente); la web no enseña identificadores crudos. */
-export interface FinalReportEvidenceEntry { id: string; text: string; }
+ * catálogo del expediente); la web no enseña identificadores crudos.
+ * `origin` es el lugar donde se reveló (id de lugar del expediente) y
+ * `minute` el minuto de juego en que se reveló; ausentes en informes
+ * guardados antes de la fase 4 (el motor los rellena al reconstruir). */
+export interface FinalReportEvidenceEntry {
+  id: string;
+  text: string;
+  origin?: string;
+  minute?: number;
+}
 /** Entrada de la cronología del informe: minuto, tipo y resumen factual de
- * la acción (la API la reconstruye desde los registros de operaciones). */
-export interface FinalReportTimelineEntry { sequence: number; minute: number; type: string; summary: string; }
+ * la acción (la API la reconstruye desde los registros de operaciones).
+ * `evidenceIds` son las pruebas reveladas en este hito, en orden: la API
+ * las deriva del registro de cada prueba (minuto de revelación + método),
+ * así que un hito sin pruebas reveladas no trae la clave. */
+export interface FinalReportTimelineEntry {
+  sequence: number;
+  minute: number;
+  type: string;
+  summary: string;
+  evidenceIds?: string[];
+}
 /** Detención del informe: quién, si era la persona responsable y si había
  * orden válida contra ella. */
 export interface FinalReportDetention { suspectId: string; suspectName: string; correct: boolean; withWarrant: boolean; }
+/** Componente estable del desglose de puntos (rediseño Norte, fase 4): la
+ * etiqueta localizada no identifica el componente, así que el motor emite
+ * su `id` y su `max` (máximo que el componente puede sumar; 0 en los de
+ * penalización, que solo restan). La vista explica cada componente con sus
+ * cifras reales a partir de este `id`. */
+export type FinalReportScoreId = 'objectives' | 'evidence' | 'detention' | 'wrongDetentions' | 'irregular' | 'time';
 /** Una línea de la puntuación: qué se valora y cuántos puntos aporta. */
-export interface FinalReportScoreEntry { label: string; points: number; }
+export interface FinalReportScoreEntry { label: string; points: number; id: FinalReportScoreId; max: number; }
+/** Una ciudad de la ruta recorrida (rediseño Norte, fase 4): en el orden
+ * de la primera visita; `arrivedMinute` es el minuto de llegada (null en
+ * la ciudad inicial y cuando la cronología no registra el viaje);
+ * `inspected` son los lugares inspeccionados allí, `talkedTo` las personas
+ * con las que se habló y `evidenceIds` las pruebas reveladas allí. Todo
+ * sale del estado congelado de la partida y de la definición: nada se
+ * inventa y una ciudad de paso sin nada que contar enseña sus listas
+ * vacías. */
+export interface FinalReportRouteCity {
+  cityId: string;
+  cityName: string;
+  arrivedMinute: number | null;
+  inspected: string[];
+  talkedTo: string[];
+  evidenceIds: string[];
+}
 /** Una acción irregular del informe (GDD §14): qué se hizo, contra quién
  * o dónde, cuándo y si te vieron. Los nombres ya vienen resueltos por el
  * motor; la vista no re-deriva nada. */
@@ -73,6 +114,10 @@ export interface FinalReport {
    * partidas limpias y en informes guardados antes de esta entrega. */
   irregularActs: FinalReportIrregularAct[];
   score: FinalReportScore;
+  /** Ruta recorrida por ciudades, en orden de primera visita (rediseño
+   * Norte, fase 4). Ausente en informes guardados antes de esta entrega:
+   * el motor la reconstruye desde el estado congelado al proyectar. */
+  route?: FinalReportRouteCity[];
 }
 
 /** Resultado oficial de un expediente para un perfil (DEC-020, GDD §13):
@@ -964,19 +1009,38 @@ function publicBatch(value: unknown): value is PlayerViewDto['batch'] {
 function publicReportText(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 2000;
 }
+// Conjuntos de claves de una entrada de prueba: la forma completa
+// (id, texto, procedencia y minuto) y sus variantes antiguas.
+const REPORT_EVIDENCE_KEYS = ['id,text', 'id,minute,origin,text', 'id,minute,text', 'id,origin,text'];
+function publicReportEvidenceFields(record: Record<string, unknown>): boolean {
+  return publicId(record.id) && publicReportText(record.text) &&
+    (record.origin === undefined || publicId(record.origin)) &&
+    (record.minute === undefined || nonNegativeInteger(record.minute));
+}
 function publicReportEvidence(value: unknown): value is FinalReportEvidenceEntry {
-  if (!dtoRecord(value, 'id,text')) return false;
-  return publicId(value.id) && publicReportText(value.text);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value as Record<string, unknown>).sort().join(',');
+  if (!REPORT_EVIDENCE_KEYS.includes(keys)) return false;
+  return publicReportEvidenceFields(value as Record<string, unknown>);
 }
 function publicReportEvidenceList(value: unknown): value is FinalReportEvidenceEntry[] {
   return Array.isArray(value) && value.length <= 1000 && value.every(publicReportEvidence) &&
     new Set(value.map(item => item.id)).size === value.length;
 }
+// Conjuntos de claves de un hito de la cronología: con o sin las
+// pruebas que salieron de ahí (fase 4).
+const REPORT_TIMELINE_KEYS = ['minute,sequence,summary,type', 'evidenceIds,minute,sequence,summary,type'];
+function publicReportTimelineFields(record: Record<string, unknown>): boolean {
+  return nonNegativeInteger(record.sequence) && nonNegativeInteger(record.minute) &&
+    boundedString(record.type, 128) && publicReportText(record.summary) &&
+    (record.evidenceIds === undefined || (Array.isArray(record.evidenceIds) &&
+      (record.evidenceIds as unknown[]).every(item => publicId(item))));
+}
 function publicReportTimelineEntry(value: unknown): value is FinalReportTimelineEntry {
-  if (!dtoRecord(value, 'minute,sequence,summary,type')) return false;
-  return nonNegativeInteger(value.sequence) && nonNegativeInteger(value.minute) &&
-    typeof value.type === 'string' && value.type.length > 0 && value.type.length <= 128 &&
-    publicReportText(value.summary);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value as Record<string, unknown>).sort().join(',');
+  if (!REPORT_TIMELINE_KEYS.includes(keys)) return false;
+  return publicReportTimelineFields(value as Record<string, unknown>);
 }
 function publicReportTimeline(value: unknown): value is FinalReportTimelineEntry[] {
   return Array.isArray(value) && value.length <= 1000 && value.every(publicReportTimelineEntry) &&
@@ -991,10 +1055,30 @@ function publicReportDetentions(value: unknown): value is FinalReportDetention[]
   return Array.isArray(value) && value.length <= 64 && value.every(publicReportDetention) &&
     new Set(value.map(item => item.suspectId)).size === value.length;
 }
+const SCORE_IDS = ['objectives', 'evidence', 'detention', 'wrongDetentions', 'irregular', 'time'];
+// Conjuntos de claves de una entrada del desglose: la forma antigua (solo
+// etiqueta y puntos) y la nueva de la fase 4 (con id y máximo).
+const REPORT_SCORE_KEYS = ['label,points', 'id,label,max,points'];
+function publicScorePoints(points: unknown): boolean {
+  return typeof points === 'number' && Number.isSafeInteger(points) &&
+    (points as number) >= -100 && (points as number) <= 100;
+}
+function publicScoreId(id: unknown): boolean {
+  return id === undefined || (typeof id === 'string' && SCORE_IDS.includes(id));
+}
+function publicScoreMax(max: unknown): boolean {
+  return max === undefined || (typeof max === 'number' && Number.isSafeInteger(max) &&
+    (max as number) >= 0 && (max as number) <= 100);
+}
+function publicReportScoreFields(record: Record<string, unknown>): boolean {
+  return boundedString(record.label, 200) && publicScorePoints(record.points) &&
+    publicScoreId(record.id) && publicScoreMax(record.max);
+}
 function publicReportScoreEntry(value: unknown): value is FinalReportScoreEntry {
-  if (!dtoRecord(value, 'label,points')) return false;
-  return boundedString(value.label, 200) && typeof value.points === 'number' &&
-    Number.isSafeInteger(value.points) && value.points >= -100 && value.points <= 100;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value as Record<string, unknown>).sort().join(',');
+  if (!REPORT_SCORE_KEYS.includes(keys)) return false;
+  return publicReportScoreFields(value as Record<string, unknown>);
 }
 function publicReportScore(value: unknown): value is FinalReportScore {
   if (!dtoRecord(value, 'breakdown,max,total')) return false;
@@ -1022,11 +1106,35 @@ function publicReportIrregularAct(value: unknown): value is FinalReportIrregular
 function publicReportIrregularActs(value: unknown): value is FinalReportIrregularAct[] {
   return Array.isArray(value) && value.length <= 64 && value.every(publicReportIrregularAct);
 }
+function publicReportRouteCity(value: unknown): value is FinalReportRouteCity {
+  if (!dtoRecord(value, 'arrivedMinute,cityId,cityName,evidenceIds,inspected,talkedTo')) return false;
+  const record = value as Record<string, unknown>;
+  return publicId(record.cityId) && boundedString(record.cityName, 200) &&
+    (record.arrivedMinute === null || nonNegativeInteger(record.arrivedMinute)) &&
+    stringList(record.inspected, 64, 200) && stringList(record.talkedTo, 64, 200) &&
+    Array.isArray(record.evidenceIds) && (record.evidenceIds as unknown[]).every(item => publicId(item));
+}
+// Conjuntos de claves de un informe final: sin ruta (forma antigua) y
+// con ruta (fase 4).
+const FINAL_REPORT_KEYS = [
+  'detentions,evidenceFound,evidenceMissed,irregularActs,minute,objectivesAchieved,reason,result,score,timeline,truth',
+  'detentions,evidenceFound,evidenceMissed,irregularActs,minute,objectivesAchieved,reason,result,route,score,timeline,truth',
+];
+function publicReportSections(record: Record<string, unknown>): boolean {
+  return publicReportHead(record) && publicReportTruth(record.truth) && publicReportTimeline(record.timeline) &&
+    publicReportEvidenceList(record.evidenceFound) && publicReportEvidenceList(record.evidenceMissed) &&
+    publicReportDetentions(record.detentions) && publicReportIrregularActs(record.irregularActs) && publicReportScore(record.score);
+}
+function publicReportRoute(route: unknown): boolean {
+  return route === undefined || (Array.isArray(route) && route.length <= 64 &&
+    (route as unknown[]).every(publicReportRouteCity));
+}
 function publicFinalReport(value: unknown): value is FinalReport {
-  if (!dtoRecord(value, 'detentions,evidenceFound,evidenceMissed,irregularActs,minute,objectivesAchieved,reason,result,score,timeline,truth')) return false;
-  return publicReportHead(value) && publicReportTruth(value.truth) && publicReportTimeline(value.timeline) &&
-    publicReportEvidenceList(value.evidenceFound) && publicReportEvidenceList(value.evidenceMissed) &&
-    publicReportDetentions(value.detentions) && publicReportIrregularActs(value.irregularActs) && publicReportScore(value.score);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value as Record<string, unknown>).sort().join(',');
+  if (!FINAL_REPORT_KEYS.includes(keys)) return false;
+  const record = value as Record<string, unknown>;
+  return publicReportSections(record) && publicReportRoute(record.route);
 }
 function generalClock(value: unknown): boolean {
   return dtoRecord(value, 'deadlineMinutes,minute') && nonNegativeInteger(value.minute) &&
@@ -1179,8 +1287,9 @@ function publicTeamRecord(value: unknown): value is TeamRecordDto {
   if (keys !== 'id,memberId,minute,serviceId' && keys !== 'id,memberId,minute,serviceId,targetId') return false;
   if (!boundedString(value.id, 128)) return false;
   if (value.targetId !== undefined && !boundedString(value.targetId, 128)) return false;
-  if (!['margaret', 'richter', 'elena', 'david', 'clara'].includes(value.memberId as string)) return false;
-  if (!['briefing', 'evaluate', 'explain', 'lookup', 'routes', 'organize'].includes(value.serviceId as string)) return false;
+  // Fuente única de verdad (team.ts): una lista a mano aquí dejó fuera
+  // el servicio 'advice' y el cliente rechazaba la respuesta del commit.
+  if (!isTeamServiceId(value.memberId as TeamMemberId, value.serviceId)) return false;
   return nonNegativeInteger(value.minute);
 }
 function publicTeam(value: unknown): value is TeamRecordDto[] {

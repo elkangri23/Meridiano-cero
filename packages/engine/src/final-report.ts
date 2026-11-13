@@ -4,7 +4,7 @@
 // IA. La cronología NO se construye aquí (el motor no tiene acceso a los
 // registros de operaciones): `buildFinalReport` la deja vacía y la API la
 // rellena al proyectar una partida cerrada.
-import { evidenceText, caseText, resolveMessage, type Language } from '@meridiano/case-schema';
+import { evidenceText, caseText, getCity, resolveMessage, type Language } from '@meridiano/case-schema';
 import { fixedSuspect, isFixedCase, ORIGINAL_OBJECT, ORIGINAL_OBJECT_LABEL } from './fixed-case.js';
 import { knowsEvidence } from './fixed-evidence.js';
 import { irregularActsForReport, misconductOf, IRREGULAR_SCORE_PENALTY } from './misconduct.js';
@@ -92,6 +92,29 @@ function truthForDefinition(def: CaseDefinition, language: Language = 'es'): Fin
 
 // ── Pruebas halladas y omitidas ──────────────────────────────────────────────
 
+// Hallada: procedencia y minuto reales del registro de la partida (el
+// lugar donde se reveló y el minuto de juego en que se reveló).
+type EvidenceRecord = NonNullable<CaseRun['evidenceRecords']>[string];
+function foundEvidenceEntry(def: CaseDefinition, evidence: CaseDefinition['evidence'][number], record: EvidenceRecord | undefined, language: Language): FinalReport['evidenceFound'][number] {
+  return {
+    id: evidence.id,
+    text: evidenceText(evidence.id, def.texts, def.id, language) ?? evidence.id,
+    origin: record?.origin ?? evidence.origin,
+    ...(record ? { minute: record.revealedMinute } : {}),
+  };
+}
+
+// Omitida: procedencia de la definición (dónde habría estado) y sin
+// minuto, que nunca se reveló: el minuto de la definición no es un hecho
+// de la partida y no se enseña como tal.
+function missedEvidenceEntry(def: CaseDefinition, evidence: CaseDefinition['evidence'][number], language: Language): FinalReport['evidenceMissed'][number] {
+  return {
+    id: evidence.id,
+    text: evidenceText(evidence.id, def.texts, def.id, language) ?? evidence.id,
+    origin: evidence.origin,
+  };
+}
+
 function evidenceLists(def: CaseDefinition, run: CaseRun, language: Language = 'es'): Pick<FinalReport, 'evidenceFound' | 'evidenceMissed'> {
   const found: FinalReport['evidenceFound'] = [];
   const missed: FinalReport['evidenceMissed'] = [];
@@ -103,9 +126,11 @@ function evidenceLists(def: CaseDefinition, run: CaseRun, language: Language = '
   // por texto: el texto varía con el idioma.
   const decisive = new Set(keyEvidenceIds(def));
   for (const evidence of def.evidence) {
-    const entry = { id: evidence.id, text: evidenceText(evidence.id, def.texts, def.id, language) ?? evidence.id };
-    if (knowsEvidence(run, evidence.id)) found.push(entry);
-    else if (!decisive.has(evidence.id)) missed.push(entry);
+    if (knowsEvidence(run, evidence.id)) {
+      found.push(foundEvidenceEntry(def, evidence, run.evidenceRecords?.[evidence.id], language));
+    } else if (!decisive.has(evidence.id)) {
+      missed.push(missedEvidenceEntry(def, evidence, language));
+    }
   }
   return { evidenceFound: found, evidenceMissed: missed };
 }
@@ -167,14 +192,68 @@ export function scoreForReport(
     total,
     max: SCORE_MAX,
     breakdown: [
-      { label: resolveMessage(language, 'engine.report.scoreObjectives'), points: objectivesPoints },
-      { label: resolveMessage(language, 'engine.report.scoreEvidence'), points: evidencePoints },
-      { label: resolveMessage(language, 'engine.report.scoreDetention'), points: detentionPoints },
-      { label: resolveMessage(language, 'engine.report.scoreWrongDetentions'), points: wrongPoints },
-      { label: resolveMessage(language, 'engine.report.scoreIrregular'), points: irregularPoints },
-      { label: resolveMessage(language, 'engine.report.scoreTime'), points: timePoints },
+      { id: 'objectives', label: resolveMessage(language, 'engine.report.scoreObjectives'), points: objectivesPoints, max: 50 },
+      { id: 'evidence', label: resolveMessage(language, 'engine.report.scoreEvidence'), points: evidencePoints, max: 25 },
+      { id: 'detention', label: resolveMessage(language, 'engine.report.scoreDetention'), points: detentionPoints, max: 15 },
+      { id: 'wrongDetentions', label: resolveMessage(language, 'engine.report.scoreWrongDetentions'), points: wrongPoints, max: 0 },
+      { id: 'irregular', label: resolveMessage(language, 'engine.report.scoreIrregular'), points: irregularPoints, max: 0 },
+      { id: 'time', label: resolveMessage(language, 'engine.report.scoreTime'), points: timePoints, max: 10 },
     ],
   };
+}
+
+// ── Ruta recorrida ─────────────────────────────────────────────────────────
+// Ciudades visitadas en orden de primera visita, con lo que se hizo en cada
+// una: lo inspeccionado, con quién se habló y qué se encontró. Todo sale del
+// estado congelado de la partida + la definición, sin inventar nada:
+//  - el orden es la ciudad inicial (primera del expediente, como en la
+//    vista del jugador) + los `travel:<ciudad>` de los descubrimientos, en
+//    orden, + la ciudad final si faltara;
+//  - una ciudad de paso sin nada que contar enseña sus listas vacías (el
+//    viaje existió aunque no se hiciera nada allí);
+//  - el minuto de llegada no vive en el estado del motor: lo rellena la API
+//    desde la cronología de los registros de operaciones (ver
+//    `publicFinalReport`); aquí queda en null.
+function locationName(def: CaseDefinition, id: string, language: Language): string {
+  const location = def.locations.find(item => item.id === id);
+  if (!location) return id;
+  return caseText(def.id, 'location.' + id + '.name', language) ?? location.name;
+}
+
+function routeCityName(def: CaseDefinition, cityId: string): string {
+  return def.cities.find(city => city.id === cityId)?.name ?? getCity(cityId)?.name ?? cityId;
+}
+
+export function routeForReport(def: CaseDefinition, run: CaseRun, language: Language = 'es'): NonNullable<FinalReport['route']> {
+  const visited: string[] = [];
+  const add = (cityId: string | undefined): void => {
+    if (cityId && !visited.includes(cityId)) visited.push(cityId);
+  };
+  add(def.cities[0]?.id);
+  for (const discovery of run.discoveries) {
+    if (discovery.startsWith('travel:')) add(discovery.slice('travel:'.length));
+  }
+  add(run.position.cityId);
+  return visited.map(cityId => {
+    const inspected = [...new Set(run.discoveries
+      .filter(discovery => def.locations.find(location => location.id === discovery)?.cityId === cityId)
+      .map(discovery => locationName(def, discovery, language)))];
+    const talkedIds = [...new Set(run.conversationRecords.flatMap(record => {
+      const match = /^talk:([^@]+)@\d+$/.exec(record);
+      if (!match?.[1]) return [];
+      const npc = def.npcs.find(entry => entry.id === match[1]);
+      return npc?.cityId === cityId ? [npc.id] : [];
+    }))];
+    const talkedTo = talkedIds.map(id => def.npcs.find(entry => entry.id === id)?.name ?? id);
+    const evidenceIds = Object.entries(run.evidenceRecords ?? {})
+      .filter(([, record]) => {
+        const originCity = def.locations.find(location => location.id === record.origin)?.cityId;
+        return originCity ? originCity === cityId : record.origin === cityId;
+      })
+      .sort(([, a], [, b]) => a.revealedMinute - b.revealedMinute)
+      .map(([id]) => id);
+    return { cityId, cityName: routeCityName(def, cityId), arrivedMinute: null, inspected, talkedTo, evidenceIds };
+  });
 }
 
 export function buildFinalReport(def: CaseDefinition, run: CaseRun, reason: FinalReport['reason'], language: Language = 'es'): FinalReport {
@@ -184,6 +263,7 @@ export function buildFinalReport(def: CaseDefinition, run: CaseRun, reason: Fina
     objectivesAchieved: achieved,
     reason,
     minute: run.minute,
+    route: routeForReport(def, run, language),
     truth: truthForDefinition(def, language),
     // La cronología vive en los registros de operaciones: la API la
     // rellena al proyectar una partida cerrada (ver `completeFinalReport`).
@@ -220,6 +300,14 @@ function copyFinalReport(report: FinalReport): FinalReport {
     evidenceFound: report.evidenceFound.map(entry => ({ ...entry })),
     evidenceMissed: report.evidenceMissed.map(entry => ({ ...entry })),
     detentions: report.detentions.map(entry => ({ ...entry })),
+    ...(report.route ? {
+      route: report.route.map(city => ({
+        ...city,
+        inspected: [...city.inspected],
+        talkedTo: [...city.talkedTo],
+        evidenceIds: [...city.evidenceIds],
+      })),
+    } : {}),
     irregularActs: [...(report.irregularActs ?? [])],
     score: { total: report.score.total, max: report.score.max, breakdown: report.score.breakdown.map(entry => ({ ...entry })) },
   };
@@ -233,15 +321,35 @@ function copyFinalReport(report: FinalReport): FinalReport {
  * de español se reconstruye siempre en ese idioma (el guardado es español):
  * la reconstrucción es determinista desde definición + estado, así que el
  * contenido es el mismo que al cerrar, solo traducido. */
+// Motivo guardado en el informe: el tipo lo declara completo, así que
+// se comprueba en runtime sobre `unknown`; cualquier valor extraño
+// equivale a `finished`.
+function storedReasonOf(stored: unknown): FinalReport['reason'] {
+  const rawReason = (stored as { reason?: unknown }).reason;
+  if (rawReason === 'deadline') return 'deadline';
+  if (rawReason === 'withdrawn') return 'withdrawn';
+  return 'finished';
+}
+
+// Informes guardados antes de la fase 4 no traen ruta ni desglose con
+// id/máximo: se reconstruyen desde la definición y el estado congelado —
+// determinista, mismo resultado y misma puntuación que al cerrar — en vez
+// de enseñar el recorrido incompleto. La reconstrucción también cubre el
+// informe antiguo de 4 campos (que tampoco trae estas secciones).
+function needsRebuildOf(stored: unknown): boolean {
+  const storedShape = stored as { route?: unknown; score?: { breakdown?: Array<{ id?: unknown; max?: unknown }> } };
+  const storedBreakdown = storedShape.score?.breakdown;
+  return !Array.isArray(storedShape.route) ||
+    !Array.isArray(storedBreakdown) ||
+    !storedBreakdown.every(entry => typeof entry.id === 'string' && typeof entry.max === 'number');
+}
+
 export function completeFinalReport(def: CaseDefinition, run: CaseRun, language: Language = 'es'): FinalReport | null {
   if (run.status !== 'closed' || !run.finalReport) return null;
-  // El informe guardado puede ser el antiguo de 4 campos: el tipo lo
-  // declara completo, así que se comprueba en runtime sobre `unknown`.
   const stored: unknown = run.finalReport;
-  const rawReason = (stored as { reason?: unknown }).reason;
-  const storedReason = rawReason === 'deadline' ? 'deadline' as const
-    : rawReason === 'withdrawn' ? 'withdrawn' as const : 'finished' as const;
+  const storedReason = storedReasonOf(stored);
   if (language !== 'es') return buildFinalReport(def, run, storedReason, language);
+  if (needsRebuildOf(stored)) return buildFinalReport(def, run, storedReason);
   if (isCompleteFinalReport(stored)) {
     const copied = copyFinalReport(stored);
     // Informes guardados antes de las acciones irregulares no traen la
@@ -251,6 +359,5 @@ export function completeFinalReport(def: CaseDefinition, run: CaseRun, language:
     }
     return copied;
   }
-  const reason = storedReason;
-  return buildFinalReport(def, run, reason);
+  return buildFinalReport(def, run, storedReason);
 }

@@ -433,6 +433,7 @@ function teamRecordText(record: string, language: Language): string | null {
     // La evaluación de carrera de Margaret faltaba y el dossier enseñaba
     // el registro crudo `team:margaret:evaluate@10`.
     evaluate: { key: 'engine.record.team.evaluate', vars: {} },
+    advice: { key: 'engine.record.team.advice', vars: {} },
   };
   const phrase = phrases[serviceId];
   if (!phrase) return record;

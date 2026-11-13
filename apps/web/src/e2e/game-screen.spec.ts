@@ -19,13 +19,12 @@ async function openGameScreen(page: Page) {
 }
 
 /** Pulsa una oferta y espera el reloj en `minute`. Las acciones costosas o
- * irreversibles (viajar, detener, recuperar, pedir orden, cerrar) enseñan
- * el diálogo de confirmación; las baratas (inspeccionar, hablar, recoger,
- * consultar, esperar) se ejecutan en el mismo clic (lote 2). El análisis
- * vive en la ventana del laboratorio y pedirlo tampoco avanza el reloj
- * (los 90 min son la espera del resultado): se pulsa aparte. */
+ * irreversibles (viajar, detener, recuperar, pedir orden) enseñan el
+ * diálogo de confirmación; las baratas (inspeccionar, hablar, recoger,
+ * consultar, esperar) se ejecutan en el mismo clic (lote 2). El cierre ya
+ * no es una oferta de escena: se hace desde la cabecera con `closeCase`. */
 async function playOffer(page: Page, testId: string, minute: number) {
-  const needsDialog = /offer-(travel|detain|recover|request_warrant|finish)/.test(testId);
+  const needsDialog = /offer-(travel|detain|recover|request_warrant)/.test(testId);
   await page.getByTestId(testId).click();
   if (needsDialog) {
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
@@ -37,7 +36,20 @@ async function playOffer(page: Page, testId: string, minute: number) {
   if (!needsDialog) await expect(page.getByTestId('preview-dialog')).toBeHidden();
 }
 
-/** Viaja desde la ventana del mapa: abre Mapa, pulsa Viajar, confirma y cierra la ventana. */
+/** Cierra el caso desde la cabecera (rediseño Norte): botón «Cerrar el
+ * caso», pestaña Informe, «Iniciar el cierre del caso», confirmación en
+ * línea y el informe final a pantalla entera. */
+async function closeCase(page: Page) {
+  await page.getByTestId('close-case-header').click();
+  await expect(page.getByRole('tabpanel', { name: 'Informe' })).toBeVisible();
+  await page.getByTestId('dock-close-start').click();
+  await page.getByTestId('dock-close-yes').click();
+  await expect(page.getByTestId('report-full')).toBeVisible();
+  await expect(page.getByTestId('run-state')).toContainText('Partida cerrada');
+}
+
+/** Viaja desde la pestaña Mapa del dock: abre Mapa, pulsa Viajar y
+ * confirma. La ciudad de destino deja de listarse como destino. */
 async function travelTo(page: Page, cityId: string, minute: number) {
   await page.click('button:has-text("Mapa")');
   await page.getByTestId(`travel-${cityId}`).click();
@@ -45,12 +57,14 @@ async function travelTo(page: Page, cityId: string, minute: number) {
   await page.getByTestId('preview-confirm').click();
   await expect(page.getByTestId('preview-dialog')).toBeHidden();
   await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
-  await page.keyboard.press('Escape');
   await expect(page.getByTestId(`travel-${cityId}`)).toBeHidden();
 }
 
 test.describe('E2E T3-05 - Pantalla de juego', () => {
-  test('Ruta A completa (470 min): inspeccionar, recoger, analizar, viajar, consultar, orden, detener, recuperar y cerrar', async ({ page }) => {
+  // Rediseño Norte, fase 2: la ruta A vuelve a ser jugable — el análisis
+  // de EV-02 vive ahora en su propia ficha del Dossier, y el hallazgo se
+  // anuncia en la escena con su distintivo en la pestaña Dossier.
+  test('Ruta A completa (470 min): hallazgo en escena, re-inspección sin coste, análisis en el Dossier, orden, detención y cierre', async ({ page }) => {
     await openGameScreen(page);
     // Objetivos siempre visibles (lote 2): los dos pendientes al empezar.
     const objectives = page.getByTestId('objectives-panel');
@@ -59,86 +73,85 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(objectives).toContainText('Recuperar el astrolabio original');
     await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'false');
     await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'false');
+    // Inspeccionar el lugar: hallazgo anunciado en la escena y distintivo
+    // del Dossier en 1; el lugar queda marcado «Revisado ✓».
     await playOffer(page, 'offer-inspect:MAD-SALA', 10);
+    const finding = page.getByTestId('finding-card');
+    await expect(finding).toBeVisible();
+    await expect(finding).toContainText('Has descubierto:');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('1');
+    await expect(page.getByTestId('offer-card-inspect:MAD-SALA')).toContainText('Revisado ✓');
+    // Re-inspeccionar el lugar: sin coste y sin duplicar — solo la nota.
+    await page.getByTestId('offer-inspect:MAD-SALA').click();
+    await expect(page.getByTestId('revisit-note-inspect:MAD-SALA')).toBeVisible();
+    await expect(page.getByTestId('revisit-note-inspect:MAD-SALA')).toContainText('Ya revisaste esto: no hay nada nuevo. Sin coste.');
+    await expect(page.getByTestId('clock')).toContainText('10 min');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('1');
+    // Inspeccionar la cerradura: el hallazgo pasa a ser EV-02, distintivo
+    // en 2, y la cerradura queda marcada «Revisado ✓».
     await playOffer(page, 'offer-inspect:MAD-SALA:cerradura', 30);
-    await playOffer(page, 'offer-collect:EV-02', 30);
-    // El análisis vive en el laboratorio y madura en el minuto 120,
-    // durante el viaje posterior. Pedirlo no avanza el reloj (los 90 min
-    // son la espera del resultado, no el coste de la acción).
-    await page.getByTestId('open-lab').click();
-    await page.getByTestId('offer-analyze:EV-02').click();
+    await expect(finding).toContainText('Has descubierto: La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('2');
+    await expect(page.getByTestId('offer-card-inspect:MAD-SALA:cerradura')).toContainText('Revisado ✓');
+    // Re-inspeccionar la cerradura: sin coste y sin duplicar.
+    await page.getByTestId('offer-inspect:MAD-SALA:cerradura').click();
+    await expect(page.getByTestId('revisit-note-inspect:MAD-SALA:cerradura')).toBeVisible();
     await expect(page.getByTestId('clock')).toContainText('30 min');
-    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('2');
+    await playOffer(page, 'offer-collect:EV-02', 30);
+    // Sin laboratorio en el dock ni en la escena, pero el análisis de
+    // EV-02 vive en su ficha del Dossier, con su demora visible.
+    await expect(page.getByTestId('open-lab')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Laboratorio', exact: true })).toHaveCount(0);
+    await page.click('button:has-text("Dossier")');
+    const dossier = page.getByTestId('dock-panel-dossier');
+    await expect(dossier).toContainText('Solicitudes en curso');
+    await expect(dossier).toContainText('Sin solicitudes pendientes.');
+    const evidence = page.getByTestId('evidence-EV-02');
+    await expect(evidence).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
+    const analyze = page.getByTestId('offer-analyze:EV-02');
+    await expect(analyze).toBeVisible();
+    await expect(analyze).toContainText('Analizar huellas y marcas · 90 min');
+    // Pedir el análisis: cuesta 0, queda en curso con su cuenta atrás y
+    // en el bloque de solicitudes; el Informe ya refleja el pendiente.
+    await analyze.click();
+    await expect(page.getByTestId('clock')).toContainText('30 min');
+    await expect(evidence).toContainText('En análisis · listo en 90 min (minuto 120)');
+    await expect(page.getByTestId('dossier-pending')).toContainText('Análisis · La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(page.getByTestId('dossier-pending')).toContainText('Responde en el minuto 120 (ahora 30)');
+    await page.click('button:has-text("Informe")');
+    await expect(page.getByTestId('dock-panel-informe')).toContainText('Solicitudes pendientes al cerrar: Análisis · Responde en el minuto 120 (ahora 30).');
+    // Viajar a París madura el análisis: EV-03 vuelve vinculada a EV-02,
+    // con su texto, sin salir del Dossier; el distintivo sube a 3.
     await travelTo(page, 'paris', 210);
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('dossier-evidence-count')).toHaveText('3');
+    await expect(evidence).toContainText('Resultado del análisis · EV-03 vinculada a esta evidencia');
+    await expect(evidence).toContainText('La huella técnica es compatible con una herramienta de la serie HV-17.');
+    await expect(dossier).toContainText('Sin solicitudes pendientes.');
+    // Con EV-03 + EV-04 se pide la orden contra Inés: consultas en París,
+    // espera a que maduren, orden y detención coordinada sin moverse.
     await playOffer(page, 'offer-query:herramienta-hv17', 210);
     await playOffer(page, 'offer-query:traslado-ines', 210);
     await playOffer(page, 'offer-wait:30', 240);
     await playOffer(page, 'offer-request_warrant:ines', 240);
     await playOffer(page, 'offer-wait:30', 270);
-    await travelTo(page, 'lisboa', 420);
-    await playOffer(page, 'offer-talk:ines:identidad', 420);
-    // La detención es automática (GDD §12): 30 min de coordinación con las
-    // autoridades, en vez de 15 min deteniendo en persona.
-    await playOffer(page, 'offer-detain:ines', 450);
-    await playOffer(page, 'offer-recover:astrolabio-original', 470);
-    // Al detener y recuperar, el panel marca los dos objetivos como logrados.
-    await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'true');
-    await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'true');
-    await playOffer(page, 'offer-finish', 470);
-    await expect(page.getByTestId('clock')).toContainText('Cerrada');
-    // Partida cerrada: Guardados explica por qué no se puede guardar ni cargar.
-    await page.click('button:has-text("Guardados")');
-    await expect(page.getByTestId('save-closed-notice')).toBeVisible();
-    await expect(page.getByTestId('save-closed-notice')).toContainText('No se pueden crear guardados nuevos ni cargar uno anterior');
-    await expect(page.getByTestId('save-create')).toBeDisabled();
-    await expect(page.locator('text=Manuales: 0 / 10')).toBeVisible();
-    await page.keyboard.press('Escape');
-    // Informe final disponible en la ventana correspondiente.
-    await page.click('button:has-text("Informe final")');
-    await expect(page.locator('text=Resultado:')).toBeVisible();
-    // Informe final en español: resultado y motivo traducidos, objetivos
-    // como frases (antes: `complete`, `finished`, `obj-detener`…).
-    const report = page.getByRole('dialog', { name: 'Informe final' }).locator('.game-window-body');
-    await expect(report).toContainText('Resultado: completado');
-    await expect(report).toContainText('Motivo: finalizado');
-    await expect(report).toContainText('Detener a Inés con orden válida');
-    await expect(report).toContainText('Recuperar el astrolabio original');
-    await expect(report).not.toContainText('obj-detener');
-    await expect(report).not.toContainText('obj-recuperar');
-    await expect(report).not.toContainText('complete ·');
-    await expect(report).not.toContainText('finished');
-    // Informe final completo (GDD §12): verdad, cronología, pruebas,
-    // detenciones y puntuación con su desglose.
-    await expect(report).toContainText('La verdad del caso');
-    await expect(report).toContainText('Responsable: Inés Valera');
-    await expect(report).toContainText('Objeto sustraído: el astrolabio original');
-    await expect(report).toContainText('El registro firmado asigna la herramienta HV-17 a Inés Valera.');
-    await expect(report).toContainText('Cronología');
-    await expect(report).toContainText('[min 10] Inspección en Sala de embalaje.');
-    await expect(report).toContainText('[min 470] La investigación ha concluido.');
-    await expect(report).toContainText('Pruebas halladas');
-    await expect(report).toContainText('La caja está a la vista. Su etiqueta remite al archivo de París.');
-    await expect(report).toContainText('Pruebas omitidas');
-    await expect(report).toContainText('La caja guarda una copia del manifiesto, con sello y firma verificables.');
-    await expect(report).toContainText('Detenciones');
-    await expect(report).toContainText('Inés Valera — correcta · con orden');
-    await expect(report).toContainText('Puntuación');
-    await expect(report).toContainText('Objetivos logrados: +50');
-    await expect(report).toContainText('Pruebas halladas: +14');
-    await expect(report).toContainText('Detención correcta: +15');
-    await expect(report).toContainText('Tiempo restante: +8');
-    await expect(report).toContainText('Total: 87 / 100');
-    // La consola narró cada acción: recoger con su hallazgo (no el ID),
-    // consultas y orden con su vencimiento, orden concedida, detención y cierre.
+    const detainCard = page.getByTestId('offer-card-detain:ines');
+    await expect(detainCard).toBeVisible();
+    await expect(detainCard).toContainText('Coordinar la detención de Inés Valera con las autoridades');
+    await playOffer(page, 'offer-detain:ines', 300);
     const console = page.locator('.game-console');
-    await expect(console).toContainText('Recogido: La cerradura de la vitrina tiene residuo de herramienta.');
-    await expect(console).not.toContainText('Objeto EV-02 recogido.');
-    await expect(console).toContainText('El resultado llegará sobre el minuto 120.');
-    await expect(console).toContainText('Has solicitado una orden contra Inés Valera.');
-    await expect(console).toContainText('Orden contra Inés Valera concedida.');
     await expect(console).toContainText('Las autoridades han detenido a Inés Valera por orden de A.C.M.E. El caso sigue abierto.');
-    await expect(console).toContainText('El informe final está disponible en la ventana «Informe final».');
-    await expect(console).not.toContainText('La investigación avanza.');
+    // Los objetivos viven en la pestaña Dossier del dock.
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('objective-obj-detener')).toHaveAttribute('data-achieved', 'true');
+    // Viajar a Lisboa a recuperar el astrolabio y cerrar: 470 min.
+    await travelTo(page, 'lisboa', 450);
+    await playOffer(page, 'offer-recover:astrolabio-original', 470);
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('objective-obj-recuperar')).toHaveAttribute('data-achieved', 'true');
+    await closeCase(page);
+    await expect(page.getByTestId('report-full')).toContainText('Total: 87 / 100');
   });
 
   test('Ruta B completa (500 min) con guardar y reanudar a mitad de ruta', async ({ page }) => {
@@ -179,19 +192,39 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await playOffer(page, 'offer-talk:ines:identidad', 450);
     await playOffer(page, 'offer-detain:ines', 480);
     await playOffer(page, 'offer-recover:astrolabio-original', 500);
-    await playOffer(page, 'offer-finish', 500);
-    await expect(page.getByTestId('clock')).toContainText('Cerrada');
+    await closeCase(page);
+    // Informe final a pantalla entera, en español: resultado y motivo
+    // traducidos, objetivos como frases (antes: `complete`, `finished`,
+    // `obj-detener`…).
+    const report = page.getByTestId('report-full');
+    await expect(report).toContainText('Resultado: completado');
+    await expect(report).toContainText('Motivo: finalizado');
+    await expect(report).toContainText('Detener a Inés con orden válida');
+    await expect(report).toContainText('Recuperar el astrolabio original');
+    await expect(report).not.toContainText('obj-detener');
+    await expect(report).not.toContainText('obj-recuperar');
+    await expect(report).not.toContainText('complete ·');
+    await expect(report).not.toContainText('finished');
+    await expect(report).toContainText('La verdad del caso');
+    // Fase 4: la verdad vive en secciones desplegables; «Quién fue» se
+    // abre antes de afirmar su contenido.
+    await page.getByTestId('truth-who').locator('summary').click();
+    await expect(report).toContainText('Responsable: Inés Valera');
+    await expect(report).toContainText('Inés Valera — correcta · con orden');
+    // «Ver la partida» vuelve al layout en modo solo lectura.
+    await page.getByTestId('report-view-run').click();
+    await expect(page.getByTestId('game-screen')).toBeVisible();
+    await expect(page.getByTestId('run-state')).toContainText('Partida cerrada');
   });
 
-  test('Teclado: Enter en una oferta ejecuta en un clic, Escape cierra el diálogo y Ctrl+Enter envía la orden en texto libre', async ({ page }) => {
+  test('Teclado: Enter en una oferta ejecuta en un clic y Escape cierra el diálogo', async ({ page }) => {
     await openGameScreen(page);
-    // Ctrl+Enter en la orden en texto libre: el mock interpreta la primera oferta.
-    // Inspeccionar es barato (lote 2): se ejecuta en el mismo clic, sin diálogo.
-    await page.getByTestId('order-input').fill('inspecciona la sala con cuidado');
-    await page.keyboard.press('Control+Enter');
+    // Tab/Enter: enfocar una oferta barata y ejecutar con Enter, sin diálogo.
+    await page.getByTestId('offer-inspect:MAD-SALA').focus();
+    await expect(page.getByTestId('offer-inspect:MAD-SALA')).toBeFocused();
+    await page.keyboard.press('Enter');
     await expect(page.getByTestId('clock')).toContainText('10 min');
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
-    // Tab/Enter: enfocar una oferta barata y ejecutar con Enter, sin diálogo.
     await page.getByTestId('offer-inspect:MAD-SALA:cerradura').focus();
     await expect(page.getByTestId('offer-inspect:MAD-SALA:cerradura')).toBeFocused();
     await page.keyboard.press('Enter');
@@ -209,8 +242,8 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
 
   test('Feedback visible: hablar abre el chat con respuesta e inspeccionar muestra el hallazgo', async ({ page }) => {
     await openGameScreen(page);
-    // La pista de cómo se juega está visible al empezar.
-    await expect(page.locator('text=Tras cada acción el resultado aparece en la consola.')).toBeVisible();
+    // La pista de cómo se juega está visible al empezar, en la consola.
+    await expect(page.locator('.game-console')).toContainText('La investigación comienza. Inspecciona la escena o elige una acción.');
     // Hablar con Tomás: la conversación se abre sola con su saludo.
     await playOffer(page, 'offer-talk:tomas:identidad', 0);
     const chat = page.getByTestId('chat-turns');
@@ -231,7 +264,7 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.locator('.game-console')).not.toContainText('Objeto EV-02 recogido.');
     // El dossier muestra los hallazgos con texto legible, no IDs crudos.
     await page.click('button:has-text("Dossier")');
-    const dossier = page.locator('.game-window-body');
+    const dossier = page.getByTestId('dock-panel-dossier');
     await expect(dossier).toContainText('La caja está a la vista');
     await expect(dossier).not.toContainText('EV-01');
     await expect(dossier).toContainText('Hablaste con Tomás Ríos (min 0).');
@@ -256,14 +289,26 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     await expect(page.getByTestId('hourglass')).toContainText('+10 min');
     await expect(page.getByTestId('hourglass-scene')).toBeVisible();
     await expect(page.getByTestId('hourglass-scene')).toContainText('El reloj avanza 10 min');
-    // Viajar desde la escena: animación de viaje, fondo de París y reloj de arena.
+    // Viajar desde la escena (rediseño Norte, fase 3): la transición
+    // precede al cambio de escena — primero se ve «Viajando a París» con
+    // la ruta y los minutos descontando, y la escena sigue en Madrid
+    // hasta que termina.
     await page.getByTestId('offer-travel:paris').click();
     await expect(page.getByTestId('preview-dialog')).toBeVisible();
     await expect(page.getByTestId('preview-dialog')).toContainText('Viaje a París');
     await page.getByTestId('preview-confirm').click();
     await expect(page.getByTestId('preview-dialog')).toBeHidden();
     await expect(page.getByTestId('travel-animation')).toBeVisible();
-    await expect(page.getByTestId('travel-animation')).toContainText('De Madrid a París');
+    await expect(page.getByTestId('travel-animation')).toContainText('Viajando a París');
+    await expect(page.getByTestId('travel-animation')).toContainText('Madrid → París · 180 min');
+    // Sin botones: la transición es solo visual y se cierra sola.
+    await expect(page.getByTestId('travel-animation').getByRole('button')).toHaveCount(0);
+    // La ruta se dibuja también en el mapa del dock.
+    await page.click('button:has-text("Mapa")');
+    await expect(page.locator('.game-atlas-route-live')).toBeVisible();
+    await expect(page.locator('.game-atlas-travel-dot')).toBeVisible();
+    // Al terminar, la escena ya es París y el reloj descontó el viaje.
+    await expect(page.getByTestId('travel-animation')).toBeHidden();
     await expect(page.getByTestId('hourglass')).toBeVisible();
     await expect(page.getByTestId('hourglass')).toContainText('+180 min');
     await expect(page.getByTestId('scene-art')).toHaveAttribute('data-location', 'PAR-ARCH');
@@ -272,11 +317,6 @@ test.describe('E2E T3-05 - Pantalla de juego', () => {
     // clave cruda del motor (arreglo: antes enseñaba `travel:paris`).
     await expect(page.locator('.game-console')).toContainText('Sales de Madrid y llegas a París.');
     await expect(page.locator('.game-console')).not.toContainText('travel:paris');
-    // El aviso de viaje NO se cierra solo: se queda hasta pulsar «Seguir».
-    await page.waitForTimeout(4000);
-    await expect(page.getByTestId('travel-animation')).toBeVisible();
-    await page.getByTestId('travel-animation').getByRole('button', { name: 'Seguir' }).click();
-    await expect(page.getByTestId('travel-animation')).toBeHidden();
     // En París, la escena muestra a Émile y el archivo.
     await expect(page.locator('.game-scene')).toContainText('Émile · Archivo de conservación');
     await expect(page.getByTestId('offer-inspect:PAR-ARCH')).toBeVisible();

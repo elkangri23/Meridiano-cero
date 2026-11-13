@@ -14,10 +14,10 @@ async function openGameScreen(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('0 min');
 }
 
-/** Abre el equipo desde la barra de herramientas. */
+/** Abre la pestaña Equipo del dock. */
 async function openTeam(page: Page) {
-  await page.click('button:has-text("Equipo A.C.M.E.")');
-  await expect(page.getByRole('dialog', { name: 'Equipo A.C.M.E.' })).toBeVisible();
+  await page.getByTestId('toolbar-team').click();
+  await expect(page.getByRole('tabpanel', { name: 'Equipo' })).toBeVisible();
 }
 
 /** Recoge EV-02 (la cerradura de la vitrina): inspeccionar la sala y la cerradura, recoger. */
@@ -30,25 +30,11 @@ async function collectLockEvidence(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('30 min');
 }
 
-/** Pide el análisis de huellas de EV-02 y espera a que madure (min 120). */
-async function completeAnalysis(page: Page) {
-  await collectLockEvidence(page);
-  await page.getByTestId('open-lab').click();
-  await expect(page.getByRole('dialog', { name: 'Laboratorio' })).toBeVisible();
-  await page.getByTestId('offer-analyze:EV-02').click();
-  await expect(page.getByTestId('preview-dialog')).toBeHidden();
-  await page.keyboard.press('Escape');
-  for (const minute of [60, 90, 120]) {
-    await page.getByTestId('offer-wait:30').click();
-    await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
-  }
-}
-
 test.describe('E2E equipo A.C.M.E.', () => {
   test('pedir ayuda a Margaret y a Clara es gratis, queda registrado y no revela la solución', async ({ page }) => {
     await openGameScreen(page);
     await openTeam(page);
-    const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
+    const team = page.getByTestId('dock-panel-equipo');
     // Los cinco miembros del GDD §8, con su función y el límite escrito.
     for (const name of ['Margaret Sullivan', 'Dr. Samuel Richter', 'Elena Vázquez', 'David Nakamura', 'Clara Beaumont']) {
       await expect(team).toContainText(name);
@@ -73,11 +59,24 @@ test.describe('E2E equipo A.C.M.E.', () => {
     await expect(page.getByTestId('team-turns')).not.toContainText('culpable');
   });
 
+  // Rediseño Norte, fase 2: Richter necesita EV-03, que sale del análisis
+  // de EV-02 en su ficha del Dossier.
   test('Richter explica un análisis completado y David muestra las rutas desde Madrid', async ({ page }) => {
     await openGameScreen(page);
-    await completeAnalysis(page);
+    await collectLockEvidence(page);
+    // El análisis de EV-02 vive en su ficha del Dossier: cuesta 0 y
+    // madura a los 90 min de juego.
+    await page.click('button:has-text("Dossier")');
+    await expect(page.getByTestId('offer-analyze:EV-02')).toContainText('Analizar huellas y marcas · 90 min');
+    await page.getByTestId('offer-analyze:EV-02').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('clock')).toContainText('30 min');
+    for (const minute of [60, 90, 120]) {
+      await page.getByTestId('offer-wait:30').click();
+      await expect(page.getByTestId('clock')).toContainText(`${minute} min`);
+    }
     await openTeam(page);
-    const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
+    const team = page.getByTestId('dock-panel-equipo');
     // Richter: el selector trae el análisis completado y su explicación es el texto del resultado.
     await expect(page.getByTestId('team-analysis')).toHaveValue('EV-03');
     await page.getByTestId('team-explain').click();
@@ -103,5 +102,47 @@ test.describe('E2E equipo A.C.M.E.', () => {
     await expect(page.getByTestId('team-turns')).toContainText('Sin registro en los archivos consultados. La ausencia de registro no demuestra inocencia.');
     await expect(page.getByTestId('team-history')).toContainText('Elena Vázquez · Consulta de inteligencia');
     await expect(page.getByTestId('clock')).toContainText('0 min');
+  });
+
+  // Rediseño Norte, fase 3: Elena aconseja y Margaret valora en el sitio,
+  // gratis (0 min), y Central y Laboratorio se presentan sin pestaña.
+  test('Elena aconseja y Margaret valora en el sitio, gratis, sin pestaña de laboratorio', async ({ page }) => {
+    await openGameScreen(page);
+    await openTeam(page);
+    const team = page.getByTestId('dock-panel-equipo');
+    // El dock tiene cinco pestañas y ninguna es Laboratorio.
+    await expect(page.getByTestId('game-dock').getByRole('tab')).toHaveCount(5);
+    await expect(page.getByRole('tab', { name: 'Laboratorio' })).toHaveCount(0);
+    await expect(team.getByTestId('team-central-row')).toContainText('Central operativa');
+    await expect(team.getByTestId('team-lab-row')).toContainText('Sin pestaña propia');
+    // Elena: consejo en el sitio, gratis, sin diálogo y sin avanzar el reloj.
+    await page.getByTestId('team-advice').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('clock')).toContainText('0 min');
+    const elenaReply = page.getByTestId('team-reply-elena');
+    await expect(elenaReply).toBeVisible();
+    await expect(elenaReply).toContainText('Elena · consejo · sin coste (0 min)');
+    await expect(elenaReply).toContainText('Estás en Madrid: Sala de embalaje.');
+    await expect(elenaReply).toContainText('Objetivos pendientes (2):');
+    await expect(elenaReply).toContainText('Detener a Inés con orden válida');
+    await expect(elenaReply).not.toContainText('culpable');
+    await expect(page.getByTestId('team-turns')).toContainText('¿Qué me aconsejas como siguiente paso?');
+    await expect(page.getByTestId('team-history')).toContainText('Elena Vázquez · Pedir consejo');
+    await expect(page.locator('.game-console')).toContainText('que te aconsejara sobre el siguiente paso');
+    // Margaret: valoración en el sitio, también gratis.
+    await page.getByTestId('team-evaluate').click();
+    await expect(page.getByTestId('preview-dialog')).toBeHidden();
+    await expect(page.getByTestId('clock')).toContainText('0 min');
+    const margaretReply = page.getByTestId('team-reply-margaret');
+    await expect(margaretReply).toBeVisible();
+    await expect(margaretReply).toContainText('Margaret Sullivan · valoración de carrera · sin coste (0 min)');
+    // El perfil de carrera es el del usuario de desarrollo local,
+    // compartido por todos los specs: ya puede traer casos cerrados
+    // de corridas anteriores, así que no se afirma un número concreto.
+    await expect(margaretReply).toContainText('Tu carrera:');
+    await expect(margaretReply).toContainText('puntos');
+    await expect(margaretReply).not.toContainText('culpable');
+    await expect(page.getByTestId('team-turns')).toContainText('¿Cómo va mi carrera?');
+    await expect(page.getByTestId('team-history')).toContainText('Margaret Sullivan · Evaluar mi carrera');
   });
 });

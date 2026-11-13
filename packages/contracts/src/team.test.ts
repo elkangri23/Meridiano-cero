@@ -14,7 +14,7 @@ describe('Equipo A.C.M.E. (GDD §8)', () => {
     expect(TEAM_SERVICES).toEqual({
       margaret: ['briefing', 'evaluate'],
       richter: ['explain'],
-      elena: ['lookup'],
+      elena: ['lookup', 'advice'],
       david: ['routes'],
       clara: ['organize'],
     });
@@ -25,6 +25,9 @@ describe('Equipo A.C.M.E. (GDD §8)', () => {
     expect(isTeamServiceId('david', 'coordinate')).toBe(false);
     // La evaluación de carrera es solo de Margaret (T5-04, GDD §13).
     expect(isTeamServiceId('margaret', 'evaluate')).toBe(true);
+    // El consejo de Elena es solo suyo (rediseño Norte, fase 3).
+    expect(isTeamServiceId('elena', 'advice')).toBe(true);
+    expect(isTeamServiceId('margaret', 'advice')).toBe(false);
     expect(isTeamServiceId('clara', 'evaluate')).toBe(false);
   });
   it('isTeamRecord acepta registros con y sin objetivo, y rechaza el resto', () => {

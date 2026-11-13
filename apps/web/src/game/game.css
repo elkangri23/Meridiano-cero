@@ -1,4 +1,6 @@
-/* Pantalla de juego — rediseño A2 (claro, moderno).
+/* Pantalla de juego — rediseño A2 (claro, moderno) + rediseño Norte fase 1
+ * (una sola pantalla: escena central, dock fijo de 5 pestañas a la derecha,
+ * consola sola abajo; sin ventanas ni campo de órdenes).
  * Tokens de la maqueta A2 aprobada: papel #F8F7F4, tinta #101828,
  * dorado #C9A227 (solo acentos y evidencia clave; como texto se usa su
  * variante oscura #7A5E06, legible sobre papel), teal #0E7C7B (viajes).
@@ -52,28 +54,73 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game h2 { font-size:1.15em; font-weight:700; line-height:1.25; }
 .game h3 { font-size:.9em; }
 
-/* Cabecera de agencia + tira del expediente. */
+/* Cabecera fija (rediseño Norte): marca, datos del expediente, caja de
+ * reloj con lo que queda y barra de plazo, estado de la partida y
+ * acciones. */
 .game-header { margin-bottom:16px; }
-.game-agency { display:flex; justify-content:space-between; align-items:center; gap:18px; padding:16px 0; border-bottom:1px solid var(--edge); }
-.game-brand { display:flex; align-items:center; gap:18px; }
+.game-agency { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; padding:16px 0; border-bottom:1px solid var(--edge); flex-wrap:wrap; }
+.game-brand { display:flex; align-items:center; gap:18px; flex-shrink:0; }
 .game-mark { font-family:var(--serif); font-size:2em; line-height:1; border:2px solid var(--gold-bright); color:#FFFFFF; background:var(--ink); width:62px; height:62px; display:grid; place-items:center; position:relative; font-weight:700; flex-shrink:0; border-radius:12px; }
 .game-mark > span { position:absolute; font-size:.35em; right:3px; bottom:1px; background:var(--gold-bright); color:var(--ink); padding:1px 3px; border-radius:3px; font-family:var(--sans); }
-.game-detective { display:flex; align-items:center; gap:12px; font-size:.8em; }
-.game-detective strong,.game-detective small { display:block; }
-.game-detective small { color:var(--muted); font-size:.8em; }
-/* Avatar redondo tinta con inicial: es lo único que queda del bloque de
- * detective en la cabecera (decisión 4: fuera nombre y rango). */
+.game-head-facts { display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; flex:1; min-width:0; }
+.game-fact { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.game-fact strong { font-size:.9em; font-weight:700; }
+.game-fact small { color:var(--muted); font-size:.75em; }
+/* Avatar redondo tinta con inicial, junto al nombre del detective. */
 .game-avatar { display:grid; place-items:center; width:42px; height:42px; background:var(--ink); color:#FFFFFF; border:1px solid var(--ink); border-radius:50%; flex-shrink:0; font-weight:800; }
+.game-fact .game-avatar { width:26px; height:26px; display:inline-grid; vertical-align:-7px; margin-right:4px; font-size:.8em; }
+.game-clockbox { min-width:180px; }
+.game-clockbox-row { display:flex; justify-content:space-between; align-items:baseline; gap:12px; font-size:.8em; }
+.game-clock-remaining { font-family:var(--mono); font-size:1.25em; color:var(--ink); }
+.game-deadline { height:7px; background:#ECE8DC; border-radius:99px; overflow:hidden; margin:6px 0; }
+.game-deadline i { display:block; height:100%; background:var(--gold-bright); border-radius:99px; }
+.game-state-pill { display:inline-flex; align-items:center; padding:6px 12px; border-radius:999px; background:var(--green-bg); color:var(--green); font-size:.75em; font-weight:700; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap; align-self:center; }
+.game-state-pill--closed { background:#EFEDE8; color:var(--muted); }
 .game-header-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 .game-header-actions a { white-space:nowrap; }
-.game-case-strip { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:0; background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:0; box-shadow:var(--shadow); overflow:hidden; }
-.game-case-strip > div { padding:12px 18px; border-left:1px solid var(--edge); }
-.game-case-strip > div:first-child { border-left:none; }
-.game-case-strip strong { font-size:.9em; font-weight:700; }
-.game-case-strip p { margin-bottom:2px; }
 
-/* Estado de la investigación: tarjeta de la columna derecha de la escena,
- * con progreso real y barra. Logrado: check verde + chip visible, NUNCA tachado. */
+/* Retícula de una sola pantalla (rediseño Norte): escena central y dock
+ * fijo a la derecha (392 px, sticky); la consola va sola abajo, a todo
+ * lo ancho. */
+.game-layout { display:grid; grid-template-columns:minmax(0,1fr) 392px; gap:20px; align-items:start; margin-bottom:16px; }
+.game-dock { position:sticky; top:16px; max-height:calc(100vh - 32px); display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--edge); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
+.game-dock-tabs { display:flex; flex-wrap:wrap; border-bottom:1px solid var(--edge); background:var(--panel-soft); }
+.game-dock-tabs button[role="tab"] { border:none; border-radius:0; background:transparent; padding:12px 8px; font-weight:600; font-size:.85em; min-height:44px; flex:1; }
+.game-dock-tabs button[role="tab"]:hover { background:var(--panel); }
+.game-dock-tabs button[role="tab"][aria-selected="true"] { background:var(--panel); font-weight:700; box-shadow:inset 0 -3px 0 var(--gold-bright); }
+.game-dock-body { overflow:auto; min-height:0; }
+.game-dock-panel { padding:16px 18px 20px; }
+.game-dock-panel > h2 { margin-bottom:12px; }
+.game-dock-panel > h2:focus-visible { outline:2px solid var(--gold); }
+.game-dock-panel .game-objectives { margin-bottom:16px; }
+.game-dock-panel .game-scene-meta { margin-bottom:16px; }
+/* Contenido de los paneles del dock: tablas, formularios y notas. */
+.game-dock-body table { border-collapse:collapse; width:100%; }
+.game-dock-body th,.game-dock-body td { border:1px solid var(--edge); padding:8px; text-align:left; }
+.game-dock-body th { color:var(--muted); font-weight:700; font-size:.75em; letter-spacing:.08em; text-transform:uppercase; background:var(--panel-soft); }
+.game-dock-body h4 { font-size:.75em; letter-spacing:.13em; color:var(--muted); font-weight:700; text-transform:uppercase; margin:16px 0 8px; }
+.game-dock-body h4:first-child { margin-top:0; }
+.game-dock-body label { display:block; margin:8px 0; }
+.game-dock-body input,.game-dock-body select { width:100%; box-sizing:border-box; background:#FFFFFF; color:var(--ink); border:1px solid var(--edge-strong); border-radius:9px; padding:8px; }
+.game-dock-body input[type="checkbox"] { width:20px; height:20px; accent-color:var(--teal); }
+.game-dock-body form button[type="submit"] { background:var(--gold-bright); color:var(--ink); border-color:var(--gold-bright); font-weight:700; }
+
+/* Pestaña Informe: estado en cifras y zona de cierre. */
+.game-report-stats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+.game-report-stats > div { background:var(--panel-soft); border:1px solid var(--edge); border-radius:12px; padding:12px 14px; }
+.game-report-stats strong { display:block; font-size:1.1em; margin-top:2px; }
+.game-close-zone { margin-top:20px; border-top:1px solid var(--edge); padding-top:16px; }
+.game-close-zone p { font-size:.9em; margin-top:8px; }
+.game-close-confirm { border:1px solid var(--gold-bright); border-radius:14px; padding:12px; margin-top:12px; background:var(--gold-bg); }
+.game-close-confirm-actions { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+
+/* Informe final a pantalla entera: el cierre es su propio momento. */
+.game-report-full { max-width:960px; }
+.game-report-full-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; padding:16px 0; border-bottom:1px solid var(--edge); margin-bottom:16px; }
+.game-report-full-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+
+/* Estado de la investigación: tarjeta con progreso real y barra.
+ * Logrado: check verde + chip visible, NUNCA tachado. */
 .game-objectives { background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); }
 .game-objectives ul { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:10px; }
 .game-objectives li { font-size:.9em; text-decoration:none; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -83,14 +130,8 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-objective-state { font-size:.7em; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:3px 8px; border-radius:999px; white-space:nowrap; }
 .game-objective-state--done { background:var(--green-bg); color:var(--green); }
 .game-objective-state--todo { background:#EFEDE8; color:var(--muted); }
-.game-clock { text-align:right; }
-.game-clock strong { font-size:1.25em; color:var(--ink); font-family:var(--mono); }
-.game-clock strong span { color:var(--muted); font-size:.7em; }
-.game-clock small { display:block; font-size:.6em; color:var(--muted); }
 
 /* Reloj de arena: cae la arena y el reloj gira al avanzar el tiempo. */
-.game-clock-pulse strong { animation:game-clock-flash 2.4s ease-out 1; }
-@keyframes game-clock-flash { 0% { background:var(--gold-bg); color:var(--ink); } 100% { background:transparent; color:var(--ink); } }
 .game-hourglass { display:inline-flex; align-items:center; gap:8px; margin-left:8px; color:var(--gold); font-size:.75em; vertical-align:middle; }
 .game-hourglass svg { width:30px; height:40px; animation:game-hourglass-spin 1.2s linear infinite; }
 .game-hourglass-scene { margin-left:0; font-size:.85em; }
@@ -105,10 +146,10 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-error { color:var(--error); }
 
 
-/* Escena reorganizada (fase 4): héroe con la ilustración a todo lo ancho y
- * el nombre del lugar encima; debajo, dos columnas (acciones a la
- * izquierda, dossier/estado/operaciones a la derecha). */
-.game-scene { border:1px solid var(--edge); border-radius:18px; background:var(--panel); margin-bottom:16px; box-shadow:var(--shadow); overflow:hidden; }
+/* Escena (rediseño Norte): héroe con la ilustración a todo lo ancho y el
+ * nombre del lugar encima; debajo, una sola columna de grupos de
+ * acciones y el chat con el NPC en línea. */
+.game-scene { border:1px solid var(--edge); border-radius:18px; background:var(--panel); box-shadow:var(--shadow); overflow:hidden; padding-bottom:20px; }
 .game-scene-hero { position:relative; display:flex; align-items:flex-end; min-height:320px; overflow:hidden; border-bottom:1px solid var(--edge); }
 .game-scene-hero .game-scene-art { position:absolute; inset:0; border-bottom:0; background:var(--panel-soft); overflow:hidden; }
 .game-scene-hero .game-scene-art img { display:block; width:100%; height:100%; object-fit:cover; object-position:center 62%; }
@@ -119,16 +160,11 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-scene-hero-chip { display:inline-block; background:rgba(255,255,255,.14); color:#FFFFFF; border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:4px 10px; font-size:.7em; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:normal; line-height:1.4; }
 .game-scene-hero-cap .game-hourglass { color:#FFFFFF; }
 .game-scene-description { padding:16px 20px 0; font-size:.95em; line-height:1.7; }
-.game-scene-meta { padding:8px 20px 0; font-size:.85em; color:var(--muted); }
+.game-scene-meta { font-size:.85em; color:var(--muted); }
 .game-scene-meta p { margin-top:4px; }
 
-/* Rejilla de la escena: izquierda ancha, derecha estrecha (320 px). */
-.game-scene-grid { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:20px; align-items:start; padding:16px 20px 20px; }
-.game-scene-main { display:grid; gap:20px; min-width:0; }
-.game-scene-side { display:grid; gap:20px; min-width:0; }
-
 /* Grupo de acciones: tarjeta con cabecera numerada, como en la maqueta. */
-.game-scene-group { background:var(--panel); border:1px solid var(--edge); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
+.game-scene-group { background:var(--panel); border:1px solid var(--edge); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; margin:16px 20px 0; }
 .game-scene-group-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; border-bottom:1px solid var(--edge); padding:18px 22px 12px; }
 .game-scene-group-head h2 { font-size:20px; }
 .game-scene-group-head span { color:var(--muted); font-size:.8em; white-space:nowrap; }
@@ -157,30 +193,16 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-scene-npc-topics button { white-space:nowrap; }
 .game-scene-closed { padding:12px; color:var(--muted); font-size:.9em; }
 
-/* Columna derecha: tarjetas de dossier, estado y operaciones. */
-.game-scene-side-card { background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); }
-.game-scene-side-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
-.game-scene-side-head h2 { font-size:20px; }
-.game-scene-side-head span { color:var(--muted); font-size:.8em; white-space:nowrap; }
-.game-scene-side-empty { color:var(--muted); font-size:.85em; margin-top:12px; }
-.game-scene-evidence { border:1px solid var(--edge); border-radius:12px; padding:13px 15px; margin-top:10px; background:#FFFFFF; }
-.game-scene-evidence-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.game-scene-evidence-type { color:var(--gold); font-size:.7em; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
-.game-scene-evidence-minute { font-family:var(--mono); font-size:.75em; color:var(--muted); white-space:nowrap; }
-.game-scene-evidence h4 { margin:6px 0 3px; font-size:.9em; font-family:var(--sans); font-weight:700; line-height:1.4; }
-.game-scene-evidence p { color:var(--muted); font-size:.8em; }
-.game-scene-side-full { width:100%; margin-top:14px; }
+/* Cabecera de panel dentro del dock (antes .game-scene-side-head). */
+.game-panel-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.game-panel-head h2 { font-size:20px; }
+.game-panel-head span { color:var(--muted); font-size:.8em; white-space:nowrap; }
 .game-scene-progress-line { display:flex; justify-content:space-between; align-items:baseline; margin-top:12px; font-size:.9em; }
 .game-scene-progress-line b:last-child { color:var(--teal-dark); }
 .game-scene-progress { height:7px; background:#ECE8DC; border-radius:99px; overflow:hidden; margin-top:7px; }
 .game-scene-progress i { display:block; height:100%; background:var(--gold-bright); border-radius:99px; }
-.game-scene-ops { display:grid; gap:10px; margin-top:12px; }
-.game-scene-ops button { text-align:left; font-weight:600; font-size:.85em; }
-.game-scene-ops button[aria-pressed="true"] { background:var(--ink); border-color:var(--ink); color:#FFFFFF; font-weight:700; }
-.game .game-scene-ops-primary { background:var(--teal); border-color:var(--teal); color:#FFFFFF; font-weight:700; }
-.game .game-scene-ops-primary:hover { background:var(--teal-dark); }
 
-/* Consola narrativa: cuaderno de campo. */
+/* Consola narrativa: cuaderno de campo, sola abajo a todo lo ancho. */
 .game-console { border:1px solid var(--edge); border-left:4px solid var(--gold-bright); border-radius:14px; background:var(--panel); padding:16px 20px; margin-bottom:16px; box-shadow:var(--shadow); }
 .game-console h2 { margin:8px 0 12px; }
 .game-console ol { margin:0; padding:0; list-style:none; max-height:12rem; overflow:auto; font-size:.84em; }
@@ -191,22 +213,10 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-narrative-cursor { color:var(--gold); }
 .game-typing-cursor { color:var(--gold); animation:game-typing-blink .8s steps(1) infinite; }
 @keyframes game-typing-blink { 0%,50% { opacity:1; } 51%,100% { opacity:0; } }
-.game-console details { margin-top:12px; }
-.game-console details summary { cursor:pointer; color:var(--muted); font-size:.85em; }
-.game-console details ol { max-height:none; }
 
-/* Orden: sección de comando. */
-.game-order { border:1px solid var(--edge); border-radius:14px; background:var(--panel); padding:18px 20px 10px; margin-bottom:16px; box-shadow:var(--shadow); }
-.game-order-label { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:13px; font-size:.85em; text-transform:uppercase; }
-.game-order-label > span { color:var(--muted); font-size:.6em; letter-spacing:.1em; }
-.game-order form { display:flex; align-items:stretch; border:1px solid var(--edge-strong); border-radius:9px; background:#FFFFFF; }
-.game-prompt-symbol { color:var(--gold); padding:0 14px; align-self:center; font-weight:700; }
-.game-order textarea { min-width:0; width:100%; border:0; background:transparent; color:var(--paper); padding:15px 0; font-size:.9em; resize:vertical; }
-.game-order textarea::placeholder { color:var(--muted); }
-.game-order form button { white-space:nowrap; margin:0; border:0; border-left:1px solid var(--edge); border-radius:0 9px 9px 0; background:var(--ink); color:#FFFFFF; font-weight:700; }
-.game-order form button:hover { background:#1D2A44; }
-.game-order-bottom { display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:32px; }
-.game-order-bottom p { font-size:.65em; color:var(--muted); }
+/* Estado del flujo de ofertas en línea (sin campo de órdenes): solo
+ * aclaración, error o recuperación, encima de la consola. */
+.game-order-status { margin-bottom:16px; }
 .game-clarification,.game-recovering { border:1px solid var(--gold-bright); border-radius:14px; padding:12px; margin-top:12px; background:var(--gold-bg); }
 .game-clarification button,.game-recovering button,.game-error button { margin-right:8px; }
 
@@ -219,37 +229,23 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-preview-facts span { white-space:nowrap; font-family:var(--mono); font-weight:600; }
 .game-preview-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:25px; }
 
-/* Animación de viaje. */
+/* Transición de viaje (rediseño Norte, fase 3): la ruta se dibuja en el
+ * mini-mapa, los minutos descuentan y la barra avanza; solo visual, sin
+ * interacción (el contenedor y el panel dejan pasar los clics). */
 .game-travel { position:fixed; inset:0; z-index:30; display:grid; place-items:center; background:rgba(16,24,40,.5); padding:16px; pointer-events:none; }
-.game-travel-panel { pointer-events:auto; border:1px solid var(--edge); border-radius:18px; box-shadow:var(--shadow-lg); background:var(--panel); padding:24px; max-width:520px; width:100%; }
+.game-travel-panel { pointer-events:none; border:1px solid var(--edge); border-radius:18px; box-shadow:var(--shadow-lg); background:var(--panel); padding:24px; max-width:520px; width:100%; }
 .game-travel-panel > p { font-size:.9em; margin-top:8px; }
-.game-travel-route { position:relative; height:56px; margin:16px 0 8px; }
-.game-travel-line { position:absolute; left:0; right:0; top:18px; border-top:2px dashed var(--gold-bright); }
-.game-travel-plane { position:absolute; top:8px; left:4%; width:28px; height:auto; animation:game-travel-plane 2.4s linear 1 forwards; }
-@keyframes game-travel-plane { from { left:4%; } to { left:88%; } }
-.game-travel-city { position:absolute; top:28px; font-size:.75em; }
-.game-travel-from { left:0; }
-.game-travel-to { right:0; }
+.game-travel-svg { display:block; width:100%; height:132px; margin:12px 0 4px; }
+.game-travel-svg-base { stroke:var(--edge-strong); stroke-width:1.5; fill:none; stroke-dasharray:4 4; }
+.game-travel-svg-live { stroke:var(--gold-bright); stroke-width:3; fill:none; stroke-linecap:round; }
+.game-travel-svg-dot { fill:#FFFFFF; stroke:var(--ink); stroke-width:2; }
+.game-travel-svg-label { font-family:var(--sans); font-size:11px; font-weight:700; fill:var(--ink); }
+.game-travel-svg-traveler { fill:var(--gold-bright); stroke:#9A7B14; stroke-width:1.5; }
+.game-travel-count { font-family:var(--mono); font-size:1.25rem; font-weight:500; text-align:center; margin-top:8px; }
+.game-travel-bar { height:9px; background:#EAE6D9; border:1px solid var(--edge); border-radius:99px; overflow:hidden; margin-top:8px; }
+.game-travel-bar > i { display:block; height:100%; background:linear-gradient(90deg, var(--gold-bright), #DFC05A); }
 
-/* Ventanas de herramienta: tarjeta blanca con barra clara. */
-.game-window { position:absolute; z-index:20; width:min(28em, calc(100vw - 32px)); border:1px solid var(--edge); border-radius:14px; background:var(--panel); box-shadow:var(--shadow-lg); overflow:hidden; }
-.game-window-titlebar { display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--panel-soft); color:var(--paper); padding:8px 12px; border-bottom:1px solid var(--edge); cursor:move; }
-.game-window-titlebar h3 { color:var(--paper); margin:0; cursor:move; font-weight:700; }
-.game-window-titlebar h3:focus-visible { outline:2px solid var(--gold); }
-.game-window-controls { display:flex; align-items:center; gap:4px; }
-.game-window-controls button { min-height:32px; padding:2px 8px; }
-.game-window-moving { font-size:.8rem; color:var(--gold); }
-.game-window-body { padding:16px; max-height:60vh; overflow:auto; }
-.game-window-body table { border-collapse:collapse; width:100%; }
-.game-window-body th,.game-window-body td { border:1px solid var(--edge); padding:8px; text-align:left; }
-.game-window-body th { color:var(--muted); font-weight:700; font-size:.75em; letter-spacing:.08em; text-transform:uppercase; background:var(--panel-soft); }
-.game-window-body h4 { font-size:.75em; letter-spacing:.13em; color:var(--muted); font-weight:700; text-transform:uppercase; margin:16px 0 8px; }
-.game-window-body h4:first-child { margin-top:0; }
-.game-window-body label { display:block; margin:8px 0; }
-.game-window-body input,.game-window-body select { width:100%; box-sizing:border-box; background:#FFFFFF; color:var(--ink); border:1px solid var(--edge-strong); border-radius:9px; padding:8px; }
-.game-window-body input[type="checkbox"] { width:20px; height:20px; accent-color:var(--teal); }
-.game-window-body form button[type="submit"] { background:var(--gold-bright); color:var(--ink); border-color:var(--gold-bright); font-weight:700; }
-.game-minimized-bar { position:fixed; left:16px; bottom:16px; z-index:30; display:flex; flex-wrap:wrap; gap:8px; }
+/* Confirmación de carga de un guardado. */
 .game-load-confirm { border:1px solid var(--gold-bright); border-radius:14px; padding:12px; margin-top:12px; background:var(--gold-bg); }
 .game-load-confirm button { margin-right:8px; }
 
@@ -258,6 +254,12 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-atlas-land { position:absolute; inset:10px 15%; background:var(--teal); opacity:.35; clip-path:polygon(30% 0,80% 0,80% 20%,100% 20%,100% 40%,80% 40%,80% 60%,60% 60%,60% 80%,50% 80%,50% 100%,20% 100%,20% 80%,10% 80%,10% 60%,20% 60%,20% 40%,10% 40%,10% 20%,30% 20%); }
 .game-atlas-city { position:absolute; font-size:.7em; color:var(--ink); font-weight:600; text-shadow:0 1px #FFFFFF; }
 .game-atlas-city--case::before { content:"◆ "; color:var(--gold); }
+/* Ruta en vivo en el mapa del dock (rediseño Norte, fase 3): la línea se
+ * traza y el punto avanza con el progreso del viaje. */
+.game-atlas-route { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.game-atlas-route-base { stroke:var(--edge-strong); stroke-width:1.5; fill:none; stroke-dasharray:4 4; }
+.game-atlas-route-live { stroke:var(--gold-bright); stroke-width:3; fill:none; stroke-linecap:round; }
+.game-atlas-travel-dot { position:absolute; width:12px; height:12px; margin:-6px 0 0 -6px; border-radius:50%; background:var(--gold-bright); border:2px solid #9A7B14; }
 .game-atlas-city--tourist::before { content:"▪ "; color:var(--teal); }
 .game-destination-list { list-style:none; padding:0; margin:0; }
 .game-destination-list li { display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid var(--edge); padding:11px 0; }
@@ -272,6 +274,15 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-portrait-photo { flex:none; width:48px; height:60px; object-fit:cover; border:2px solid var(--edge); border-radius:10px; background:#EFEDE8; }
 .game-portrait-photo.game-portrait-small { width:32px; height:40px; }
 .game-chat-turns { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow:auto; }
+/* Respuestas del equipo en su sitio (rediseño Norte, fase 3): la burbuja
+ * bajo la tarjeta de Elena (teal) y de Margaret (dorada). */
+.game-team-reply { flex-direction:column; align-items:stretch; gap:2px; border:1px solid var(--teal); background:var(--teal-bg); border-radius:10px; padding:10px 12px; }
+.game-team-reply span { display:block; }
+.game-team-reply--gold { border-color:var(--gold-bright); background:var(--gold-bg); }
+.game-team-reply .game-chat-speaker { color:var(--teal-dark); }
+.game-team-reply--gold .game-chat-speaker { color:var(--gold); }
+.game-team-avatar { flex:none; width:42px; height:42px; border-radius:50%; background:var(--ink); color:#F3E9C8; display:flex; align-items:center; justify-content:center; font-family:var(--serif); font-weight:700; }
+.game-team-row-text { flex:1; min-width:0; }
 .game-chat-turns li { padding:10px 12px; font-size:.85em; line-height:1.6; max-width:92%; border-radius:12px; }
 .game-chat-turns li span { display:block; }
 .game-chat-speaker { font-size:.7em; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
@@ -287,7 +298,6 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-scene-chat-head h3 { margin:0; font-size:.85em; letter-spacing:.1em; text-transform:uppercase; }
 .game-scene-chat-head h3:focus-visible { outline:2px solid var(--gold); }
 .game-scene-chat-head button { flex:none; }
-.game-order-hint { font-size:.75em; color:var(--muted); margin-top:8px; line-height:1.6; }
 
 /* Tarjeta de evidencia: blanca, borde dorado a la izquierda. */
 .game-evidence-card { padding:18px 14px; border:1px solid var(--edge); border-left:4px solid var(--gold-bright); border-radius:12px; background:var(--panel); color:var(--paper); box-shadow:var(--shadow); margin:12px 0; }
@@ -324,23 +334,16 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 .game-report-objectives li::before { content:"▪ "; color:var(--gold-bright); }
 
 @media (max-width:1100px) { .game { padding:0 20px; } }
+@media (max-width:1020px) {
+  /* La retícula se apila: escena primero, dock después, consola al final. */
+  .game-layout { grid-template-columns:1fr; }
+  .game-dock { position:static; max-height:none; }
+}
 @media (max-width:850px) {
   .game-agency { flex-wrap:wrap; }
-  .game-detective { display:none; }
-  .game-case-strip { grid-template-columns:1fr 1fr; }
-  .game-case-strip > div { border-left:none; border-top:1px solid var(--edge); }
-  .game-case-strip > div:nth-child(-n+2) { border-top:none; }
-  .game-clock { text-align:left; }
-}
-@media (max-width:900px) {
-  /* La rejilla de la escena se apila: acciones primero, columna derecha después. */
-  .game-scene-grid { grid-template-columns:1fr; }
 }
 @media (max-width:720px) {
   .game { padding:8px; }
-  .game-window { position:static; width:auto; box-shadow:var(--shadow); margin-bottom:16px; }
-  .game-window-body { max-height:none; }
-  .game-case-strip { grid-template-columns:1fr; }
   /* Las tarjetas se apilan: icono y título arriba, botón debajo. */
   .game-scene-card { flex-direction:column; gap:10px; }
   .game-scene-card > button { align-self:flex-start; }
@@ -356,12 +359,6 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
   .game-agency { padding:22px 0 12px; }
   .game-brand { gap:12px; }
   .game-mark { width:48px; height:48px; font-size:1.8em; }
-  .game-order { padding:14px; }
-  .game-order form { flex-wrap:wrap; }
-  .game-order textarea { width:calc(100% - 45px); }
-  .game-order form button { width:100%; border-left:0; border-top:1px solid var(--edge); border-radius:0 0 9px 9px; }
-  .game-order-label > span { display:none; }
-  .game-order-bottom { flex-wrap:wrap; }
 }
 @media (prefers-reduced-motion:reduce) { .game *, .game *::before, .game *::after { scroll-behavior:auto; animation:none; transition:none; } }
 /* Movimiento reducido manual (§15). */
@@ -373,3 +370,93 @@ html.game-reduced-motion .game *, html.game-reduced-motion .game *::before, html
 /* Enlace de salto (§15). */
 .game-skip-link { position:absolute; left:-9999px; top:0; z-index:60; background:var(--gold-bright); color:var(--ink); padding:8px 12px; font-weight:700; border-radius:9px; }
 .game-skip-link:focus { position:fixed; left:8px; top:auto; bottom:8px; }
+
+/* Hallazgo en la escena (rediseño Norte, fase 2): tarjeta dorada
+ * destacada con el último descubrimiento y su botón al Dossier. */
+.game-finding-card { background:var(--gold-bg); border:1px solid var(--gold-bright); border-radius:12px; padding:16px; margin:0 0 16px; box-shadow:0 2px 8px rgba(16,24,40,.10); }
+.game-finding-kicker { display:block; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-bottom:6px; }
+.game-finding-card h3 { margin:0 0 4px; font-size:18px; line-height:1.35; overflow-wrap:anywhere; }
+.game-finding-meta { margin:0 0 12px; font-size:13px; color:var(--ink-soft); }
+.game-finding-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.game-finding-note { margin:0; font-size:13px; color:var(--ink-soft); flex:1 1 200px; min-width:0; }
+
+/* Distintivo con el número de evidencias en la pestaña Dossier. */
+.game-dock-badge { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; margin-left:6px; padding:0 5px; border-radius:999px; background:var(--gold-bright); color:var(--ink); font-size:12px; font-weight:700; line-height:1; }
+
+/* Tarjeta de inspeccionar ya revisada: sin coste, sin duplicar. */
+.game-scene-card--reviewed { background:var(--gold-bg); }
+.game-scene-card-state--reviewed { color:var(--green); }
+
+/* Ficha de evidencia del maletín (fase 2): título y meta ajustan dentro
+ * de su caja (nada se sale); el análisis vive en la propia ficha. */
+.game-evidence-row { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; min-width:0; }
+.game-evidence-title { flex:1 1 200px; min-width:0; font-weight:700; overflow-wrap:anywhere; }
+.game-evidence-meta { margin:6px 0 0; font-size:13px; color:var(--ink-soft); overflow-wrap:anywhere; }
+.game-evidence-analysis { margin-top:10px; }
+.game-evidence-analysis-hint { margin:6px 0 0; font-size:13px; color:var(--ink-soft); }
+.game-analysis-status { margin:0; padding:8px 10px; border-radius:8px; background:var(--teal-bg); color:var(--teal); font-weight:600; overflow-wrap:anywhere; }
+.game-analysis-result { border-top:1px solid var(--edge); padding-top:8px; }
+.game-analysis-result-kind { display:block; font-size:13px; font-weight:700; color:var(--teal); overflow-wrap:anywhere; }
+.game-analysis-result p { margin:4px 0 0; overflow-wrap:anywhere; }
+.game-no-analysis { margin:0; font-size:13px; color:var(--ink-soft); font-style:italic; }
+
+/* Informe final como recorrido (rediseño Norte, fase 4): una sola columna
+ * en móvil y escritorio; cada tarjeta tiene su propio estado y ningún texto
+ * se sale de su caja (flex-wrap + min-width:0 + overflow-wrap). */
+.game-report-full section { margin:24px 0; }
+.game-report-full section > h2 { margin:0 0 8px; }
+.game-report-full section > p { margin:8px 0; }
+.game-score-hero { display:grid; grid-template-columns:170px 1fr; gap:16px; align-items:start; background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:16px; margin-top:12px; }
+.game-score-big { text-align:center; border:2px solid var(--gold-bright); background:var(--gold-bg); border-radius:12px; padding:12px 8px; }
+.game-score-number { font-family:var(--serif); font-size:2.6em; font-weight:800; line-height:1; }
+.game-score-of { font-size:.85em; font-weight:700; color:var(--gold); margin-top:4px; }
+.game-score-parts { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
+.game-score-part { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; text-align:left; border:1.5px solid var(--edge-strong); border-radius:10px; padding:10px 12px; background:#FFFFFF; }
+.game-score-part:hover { border-color:var(--ink); }
+.game-score-part[aria-pressed="true"] { border-color:var(--gold-bright); background:var(--gold-bg); }
+.game-score-part-label { font-size:.72em; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); overflow-wrap:anywhere; }
+.game-score-part-value { font-family:var(--mono); font-size:1.05em; overflow-wrap:anywhere; }
+.game-score-part-why { font-size:.75em; font-weight:700; color:var(--gold); }
+.game-score-detail { grid-column:1 / -1; border:1px solid var(--teal); background:var(--teal-bg); border-radius:10px; padding:10px 12px; margin:0; overflow-wrap:anywhere; }
+.game-timeline-nav { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 12px; }
+.game-timeline-pos { font-family:var(--mono); font-size:.85em; color:var(--muted); }
+.game-timeline-list { list-style:none; margin:0 0 12px; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:8px; }
+.game-timeline-item { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; min-width:0; text-align:left; border:1.5px solid var(--edge-strong); border-radius:10px; padding:8px 10px; background:#FFFFFF; }
+.game-timeline-item:hover { border-color:var(--ink); }
+.game-timeline-item[aria-pressed="true"] { border-color:var(--gold-bright); background:var(--gold-bg); }
+.game-timeline-minute { font-family:var(--mono); font-size:.75em; color:var(--gold); }
+.game-timeline-summary { font-weight:700; font-size:.9em; line-height:1.35; overflow-wrap:anywhere; min-width:0; }
+.game-timeline-evidence { font-size:.75em; font-weight:700; color:var(--teal-dark); overflow-wrap:anywhere; }
+.game-timeline-detail { border:2px solid var(--gold-bright); background:var(--gold-bg); border-radius:12px; padding:12px 14px; }
+.game-timeline-detail h3 { margin:4px 0 8px; }
+.game-timeline-detail p { margin:6px 0; overflow-wrap:anywhere; }
+.game-route-cities { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px; margin-top:8px; }
+.game-route-city { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; text-align:left; border:1.5px solid var(--edge-strong); border-radius:10px; padding:10px 12px; background:#FFFFFF; }
+.game-route-city:hover { border-color:var(--ink); }
+.game-route-city[aria-expanded="true"] { border-color:var(--teal); background:var(--teal-bg); }
+.game-route-city-name { font-weight:800; overflow-wrap:anywhere; }
+.game-route-city-sub { font-size:.8em; color:var(--muted); font-weight:600; overflow-wrap:anywhere; }
+.game-route-panel { border:1px solid var(--teal); background:#FFFFFF; border-radius:10px; padding:12px 14px; margin-top:10px; }
+.game-route-panel h3 { margin:0 0 6px; }
+.game-route-panel li { overflow-wrap:anywhere; }
+.game-evidence-gallery { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:10px; margin-top:8px; }
+.game-evidence-card { border:1px solid var(--edge); border-left:4px solid var(--gold-bright); border-radius:10px; background:#FFFFFF; padding:10px 12px; min-width:0; }
+.game-evidence-card--missed { border-left-color:var(--error, #B42318); background:var(--panel-soft); }
+.game-journey-evidence-title { margin:0; font-weight:700; line-height:1.35; overflow-wrap:anywhere; min-width:0; }
+.game-evidence-code { white-space:nowrap; }
+.game-evidence-text { font-weight:700; overflow-wrap:anywhere; }
+.game-evidence-toggle { margin-top:8px; }
+.game-evidence-detail { border-top:1px dashed var(--edge); margin-top:10px; padding-top:8px; }
+.game-evidence-detail p { margin:4px 0; font-size:.88em; overflow-wrap:anywhere; }
+.game-truth-details { border:1px solid var(--edge); border-radius:10px; background:#FFFFFF; margin:8px 0; overflow:hidden; }
+.game-truth-details summary { cursor:pointer; font-family:var(--serif); font-weight:700; font-size:1em; padding:10px 12px; min-height:44px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+.game-truth-details[open] summary { border-bottom:1px solid var(--edge); background:var(--panel-soft); }
+.game-truth-details p { margin:8px 12px; overflow-wrap:anywhere; }
+.game-truth-details .game-report-objectives { margin:8px 12px; }
+.game-chrono-full-list { margin:8px 0; padding-left:20px; }
+.game-chrono-full-list li { margin:6px 0; overflow-wrap:anywhere; }
+.game-report-closing { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--edge); }
+@media (max-width:560px) {
+  .game-score-hero { grid-template-columns:1fr; }
+  .game-score-big { text-align:left; padding:10px 12px; }
+}

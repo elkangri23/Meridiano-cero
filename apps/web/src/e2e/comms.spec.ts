@@ -31,10 +31,10 @@ async function collectLockEvidence(page: Page) {
   await expect(page.getByTestId('clock')).toContainText('30 min');
 }
 
-/** Abre la central de comunicaciones desde la barra de herramientas. */
+/** Abre la pestaña Central del dock. */
 async function openComms(page: Page) {
-  await page.click('button:has-text("Central de comunicaciones")');
-  await expect(page.getByRole('dialog', { name: 'Central de comunicaciones' })).toBeVisible();
+  await page.getByTestId('toolbar-comms').click();
+  await expect(page.getByRole('tabpanel', { name: 'Central' })).toBeVisible();
 }
 
 test.describe('E2E central de comunicaciones', () => {
@@ -42,9 +42,8 @@ test.describe('E2E central de comunicaciones', () => {
     await openGameScreen(page);
     // Sin hablar con nadie, la central no ofrece contactos.
     await openComms(page);
-    const comms = page.getByRole('dialog', { name: 'Central de comunicaciones' });
+    const comms = page.getByTestId('dock-panel-central');
     await expect(comms).toContainText('Habla primero con alguien en persona');
-    await page.keyboard.press('Escape');
     await talkToLucia(page);
     await openComms(page);
     // Lucía, con correo y fax; Tomás no aparece (aún no se ha hablado con él).
@@ -76,7 +75,7 @@ test.describe('E2E central de comunicaciones', () => {
     await collectLockEvidence(page);
     await talkToLucia(page);
     await openComms(page);
-    const comms = page.getByRole('dialog', { name: 'Central de comunicaciones' });
+    const comms = page.getByTestId('dock-panel-central');
     // El documento solo ofrece lo recogido: la cerradura sí, lo demás no.
     await page.getByTestId('comms-recipient').selectOption('lucia');
     const docOptions = await page.getByTestId('comms-document').locator('option').allTextContents();
@@ -92,8 +91,7 @@ test.describe('E2E central de comunicaciones', () => {
     await expect(page.getByTestId('comms-history')).toContainText('Documento: La cerradura de la vitrina tiene residuo de herramienta.');
     await expect(page.getByTestId('comms-history')).toContainText('Acuse sobre el min 90');
     // El documento sigue en poder del jugador (se envía una copia).
-    await page.keyboard.press('Escape');
     await page.click('button:has-text("Dossier")');
-    await expect(page.getByRole('dialog', { name: 'Dossier' })).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
+    await expect(page.getByTestId('dock-panel-dossier')).toContainText('La cerradura de la vitrina tiene residuo de herramienta.');
   });
 });

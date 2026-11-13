@@ -7,7 +7,7 @@ import type { Page } from '@playwright/test';
  * No se prueba con un lector de pantalla real ni con usuarios reales
  * (Antonio confirmó que no dispone de ellos): se prueba el comportamiento
  * observable en el navegador (atributos ARIA, foco, clases, anuncios).
- * El archivo tiene 8 pruebas (8 entradas locales): la API de desarrollo
+ * El archivo tiene 7 pruebas (7 entradas locales): la API de desarrollo
  * limita la entrada local a 10 intentos por IP y minuto. */
 
 /** Crea una partida desde la UI del archivo; la creación confirmada navega sola a su pantalla de juego. */
@@ -25,7 +25,7 @@ async function openGameScreen(page: Page) {
 
 async function openSettings(page: Page) {
   await page.click('button:has-text("Ajustes")');
-  const settings = page.getByRole('dialog', { name: 'Ajustes' });
+  const settings = page.getByTestId('dock-panel-settings');
   await expect(settings).toBeVisible();
   return settings;
 }
@@ -82,7 +82,7 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     await expect.poll(async () => (await activeElement(page))?.id, { timeout: 5000 }).toBe('game-scene');
   });
 
-  test('el dossier con teclado: foco dorado, título al abrir, botón activo oscuro y retorno al cerrar', async ({ page }) => {
+  test('el dossier con teclado: foco dorado, título al abrir y pestaña activa marcada', async ({ page }) => {
     await openGameScreen(page);
     await dismissIntro(page);
     // Un Tab pone al navegador en modalidad teclado: el foco por script
@@ -96,40 +96,25 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     expect(outline.width).toBe('3px');
     expect(outline.color).toBe('rgb(255, 255, 85)');
     await page.keyboard.press('Enter');
-    const dossier = page.getByRole('dialog', { name: 'Dossier' });
+    const dossier = page.getByRole('tabpanel', { name: 'Dossier' });
     await expect(dossier).toBeVisible();
     await expect.poll(async () => activeElement(page), { timeout: 5000 }).toEqual(
-      expect.objectContaining({ tag: 'H3', text: 'Dossier' }));
+      expect.objectContaining({ tag: 'H2', text: 'Dossier' }));
     const active = await page.evaluate(() => {
       const button = document.querySelector('[data-testid="toolbar-dossier"]') as HTMLElement;
       const style = getComputedStyle(button);
-      return { background: style.backgroundColor, weight: style.fontWeight, pressed: button.getAttribute('aria-pressed') };
+      return { boxShadow: style.boxShadow, weight: style.fontWeight, selected: button.getAttribute('aria-selected') };
     });
-    expect(active.pressed).toBe('true');
-    expect(active.background).toBe('rgb(0, 85, 85)');
+    expect(active.selected).toBe('true');
     expect(active.weight).toBe('700');
-    await page.keyboard.press('Escape');
+    expect(active.boxShadow).toContain('rgb(201, 162, 39)');
+    // Sin ventanas ya no hay cierre: cambiar a otra pestaña oculta el
+    // dossier y el foco va al encabezado del panel nuevo.
+    await page.getByTestId('toolbar-map').focus();
+    await page.keyboard.press('Enter');
     await expect(dossier).toBeHidden();
-    await expectFocusTestId(page, 'toolbar-dossier');
-  });
-
-  test('minimizar mueve el foco a Restaurar y restaurar lo devuelve al título', async ({ page }) => {
-    await openGameScreen(page);
-    await dismissIntro(page);
-    await page.getByTestId('toolbar-dossier').focus();
-    await page.keyboard.press('Enter');
-    const dossier = page.getByRole('dialog', { name: 'Dossier' });
-    await expect(dossier).toBeVisible();
-    await expect.poll(async () => (await activeElement(page))?.tag, { timeout: 5000 }).toBe('H3');
-    // Título → Mover → Minimizar.
-    await page.keyboard.press('Tab');
-    await page.keyboard.press('Tab');
-    await expect.poll(async () => (await activeElement(page))?.text, { timeout: 5000 }).toBe('_');
-    await page.keyboard.press('Enter');
-    await expectFocusTestId(page, 'minimized-restore-dossier');
-    await page.keyboard.press('Enter');
     await expect.poll(async () => activeElement(page), { timeout: 5000 }).toEqual(
-      expect.objectContaining({ tag: 'H3', text: 'Dossier' }));
+      expect.objectContaining({ tag: 'H2', text: 'Mapa' }));
   });
 
   test('el diálogo de confirmación atrapa el foco y lo devuelve al cancelar', async ({ page }) => {
@@ -168,7 +153,6 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     // Con el movimiento reducido, las animaciones se apagan.
     const settings = await openSettings(page);
     await settings.getByTestId('a11y-reduced-motion').check();
-    await page.keyboard.press('Escape');
     await expect.poll(async () => page.evaluate(() => document.documentElement.className)).toContain('game-reduced-motion');
     await page.getByTestId('offer-inspect:MAD-SALA:cerradura').click();
     await expect(page.getByTestId('clock')).toContainText('20 min');
@@ -179,7 +163,6 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     // Sin anuncios, la región queda vacía aunque haya narración nueva.
     const settingsAgain = await openSettings(page);
     await settingsAgain.getByTestId('a11y-announce-narration').uncheck();
-    await page.keyboard.press('Escape');
     await page.getByTestId('offer-collect:EV-02').click();
     await expect(page.getByTestId('clock')).toContainText('30 min');
     await page.waitForTimeout(2000);
@@ -198,7 +181,7 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     await dismissIntro(page);
     await page.getByTestId('toolbar-map').focus();
     await page.keyboard.press('Enter');
-    const map = page.getByRole('dialog', { name: 'Mapa' });
+    const map = page.getByRole('tabpanel', { name: 'Mapa' });
     await expect(map).toBeVisible();
     const atlas = map.locator('.game-atlas');
     await expect(atlas).toHaveAttribute('role', 'img');
@@ -207,18 +190,17 @@ test.describe('E2E accesibilidad (GDD §15)', () => {
     await expect(atlas).toHaveAttribute('aria-label', /Mapa mundial con las ciudades admitidas: Madrid, Barcelona, .*París, Lisboa\./);
   });
 
-  test('a escala 200% no hay desbordamiento horizontal ni ventanas fuera de la pantalla', async ({ page }) => {
+  test('a escala 200% no hay desbordamiento horizontal ni paneles fuera de la pantalla', async ({ page }) => {
     await openGameScreen(page);
     const settings = await openSettings(page);
     await settings.getByLabel('Tamaño de texto').selectOption('200');
-    await page.keyboard.press('Escape');
     await expect.poll(async () => page.evaluate(() => getComputedStyle(document.querySelector('main') as HTMLElement).fontSize)).toBe('32px');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     expect(overflow).toBe(true);
     await dismissIntro(page);
     await page.getByTestId('toolbar-team').focus();
     await page.keyboard.press('Enter');
-    const team = page.getByRole('dialog', { name: 'Equipo A.C.M.E.' });
+    const team = page.getByRole('tabpanel', { name: 'Equipo' });
     await expect(team).toBeVisible();
     const box = await team.boundingBox();
     expect(box).not.toBeNull();

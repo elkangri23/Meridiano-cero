@@ -1,5 +1,5 @@
 import { isIdempotencyKey } from '@meridiano/contracts';
-import type { SessionDto } from '@meridiano/contracts';
+import type { CaseSummary, ContentRating, CrimeType, SessionDto } from '@meridiano/contracts';
 import type { ArchiveApi, CreationParams, ExplorationMode } from './client';
 import { ArchiveError } from './client';
 
@@ -142,4 +142,18 @@ export function createRunCoordinator(api: ArchiveApi, storage: IntentStorage) {
       return send(intent, identity, signal);
     },
   };
+}
+
+/** Preselección de «Repetir este expediente» (informe final, fase 4):
+ * desde el estado de navegación, el expediente a repetir y su dificultad.
+ * Solo vale si el expediente sigue en el catálogo y se puede iniciar; un
+ * id desconocido, no iniciable o que no es texto no preselecciona nada y
+ * una dificultad no válida equivale a normal. La partida NO se crea aquí:
+ * el usuario la confirma desde el formulario. */
+export interface RepeatSelection { caseId: string; crimeType: CrimeType; contentRating: ContentRating; difficulty: Difficulty }
+export function repeatPreselect(cases: CaseSummary[], repeatCaseId: unknown, difficulty: unknown): RepeatSelection | null {
+  if (typeof repeatCaseId !== 'string') return null;
+  const entry = cases.find(item => item.caseId === repeatCaseId && item.canStart);
+  if (!entry) return null;
+  return { caseId: entry.caseId, crimeType: entry.crimeType, contentRating: entry.contentRating, difficulty: isDifficulty(difficulty) ? difficulty : 'normal' };
 }
