@@ -51,6 +51,7 @@ export interface AdminDashboardMetrics {
   runsActive: number;
   aiTokensUsed24h: number;
   aiErrorRate24h: number;
+  byProvider: AdminAIMetrics[];
 }
 
 export interface AdminAuditLogEntry {

@@ -33,15 +33,8 @@ export const adminApi = {
   },
 
   async getDashboardMetrics(): Promise<AdminDashboardMetrics> {
-    // Fase 1: datos mock. En Fase 2, reemplazar por llamada real.
-    return {
-      usersTotal: 127,
-      usersActive24h: 23,
-      runsTotal: 89,
-      runsActive: 5,
-      aiTokensUsed24h: 45231,
-      aiErrorRate24h: 2.1,
-    };
+    // Fase 2: métricas reales desde la API
+    return request('/admin/metrics');
   },
 
   async getUsers(): Promise<{ users: AdminUserSummary[]; total: number }> {

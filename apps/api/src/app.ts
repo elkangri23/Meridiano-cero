@@ -75,7 +75,7 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
     registerAiRoutes(app, options.config, options.database);
     registerAiConnectionRoutes(app, options.config, options.database);
 
-    // Rutas de administración (Fase 1). Se registran siempre; el acceso
+    // Rutas de administración (Fase 2). Se registran siempre; el acceso
     // está protegido por createAdminAuthorizer (sesión + rol admin/superadmin).
     if (options.config.adminEnabled ?? true) {
       registerAdminRoutes(app, options.config, options.database);

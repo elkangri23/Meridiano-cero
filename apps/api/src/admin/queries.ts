@@ -1,8 +1,43 @@
 import { sql } from 'drizzle-orm';
+import type { Database } from '../database/connection.ts';
 
-// Consultas para métricas de IA
-export function getIAMetricsQuery() {
-  return sql`
+// Tipos para los resultados de las consultas
+export interface IAMetricsRow {
+  providerId: string;
+  model: string;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalTokens: number;
+  avgLatencyMs: number;
+  requestCount: number;
+  errorCount: number;
+}
+
+export interface RunsMetricsRow {
+  status: string;
+  difficulty: string;
+  count: number;
+  avgDeadlineMinutes: number;
+}
+
+export interface UsersMetricsRow {
+  role: string;
+  userCount: number;
+  activeSessions: number;
+}
+
+export interface AuditLogRow {
+  action: string;
+  targetType: string;
+  targetId: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
+// Consulta para métricas de IA (24h)
+export async function getIAMetrics(database: Database): Promise<IAMetricsRow[]> {
+  const result = await database.orm.execute(sql<IAMetricsRow>`
     SELECT
       providerId,
       model,
@@ -15,12 +50,13 @@ export function getIAMetricsQuery() {
     FROM ai_usage
     WHERE createdAt >= NOW() - INTERVAL '24 hours'
     GROUP BY providerId, model
-  `;
+  `);
+  return (result as unknown as { rows: IAMetricsRow[] }).rows ?? [];
 }
 
-// Consultas para métricas de partidas
-export function getRunsMetricsQuery() {
-  return sql`
+// Consulta para métricas de partidas (24h)
+export async function getRunsMetrics(database: Database): Promise<RunsMetricsRow[]> {
+  const result = await database.orm.execute(sql<RunsMetricsRow>`
     SELECT
       status,
       difficulty,
@@ -29,25 +65,29 @@ export function getRunsMetricsQuery() {
     FROM runs
     WHERE createdAt >= NOW() - INTERVAL '24 hours'
     GROUP BY status, difficulty
-  `;
+  `);
+  return (result as unknown as { rows: RunsMetricsRow[] }).rows ?? [];
 }
 
-// Consultas para métricas de usuarios
-export function getUsersMetricsQuery() {
-  return sql`
+// Consulta para métricas de usuarios por rol
+export async function getUsersMetrics(database: Database): Promise<UsersMetricsRow[]> {
+  const result = await database.orm.execute(sql<UsersMetricsRow>`
     SELECT
       role,
       COUNT(*) as userCount,
       COUNT(DISTINCT sessionId) as activeSessions
     FROM profiles
-    LEFT JOIN sessions ON profiles.id = sessions.profileId AND sessions.revokedAt IS NULL AND sessions.expiresAt > NOW()
+    LEFT JOIN sessions ON profiles.id = sessions.profileId
+      AND sessions.revokedAt IS NULL
+      AND sessions.expiresAt > NOW()
     GROUP BY role
-  `;
+  `);
+  return (result as unknown as { rows: UsersMetricsRow[] }).rows ?? [];
 }
 
-// Consultas para cuotas IA
-export function getAIQuotasQuery() {
-  return sql`
+// Consulta para cuotas IA activas
+export async function getAIQuotas(database: Database) {
+  const result = await database.orm.execute(sql`
     SELECT
       scope,
       scopeValue,
@@ -56,53 +96,39 @@ export function getAIQuotasQuery() {
       isActive
     FROM ai_quotas
     WHERE isActive = true
-  `;
+  `);
+  return (result as unknown as { rows: any[] }).rows ?? [];
 }
 
-// Consultas para auditoría
-export function getAdminAuditQuery(filters: { startDate?: string; endDate?: string; action?: string }) {
-  const conditions: string[] = [];
-  const params: any[] = [];
-
-  if (filters.startDate) {
-    conditions.push(`createdAt >= $${params.length + 1}`);
-    params.push(filters.startDate);
-  }
-  if (filters.endDate) {
-    conditions.push(`createdAt <= $${params.length + 1}`);
-    params.push(filters.endDate);
-  }
-  if (filters.action) {
-    conditions.push(`action = $${params.length + 1}`);
-    params.push(filters.action);
-  }
-
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  return sql`
+// Consulta para auditoría con filtros opcionales
+export async function getAdminAudit(database: Database, filters: { startDate?: string; endDate?: string; action?: string }): Promise<AuditLogRow[]> {
+  const result = await database.orm.execute(sql<AuditLogRow>`
     SELECT
       action,
-      target_type,
-      target_id,
+      target_type as "targetType",
+      target_id as "targetId",
       before,
       after,
-      created_at
+      created_at as "createdAt"
     FROM admin_audit_log
-    ${sql.raw(whereClause)}
+    ${filters.startDate ? sql`WHERE createdAt >= ${filters.startDate}` : sql``}
+    ${filters.endDate ? sql`AND createdAt <= ${filters.endDate}` : sql``}
+    ${filters.action ? sql`AND action = ${filters.action}` : sql``}
     ORDER BY created_at DESC
-  `;
+  `);
+  return (result as unknown as { rows: AuditLogRow[] }).rows ?? [];
 }
 
 // Función para registrar acción administrativa
-export async function logAdminAction(_database: any, data: {
+export async function logAdminAction(database: Database, data: {
   adminId: string;
   action: string;
   targetType: string;
   targetId: string;
-  before?: any;
-  after?: any;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
 }) {
-  await sql`
+  await database.orm.execute(sql`
     INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, before, after, created_at)
     VALUES (
       ${data.adminId},
@@ -113,5 +139,5 @@ export async function logAdminAction(_database: any, data: {
       ${JSON.stringify(data.after ?? null)},
       NOW()
     )
-  `;
+  `);
 }
