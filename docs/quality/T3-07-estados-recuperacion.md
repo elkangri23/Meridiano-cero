@@ -1,6 +1,6 @@
 # T3-07: estados de recuperación UI
 
-Fecha: 2026-11-16. Continuación autorizada de la fase 3. Referencias: SPEC-004/006, BORDES-EJECUCION.md (BOR-067 a BOR-072), TAREAS.md.
+Fecha: 2026-11-16. Continuación autorizada de la fase 3. Referencias: SPEC-004/006, BORDES-EJECUCION.md (BOR-067 a BOR-072), TARESAS.md.
 
 ## Comportamiento implementado
 
@@ -54,6 +54,16 @@ Se añaden claves de traducción en los tres idiomas:
 | BOR-070 | Modal falla, llega evento | El foco se restaura con `restoreFocusRef`; el estado persiste hasta que el usuario actúa |
 | BOR-071 | Preferencias inválidas o storage bloqueado | Defaults seguros; `savePhase` no depende de localStorage |
 | BOR-072 | Assets/versiones distintas | `uncertain` permite al usuario recargar y sincronizar |
+
+## Pendiente (flujo general de acciones)
+
+Los siguientes estados mencionados en TARESAS.md línea 11 quedan pendientes:
+- `preview` / `confirming` / `awaiting_result`: manejo de órdenes/confirmaciones
+- `refreshing`: refresco de respuesta de cierre
+- `unauthenticated`: transición desde sin sesión
+- `degraded`: modo degradado
+
+Estos estados pertenecen al flujo general de acciones, no específicamente a guardados/cargas.
 
 ## Verificación ejecutada
 
