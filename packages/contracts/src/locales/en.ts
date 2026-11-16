@@ -722,6 +722,8 @@ export const EN_MESSAGES: Record<LocaleKey, string> = {
   'game.saveRun': 'Save run',
   'game.saveConfirmed': 'Save confirmed by the server.',
   'game.saveFailed': 'Could not save. Try again.',
+  'game.saveUncertain': 'Save uncertain. Reload the page to verify.',
+  'game.saveConflict': 'Version conflict. Reload to sync changes.',
   'game.manualSaves': 'Manual saves',
   'game.loadConfirmText': 'You will return to "{name}" (min {minute}). You will lose the later progress of the current branch; the first official result is kept.',
   'game.loadThisPoint': 'Load this point',

@@ -725,6 +725,8 @@ export const FR_MESSAGES: Record<LocaleKey, string> = {
   'game.saveRun': 'Sauvegarder la partie',
   'game.saveConfirmed': 'Sauvegarde confirmée par le serveur.',
   'game.saveFailed': 'Impossible de sauvegarder. Réessaie.',
+  'game.saveUncertain': 'Sauvegarde incertaine. Recharge la page pour vérifier.',
+  'game.saveConflict': 'Conflit de version. Recharge pour synchroniser les changements.',
   'game.manualSaves': 'Sauvegardes manuelles',
   'game.loadConfirmText': 'Tu reviendras à « {name} » (min {minute}). Tu perdras la progression ultérieure de la branche actuelle ; le premier résultat officiel est conservé.',
   'game.loadThisPoint': 'Charger ce point',

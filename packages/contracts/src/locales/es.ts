@@ -732,6 +732,8 @@ export const ES_MESSAGES = {
   'game.saveRun': 'Guardar partida',
   'game.saveConfirmed': 'Guardado confirmado por el servidor.',
   'game.saveFailed': 'No se pudo guardar. Reinténtalo.',
+  'game.saveUncertain': 'Guardado incierto. Recarga la página para verificar.',
+  'game.saveConflict': 'Conflicto de versión. Recarga para alinear cambios.',
   'game.manualSaves': 'Guardados manuales',
   'game.loadConfirmText': 'Volverás a «{name}» (min {minute}). Perderás el progreso posterior de la rama actual; el primer resultado oficial se mantiene.',
   'game.loadThisPoint': 'Cargar este punto',

@@ -46,7 +46,17 @@ type OrderPhase =
   | { kind: 'error'; message: string };
 
 type ScreenPhase = 'loading' | 'ready' | 'signed_out' | 'not_found' | 'error';
-type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
+/** Estados de UI para operaciones de guardado/carga (T3-07). Cada estado
+ * define qué controles están habilitados, el foco y el anuncio accesible.
+ * No traslada reglas de dominio al cliente: la incertidumbre se muestra,
+ * pero el servidor decide. */
+type SavePhase =
+  | 'idle'
+  | 'saving'
+  | 'saved'
+  | 'failed'
+  | 'uncertain'
+  | 'conflict';
 
 /** Claves i18n de los canales, tipos de solicitud y tipos de evidencia
  * (el texto vive en `locales/es.ts`). */
@@ -1725,6 +1735,8 @@ function SavesContent({ view, saves, savePhase, saveName, replaceTarget, loadTar
       replaceTarget={replaceTarget} onSaveName={onSaveName} onCreate={onCreate} />
     {savePhase === 'saved' && <p role="status">{t('game.saveConfirmed')}</p>}
     {savePhase === 'failed' && <p role="alert">{t('game.saveFailed')}</p>}
+    {savePhase === 'uncertain' && <p role="alert">{t('game.saveUncertain')}</p>}
+    {savePhase === 'conflict' && <p role="alert">{t('game.saveConflict')}</p>}
     <h4>{t('game.manualSaves')}</h4>
     <SaveList saves={saves} atLimit={atLimit} closed={closed} onLoad={onLoad} onDelete={onDelete} onReplace={onReplace} />
     {loadTarget && <div className="game-load-confirm" role="dialog" aria-label={t('game.confirmLoad')} data-testid="load-confirm">
@@ -2961,7 +2973,13 @@ export function GameScreen() {
       await reloadSaves();
       await reloadView();
     } catch (error) {
-      setSavePhase('failed');
+      // VERSION_CONFLICT: otra pestaña actuó antes; conservamos la intención
+      // de guardar pero pedimos recarga para alinear la revisión actual.
+      if (error instanceof GameError && error.kind === 'version_conflict') {
+        setSavePhase('conflict');
+        return;
+      }
+      setSavePhase('uncertain');
       handleActionError(error);
     }
   }
@@ -2978,6 +2996,13 @@ export function GameScreen() {
       setNotice(t('game.notice.saveLoaded', { name: target.name, minute: response.clock.minute }));
       await reloadSaves();
     } catch (error) {
+      // VERSION_CONFLICT: otra pestaña cargó o actuó antes; la intención de
+      // carga se conserva como incierta hasta que el usuario recargue la vista.
+      if (error instanceof GameError && error.kind === 'version_conflict') {
+        setSavePhase('conflict');
+        return;
+      }
+      setSavePhase('uncertain');
       handleActionError(error);
     }
   }
