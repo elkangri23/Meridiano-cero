@@ -18,7 +18,7 @@ import { loadRunTimeline } from './timeline.ts';
 import { loadCareerProfile, loadOfficialResultForContent } from './career.ts';
 import { contentHashForDefinition } from '@meridiano/case-schema/server';
 import { eq, and, desc, sql } from 'drizzle-orm';
-import { manualSaves, operationRecords } from '../database/schema.ts';
+import { manualSaves, operationRecords, runs } from '../database/schema.ts';
 import type { CaseRun } from '@meridiano/case-schema';
 import { createHash, randomUUID } from 'node:crypto';
 
@@ -387,6 +387,34 @@ export function registerGameRoutes(app: FastifyInstance, config: AppConfig, data
       const next = saves.length > limitNum ? saves[limitNum] : undefined;
       const nextCursor = next ? next.id : null;
       return reply.send({ items, manualLimit: 10, manualCount: items.length, nextCursor });
+    }
+  );
+
+  // POST /api/v1/runs/:runId/close - Cerrar partida oficialmente (T3-06)
+  app.post<{ Params: { runId: string } }>(
+    '/api/v1/runs/:runId/close',
+    { onRequest: authorize },
+    async (request, reply) => {
+      const run = await available(() => readStoredRun(database, digest(request), request.params.runId));
+      if (run.status === 'closed') return reply.code(200).send({ message: 'La partida ya está cerrada.', runId: request.params.runId });
+
+      await database.orm.update(runs)
+        .set({ status: 'closed', updatedAt: sql`now()` })
+        .where(eq(runs.id, request.params.runId));
+
+      // Registrar en operación_records
+      await database.orm.insert(operationRecords).values({
+        runId: request.params.runId,
+        ownerId: run.ownerId,
+        idempotencyKey: `close-run-${request.params.runId}`,
+        kind: 'close_run',
+        requestDigest: createHash('sha256').update(JSON.stringify({ runId: request.params.runId })).digest('hex'),
+        resultPublic: JSON.stringify({ status: 'closed' }),
+        branchId: run.branchId,
+        revision: run.revision,
+      }).execute();
+
+      return reply.code(200).send({ runId: request.params.runId, status: 'closed', message: 'Partida cerrada exitosamente' });
     }
   );
 

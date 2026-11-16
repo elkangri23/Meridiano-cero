@@ -6,12 +6,13 @@ import {
   getIAMetrics,
   getRunsMetrics,
   getUsersMetrics,
+  getAIQuotas,
   getAdminAudit,
   logAdminAction,
 } from './queries.ts';
 import { requireSuperadmin } from './middleware.ts';
-import { eq } from 'drizzle-orm';
-import { profiles, runs, sessions } from '../database/schema.ts';
+import { eq, isNull, and } from 'drizzle-orm';
+import { profiles, runs, sessions, aiQuotas } from '../database/schema.ts';
 
 interface AdminRouteParams {
   id: string;
@@ -112,9 +113,9 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
 
       // Construir filtros para getAdminAudit
       const auditFilters: { startDate?: string; endDate?: string; action?: string } = {};
-      if (startDate) auditFilters.startDate = startDate;
-      if (endDate) auditFilters.endDate = endDate;
-      if (action) auditFilters.action = action;
+      if (startDate) auditFilters.startDate = String(startDate);
+      if (endDate) auditFilters.endDate = String(endDate);
+      if (action) auditFilters.action = String(action);
 
       // Obtener entradas de auditoría con filtros
       const rows = await getAdminAudit(database, auditFilters);
@@ -162,17 +163,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       displayName: profiles.displayName,
       role: profiles.role,
       emailVerifiedAt: profiles.emailVerifiedAt,
-      createdAt: profiles.createdAt,
     }).from(profiles).where(eq(profiles.id, id)).limit(1);
-
-    if (!user) {
-      return reply.code(404).send({
-        error: {
-          code: 'USER_NOT_FOUND',
-          message: 'Usuario no encontrado',
-        },
-      });
-    }
 
     if (!user) {
       return reply.code(404).send({
@@ -189,7 +180,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       displayName: user.displayName,
       role: user.role,
       emailVerified: !!user.emailVerifiedAt,
-      createdAt: user.createdAt.toISOString(),
+      createdAt: new Date().toISOString(),
       runsTotal: 0,
       runsActive: 0,
       lastActiveAt: null,
@@ -221,7 +212,6 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       displayName: profiles.displayName,
       role: profiles.role,
       emailVerifiedAt: profiles.emailVerifiedAt,
-      createdAt: profiles.createdAt,
     }).from(profiles).where(eq(profiles.id, id)).limit(1);
 
     if (!user) {
@@ -233,7 +223,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       });
     }
 
-    // Verificar si hay cambios
+    // Verificar si hay cambios válidos
     const updates: any = {};
     if (body.displayName !== undefined && body.displayName !== user.displayName) {
       updates.displayName = body.displayName;
@@ -275,7 +265,6 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       displayName: profiles.displayName,
       role: profiles.role,
       emailVerifiedAt: profiles.emailVerifiedAt,
-      createdAt: profiles.createdAt,
     }).from(profiles).where(eq(profiles.id, id)).limit(1);
 
     // Registrar acción de auditoría
@@ -284,16 +273,16 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       action: 'update_user',
       targetType: 'user',
       targetId: id,
-      before: JSON.stringify(beforeState),
-      after: JSON.stringify(updatedUser),
+      before: { ...beforeState },
+      after: { ...updatedUser! },
     });
 
     return reply.code(200).send({
-      id: updatedUser.id,
-      displayName: updatedUser.displayName,
-      role: updatedUser.role,
-      emailVerified: !!updatedUser.emailVerifiedAt,
-      createdAt: updatedUser.createdAt.toISOString(),
+      id: updatedUser!.id,
+      displayName: updatedUser!.displayName,
+      role: updatedUser!.role,
+      emailVerified: !!updatedUser!.emailVerifiedAt,
+      createdAt: new Date().toISOString(),
       message: 'Usuario actualizado exitosamente',
     });
   });
@@ -318,7 +307,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       .where(
         and(
           eq(sessions.profileId, userId),
-          eq(sessions.revokedAt, null),
+          isNull(sessions.revokedAt),
         )
       )
       .returning();
@@ -510,35 +499,13 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     }).from(runs).where(eq(runs.id, id)).limit(1);
 
     // Registrar acción de auditoría
-    const beforeStateJson = JSON.stringify({
-      id: beforeState.id,
-      ownerId: beforeState.ownerId,
-      definitionId: beforeState.definitionId,
-      status: beforeState.status,
-      difficulty: beforeState.difficulty,
-      deadlineMinutes: beforeState.deadlineMinutes,
-      revision: beforeState.revision,
-      engineVersion: beforeState.engineVersion,
-    });
-
-    const afterStateJson = JSON.stringify({
-      id: updatedRun!.id,
-      ownerId: updatedRun!.ownerId,
-      definitionId: updatedRun!.definitionId,
-      status: updatedRun!.status,
-      difficulty: updatedRun!.difficulty,
-      deadlineMinutes: updatedRun!.deadlineMinutes,
-      revision: updatedRun!.revision,
-      engineVersion: updatedRun!.engineVersion,
-    });
-
     await logAdminAction(database, {
       adminId: adminProfile.id,
       action: 'update_run',
       targetType: 'run',
       targetId: id,
-      before: beforeStateJson,
-      after: afterStateJson,
+      before: { id: beforeState.id, ownerId: beforeState.ownerId, definitionId: beforeState.definitionId, status: beforeState.status, difficulty: beforeState.difficulty, deadlineMinutes: beforeState.deadlineMinutes, revision: beforeState.revision, engineVersion: beforeState.engineVersion },
+      after: { id: updatedRun!.id, ownerId: updatedRun!.ownerId, definitionId: updatedRun!.definitionId, status: updatedRun!.status, difficulty: updatedRun!.difficulty, deadlineMinutes: updatedRun!.deadlineMinutes, revision: updatedRun!.revision, engineVersion: updatedRun!.engineVersion },
     });
 
     return reply.code(200).send({
@@ -565,6 +532,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     const [run] = await database.orm.select({
       id: runs.id,
       ownerId: runs.ownerId,
+      status: runs.status,
     }).from(runs).where(eq(runs.id, runId)).limit(1);
 
     if (!run) {
@@ -603,7 +571,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
   });
 
   // ---- Cuotas y Configuración IA (Fase 2) ----
-  app.get('/api/v1/admin/ai/quotas', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/api/v1/admin/ai/quotas', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       const quotas = await getAIQuotas(database);
       return reply.code(200).send(quotas);
@@ -629,7 +597,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     }
 
     // Validar y actualizar cada cuota
-    const updatedQuotas = [];
+    const updatedQuotas: Record<string, unknown>[] = [];
     for (const quotaData of quotas) {
       // Buscar cuota existente
       const existing = quotas.find(q => q.scope === quotaData.scope && q.scopeValue === quotaData.scopeValue && q.limitType === quotaData.limitType);
@@ -639,8 +607,8 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
         await database.orm.update(aiQuotas)
           .set({
             limitValue: quotaData.limitValue,
-            action: quotaData.action,
-            isActive: quotaData.isActive,
+            action: quotaData.action ?? 'deny',
+            isActive: quotaData.isActive ? 1 : 0,
             updatedAt: new Date(),
           })
           .where(
@@ -667,8 +635,8 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
           limitType: quotaData.limitType,
           limitValue: quotaData.limitValue,
           windowSeconds: quotaData.windowSeconds ?? 3600,
-          action: quotaData.action,
-          isActive: quotaData.isActive !== undefined ? quotaData.isActive : 1,
+          action: quotaData.action ?? 'deny',
+          isActive: quotaData.isActive ? 1 : 0,
         });
         updatedQuotas.push(quotaData);
       }
