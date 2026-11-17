@@ -42,9 +42,19 @@ const paletteOverrides = {
   deuteranopia: tokensOf(styleCss, /html\.palette-deuteranopia[^{]*\{[^}]*\}/),
   tritanopia: tokensOf(styleCss, /html\.palette-tritanopia[^{]*\{[^}]*\}/),
 };
+// Alto contraste: style.css tiene VARIAS reglas html.game-high-contrast
+// (la compartida y las de .game/.prototype); hay que fusionarlas todas,
+// no solo la primera.
+function tokensOfAll(css, pattern) {
+  const out = {};
+  for (const match of css.matchAll(pattern)) {
+    for (const [, name, value] of match[0].matchAll(/--([a-z-]+):\s*(#[0-9a-f]{6})/gi)) out[name] = value.toLowerCase();
+  }
+  return out;
+}
 const highContrast = {
   ...tokensOf(gameCss, /\.game-high-contrast\s*\{[^}]*\}/),
-  ...tokensOf(styleCss, /html\.game-high-contrast[^{]*\{[^}]*\}/),
+  ...tokensOfAll(styleCss, /html\.game-high-contrast[^{]*\{[^}]*\}/g),
 };
 
 const palettes = {
@@ -63,7 +73,20 @@ const pairs = [
   ['blanco sobre tinta (botones, burbuja propia)', t => [t.white, t.ink], 4.5],
   ['dorado claro sobre tinta', t => [t['gold-bright'], t.ink], 4.5],
   ['tinta sobre dorado claro (botón primario)', t => [t.ink, t['gold-bright']], 4.5],
-  ['blanco sobre teal (botón teal)', t => [t.white, t.teal], 4.5],
+  // El par 'blanco sobre teal' se quita: ningún elemento usa texto blanco
+  // sobre fondo teal (los únicos fondos teal son las tierras del atlas,
+  // decorativas, sin texto); en alto contraste --teal es claro para que
+  // el texto teal sobre panel negro sea legible. En su lugar, los pares
+  // reales de texto teal/verde sobre panel y sobre fichas.
+  ['teal oscuro sobre panel (enlaces del juego)', t => [t['teal-dark'], t.panel], 4.5],
+  ['teal sobre panel', t => [t.teal, t.panel], 4.5],
+  ['verde sobre panel', t => [t.green, t.panel], 4.5],
+  ['papel sobre teal-bg (respuesta de equipo)', t => [t.paper, t['teal-bg']], 4.5],
+  ['teal oscuro sobre teal-bg (portavoz, estado)', t => [t['teal-dark'], t['teal-bg']], 4.5],
+  ['papel sobre gold-bg (confirmación, hallazgo)', t => [t.paper, t['gold-bg']], 4.5],
+  ['dorado sobre gold-bg', t => [t.gold, t['gold-bg']], 4.5],
+  ['verde sobre gold-bg (revisado)', t => [t.green, t['gold-bg']], 4.5],
+  ['verde sobre verde claro (objetivo logrado)', t => [t.green, t['green-bg']], 4.5],
   ['dorado sobre panel (foco, 3:1)', t => [t.gold, t.panel], 3],
 ];
 const fixedPairs = [
@@ -81,6 +104,11 @@ const fixedPairs = [
   ['teal claro #7FD1CE sobre negro (enlaces en alto contraste)', ['#7FD1CE', BLACK], 4.5],
   ['verde claro #5BC98A sobre negro (aviso ok en alto contraste)', ['#5BC98A', BLACK], 4.5],
   ['tinta sobre dorado claro #FFE14D (botón primario en alto contraste)', ['#000000', '#FFE14D'], 4.5],
+  // Alto contraste en el juego (style.css): fichas oscuras con texto claro.
+  ['blanco sobre teal oscuro #062E2E (ficha de equipo en alto contraste)', [WHITE, '#062E2E'], 4.5],
+  ['blanco sobre dorado oscuro #332A00 (ficha dorada en alto contraste)', [WHITE, '#332A00'], 4.5],
+  ['blanco sobre verde oscuro #0B2E1A (ficha verde en alto contraste)', [WHITE, '#0B2E1A'], 4.5],
+  ['teal oscuro #0A5C5B sobre teal claro #E3F2F1 (estado de análisis)', ['#0A5C5B', '#E3F2F1'], 4.5],
 ];
 
 let failures = 0;

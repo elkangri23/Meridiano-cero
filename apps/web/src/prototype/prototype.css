@@ -48,7 +48,7 @@
 .prototype .tool-navigation button { text-align:left; color:var(--muted); background:transparent; border:0; border-left:2px solid transparent; font-size:.7em; padding:16px 11px; line-height:1.5; }
 .prototype .tool-navigation button span { display:block; font-size:.75em; opacity:.8; margin-bottom:5px; }
 .prototype .tool-navigation button[aria-pressed="true"] { background:var(--ink); border-left-color:var(--gold-bright); color:#FFFFFF; }
-.prototype .tool-navigation button:hover { background:var(--panel-soft); color:var(--ink); }
+.prototype .tool-navigation button:not([aria-pressed="true"]):hover { background:var(--panel-soft); color:var(--ink); }
 .prototype .tool-content { padding:23px 20px; font-size:.86em; }
 .prototype .tool-content section>h2 { margin:8px 0 17px; }
 .prototype .tool-content section>p { color:var(--muted); font-size:.9em; }
@@ -111,7 +111,8 @@
 html:has(.prototype),body:has(.prototype) { background:#F8F7F4; }
 .prototype { max-width:1440px; margin:16px auto; padding:16px; background:var(--panel); border:1px solid var(--edge); border-radius:14px; box-shadow:var(--shadow); line-height:1.5; }
 .prototype[data-font="readable"] { font-family:Arial,Helvetica,sans-serif; }
-.prototype[data-contrast="high"] { --panel:#000000; --ink:#000000; --edge:#ffffff; --muted:#ffffff; }
+.prototype[data-contrast="high"] { --panel:#000000; --ink:#000000; --edge:#ffffff; --muted:#ffffff; --panel-soft:#000000; --teal-dark:#7FD1CE; }
+html:has(.prototype[data-contrast="high"]),body:has(.prototype[data-contrast="high"]) { background:#000000; }
 .prototype h1 { font-size:clamp(1.2rem,2.4vw,2rem); font-weight:700; }
 .prototype h2 { font-size:1.15em; font-weight:700; }
 .prototype .overline { font-size:.75em; letter-spacing:.04em; }
@@ -148,3 +149,17 @@ html:has(.prototype),body:has(.prototype) { background:#F8F7F4; }
   .prototype .tool-navigation button[aria-pressed="true"] { border-bottom-color:var(--gold-bright); }
   .prototype .command-bottom { flex-wrap:wrap; }
 }
+
+/* Alto contraste del prototipo (§15): en modo global (clase en <html>) y
+ * en su propio data-contrast="high". El campo de órdenes es blanco con
+ * texto tinta; el símbolo del prompt también; al pasar el ratón por un
+ * botón sin pulsar, el texto pasa a blanco (en alto contraste el fondo
+ * es negro y la tinta desaparecería). */
+html.game-high-contrast .prototype .command-section input,
+.prototype[data-contrast="high"] .command-section input { color:var(--ink); }
+html.game-high-contrast .prototype .command-section input::placeholder,
+.prototype[data-contrast="high"] .command-section input::placeholder { color:#667085; }
+html.game-high-contrast .prototype .command-section .prompt-symbol,
+.prototype[data-contrast="high"] .command-section .prompt-symbol { color:var(--ink); }
+html.game-high-contrast .prototype .tool-navigation button:hover,
+.prototype[data-contrast="high"] .tool-navigation button:hover { color:#FFFFFF; }

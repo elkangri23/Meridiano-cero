@@ -37,19 +37,31 @@ html.game-high-contrast .game, html.game-high-contrast .archive, html.game-high-
 /* Alto contraste en las pantallas públicas (§15): el fondo de página pasa
  * a negro con el resto de la paleta. Sin esto, --paper/--muted en blanco
  * quedaban sobre el papel claro y el texto era invisible (landing,
- * login: overline, descripción, notas de hechos, banner). La pantalla de
- * juego (.game) y el prototipo quedan fuera: su alto contraste vive en
- * game.css y es otra superficie. Los títulos de estas pantallas usan
- * --paper (en modo normal vale lo mismo que --ink), así que en alto
+ * login: overline, descripción, notas de hechos, banner; juego: cabecera
+ * y briefing; prototipo: todo el texto). Los títulos de estas pantallas
+ * usan --paper (en modo normal vale lo mismo que --ink), así que en alto
  * contraste pasan a blanco con el fondo negro. */
 html.game-high-contrast body:has(.landing),
 html.game-high-contrast body:has(.archive),
 html.game-high-contrast body:has(.glosario),
-html.game-high-contrast body:has(.creditos) { background:#000000; color:#FFFFFF; }
+html.game-high-contrast body:has(.creditos),
+html.game-high-contrast body:has(.game),
+html.game-high-contrast body:has(.prototype) { background:#000000; color:#FFFFFF; }
+/* Alto contraste en el juego (§15): las fichas claras (teal-bg, gold-bg,
+ * green-bg, panel-soft) pasan a oscuras y los textos teal/verde a sus
+ * variantes claras; sin esto, el texto blanco quedaba sobre fichas claras
+ * y el teal oscuro sobre panel negro. La regla compartida de arriba no
+ * cubría estos tokens: .game define sus propios valores y ganan a los
+ * heredados de game.css. El prototipo solo necesita panel-soft y
+ * teal-dark: su atlas sigue claro con ciudades en tinta. */
+html.game-high-contrast .game {
+  --panel-soft:#000000; --teal:#7FD1CE; --teal-dark:#7FD1CE; --teal-bg:#062E2E; --gold-bg:#332A00; --green:#5BC98A; --green-bg:#0B2E1A;
+}
+html.game-high-contrast .prototype { --panel-soft:#000000; --teal-dark:#7FD1CE; }
 /* Enlaces y avisos sobre fondo negro: el teal oscuro (2,7:1) y el verde
  * (3,9:1) no llegan a AA; variantes claras de la misma familia (11,9:1 y
- * 10,2:1). Solo en estas pantallas: en el juego --green va sobre fondo
- * verde claro y --teal-dark es texto sobre paneles, y no se tocan. */
+ * 10,2:1). Solo en estas pantallas: el juego y el prototipo llevan sus
+ * propias reglas arriba, con los mismos valores claros. */
 html.game-high-contrast .landing,
 html.game-high-contrast .archive,
 html.game-high-contrast .glosario,

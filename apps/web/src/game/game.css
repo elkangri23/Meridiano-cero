@@ -306,7 +306,7 @@ body:has(.game) { background:#F8F7F4; color:#101828; }
 
 /* Estados vacíos y notas. */
 .game-empty-state { padding:25px 0; text-align:center; border-block:1px dashed var(--edge); margin-top:25px; }
-.game-empty-state .game-empty-glyph { display:block; font-size:3em; color:var(--gold-bright); }
+.game-empty-state .game-empty-glyph { display:block; font-size:3em; color:var(--gold); }
 .game-empty-state p { font-size:.85em; color:var(--muted); margin-top:15px; }
 .game-panel-note { margin-top:20px; font-size:.7em; color:var(--muted); }
 
@@ -394,7 +394,7 @@ html.game-reduced-motion .game *, html.game-reduced-motion .game *::before, html
 .game-evidence-meta { margin:6px 0 0; font-size:13px; color:var(--ink-soft); overflow-wrap:anywhere; }
 .game-evidence-analysis { margin-top:10px; }
 .game-evidence-analysis-hint { margin:6px 0 0; font-size:13px; color:var(--ink-soft); }
-.game-analysis-status { margin:0; padding:8px 10px; border-radius:8px; background:var(--teal-bg); color:var(--teal); font-weight:600; overflow-wrap:anywhere; }
+.game-analysis-status { margin:0; padding:8px 10px; border-radius:8px; background:var(--teal-bg); color:var(--teal-dark); font-weight:600; overflow-wrap:anywhere; }
 .game-analysis-result { border-top:1px solid var(--edge); padding-top:8px; }
 .game-analysis-result-kind { display:block; font-size:13px; font-weight:700; color:var(--teal); overflow-wrap:anywhere; }
 .game-analysis-result p { margin:4px 0 0; overflow-wrap:anywhere; }
@@ -460,3 +460,36 @@ html.game-reduced-motion .game *, html.game-reduced-motion .game *::before, html
   .game-score-hero { grid-template-columns:1fr; }
   .game-score-big { text-align:left; padding:10px 12px; }
 }
+
+/* Alto contraste en la pantalla de juego (§15): el fondo de página es
+ * negro (style.css) y los paneles negros; estos ajustes cubren los usos
+ * de --ink como texto sobre panel negro, los fondos blancos fijos y las
+ * fichas claras. Los tokens oscuros de fichas viven en style.css.
+ * Sin esto: la cabecera y el briefing eran blancos sobre papel claro,
+ * las pestañas del dock y los nombres de NPC tinta sobre negro, y las
+ * fichas de informe blancas con texto blanco. */
+html.game-high-contrast .game button:hover { background:#FFFFFF; }
+html.game-high-contrast .game-dock-tabs button[role="tab"] { color:var(--paper); }
+html.game-high-contrast .game-clock-remaining { color:var(--paper); }
+html.game-high-contrast .game-scene-card-icon { color:var(--paper); }
+html.game-high-contrast .game-scene-card-note { color:var(--paper); }
+html.game-high-contrast .game-scene-npc h3 strong,
+html.game-high-contrast .game-chat-npc strong { color:var(--paper); }
+html.game-high-contrast .game-atlas-city { color:var(--paper); text-shadow:none; }
+html.game-high-contrast .game-travel-svg-label { fill:var(--paper); }
+html.game-high-contrast .game-objective-state--todo,
+html.game-high-contrast .game-state-pill--closed { background:var(--panel-soft); }
+html.game-high-contrast .game-chat-npc-turn { background:var(--panel); }
+html.game-high-contrast .game-score-part,
+html.game-high-contrast .game-timeline-item,
+html.game-high-contrast .game-route-city,
+html.game-high-contrast .game-route-panel,
+html.game-high-contrast .game-truth-details,
+html.game-high-contrast .game-evidence-card { background:var(--panel); }
+html.game-high-contrast .game-score-part[aria-pressed="true"] { background:var(--gold-bg); }
+html.game-high-contrast .game-timeline-item[aria-pressed="true"] { background:var(--gold-bg); }
+html.game-high-contrast .game-route-city[aria-expanded="true"] { background:var(--teal-bg); }
+html.game-high-contrast .game-scene-npc--suspect { background:var(--panel); }
+html.game-high-contrast .game-score-part:hover,
+html.game-high-contrast .game-timeline-item:hover,
+html.game-high-contrast .game-route-city:hover { border-color:#FFFFFF; }
