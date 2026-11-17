@@ -16,7 +16,7 @@ body:has(.glosario) { background:#F8F7F4; color:#101828; }
 }
 .glosario * { box-sizing:border-box; }
 .glosario h1,.glosario h2,.glosario h3 { margin:0; font-family:var(--serif); font-weight:700; line-height:1.25; }
-.glosario h1 { font-size:clamp(1.4rem,4vw,2.2rem); line-height:1.15; color:var(--ink); }
+.glosario h1 { font-size:clamp(1.4rem,4vw,2.2rem); line-height:1.15; color:var(--paper); }
 .glosario h2 { font-size:1.15rem; color:var(--gold); margin-bottom:8px; }
 .glosario h3 { font-size:1rem; color:var(--gold); margin:16px 0 8px; }
 .glosario p { margin:0 0 12px; }
@@ -27,7 +27,7 @@ body:has(.glosario) { background:#F8F7F4; color:#101828; }
 .glosario-mark { position:relative; display:grid; place-items:center; width:56px; height:56px; border:2px solid var(--gold-bright); border-radius:12px; background:var(--ink); color:#FFFFFF; font-family:var(--serif); font-size:2rem; font-weight:700; flex-shrink:0; }
 .glosario-mark span { position:absolute; bottom:1px; right:3px; font-size:.8rem; font-family:var(--sans); background:var(--gold-bright); color:var(--ink); padding:1px 3px; border-radius:3px; }
 .glosario-nav { display:flex; flex-wrap:wrap; gap:6px; padding:20px 0; border-bottom:1px solid var(--edge); margin-bottom:24px; }
-.glosario-nav button { font:inherit; border-radius:9px; border:1px solid transparent; background:transparent; color:var(--ink); padding:10px 13px; min-height:44px; cursor:pointer; font-weight:600; }
+.glosario-nav button { font:inherit; border-radius:9px; border:1px solid transparent; background:transparent; color:var(--paper); padding:10px 13px; min-height:44px; cursor:pointer; font-weight:600; }
 .glosario-nav button:hover { background:var(--panel-soft); }
 .glosario-nav button[aria-pressed="true"] { background:var(--ink); color:#FFFFFF; font-weight:700; }
 .glosario-section { border:1px solid var(--edge); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); padding:16px 20px; margin-bottom:20px; }

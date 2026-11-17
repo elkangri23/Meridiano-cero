@@ -72,6 +72,15 @@ const fixedPairs = [
   ['blanco sobre tinta #101828 (botón activo, burbuja propia)', [WHITE, '#101828'], 4.5],
   ['negro sobre blanco (campos de ventana)', [BLACK, WHITE], 4.5],
   ['verde sobre verde claro (objetivo logrado)', ['#1E7A46', '#E7F4EC'], 4.5],
+  // Alto contraste en las pantallas públicas (landing, archivo/login,
+  // glosario, créditos — ver style.css): el fondo de página es negro y el
+  // texto blanco; los enlaces usan teal claro y los avisos verde claro.
+  // Si cambian esos valores en style.css, hay que cambiarlos aquí también.
+  ['blanco sobre negro (texto de página en alto contraste)', [WHITE, BLACK], 4.5],
+  ['dorado claro #FFE14D sobre negro (alto contraste)', ['#FFE14D', BLACK], 4.5],
+  ['teal claro #7FD1CE sobre negro (enlaces en alto contraste)', ['#7FD1CE', BLACK], 4.5],
+  ['verde claro #5BC98A sobre negro (aviso ok en alto contraste)', ['#5BC98A', BLACK], 4.5],
+  ['tinta sobre dorado claro #FFE14D (botón primario en alto contraste)', ['#000000', '#FFE14D'], 4.5],
 ];
 
 let failures = 0;

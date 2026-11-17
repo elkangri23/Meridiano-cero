@@ -21,7 +21,7 @@ body:has(.archive) { background:#F8F7F4; color:#101828; }
 }
 .archive * { box-sizing:border-box; }
 .archive h1,.archive p { margin:0; }
-.archive h1 { font-family:var(--serif); font-size:clamp(1.5rem,3vw,2.5rem); line-height:1.15; color:var(--ink); font-weight:700; letter-spacing:-.01em; }
+.archive h1 { font-family:var(--serif); font-size:clamp(1.5rem,3vw,2.5rem); line-height:1.15; color:var(--paper); font-weight:700; letter-spacing:-.01em; }
 .archive h2 { font-family:var(--serif); font-weight:700; line-height:1.25; }
 .archive button,.archive select { font:inherit; border-radius:9px; border:1px solid var(--edge-strong); background:#FFFFFF; color:var(--ink); padding:8px 12px; min-height:44px; }
 .archive button:hover { background:var(--panel-soft); }
@@ -48,7 +48,7 @@ body:has(.archive) { background:#F8F7F4; color:#101828; }
 
 /* Lista de partidas. */
 .archive-list { border-top:1px solid var(--edge); padding-top:16px; }
-.archive-list h2 { margin:8px 0; color:var(--ink); font-size:1.15rem; font-weight:700; }
+.archive-list h2 { margin:8px 0; color:var(--paper); font-size:1.15rem; font-weight:700; }
 .archive-list label { display:flex; gap:12px; align-items:center; margin-bottom:16px; }
 .archive-scroll { overflow-x:auto; border:1px solid var(--edge); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); }
 .archive table { border-collapse:collapse; width:100%; text-align:left; min-width:760px; }
@@ -60,7 +60,7 @@ body:has(.archive) { background:#F8F7F4; color:#101828; }
 
 /* Nueva partida: tarjeta blanca. */
 .archive-create { border:1px solid var(--edge); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); padding:18px 20px; margin-bottom:24px; }
-.archive-create h2 { margin:8px 0; color:var(--ink); font-size:1.15rem; font-weight:700; }
+.archive-create h2 { margin:8px 0; color:var(--paper); font-size:1.15rem; font-weight:700; }
 .archive-create p { margin-bottom:12px; }
 .archive-create form { display:flex; gap:16px; flex-wrap:wrap; align-items:start; }
 .archive-create label { display:grid; gap:8px; max-width:100%; }
@@ -81,7 +81,7 @@ body:has(.archive) { background:#F8F7F4; color:#101828; }
 
 /* Ficha inicial: tarjeta blanca. */
 .archive-initial { border:1px solid var(--edge); border-radius:14px; background:var(--panel); box-shadow:var(--shadow); padding:16px; margin-bottom:24px; overflow-wrap:anywhere; }
-.archive-initial h2 { margin:0 0 12px; color:var(--ink); font-size:1.2rem; font-weight:700; }
+.archive-initial h2 { margin:0 0 12px; color:var(--paper); font-size:1.2rem; font-weight:700; }
 .archive-initial h3 { margin:16px 0 8px; font-size:1rem; color:var(--gold); font-weight:700; }
 .archive-initial p { margin-bottom:12px; }
 .archive-initial h2:focus { outline:2px solid var(--gold); outline-offset:2px; }
