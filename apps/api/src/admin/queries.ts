@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import type { Database } from '../database/connection.ts';
 
 // Tipos para los resultados de las consultas
@@ -27,6 +27,8 @@ export interface UsersMetricsRow {
 }
 
 export interface AuditLogRow {
+  id: string;
+  adminId: string;
   action: string;
   targetType: string;
   targetId: string;
@@ -36,50 +38,64 @@ export interface AuditLogRow {
 }
 
 // Consulta para métricas de IA (24h)
+//
+// Las columnas reales son snake_case (provider_id, prompt_tokens, ...);
+// los alias entre comillas devuelven las claves camelCase que espera el
+// contrato IAMetricsRow. Los agregados se castean a int/float porque el
+// driver de Postgres devuelve COUNT/SUM como bigint (cadena) y AVG como
+// numeric (cadena).
 export async function getIAMetrics(database: Database): Promise<IAMetricsRow[]> {
   const result = await database.orm.execute(sql<IAMetricsRow>`
     SELECT
-      providerId,
+      provider_id as "providerId",
       model,
-      SUM(promptTokens) as totalPromptTokens,
-      SUM(completionTokens) as totalCompletionTokens,
-      SUM(totalTokens) as totalTokens,
-      AVG(latencyMs) as avgLatencyMs,
-      COUNT(*) as requestCount,
-      COUNT(CASE WHEN status != 'success' THEN 1 END) as errorCount
+      SUM(prompt_tokens)::int as "totalPromptTokens",
+      SUM(completion_tokens)::int as "totalCompletionTokens",
+      SUM(total_tokens)::int as "totalTokens",
+      AVG(latency_ms)::float as "avgLatencyMs",
+      COUNT(*)::int as "requestCount",
+      COUNT(CASE WHEN status != 'success' THEN 1 END)::int as "errorCount"
     FROM ai_usage
-    WHERE createdAt >= NOW() - INTERVAL '24 hours'
-    GROUP BY providerId, model
+    WHERE created_at >= NOW() - INTERVAL '24 hours'
+    GROUP BY provider_id, model
   `);
   return (result as unknown as { rows: IAMetricsRow[] }).rows ?? [];
 }
 
 // Consulta para métricas de partidas (24h)
+//
+// La tabla runs NO tiene columna status: el estado de la partida vive en
+// engine_state.status ('active' | 'closed', lo mismo que usa el motor).
+// Se deriva de ahí y se documenta, en vez de inventar la columna.
 export async function getRunsMetrics(database: Database): Promise<RunsMetricsRow[]> {
   const result = await database.orm.execute(sql<RunsMetricsRow>`
     SELECT
-      status,
+      engine_state->>'status' as status,
       difficulty,
-      COUNT(*) as count,
-      AVG(deadlineMinutes) as avgDeadlineMinutes
+      COUNT(*)::int as count,
+      AVG(deadline_minutes)::float as "avgDeadlineMinutes"
     FROM runs
-    WHERE createdAt >= NOW() - INTERVAL '24 hours'
-    GROUP BY status, difficulty
+    WHERE created_at >= NOW() - INTERVAL '24 hours'
+    GROUP BY engine_state->>'status', difficulty
   `);
   return (result as unknown as { rows: RunsMetricsRow[] }).rows ?? [];
 }
 
 // Consulta para métricas de usuarios por rol
+//
+// sessions no tiene columna sessionId: la sesión se identifica por
+// token_hash (su clave primaria). El COUNT de usuarios es DISTINCT sobre
+// profiles.id, porque el LEFT JOIN multiplicaría filas por sesión.
 export async function getUsersMetrics(database: Database): Promise<UsersMetricsRow[]> {
   const result = await database.orm.execute(sql<UsersMetricsRow>`
     SELECT
       role,
-      COUNT(*) as userCount,
-      COUNT(DISTINCT sessionId) as activeSessions
+      COUNT(DISTINCT profiles.id)::int as "userCount",
+      COUNT(DISTINCT sessions.token_hash)::int as "activeSessions"
     FROM profiles
-    LEFT JOIN sessions ON profiles.id = sessions.profileId
-      AND sessions.revokedAt IS NULL
-      AND sessions.expiresAt > NOW()
+    LEFT JOIN sessions ON profiles.id = sessions.profile_id
+      AND sessions.revoked_at IS NULL
+      AND sessions.expires_at > NOW()
     GROUP BY role
   `);
   return (result as unknown as { rows: UsersMetricsRow[] }).rows ?? [];
@@ -98,20 +114,32 @@ export async function getAIQuotas(database: Database): Promise<AIQuotaRow[]> {
   const result = await database.orm.execute(sql<AIQuotaRow>`
     SELECT
       scope,
-      scopeValue,
-      limitType,
-      limitValue,
-      isActive
+      scope_value as "scopeValue",
+      limit_type as "limitType",
+      limit_value as "limitValue",
+      is_active as "isActive"
     FROM ai_quotas
-    WHERE isActive = true
+    WHERE is_active = 1
   `);
   return (result as unknown as { rows: AIQuotaRow[] }).rows ?? [];
 }
 
 // Consulta para auditoría con filtros opcionales
+//
+// Las condiciones se construyen como lista y se unen con AND: la versión
+// anterior interpolaba un WHERE solo para startDate y un AND suelto para
+// los demás filtros, lo que rompía la SQL cuando startDate no venía, y
+// usaba createdAt (inexistente; la columna es created_at).
 export async function getAdminAudit(database: Database, filters: { startDate?: string; endDate?: string; action?: string }): Promise<AuditLogRow[]> {
+  const conditions: SQL[] = [];
+  if (filters.startDate) conditions.push(sql`created_at >= ${filters.startDate}`);
+  if (filters.endDate) conditions.push(sql`created_at <= ${filters.endDate}`);
+  if (filters.action) conditions.push(sql`action = ${filters.action}`);
+  const where = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
   const result = await database.orm.execute(sql<AuditLogRow>`
     SELECT
+      id,
+      admin_id as "adminId",
       action,
       target_type as "targetType",
       target_id as "targetId",
@@ -119,9 +147,7 @@ export async function getAdminAudit(database: Database, filters: { startDate?: s
       after,
       created_at as "createdAt"
     FROM admin_audit_log
-    ${filters.startDate ? sql`WHERE createdAt >= ${filters.startDate}` : sql``}
-    ${filters.endDate ? sql`AND createdAt <= ${filters.endDate}` : sql``}
-    ${filters.action ? sql`AND action = ${filters.action}` : sql``}
+    ${where}
     ORDER BY created_at DESC
   `);
   return (result as unknown as { rows: AuditLogRow[] }).rows ?? [];

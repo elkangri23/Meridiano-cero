@@ -110,12 +110,25 @@ async function findUserById(database: Database, id: string) {
   return user ?? null;
 }
 
+/**
+ * Estado de una partida a partir de su engine_state: la tabla runs NO tiene
+ * columna status (el esquema drizzle la declaraba, pero la BD nunca la tuvo);
+ * el motor guarda el estado en engine_state.status ('active' | 'closed').
+ */
+function runStatusOf(engineState: unknown): 'active' | 'closed' {
+  if (typeof engineState === 'object' && engineState !== null && 'status' in engineState) {
+    const status = (engineState as { status?: unknown }).status;
+    if (status === 'closed') return 'closed';
+  }
+  return 'active';
+}
+
 async function findRunById(database: Database, id: string) {
   const [run] = await database.orm.select({
     id: runs.id,
     ownerId: runs.ownerId,
     definitionId: runs.definitionId,
-    status: runs.status,
+    engineState: runs.engineState,
     difficulty: runs.difficulty,
     deadlineMinutes: runs.deadlineMinutes,
     revision: runs.revision,
@@ -123,7 +136,9 @@ async function findRunById(database: Database, id: string) {
     createdAt: runs.createdAt,
     updatedAt: runs.updatedAt,
   }).from(runs).where(eq(runs.id, id)).limit(1);
-  return run ?? null;
+  if (!run) return null;
+  const { engineState, ...rest } = run;
+  return { ...rest, status: runStatusOf(engineState) };
 }
 
 async function findProfileNameById(database: Database, id: string) {
@@ -366,15 +381,14 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       });
 
       return reply.code(200).send({
-        data: paginatedRows,
-        pagination: {
-          totalItems,
-          totalPages,
-          currentPage,
-          itemsPerPage,
-          hasNextPage: currentPage < totalPages,
-          hasPrevPage: currentPage > 1,
-        },
+        // El cliente web (adminApi.getAuditLog) espera { logs, total }:
+        // la forma anterior { data, pagination } dejaba logs undefined y
+        // la tabla vacía aunque el endpoint funcionara.
+        logs: paginatedRows,
+        total: totalItems,
+        page: currentPage,
+        limit: itemsPerPage,
+        totalPages,
       });
     } catch {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Error obteniendo auditoría' } });
@@ -625,7 +639,19 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     const beforeState = { ...run };
 
     // Aplicar actualizaciones
-    await database.orm.update(runs).set(updates).where(eq(runs.id, id));
+    // El estado no es una columna: vive en engine_state.status (igual que
+    // lo escribe el motor al cerrar). Se actualiza con jsonb_set; el resto
+    // de campos sí son columnas y van por drizzle.
+    const { status: nextStatus, ...columnUpdates } = updates;
+    if (Object.keys(columnUpdates).length > 0) {
+      await database.orm.update(runs).set(columnUpdates).where(eq(runs.id, id));
+    }
+    if (nextStatus !== undefined) {
+      await database.pool.query(
+        "UPDATE runs SET engine_state = jsonb_set(engine_state, '{status}', to_jsonb($1::text)) WHERE id = $2",
+        [nextStatus, id],
+      );
+    }
 
     // Obtener partida actualizada usando query directo
     const updatedRun = await findRunById(database, id);
