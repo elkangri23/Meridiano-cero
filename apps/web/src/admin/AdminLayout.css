@@ -444,7 +444,8 @@ body:has(.admin-layout) {
   border: 1px solid var(--edge);
   border-radius: 14px;
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .audit-table {
   border-collapse: collapse;
@@ -503,6 +504,13 @@ body:has(.admin-layout) {
 
 /* Responsive. */
 @media (max-width: 768px) {
+  .admin-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .admin-username {
+    display: none;
+  }
   .admin-body {
     flex-direction: column;
   }
