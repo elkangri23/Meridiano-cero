@@ -70,3 +70,16 @@ export interface AdminHealthResponse {
   timestamp: string;
   version: string;
 }
+
+export interface AuditFiltersState {
+  startDate: string | undefined;
+  endDate: string | undefined;
+  action: string | undefined;
+}
+
+export interface AuditPaginationState {
+  totalItems: number;
+  totalPages: number;
+  currentPage: number;
+  itemsPerPage: number;
+}
