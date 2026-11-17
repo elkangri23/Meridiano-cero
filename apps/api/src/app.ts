@@ -20,6 +20,15 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { HealthResponse } from '@meridiano/contracts';
 
+type CreateAppOptions = {
+  config: AppConfig;
+  database: Database;
+  state?: RuntimeState;
+  telemetry?: Telemetry;
+  mailer?: Mailer | null;
+  generationWorker?: boolean;
+};
+
 /** Solo INVALID_DESTINATION, VALIDATION_ERROR, GENERATION_LIMIT y FORBIDDEN
  * llevan mensaje propio (texto seguro del validador); el resto usa el
  * mensaje genérico para no filtrar detalles. */
@@ -29,7 +38,7 @@ function runStoreErrorMessage(error: RunStoreError): string {
     : 'No se pudo completar la solicitud.';
 }
 
-export function createApp(options?: { config: AppConfig; database: Database; state?: RuntimeState; telemetry?: Telemetry; mailer?: Mailer | null; generationWorker?: boolean }) {
+function buildFastifyInstance(options?: CreateAppOptions): FastifyInstance {
   const app: FastifyInstance = Fastify({ logger: false, requestTimeout: 65_000, connectionTimeout: 65_000,
     // Plazos alineados de fuera a dentro con la IA: el proveedor admite
     // 60 s (AI_TIMEOUT_MS / timeoutMs por defecto), así que el servidor
@@ -48,42 +57,41 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
     reply.header('X-Request-Id', request.id);
     reply.header('Cache-Control', 'no-store');
   });
-  const state = options?.state ?? { draining: false };
-  registerRuntime(app, state, options?.telemetry);
-  app.get<{ Reply: HealthResponse }>('/api/v1/health', async () => ({ status: 'ok' }));
-  if (options) {
-    const ready = createReadiness(options.database);
-    app.get('/api/v1/ready', async (_request, reply) => {
-      const available = !state.draining && await ready();
-      return reply.code(available ? 200 : 503).send({ status: available ? 'ready' : 'not_ready' });
-    });
-    registerLocalAuth(app, options.config, options.database);
-    registerDetectiveProfile(app, options.config, options.database);
-    // Registro público solo cuando la configuración lo activa (producción).
-    // La sesión local de desarrollo no se registra en producción porque
-    // config.localAuth es false allí (fail-closed en config.ts).
-    if (options.config.registrationEnabled) registerPublicAuth(app, options.config, options.database, options.mailer ?? null);
-    registerGameRoutes(app, options.config, options.database, ready);
-    registerGenerationRoutes(app, options.config, options.database, ready);
-    registerCaseExchangeRoutes(app, options.config, options.database, ready);
-    // El worker de generación vive en el proceso de la API (T4-08). Solo se
-    // arranca en el servidor real: los tests lo crean a mano cuando lo necesitan.
-    if (options.generationWorker) {
-      const worker = startGenerationWorker(options.database, options.config);
-      app.addHook('onClose', async () => { worker.stop(); });
-    }
-    registerAiRoutes(app, options.config, options.database);
-    registerAiConnectionRoutes(app, options.config, options.database);
+  return app;
+}
 
-    // Rutas de administración (Fase 2). Se registran siempre; el acceso
-    // está protegido por createAdminAuthorizer (sesión + rol admin/superadmin).
-    if (options.config.adminEnabled ?? true) {
-      registerAdminRoutes(app, options.config, options.database);
-    }
-  }
-  app.setNotFoundHandler((request, reply) => {
-    return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Recurso no disponible.', requestId: request.id } });
+function registerConfiguredRoutes(app: FastifyInstance, options: CreateAppOptions, state: RuntimeState): void {
+  const ready = createReadiness(options.database);
+  app.get('/api/v1/ready', async (_request, reply) => {
+    const available = !state.draining && await ready();
+    return reply.code(available ? 200 : 503).send({ status: available ? 'ready' : 'not_ready' });
   });
+  registerLocalAuth(app, options.config, options.database);
+  registerDetectiveProfile(app, options.config, options.database);
+  // Registro público solo cuando la configuración lo activa (producción).
+  // La sesión local de desarrollo no se registra en producción porque
+  // config.localAuth es false allí (fail-closed en config.ts).
+  if (options.config.registrationEnabled) registerPublicAuth(app, options.config, options.database, options.mailer ?? null);
+  registerGameRoutes(app, options.config, options.database, ready);
+  registerGenerationRoutes(app, options.config, options.database, ready);
+  registerCaseExchangeRoutes(app, options.config, options.database, ready);
+  // El worker de generación vive en el proceso de la API (T4-08). Solo se
+  // arranca en el servidor real: los tests lo crean a mano cuando lo necesitan.
+  if (options.generationWorker) {
+    const worker = startGenerationWorker(options.database, options.config);
+    app.addHook('onClose', async () => { worker.stop(); });
+  }
+  registerAiRoutes(app, options.config, options.database);
+  registerAiConnectionRoutes(app, options.config, options.database);
+
+  // Rutas de administración (Fase 2). Se registran siempre; el acceso
+  // está protegido por createAdminAuthorizer (sesión + rol admin/superadmin).
+  if (options.config.adminEnabled ?? true) {
+    registerAdminRoutes(app, options.config, options.database);
+  }
+}
+
+function registerErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof RunStoreError) {
       const statuses = {
@@ -106,5 +114,19 @@ export function createApp(options?: { config: AppConfig; database: Database; sta
     const body = status === 500 ? { code: 'INTERNAL_ERROR', message: 'Error interno.' } : clientErrors[status];
     return reply.code(status).send({ error: { ...body, requestId: request.id } });
   });
+}
+
+export function createApp(options?: CreateAppOptions) {
+  const app = buildFastifyInstance(options);
+  const state = options?.state ?? { draining: false };
+  registerRuntime(app, state, options?.telemetry);
+  app.get<{ Reply: HealthResponse }>('/api/v1/health', async () => ({ status: 'ok' }));
+  if (options) {
+    registerConfiguredRoutes(app, options, state);
+  }
+  app.setNotFoundHandler((request, reply) => {
+    return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Recurso no disponible.', requestId: request.id } });
+  });
+  registerErrorHandler(app);
   return app;
 }
