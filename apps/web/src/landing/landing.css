@@ -36,9 +36,12 @@ body:has(.landing) { background:#F8F7F4; color:#101828; }
 .landing-actions { margin-left:auto; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
 .landing-actions a { font-weight:700; white-space:nowrap; }
 
-.landing-primary { display:inline-block; background:var(--gold-bright); color:var(--ink); border:1px solid var(--gold-bright); border-radius:9px; padding:12px 20px; font-weight:700; text-decoration:none; min-height:44px; }
+/* Los botones son enlaces (<a>): el selector lleva la `a` para que su
+ * color tinta gane a `.landing a` (teal); sin ella el texto del botón
+ * primario quedaba en teal oscuro sobre dorado (3,2:1). */
+.landing a.landing-primary { display:inline-block; background:var(--gold-bright); color:var(--ink); border:1px solid var(--gold-bright); border-radius:9px; padding:12px 20px; font-weight:700; text-decoration:none; min-height:44px; }
 .landing-primary:hover { background:#B8931F; }
-.landing-secondary { display:inline-block; background:#FFFFFF; color:var(--ink); border:1px solid var(--edge-strong); border-radius:9px; padding:12px 20px; font-weight:700; text-decoration:none; min-height:44px; }
+.landing a.landing-secondary { display:inline-block; background:#FFFFFF; color:var(--ink); border:1px solid var(--edge-strong); border-radius:9px; padding:12px 20px; font-weight:700; text-decoration:none; min-height:44px; }
 .landing-secondary:hover { background:var(--panel-soft); }
 
 .landing-hero { padding:48px 0 32px; max-width:640px; }
