@@ -287,7 +287,7 @@ export function DashboardPage() {
                 border: 'none',
                 padding: '6px 12px',
                 borderRadius: '4px',
-                fontFamily: "'Courier New', monospace',
+                fontFamily: "'Courier New', monospace",
                 fontSize: '12px',
                 cursor: 'pointer',
               }}
@@ -309,7 +309,7 @@ export function DashboardPage() {
                 border: 'none',
                 padding: '6px 12px',
                 borderRadius: '4px',
-                fontFamily: "'Courier New', monospace',
+                fontFamily: "'Courier New', monospace",
                 fontSize: '12px',
                 cursor: 'pointer',
               }}
@@ -328,13 +328,13 @@ export function DashboardPage() {
         }}>
           {auditLoading && (
             <div style={{ padding: '24px', textAlign: 'center' }}>
-              <span style={{ color: '#666', fontFamily: "'Courier New', monospace' }}>Cargando auditoría…</span>
+              <span style={{ color: '#666', fontFamily: "'Courier New', monospace" }}>Cargando auditoría…</span>
             </div>
           )}
 
           {auditError && (
             <div style={{ padding: '24px', textAlign: 'center', color: '#ff5555' }}>
-              <span style={{ color: '#fff', fontFamily: "'Courier New', monospace' }}>Error: {auditError}</span>
+              <span style={{ color: '#fff', fontFamily: "'Courier New', monospace" }}>Error: {auditError}</span>
             </div>
           )}
 
@@ -345,14 +345,14 @@ export function DashboardPage() {
                   background: #0000aa;
                   color: #fff;
                   padding: 8px 12px;
-                  fontFamily: "'Courier New', monospace';
+                  fontFamily: "'Courier New', monospace";
                   fontSize: 12px;
                   border-bottom: 1px solid #333;
                 }
                 .audit-table td {
                   color: #fff;
                   padding: 8px 12px;
-                  fontFamily: "'Courier New', monospace';
+                  fontFamily: "'Courier New', monospace";
                   fontSize: 12px;
                   border-bottom: 1px solid #333;
                 }
