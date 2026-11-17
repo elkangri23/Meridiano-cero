@@ -86,8 +86,16 @@ export async function getUsersMetrics(database: Database): Promise<UsersMetricsR
 }
 
 // Consulta para cuotas IA activas
-export async function getAIQuotas(database: Database) {
-  const result = await database.orm.execute(sql`
+export interface AIQuotaRow {
+  scope: string;
+  scopeValue: string | null;
+  limitType: string;
+  limitValue: number;
+  isActive: number;
+}
+
+export async function getAIQuotas(database: Database): Promise<AIQuotaRow[]> {
+  const result = await database.orm.execute(sql<AIQuotaRow>`
     SELECT
       scope,
       scopeValue,
@@ -97,7 +105,7 @@ export async function getAIQuotas(database: Database) {
     FROM ai_quotas
     WHERE isActive = true
   `);
-  return (result as unknown as { rows: any[] }).rows ?? [];
+  return (result as unknown as { rows: AIQuotaRow[] }).rows ?? [];
 }
 
 // Consulta para auditoría con filtros opcionales
