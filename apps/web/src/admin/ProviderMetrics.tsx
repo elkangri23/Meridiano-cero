@@ -1,6 +1,6 @@
 import type { AdminAIMetrics } from './types.js';
 
-/** Métricas de IA por proveedor (24h). El padre solo lo monta cuando hay datos. */
+/** Métricas de IA por proveedor (24h). Se monta siempre; sin datos muestra el mensaje de «sin datos». */
 export function ProviderMetrics({ providers }: { providers: AdminAIMetrics[] }) {
   return (
     <section className="provider-metrics">

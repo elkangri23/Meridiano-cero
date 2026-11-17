@@ -74,9 +74,7 @@ export function DashboardPage() {
         </p>
       </section>
 
-      {providerMetrics.length > 0 && (
-        <ProviderMetrics providers={providerMetrics} />
-      )}
+      <ProviderMetrics providers={providerMetrics} />
 
       <AuditSection />
     </section>
