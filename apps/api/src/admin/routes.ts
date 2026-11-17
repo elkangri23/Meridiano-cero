@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { AppConfig } from '../config.ts';
 import type { Database } from '../database/connection.ts';
-import { createAdminAuthorizer } from './middleware.ts';
+import { createAdminAuthorizer, getAdminProfile, requireSuperadmin } from './middleware.ts';
 import {
   getIAMetrics,
   getRunsMetrics,
@@ -9,13 +9,264 @@ import {
   getAIQuotas,
   getAdminAudit,
   logAdminAction,
+  type IAMetricsRow,
+  type RunsMetricsRow,
+  type UsersMetricsRow,
 } from './queries.ts';
-import { requireSuperadmin } from './middleware.ts';
 import { eq, isNull, and } from 'drizzle-orm';
 import { profiles, runs, sessions, aiQuotas } from '../database/schema.ts';
 
 interface AdminRouteParams {
   id: string;
+}
+
+interface AuditQuery {
+  startDate?: string;
+  endDate?: string;
+  action?: string;
+  page?: string | number;
+  limit?: string | number;
+}
+
+interface UserUpdateBody {
+  displayName?: string;
+  role?: string;
+  emailVerified?: boolean;
+}
+
+type UserRole = 'player' | 'admin' | 'superadmin';
+
+interface UserUpdates {
+  displayName?: string;
+  role?: UserRole;
+  emailVerifiedAt?: Date | null;
+}
+
+interface RunUpdateBody {
+  status?: string;
+  difficulty?: string;
+  deadlineMinutes?: number;
+  revision?: number;
+}
+
+interface RunUpdates {
+  status?: 'active' | 'closed';
+  difficulty?: 'easy' | 'normal' | 'hard';
+  deadlineMinutes?: number;
+  revision?: number;
+}
+
+interface QuotaInput {
+  scope: string;
+  scopeValue?: string | null;
+  limitType: string;
+  limitValue: number;
+  windowSeconds?: number;
+  action?: string;
+  isActive?: boolean;
+}
+
+interface QuotasUpdateBody {
+  quotas?: QuotaInput[];
+}
+
+/** Error de validación de un campo en una actualización admin (400 con código propio). */
+class AdminValidationError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+function isUserRole(value: string): value is UserRole {
+  return value === 'player' || value === 'admin' || value === 'superadmin';
+}
+
+function isRunStatus(value: string): value is 'active' | 'closed' {
+  return value === 'active' || value === 'closed';
+}
+
+function isRunDifficulty(value: string): value is 'easy' | 'normal' | 'hard' {
+  return value === 'easy' || value === 'normal' || value === 'hard';
+}
+
+type QuotaScope = 'user' | 'global' | 'ip' | 'function' | 'model' | 'provider';
+
+const QUOTA_SCOPES: readonly QuotaScope[] = ['user', 'global', 'ip', 'function', 'model', 'provider'];
+
+function isQuotaScope(value: string): value is QuotaScope {
+  return (QUOTA_SCOPES as readonly string[]).includes(value);
+}
+
+async function findUserById(database: Database, id: string) {
+  const [user] = await database.orm.select({
+    id: profiles.id,
+    displayName: profiles.displayName,
+    role: profiles.role,
+    emailVerifiedAt: profiles.emailVerifiedAt,
+  }).from(profiles).where(eq(profiles.id, id)).limit(1);
+  return user ?? null;
+}
+
+async function findRunById(database: Database, id: string) {
+  const [run] = await database.orm.select({
+    id: runs.id,
+    ownerId: runs.ownerId,
+    definitionId: runs.definitionId,
+    status: runs.status,
+    difficulty: runs.difficulty,
+    deadlineMinutes: runs.deadlineMinutes,
+    revision: runs.revision,
+    engineVersion: runs.engineVersion,
+    createdAt: runs.createdAt,
+    updatedAt: runs.updatedAt,
+  }).from(runs).where(eq(runs.id, id)).limit(1);
+  return run ?? null;
+}
+
+async function findProfileNameById(database: Database, id: string) {
+  const [owner] = await database.orm.select({
+    id: profiles.id,
+    displayName: profiles.displayName,
+    role: profiles.role,
+  }).from(profiles).where(eq(profiles.id, id)).limit(1);
+  return owner ?? null;
+}
+
+function computeUserUpdates(body: UserUpdateBody, user: { displayName: string; role: UserRole; emailVerifiedAt: Date | null }): UserUpdates {
+  const updates: UserUpdates = {};
+  if (body.displayName !== undefined && body.displayName !== user.displayName) {
+    updates.displayName = body.displayName;
+  }
+  if (body.role !== undefined && body.role !== user.role) {
+    if (!isUserRole(body.role)) {
+      throw new AdminValidationError('INVALID_ROLE', 'Rol inválido. Debe ser: player, admin o superadmin');
+    }
+    updates.role = body.role;
+  }
+  if (body.emailVerified !== undefined && body.emailVerified !== !!user.emailVerifiedAt) {
+    updates.emailVerifiedAt = body.emailVerified ? new Date() : null;
+  }
+  if (Object.keys(updates).length === 0) {
+    throw new AdminValidationError('NO_CHANGES', 'No hay cambios para actualizar');
+  }
+  return updates;
+}
+
+type RunCurrent = { status: string; difficulty: string; deadlineMinutes: number; revision: number };
+
+function applyRunStatus(body: RunUpdateBody, run: RunCurrent, updates: RunUpdates): void {
+  if (body.status === undefined || body.status === run.status) return;
+  if (!isRunStatus(body.status)) {
+    throw new AdminValidationError('INVALID_STATUS', 'Estado inválido. Debe ser: active o closed');
+  }
+  updates.status = body.status;
+}
+
+function applyRunDifficulty(body: RunUpdateBody, run: RunCurrent, updates: RunUpdates): void {
+  if (body.difficulty === undefined || body.difficulty === run.difficulty) return;
+  if (!isRunDifficulty(body.difficulty)) {
+    throw new AdminValidationError('INVALID_DIFFICULTY', 'Dificultad inválida. Debe ser: easy, normal o hard');
+  }
+  updates.difficulty = body.difficulty;
+}
+
+function applyRunDeadline(body: RunUpdateBody, run: RunCurrent, updates: RunUpdates): void {
+  if (body.deadlineMinutes === undefined || body.deadlineMinutes === run.deadlineMinutes) return;
+  if (body.deadlineMinutes <= 0) {
+    throw new AdminValidationError('INVALID_DEADLINE', 'La duración debe ser mayor que 0');
+  }
+  updates.deadlineMinutes = body.deadlineMinutes;
+}
+
+function applyRunRevision(body: RunUpdateBody, run: RunCurrent, updates: RunUpdates): void {
+  if (body.revision === undefined || body.revision === run.revision) return;
+  if (body.revision < 1) {
+    throw new AdminValidationError('INVALID_REVISION', 'La revisión debe ser mayor que 0');
+  }
+  updates.revision = body.revision;
+}
+
+function computeRunUpdates(body: RunUpdateBody, run: RunCurrent): RunUpdates {
+  const updates: RunUpdates = {};
+  applyRunStatus(body, run, updates);
+  applyRunDifficulty(body, run, updates);
+  applyRunDeadline(body, run, updates);
+  applyRunRevision(body, run, updates);
+  if (Object.keys(updates).length === 0) {
+    throw new AdminValidationError('NO_CHANGES', 'No hay cambios para actualizar');
+  }
+  return updates;
+}
+
+function aggregateDashboardMetrics(usersMetrics: UsersMetricsRow[], runsMetrics: RunsMetricsRow[], aiMetrics: IAMetricsRow[]) {
+  const usersTotal = usersMetrics.reduce((sum, r) => sum + (r.userCount || 0), 0);
+  const usersActive24h = usersMetrics.reduce((sum, r) => sum + (r.activeSessions || 0), 0);
+  const runsTotal = runsMetrics.reduce((sum, r) => sum + (r.count || 0), 0);
+  const runsActive = runsMetrics.find(r => r.status === 'active')?.count ?? 0;
+
+  // Métricas de IA
+  let aiTokensTotal = 0;
+  let aiErrors = 0;
+  let aiRequests = 0;
+  for (const row of aiMetrics) {
+    aiTokensTotal += row.totalTokens || 0;
+    aiErrors += row.errorCount || 0;
+    aiRequests += row.requestCount || 0;
+  }
+
+  return {
+    usersTotal,
+    usersActive24h,
+    runsTotal,
+    runsActive,
+    aiTokensUsed24h: aiTokensTotal,
+    aiErrorRate24h: aiRequests > 0 ? Math.round((aiErrors / aiRequests) * 1000) / 10 : 0,
+    byProvider: aiMetrics,
+  };
+}
+
+async function updateQuotaRow(database: Database, quotaData: QuotaInput): Promise<void> {
+  await database.orm.update(aiQuotas)
+    .set({
+      limitValue: quotaData.limitValue,
+      action: quotaData.action ?? 'deny',
+      isActive: quotaData.isActive ? 1 : 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(aiQuotas.scope, quotaData.scope),
+        quotaData.scopeValue == null
+          ? isNull(aiQuotas.scopeValue)
+          : eq(aiQuotas.scopeValue, quotaData.scopeValue),
+        eq(aiQuotas.limitType, quotaData.limitType),
+      ),
+    );
+}
+
+async function insertQuotaRow(database: Database, quotaData: QuotaInput): Promise<void> {
+  await database.orm.insert(aiQuotas).values({
+    scope: quotaData.scope,
+    scopeValue: quotaData.scopeValue ?? null,
+    limitType: quotaData.limitType,
+    limitValue: quotaData.limitValue,
+    windowSeconds: quotaData.windowSeconds ?? 3600,
+    action: quotaData.action ?? 'deny',
+    isActive: quotaData.isActive ? 1 : 0,
+  });
+}
+
+/** Responde 401 cuando el autorizador no dejó perfil admin en la request. */
+function unauthorized(reply: FastifyReply) {
+  return reply.code(401).send({
+    error: {
+      code: 'SESSION_REQUIRED',
+      message: 'Sesión requerida',
+    },
+  });
 }
 
 /**
@@ -42,7 +293,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     try {
       const rows = await getUsersMetrics(database);
       return reply.code(200).send(rows);
-    } catch (error) {
+    } catch {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Error obteniendo métricas de usuarios' } });
     }
   });
@@ -51,7 +302,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     try {
       const rows = await getRunsMetrics(database);
       return reply.code(200).send(rows);
-    } catch (error) {
+    } catch {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Error obteniendo métricas de partidas' } });
     }
   });
@@ -64,35 +315,8 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
         getRunsMetrics(database),
         getIAMetrics(database),
       ]);
-
-      // Calcular totales
-      const usersTotal = usersMetrics.reduce((sum, r) => sum + (r.userCount || 0), 0);
-      const usersActive24h = usersMetrics.reduce((sum, r) => sum + (r.activeSessions || 0), 0);
-      const runsTotal = runsMetrics.reduce((sum, r) => sum + (r.count || 0), 0);
-      const runsActive = runsMetrics.find(r => r.status === 'active')?.count ?? 0;
-
-      // Métricas de IA
-      let aiTokensTotal = 0;
-      let aiErrors = 0;
-      let aiRequests = 0;
-      for (const row of aiMetrics) {
-        aiTokensTotal += row.totalTokens || 0;
-        aiErrors += row.errorCount || 0;
-        aiRequests += row.requestCount || 0;
-      }
-
-      const dashboardMetrics = {
-        usersTotal,
-        usersActive24h,
-        runsTotal,
-        runsActive,
-        aiTokensUsed24h: aiTokensTotal,
-        aiErrorRate24h: aiRequests > 0 ? Math.round((aiErrors / aiRequests) * 1000) / 10 : 0,
-        byProvider: aiMetrics,
-      };
-
-      return reply.code(200).send(dashboardMetrics);
-    } catch (error) {
+      return reply.code(200).send(aggregateDashboardMetrics(usersMetrics, runsMetrics, aiMetrics));
+    } catch {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Error obteniendo métricas' } });
     }
   });
@@ -101,15 +325,19 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     try {
       const rows = await getIAMetrics(database);
       return reply.code(200).send(rows);
-    } catch (error) {
+    } catch {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Error obteniendo métricas de IA' } });
     }
   });
 
-  app.get('/api/v1/admin/audit', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/api/v1/admin/audit', async (request: FastifyRequest<{ Querystring: AuditQuery }>, reply: FastifyReply) => {
     try {
-      const query = request.query as Record<string, string | number | undefined>;
-      const { startDate, endDate, action, page = 1, limit = 50 } = query;
+      const { startDate, endDate, action, page = 1, limit = 50 } = request.query;
+
+      const adminProfile = getAdminProfile(request);
+      if (!adminProfile) {
+        return unauthorized(reply);
+      }
 
       // Construir filtros para getAdminAudit
       const auditFilters: { startDate?: string; endDate?: string; action?: string } = {};
@@ -131,7 +359,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
 
       // Registrar acción de auditoría
       await logAdminAction(database, {
-        adminId: (request as any).adminProfile.id,
+        adminId: adminProfile.id,
         action: 'view_audit',
         targetType: 'audit_log',
         targetId: 'list',
@@ -148,7 +376,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
           hasPrevPage: currentPage > 1,
         },
       });
-    } catch (error) {
+    } catch {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Error obteniendo auditoría' } });
     }
   });
@@ -157,13 +385,13 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
   app.get('/api/v1/admin/users/:id', async (request: FastifyRequest<{ Params: AdminRouteParams }>, reply: FastifyReply) => {
     const { id } = request.params;
 
+    const adminProfile = getAdminProfile(request);
+    if (!adminProfile) {
+      return unauthorized(reply);
+    }
+
     // Obtener usuario específico usando query directo
-    const [user] = await database.orm.select({
-      id: profiles.id,
-      displayName: profiles.displayName,
-      role: profiles.role,
-      emailVerifiedAt: profiles.emailVerifiedAt,
-    }).from(profiles).where(eq(profiles.id, id)).limit(1);
+    const user = await findUserById(database, id);
 
     if (!user) {
       return reply.code(404).send({
@@ -190,7 +418,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
 
     // Registrar acción de auditoría
     await logAdminAction(database, {
-      adminId: (request as any).adminProfile.id,
+      adminId: adminProfile.id,
       action: 'view_user',
       targetType: 'user',
       targetId: id,
@@ -199,20 +427,19 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     return reply.code(200).send(transformedUser);
   });
 
-  app.patch('/api/v1/admin/users/:id', async (request: FastifyRequest<{ Params: AdminRouteParams }>, reply: FastifyReply) => {
+  app.patch('/api/v1/admin/users/:id', async (request: FastifyRequest<{ Params: AdminRouteParams; Body: UserUpdateBody }>, reply: FastifyReply) => {
     requireSuperadmin(request);
 
     const { id } = request.params;
-    const body = request.body as any;
-    const adminProfile = (request as any).adminProfile;
+    const body = request.body;
+
+    const adminProfile = getAdminProfile(request);
+    if (!adminProfile) {
+      return unauthorized(reply);
+    }
 
     // Obtener usuario actual usando query directo
-    const [user] = await database.orm.select({
-      id: profiles.id,
-      displayName: profiles.displayName,
-      role: profiles.role,
-      emailVerifiedAt: profiles.emailVerifiedAt,
-    }).from(profiles).where(eq(profiles.id, id)).limit(1);
+    const user = await findUserById(database, id);
 
     if (!user) {
       return reply.code(404).send({
@@ -224,33 +451,14 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     }
 
     // Verificar si hay cambios válidos
-    const updates: any = {};
-    if (body.displayName !== undefined && body.displayName !== user.displayName) {
-      updates.displayName = body.displayName;
-    }
-    if (body.role !== undefined && body.role !== user.role) {
-      // Validar roles permitidos
-      if (!['player', 'admin', 'superadmin'].includes(body.role)) {
-        return reply.code(400).send({
-          error: {
-            code: 'INVALID_ROLE',
-            message: 'Rol inválido. Debe ser: player, admin o superadmin',
-          },
-        });
+    let updates: UserUpdates;
+    try {
+      updates = computeUserUpdates(body, user);
+    } catch (error) {
+      if (error instanceof AdminValidationError) {
+        return reply.code(400).send({ error: { code: error.code, message: error.message } });
       }
-      updates.role = body.role;
-    }
-    if (body.emailVerified !== undefined && body.emailVerified !== !!user.emailVerifiedAt) {
-      updates.emailVerifiedAt = body.emailVerified ? new Date() : null;
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return reply.code(400).send({
-        error: {
-          code: 'NO_CHANGES',
-          message: 'No hay cambios para actualizar',
-        },
-      });
+      throw error;
     }
 
     // Guardar cambios originales para auditoría
@@ -260,12 +468,15 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     await database.orm.update(profiles).set(updates).where(eq(profiles.id, id));
 
     // Obtener usuario actualizado usando query directo
-    const [updatedUser] = await database.orm.select({
-      id: profiles.id,
-      displayName: profiles.displayName,
-      role: profiles.role,
-      emailVerifiedAt: profiles.emailVerifiedAt,
-    }).from(profiles).where(eq(profiles.id, id)).limit(1);
+    const updatedUser = await findUserById(database, id);
+    if (!updatedUser) {
+      return reply.code(404).send({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'Usuario no encontrado',
+        },
+      });
+    }
 
     // Registrar acción de auditoría
     await logAdminAction(database, {
@@ -274,14 +485,14 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       targetType: 'user',
       targetId: id,
       before: { ...beforeState },
-      after: { ...updatedUser! },
+      after: { ...updatedUser },
     });
 
     return reply.code(200).send({
-      id: updatedUser!.id,
-      displayName: updatedUser!.displayName,
-      role: updatedUser!.role,
-      emailVerified: !!updatedUser!.emailVerifiedAt,
+      id: updatedUser.id,
+      displayName: updatedUser.displayName,
+      role: updatedUser.role,
+      emailVerified: !!updatedUser.emailVerifiedAt,
       createdAt: new Date().toISOString(),
       message: 'Usuario actualizado exitosamente',
     });
@@ -289,15 +500,10 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
 
   app.delete('/api/v1/admin/users/:id/sessions', async (request: FastifyRequest<{ Params: AdminRouteParams }>, reply: FastifyReply) => {
     const userId = request.params.id;
-    const adminProfile = (request as any).adminProfile;
+    const adminProfile = getAdminProfile(request);
 
     if (!adminProfile) {
-      return reply.code(401).send({
-        error: {
-          code: 'SESSION_REQUIRED',
-          message: 'Sesión requerida',
-        },
-      });
+      return unauthorized(reply);
     }
 
     // Revocar todas las sesiones activas del usuario
@@ -308,7 +514,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
         and(
           eq(sessions.profileId, userId),
           isNull(sessions.revokedAt),
-        )
+        ),
       )
       .returning();
 
@@ -334,19 +540,13 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
   app.get('/api/v1/admin/runs/:id', async (request: FastifyRequest<{ Params: AdminRouteParams }>, reply: FastifyReply) => {
     const { id } = request.params;
 
+    const adminProfile = getAdminProfile(request);
+    if (!adminProfile) {
+      return unauthorized(reply);
+    }
+
     // Obtener partida específica usando query directo
-    const [run] = await database.orm.select({
-      id: runs.id,
-      ownerId: runs.ownerId,
-      definitionId: runs.definitionId,
-      status: runs.status,
-      difficulty: runs.difficulty,
-      deadlineMinutes: runs.deadlineMinutes,
-      revision: runs.revision,
-      engineVersion: runs.engineVersion,
-      createdAt: runs.createdAt,
-      updatedAt: runs.updatedAt,
-    }).from(runs).where(eq(runs.id, id)).limit(1);
+    const run = await findRunById(database, id);
 
     if (!run) {
       return reply.code(404).send({
@@ -358,15 +558,11 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     }
 
     // Obtener datos del propietario
-    const [owner] = await database.orm.select({
-      id: profiles.id,
-      displayName: profiles.displayName,
-      role: profiles.role,
-    }).from(profiles).where(eq(profiles.id, run.ownerId)).limit(1);
+    const owner = await findProfileNameById(database, run.ownerId);
 
     // Registrar acción de auditoría
     await logAdminAction(database, {
-      adminId: (request as any).adminProfile.id,
+      adminId: adminProfile.id,
       action: 'view_run',
       targetType: 'run',
       targetId: id,
@@ -391,26 +587,19 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     return reply.code(200).send(transformedRun);
   });
 
-  app.patch('/api/v1/admin/runs/:id', async (request: FastifyRequest<{ Params: AdminRouteParams }>, reply: FastifyReply) => {
+  app.patch('/api/v1/admin/runs/:id', async (request: FastifyRequest<{ Params: AdminRouteParams; Body: RunUpdateBody }>, reply: FastifyReply) => {
     requireSuperadmin(request);
 
     const { id } = request.params;
-    const body = request.body as any;
-    const adminProfile = (request as any).adminProfile;
+    const body = request.body;
+
+    const adminProfile = getAdminProfile(request);
+    if (!adminProfile) {
+      return unauthorized(reply);
+    }
 
     // Obtener partida actual usando query directo
-    const [run] = await database.orm.select({
-      id: runs.id,
-      ownerId: runs.ownerId,
-      definitionId: runs.definitionId,
-      status: runs.status,
-      difficulty: runs.difficulty,
-      deadlineMinutes: runs.deadlineMinutes,
-      revision: runs.revision,
-      engineVersion: runs.engineVersion,
-      createdAt: runs.createdAt,
-      updatedAt: runs.updatedAt,
-    }).from(runs).where(eq(runs.id, id)).limit(1);
+    const run = await findRunById(database, id);
 
     if (!run) {
       return reply.code(404).send({
@@ -422,60 +611,14 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     }
 
     // Verificar si hay cambios válidos
-    const updates: any = {};
-    if (body.status !== undefined && body.status !== run.status) {
-      // Validar estados permitidos
-      if (!['active', 'closed'].includes(body.status)) {
-        return reply.code(400).send({
-          error: {
-            code: 'INVALID_STATUS',
-            message: 'Estado inválido. Debe ser: active o closed',
-          },
-        });
+    let updates: RunUpdates;
+    try {
+      updates = computeRunUpdates(body, run);
+    } catch (error) {
+      if (error instanceof AdminValidationError) {
+        return reply.code(400).send({ error: { code: error.code, message: error.message } });
       }
-      updates.status = body.status;
-    }
-    if (body.difficulty !== undefined && body.difficulty !== run.difficulty) {
-      if (!['easy', 'normal', 'hard'].includes(body.difficulty)) {
-        return reply.code(400).send({
-          error: {
-            code: 'INVALID_DIFFICULTY',
-            message: 'Dificultad inválida. Debe ser: easy, normal o hard',
-          },
-        });
-      }
-      updates.difficulty = body.difficulty;
-    }
-    if (body.deadlineMinutes !== undefined && body.deadlineMinutes !== run.deadlineMinutes) {
-      if (body.deadlineMinutes <= 0) {
-        return reply.code(400).send({
-          error: {
-            code: 'INVALID_DEADLINE',
-            message: 'La duración debe ser mayor que 0',
-          },
-        });
-      }
-      updates.deadlineMinutes = body.deadlineMinutes;
-    }
-    if (body.revision !== undefined && body.revision !== run.revision) {
-      if (body.revision < 1) {
-        return reply.code(400).send({
-          error: {
-            code: 'INVALID_REVISION',
-            message: 'La revisión debe ser mayor que 0',
-          },
-        });
-      }
-      updates.revision = body.revision;
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return reply.code(400).send({
-        error: {
-          code: 'NO_CHANGES',
-          message: 'No hay cambios para actualizar',
-        },
-      });
+      throw error;
     }
 
     // Guardar cambios originales para auditoría
@@ -485,18 +628,15 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     await database.orm.update(runs).set(updates).where(eq(runs.id, id));
 
     // Obtener partida actualizada usando query directo
-    const [updatedRun] = await database.orm.select({
-      id: runs.id,
-      ownerId: runs.ownerId,
-      definitionId: runs.definitionId,
-      status: runs.status,
-      difficulty: runs.difficulty,
-      deadlineMinutes: runs.deadlineMinutes,
-      revision: runs.revision,
-      engineVersion: runs.engineVersion,
-      createdAt: runs.createdAt,
-      updatedAt: runs.updatedAt,
-    }).from(runs).where(eq(runs.id, id)).limit(1);
+    const updatedRun = await findRunById(database, id);
+    if (!updatedRun) {
+      return reply.code(404).send({
+        error: {
+          code: 'RUN_NOT_FOUND',
+          message: 'Partida no encontrada',
+        },
+      });
+    }
 
     // Registrar acción de auditoría
     await logAdminAction(database, {
@@ -505,11 +645,11 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
       targetType: 'run',
       targetId: id,
       before: { id: beforeState.id, ownerId: beforeState.ownerId, definitionId: beforeState.definitionId, status: beforeState.status, difficulty: beforeState.difficulty, deadlineMinutes: beforeState.deadlineMinutes, revision: beforeState.revision, engineVersion: beforeState.engineVersion },
-      after: { id: updatedRun!.id, ownerId: updatedRun!.ownerId, definitionId: updatedRun!.definitionId, status: updatedRun!.status, difficulty: updatedRun!.difficulty, deadlineMinutes: updatedRun!.deadlineMinutes, revision: updatedRun!.revision, engineVersion: updatedRun!.engineVersion },
+      after: { id: updatedRun.id, ownerId: updatedRun.ownerId, definitionId: updatedRun.definitionId, status: updatedRun.status, difficulty: updatedRun.difficulty, deadlineMinutes: updatedRun.deadlineMinutes, revision: updatedRun.revision, engineVersion: updatedRun.engineVersion },
     });
 
     return reply.code(200).send({
-      id: updatedRun!.id,
+      id: updatedRun.id,
       message: 'Partida actualizada exitosamente',
       changes: { ...updates } as Record<string, unknown>,
     });
@@ -517,23 +657,14 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
 
   app.delete('/api/v1/admin/runs/:id/sessions', async (request: FastifyRequest<{ Params: AdminRouteParams }>, reply: FastifyReply) => {
     const runId = request.params.id;
-    const adminProfile = (request as any).adminProfile;
+    const adminProfile = getAdminProfile(request);
 
     if (!adminProfile) {
-      return reply.code(401).send({
-        error: {
-          code: 'SESSION_REQUIRED',
-          message: 'Sesión requerida',
-        },
-      });
+      return unauthorized(reply);
     }
 
     // Verificar partida existe usando query directo
-    const [run] = await database.orm.select({
-      id: runs.id,
-      ownerId: runs.ownerId,
-      status: runs.status,
-    }).from(runs).where(eq(runs.id, runId)).limit(1);
+    const run = await findRunById(database, runId);
 
     if (!run) {
       return reply.code(404).send({
@@ -575,16 +706,21 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     try {
       const quotas = await getAIQuotas(database);
       return reply.code(200).send(quotas);
-    } catch (error) {
+    } catch {
       return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Error obteniendo cuotas IA' } });
     }
   });
 
-  app.patch('/api/v1/admin/ai/quotas', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.patch('/api/v1/admin/ai/quotas', async (request: FastifyRequest<{ Body: QuotasUpdateBody }>, reply: FastifyReply) => {
     requireSuperadmin(request);
 
-    const body = request.body as any;
-    const adminProfile = (request as any).adminProfile;
+    const body = request.body;
+
+    const adminProfile = getAdminProfile(request);
+    if (!adminProfile) {
+      return unauthorized(reply);
+    }
+
     const { quotas } = body;
 
     if (!quotas || !Array.isArray(quotas)) {
@@ -597,31 +733,18 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
     }
 
     // Validar y actualizar cada cuota
-    const updatedQuotas: Record<string, unknown>[] = [];
+    const updatedQuotas: QuotaInput[] = [];
     for (const quotaData of quotas) {
       // Buscar cuota existente
       const existing = quotas.find(q => q.scope === quotaData.scope && q.scopeValue === quotaData.scopeValue && q.limitType === quotaData.limitType);
 
       if (existing) {
         // Actualizar cuota existente
-        await database.orm.update(aiQuotas)
-          .set({
-            limitValue: quotaData.limitValue,
-            action: quotaData.action ?? 'deny',
-            isActive: quotaData.isActive ? 1 : 0,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(aiQuotas.scope, quotaData.scope),
-              eq(aiQuotas.scopeValue, quotaData.scopeValue),
-              eq(aiQuotas.limitType, quotaData.limitType)
-            )
-          );
+        await updateQuotaRow(database, quotaData);
         updatedQuotas.push({ ...existing, ...quotaData });
       } else {
         // Crear nueva cuota (solo scopes globales o user)
-        if (!['user', 'global', 'ip', 'function', 'model', 'provider'].includes(quotaData.scope)) {
+        if (!isQuotaScope(quotaData.scope)) {
           return reply.code(400).send({
             error: {
               code: 'INVALID_SCOPE',
@@ -629,15 +752,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AppConfig, dat
             },
           });
         }
-        await database.orm.insert(aiQuotas).values({
-          scope: quotaData.scope,
-          scopeValue: quotaData.scopeValue,
-          limitType: quotaData.limitType,
-          limitValue: quotaData.limitValue,
-          windowSeconds: quotaData.windowSeconds ?? 3600,
-          action: quotaData.action ?? 'deny',
-          isActive: quotaData.isActive ? 1 : 0,
-        });
+        await insertQuotaRow(database, quotaData);
         updatedQuotas.push(quotaData);
       }
     }
