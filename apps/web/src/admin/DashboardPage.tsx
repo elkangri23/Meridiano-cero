@@ -16,7 +16,7 @@ export function DashboardPage() {
     startDate: string | undefined;
     endDate: string | undefined;
     action: string | undefined;
-  }>({});
+  }>({ startDate: undefined, endDate: undefined, action: undefined });
 
   const [auditLoading, setAuditLoading] = useState(true);
   const [auditError, setAuditError] = useState<string | null>(null);

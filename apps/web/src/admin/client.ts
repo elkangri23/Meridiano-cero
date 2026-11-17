@@ -57,7 +57,7 @@ export const adminApi = {
     return request('/admin/ai/metrics');
   },
 
-  async getAuditLog(filters?: { startDate?: string; endDate?: string; action?: string }): Promise<{ logs: AdminAuditLogEntry[]; total: number }> {
+  async getAuditLog(filters?: { startDate: string | undefined; endDate: string | undefined; action: string | undefined }): Promise<{ logs: AdminAuditLogEntry[]; total: number }> {
     const params = new URLSearchParams();
     if (filters?.startDate) params.set('startDate', filters.startDate);
     if (filters?.endDate) params.set('endDate', filters.endDate);
