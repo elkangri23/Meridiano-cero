@@ -3,7 +3,7 @@ import './AdminLayout.css';
 
 /**
  * Layout principal del panel de administración.
- * Diseñado para seguir el estilo visual de Meridiano-cero (MS-DOS).
+ * Mismo aspecto visual que la aplicación de los jugadores (rediseño A2).
  */
 export function AdminLayout() {
   const location = useLocation();
@@ -32,26 +32,28 @@ export function AdminLayout() {
         </div>
       </header>
 
-      <nav className="admin-sidebar" aria-label="Navegación del panel">
-        <ul className="admin-nav-list">
-          {navItems.map((item) => (
-            <li key={item.path}>
-              <Link
-                to={item.path}
-                className={`admin-nav-link ${location.pathname === item.path ? 'active' : ''}`}
-                aria-current={location.pathname === item.path ? 'page' : undefined}
-              >
-                <span className="admin-nav-icon" aria-hidden="true">{item.icon}</span>
-                <span className="admin-nav-label">{item.label}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <div className="admin-body">
+        <nav className="admin-sidebar" aria-label="Navegación del panel">
+          <ul className="admin-nav-list">
+            {navItems.map((item) => (
+              <li key={item.path}>
+                <Link
+                  to={item.path}
+                  className={`admin-nav-link ${location.pathname === item.path ? 'active' : ''}`}
+                  aria-current={location.pathname === item.path ? 'page' : undefined}
+                >
+                  <span className="admin-nav-icon" aria-hidden="true">{item.icon}</span>
+                  <span className="admin-nav-label">{item.label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-      <main className="admin-main">
-        <Outlet />
-      </main>
+        <main className="admin-main">
+          <Outlet />
+        </main>
+      </div>
 
       <footer className="admin-footer">
         <span>Meridiano-cero v{import.meta.env.VITE_APP_VERSION ?? 'beta'}</span>

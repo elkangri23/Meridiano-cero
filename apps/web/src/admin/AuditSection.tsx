@@ -48,7 +48,7 @@ export function AuditSection() {
   }, [JSON.stringify(auditFilters)]);
 
   return (
-    <section className="audit-section" style={{ marginTop: '32px' }}>
+    <section className="audit-section">
       <h3>📋 Auditoría de Acciones Administrativas</h3>
 
       <AuditFilters
