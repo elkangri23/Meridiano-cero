@@ -340,26 +340,26 @@ export function DashboardPage() {
 
           {!auditLoading && !auditError && (
             <div style={{ padding: '16px' }}>
-              <style>
+              <style>{`
                 .audit-table th {
                   background: #0000aa;
                   color: #fff;
                   padding: 8px 12px;
-                  fontFamily: "'Courier New', monospace";
-                  fontSize: 12px;
+                  font-family: 'Courier New', monospace;
+                  font-size: 12px;
                   border-bottom: 1px solid #333;
                 }
                 .audit-table td {
                   color: #fff;
                   padding: 8px 12px;
-                  fontFamily: "'Courier New', monospace";
-                  fontSize: 12px;
+                  font-family: 'Courier New', monospace;
+                  font-size: 12px;
                   border-bottom: 1px solid #333;
                 }
                 .audit-table tr:hover {
                   background: rgba(255, 255, 85, 0.05);
                 }
-              </style>
+              `}</style>
               <table className="audit-table">
                 <thead>
                   <tr>
