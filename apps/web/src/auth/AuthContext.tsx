@@ -3,7 +3,7 @@ import { archiveApi } from '../archive/client.js';
 
 /**
  * Perfil con rol (extendido para soportar admin/superadmin).
- * El contrato original SessionDto.solo tiene role: 'player'.
+ * SessionDto ya admite 'player' | 'admin' | 'superadmin' en el contrato.
  */
 interface ProfileWithRole {
   id: string;
@@ -42,9 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const controller = new AbortController();
     archiveApi.me(controller.signal)
       .then((data) => {
-        // El API devuelve SessionDto con role: 'player', pero el backend ahora
-        // devuelve el rol como string (player|admin|superadmin). Casteamos
-        // para trabajar con el rol extendido.
+        // SessionDto ya tipa el rol como 'player' | 'admin' | 'superadmin';
+        // el cast solo cubre que el perfil pueda venir sin rol (defensa).
         const rawSession = data as { profile: ProfileWithRole | null; csrfToken: string } | null;
         const profile = rawSession?.profile ? {
           id: rawSession.profile.id,

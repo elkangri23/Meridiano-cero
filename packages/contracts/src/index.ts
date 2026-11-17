@@ -350,7 +350,7 @@ export interface RunSummaryDto {
 export interface RunListDto { profileId: string; items: RunSummaryDto[]; nextCursor: string | null }
 
 export interface SessionDto {
-  profile: { id: string; displayName: string; role: 'player'; emailVerified: boolean };
+  profile: { id: string; displayName: string; role: 'player' | 'admin' | 'superadmin'; emailVerified: boolean };
   csrfToken: string;
 }
 
@@ -365,7 +365,7 @@ function shortText(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 160;
 }
 function profile(value: unknown): value is SessionDto['profile'] {
-  return dtoRecord(value, 'displayName,emailVerified,id,role') && uuid(value.id) && shortText(value.displayName) && value.role === 'player' && typeof value.emailVerified === 'boolean';
+  return dtoRecord(value, 'displayName,emailVerified,id,role') && uuid(value.id) && shortText(value.displayName) && (value.role === 'player' || value.role === 'admin' || value.role === 'superadmin') && typeof value.emailVerified === 'boolean';
 }
 export function isSessionDto(value: unknown): value is SessionDto {
   return dtoRecord(value, 'csrfToken,profile') && profile(value.profile) &&
