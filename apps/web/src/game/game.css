@@ -486,6 +486,9 @@ html.game-high-contrast .game-route-city,
 html.game-high-contrast .game-route-panel,
 html.game-high-contrast .game-truth-details,
 html.game-high-contrast .game-evidence-card { background:var(--panel); }
+html.game-high-contrast .game-score-part,
+html.game-high-contrast .game-timeline-item,
+html.game-high-contrast .game-route-city { color:var(--paper); }
 html.game-high-contrast .game-score-part[aria-pressed="true"] { background:var(--gold-bg); }
 html.game-high-contrast .game-timeline-item[aria-pressed="true"] { background:var(--gold-bg); }
 html.game-high-contrast .game-route-city[aria-expanded="true"] { background:var(--teal-bg); }
