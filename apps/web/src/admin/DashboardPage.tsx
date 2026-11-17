@@ -13,9 +13,9 @@ export function DashboardPage() {
 
   // Filtros de auditoría
   const [auditFilters, setAuditFilters] = useState<{
-    startDate?: string;
-    endDate?: string;
-    action?: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    action: string | undefined;
   }>({});
 
   const [auditLoading, setAuditLoading] = useState(true);
@@ -70,7 +70,7 @@ export function DashboardPage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setAuditError(e.message);
+          setAuditError(e instanceof Error ? e.message : 'Error desconocido');
           setAuditLoading(false);
         }
       }
@@ -374,7 +374,7 @@ export function DashboardPage() {
                 <tbody>
                   {auditData.length === 0 && (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', color: '#666' }}>
+                      <td colSpan={6} style={{ textAlign: 'center', color: '#666' }}>
                         No hay entradas de auditoría con los filtros aplicados
                       </td>
                     </tr>
